@@ -1,0 +1,28 @@
+
+--- BENCH REDIS PIPELINE 1 START ---
+
+--- REAL REDIS ---
+31889:C 04 Nov 13:14:02.373 # oO0OoO0OoO0Oo Redis is starting oO0OoO0OoO0Oo
+31889:C 04 Nov 13:14:02.373 # Redis version=4.0.2, bits=64, commit=00000000, modified=0, pid=31889, just started
+31889:C 04 Nov 13:14:02.373 # Configuration loaded
+31889:M 04 Nov 13:14:02.374 * Increased maximum number of open files to 10032 (it was originally set to 1024).
+31889:M 04 Nov 13:14:02.374 * Running mode=standalone, port=6392.
+31889:M 04 Nov 13:14:02.374 # WARNING: The TCP backlog setting of 511 cannot be enforced because /proc/sys/net/core/somaxconn is set to the lower value of 128.
+31889:M 04 Nov 13:14:02.374 # Server initialized
+31889:M 04 Nov 13:14:02.374 # WARNING overcommit_memory is set to 0! Background save may fail under low memory condition. To fix this issue add 'vm.overcommit_memory = 1' to /etc/sysctl.conf and then reboot or run the command 'sysctl vm.overcommit_memory=1' for this to take effect.
+31889:M 04 Nov 13:14:02.374 # WARNING you have Transparent Huge Pages (THP) support enabled in your kernel. This will create latency and memory usage issues with Redis. To fix this issue run the command 'echo never > /sys/kernel/mm/transparent_hugepage/enabled' as root, and add it to your /etc/rc.local in order to retain the setting after a reboot. Redis must be restarted after THP is disabled.
+31889:M 04 Nov 13:14:02.374 * Ready to accept connections
+*** 50 connections, 1000000 commands, 1 commands pipeline
+PING_INLINE: -nanPING_INLINE: 171620.00PING_INLINE: 175064.00PING_INLINE: 175986.67PING_INLINE: 176586.00PING_INLINE: 176886.41PING_INLINE: 177081.33PING_INLINE: 177301.14PING_INLINE: 177444.50PING_INLINE: 177331.11PING_INLINE: 177247.20PING_INLINE: 177178.91PING_INLINE: 177169.00PING_INLINE: 177084.31PING_INLINE: 177083.72PING_INLINE: 177058.67PING_INLINE: 177036.50PING_INLINE: 177041.17PING_INLINE: 177017.11PING_INLINE: 177013.69PING_INLINE: 177009.80PING_INLINE: 177003.81PING_INLINE: 177004.36PING_INLINE: 176991.14 requests per second
+
+--- DONE ---
+
+--- EVIO REDIS CLONE ---
+2017/11/04 13:14:09 redis server started on port 6393
+2017/11/04 13:14:09 redis server started at socket
+*** 50 connections, 1000000 commands, 1 commands pipeline
+PING_INLINE: -nanPING_INLINE: 167180.00PING_INLINE: 173258.00PING_INLINE: 175005.33PING_INLINE: 176102.00PING_INLINE: 176358.41PING_INLINE: 176593.33PING_INLINE: 176877.72PING_INLINE: 177103.00PING_INLINE: 177186.67PING_INLINE: 177269.59PING_INLINE: 177322.19PING_INLINE: 177363.67PING_INLINE: 177420.00PING_INLINE: 177448.86PING_INLINE: 177411.73PING_INLINE: 177371.75PING_INLINE: 177334.59PING_INLINE: 177310.44PING_INLINE: 177264.62PING_INLINE: 177205.00PING_INLINE: 177171.62PING_INLINE: 177173.64PING_INLINE: 177147.92 requests per second
+
+--- DONE ---
+
+--- BENCH REDIS PIPELINE 1 DONE ---

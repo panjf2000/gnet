@@ -1,0 +1,28 @@
+
+--- BENCH REDIS PIPELINE 8 START ---
+
+--- REAL REDIS ---
+31946:C 04 Nov 13:14:16.084 # oO0OoO0OoO0Oo Redis is starting oO0OoO0OoO0Oo
+31946:C 04 Nov 13:14:16.084 # Redis version=4.0.2, bits=64, commit=00000000, modified=0, pid=31946, just started
+31946:C 04 Nov 13:14:16.084 # Configuration loaded
+31946:M 04 Nov 13:14:16.084 * Increased maximum number of open files to 10032 (it was originally set to 1024).
+31946:M 04 Nov 13:14:16.085 * Running mode=standalone, port=6392.
+31946:M 04 Nov 13:14:16.085 # WARNING: The TCP backlog setting of 511 cannot be enforced because /proc/sys/net/core/somaxconn is set to the lower value of 128.
+31946:M 04 Nov 13:14:16.085 # Server initialized
+31946:M 04 Nov 13:14:16.085 # WARNING overcommit_memory is set to 0! Background save may fail under low memory condition. To fix this issue add 'vm.overcommit_memory = 1' to /etc/sysctl.conf and then reboot or run the command 'sysctl vm.overcommit_memory=1' for this to take effect.
+31946:M 04 Nov 13:14:16.085 # WARNING you have Transparent Huge Pages (THP) support enabled in your kernel. This will create latency and memory usage issues with Redis. To fix this issue run the command 'echo never > /sys/kernel/mm/transparent_hugepage/enabled' as root, and add it to your /etc/rc.local in order to retain the setting after a reboot. Redis must be restarted after THP is disabled.
+31946:M 04 Nov 13:14:16.085 * Ready to accept connections
+*** 50 connections, 1000000 commands, 8 commands pipeline
+PING_INLINE: -nanPING_INLINE: 823072.00PING_INLINE: 859168.00PING_INLINE: 870933.31PING_INLINE: 876680.00PING_INLINE: 878734.62 requests per second
+
+--- DONE ---
+
+--- EVIO REDIS CLONE ---
+2017/11/04 13:14:18 redis server started on port 6393
+2017/11/04 13:14:18 redis server started at socket
+*** 50 connections, 1000000 commands, 8 commands pipeline
+PING_INLINE: -nanPING_INLINE: 1284896.00PING_INLINE: 1284144.00PING_INLINE: 1285141.38PING_INLINE: 1285347.00 requests per second
+
+--- DONE ---
+
+--- BENCH REDIS PIPELINE 8 DONE ---

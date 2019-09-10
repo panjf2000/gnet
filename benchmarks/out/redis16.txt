@@ -1,0 +1,28 @@
+
+--- BENCH REDIS PIPELINE 16 START ---
+
+--- REAL REDIS ---
+32002:C 04 Nov 13:14:20.410 # oO0OoO0OoO0Oo Redis is starting oO0OoO0OoO0Oo
+32002:C 04 Nov 13:14:20.410 # Redis version=4.0.2, bits=64, commit=00000000, modified=0, pid=32002, just started
+32002:C 04 Nov 13:14:20.410 # Configuration loaded
+32002:M 04 Nov 13:14:20.411 * Increased maximum number of open files to 10032 (it was originally set to 1024).
+32002:M 04 Nov 13:14:20.411 * Running mode=standalone, port=6392.
+32002:M 04 Nov 13:14:20.412 # WARNING: The TCP backlog setting of 511 cannot be enforced because /proc/sys/net/core/somaxconn is set to the lower value of 128.
+32002:M 04 Nov 13:14:20.412 # Server initialized
+32002:M 04 Nov 13:14:20.412 # WARNING overcommit_memory is set to 0! Background save may fail under low memory condition. To fix this issue add 'vm.overcommit_memory = 1' to /etc/sysctl.conf and then reboot or run the command 'sysctl vm.overcommit_memory=1' for this to take effect.
+32002:M 04 Nov 13:14:20.412 # WARNING you have Transparent Huge Pages (THP) support enabled in your kernel. This will create latency and memory usage issues with Redis. To fix this issue run the command 'echo never > /sys/kernel/mm/transparent_hugepage/enabled' as root, and add it to your /etc/rc.local in order to retain the setting after a reboot. Redis must be restarted after THP is disabled.
+32002:M 04 Nov 13:14:20.412 * Ready to accept connections
+*** 50 connections, 1000000 commands, 16 commands pipeline
+PING_INLINE: 0.00PING_INLINE: 874135.50PING_INLINE: 877221.56PING_INLINE: 877315.62PING_INLINE: 877810.12PING_INLINE: 879507.50 requests per second
+
+--- DONE ---
+
+--- EVIO REDIS CLONE ---
+2017/11/04 13:14:22 redis server started on port 6393
+2017/11/04 13:14:22 redis server started at socket
+*** 50 connections, 1000000 commands, 16 commands pipeline
+PING_INLINE: -nanPING_INLINE: 2127552.00PING_INLINE: 2123142.25 requests per second
+
+--- DONE ---
+
+--- BENCH REDIS PIPELINE 16 DONE ---
