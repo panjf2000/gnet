@@ -1,3 +1,4 @@
+// Copyright 2019 Andy Pan. All rights reserved.
 // Copyright 2017 Joshua J Baker. All rights reserved.
 // Use of this source code is governed by an MIT-style
 // license that can be found in the LICENSE file.
@@ -15,6 +16,7 @@ import (
 	"time"
 
 	"github.com/panjf2000/gnet"
+	"github.com/panjf2000/gnet/ringbuffer"
 )
 
 var res string
@@ -32,13 +34,11 @@ func main() {
 	var aaaa bool
 	var noparse bool
 	var unixsocket string
-	var stdlib bool
 
 	flag.StringVar(&unixsocket, "unixsocket", "", "unix socket")
 	flag.IntVar(&port, "port", 8080, "server port")
 	flag.BoolVar(&aaaa, "aaaa", false, "aaaaa....")
 	flag.BoolVar(&noparse, "noparse", true, "do not parse requests")
-	flag.BoolVar(&stdlib, "stdlib", false, "use stdlib")
 	flag.IntVar(&loops, "loops", 0, "num loops")
 	flag.Parse()
 
@@ -54,68 +54,52 @@ func main() {
 
 	var events gnet.Events
 	events.NumLoops = loops
-	events.Serving = func(srv gnet.Server) (action gnet.Action) {
+	events.OnInitComplete = func(srv gnet.Server) (action gnet.Action) {
 		log.Printf("http server started on port %d (loops: %d)", port, srv.NumLoops)
 		if unixsocket != "" {
 			log.Printf("http server started at %s", unixsocket)
 		}
-		if stdlib {
-			log.Printf("stdlib")
-		}
 		return
 	}
 
-	events.Opened = func(c gnet.Conn) (out []byte, opts gnet.Options, action gnet.Action) {
-		c.SetContext(&gnet.InputStream{})
-		//log.Printf("opened: laddr: %v: raddr: %v", c.LocalAddr(), c.RemoteAddr())
+	events.OnClosed = func(c gnet.Conn, err error) (action gnet.Action) {
+		log.Printf("closed: %s: %s", c.LocalAddr().String(), c.RemoteAddr().String())
 		return
 	}
 
-	events.Closed = func(c gnet.Conn, err error) (action gnet.Action) {
-		//log.Printf("closed: %s: %s", c.LocalAddr().String(), c.RemoteAddr().String())
-		return
-	}
-
-	events.Data = func(c gnet.Conn, in []byte) (out []byte, action gnet.Action) {
-		if in == nil {
-			return
-		}
-		is := c.Context().(*gnet.InputStream)
-		data := is.Begin(in)
+	events.React = func(c gnet.Conn, inBuf *ringbuffer.RingBuffer) (out []byte, action gnet.Action) {
+		n := inBuf.Length()
+		data := inBuf.Bytes()
+		defer ringbuffer.Recycle(data)
 		if noparse && bytes.Contains(data, []byte("\r\n\r\n")) {
 			// for testing minimal single packet request -> response.
 			out = appendresp(nil, "200 OK", "", res)
+			inBuf.Move(n)
 			return
 		}
 		// process the pipeline
 		var req request
-		for {
-			leftover, err := parsereq(data, &req)
-			if err != nil {
-				// bad thing happened
-				out = appendresp(out, "500 Error", "", err.Error()+"\n")
-				action = gnet.Close
-				break
-			} else if len(leftover) == len(data) {
-				// request not ready, yet
-				break
-			}
-			// handle the request
-			req.remoteAddr = c.RemoteAddr().String()
-			out = appendhandle(out, &req)
-			data = leftover
+		leftover, err := parsereq(data, &req)
+		if err != nil {
+			// bad thing happened
+			out = appendresp(out, "500 Error", "", err.Error()+"\n")
+			action = gnet.Close
+			inBuf.Move(n)
+			return
+		} else if len(leftover) == len(data) {
+			// request not ready, yet
+			return
 		}
-		is.End(data)
+		// handle the request
+		req.remoteAddr = c.RemoteAddr().String()
+		out = appendhandle(out, &req)
+		inBuf.Move(n)
 		return
 	}
-	var ssuf string
-	if stdlib {
-		ssuf = "-net"
-	}
 	// We at least want the single http address.
-	addrs := []string{fmt.Sprintf("tcp"+ssuf+"://:%d", port)}
+	addrs := []string{fmt.Sprintf("tcp"+"://:%d", port)}
 	if unixsocket != "" {
-		addrs = append(addrs, fmt.Sprintf("unix"+ssuf+"://%s", unixsocket))
+		addrs = append(addrs, fmt.Sprintf("unix"+"://%s", unixsocket))
 	}
 	// Start serving!
 	log.Fatal(gnet.Serve(events, addrs...))

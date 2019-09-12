@@ -8,21 +8,27 @@
 package gnet
 
 import (
-	"io"
+	"fmt"
 	"net"
-	"sync/atomic"
 	"time"
 
 	"github.com/panjf2000/gnet/internal"
+	"github.com/panjf2000/gnet/ringbuffer"
 	"golang.org/x/sys/unix"
 )
 
+type loop struct {
+	idx     int            // loop index in the server loops list
+	poll    *internal.Poll // epoll or kqueue
+	packet  []byte         // read packet buffer
+	fdconns map[int]*conn  // loop connections fd -> conn
+}
+
 func loopCloseConn(s *server, l *loop, c *conn, err error) error {
-	atomic.AddInt32(&l.count, -1)
 	delete(l.fdconns, c.fd)
-	unix.Close(c.fd)
-	if s.events.Closed != nil {
-		switch s.events.Closed(c, err) {
+	fmt.Printf("closing fd: %d, err: %v\n", c.fd, unix.Close(c.fd))
+	if s.events.OnClosed != nil {
+		switch s.events.OnClosed(c, err) {
 		case None:
 		case Shutdown:
 			return errClosing
@@ -32,17 +38,16 @@ func loopCloseConn(s *server, l *loop, c *conn, err error) error {
 }
 
 func loopDetachConn(s *server, l *loop, c *conn, err error) error {
-	if s.events.Detached == nil {
+	if s.events.OnDetached == nil {
 		return loopCloseConn(s, l, c, err)
 	}
 	l.poll.ModDetach(c.fd)
 
-	atomic.AddInt32(&l.count, -1)
 	delete(l.fdconns, c.fd)
 	if err := unix.SetNonblock(c.fd, false); err != nil {
 		return err
 	}
-	switch s.events.Detached(c, &detachedConn{fd: c.fd}) {
+	switch s.events.OnDetached(c, &detachedConn{fd: c.fd}) {
 	case None:
 	case Shutdown:
 		return errClosing
@@ -69,6 +74,10 @@ func loopNote(s *server, l *loop, note interface{}) error {
 			return nil // ignore stale wakes
 		}
 		return loopWake(s, l, v)
+	case *signal:
+		fmt.Printf("trigger poll: %d with c: %d\n", l.poll.GetFD(), v.fd)
+		l.poll.AddReadWrite(v.fd)
+		l.fdconns[v.fd] = v.c
 	}
 	return err
 }
@@ -93,7 +102,7 @@ func loopRun(s *server, l *loop) {
 			return loopAccept(s, l, fd)
 		case !c.opened:
 			return loopOpened(s, l, c)
-		case len(c.out) > 0:
+		case c.outBuf.Length() > 0:
 			return loopWrite(s, l, c)
 		case c.action != None:
 			return loopAction(s, l, c)
@@ -128,11 +137,16 @@ func loopAccept(s *server, l *loop, fd int) error {
 			if err := unix.SetNonblock(nfd, true); err != nil {
 				return err
 			}
-			c := &conn{fd: nfd, sa: sa, lnidx: i, loop: l}
+			c := &conn{fd: nfd,
+				sa:     sa,
+				lnidx:  i,
+				inBuf:  ringbuffer.New(RingBufferSize),
+				outBuf: ringbuffer.New(RingBufferSize),
+				loop:   l,
+			}
 			l.fdconns[c.fd] = c
 			l.poll.AddReadWrite(c.fd)
-			atomic.AddInt32(&l.count, 1)
-			break
+			return nil
 		}
 	}
 	return nil
@@ -143,7 +157,7 @@ func loopUDPRead(s *server, l *loop, lnidx, fd int) error {
 	if err != nil || n == 0 {
 		return nil
 	}
-	if s.events.Data != nil {
+	if s.events.React != nil {
 		var sa6 unix.SockaddrInet6
 		switch sa := sa.(type) {
 		case *unix.SockaddrInet4:
@@ -159,17 +173,19 @@ func loopUDPRead(s *server, l *loop, lnidx, fd int) error {
 		case *unix.SockaddrInet6:
 			sa6 = *sa
 		}
-		c := &conn{}
-		c.addrIndex = lnidx
-		c.localAddr = s.lns[lnidx].lnaddr
-		c.remoteAddr = internal.SockaddrToAddr(&sa6)
-		in := append([]byte{}, l.packet[:n]...)
-		out, action := s.events.Data(c, in)
+		c := &conn{
+			addrIndex:  lnidx,
+			localAddr:  s.lns[lnidx].lnaddr,
+			remoteAddr: internal.SockaddrToAddr(&sa6),
+			inBuf:      ringbuffer.New(RingBufferSize),
+		}
+		_, _ = c.inBuf.Write(l.packet[:n])
+		out, action := s.events.React(c, c.inBuf)
 		if len(out) > 0 {
 			if s.events.PreWrite != nil {
 				s.events.PreWrite()
 			}
-			unix.Sendto(fd, out, 0, sa)
+			sniffError(unix.Sendto(fd, out, 0, sa))
 		}
 		switch action {
 		case Shutdown:
@@ -184,19 +200,20 @@ func loopOpened(s *server, l *loop, c *conn) error {
 	c.addrIndex = c.lnidx
 	c.localAddr = s.lns[c.lnidx].lnaddr
 	c.remoteAddr = internal.SockaddrToAddr(c.sa)
-	if s.events.Opened != nil {
-		out, opts, action := s.events.Opened(c)
-		if len(out) > 0 {
-			c.out = append([]byte{}, out...)
-		}
+	if s.events.OnOpened != nil {
+		out, opts, action := s.events.OnOpened(c)
 		c.action = action
+		if len(out) > 0 {
+			_, _ = c.outBuf.Write(out)
+		}
 		if opts.TCPKeepAlive > 0 {
 			if _, ok := s.lns[c.lnidx].ln.(*net.TCPListener); ok {
-				internal.SetKeepAlive(c.fd, int(opts.TCPKeepAlive/time.Second))
+				sniffError(internal.SetKeepAlive(c.fd, int(opts.TCPKeepAlive/time.Second)))
 			}
 		}
 	}
-	if len(c.out) == 0 && c.action == None {
+	//fmt.Printf("outBuf length: %d in opened\n", c.outBuf.Length())
+	if c.outBuf.Length() == 0 && c.action == None {
 		l.poll.ModRead(c.fd)
 	}
 	return nil
@@ -206,19 +223,19 @@ func loopWrite(s *server, l *loop, c *conn) error {
 	if s.events.PreWrite != nil {
 		s.events.PreWrite()
 	}
-	n, err := unix.Write(c.fd, c.out)
+	out := c.outBuf.Bytes()
+	n, err := unix.Write(c.fd, out)
 	if err != nil {
 		if err == unix.EAGAIN {
 			return nil
 		}
+		fmt.Println("closing in write")
 		return loopCloseConn(s, l, c, err)
 	}
-	if n == len(c.out) {
-		c.out = nil
-	} else {
-		c.out = c.out[n:]
-	}
-	if len(c.out) == 0 && c.action == None {
+	c.outBuf.Move(n)
+	ringbuffer.Recycle(out)
+	//fmt.Printf("c: %d, writing data length: %d", c.fd, n)
+	if c.outBuf.Length() == 0 && c.action == None {
 		l.poll.ModRead(c.fd)
 	}
 	return nil
@@ -235,88 +252,48 @@ func loopAction(s *server, l *loop, c *conn) error {
 	case Detach:
 		return loopDetachConn(s, l, c, nil)
 	}
-	if len(c.out) == 0 && c.action == None {
+	if c.outBuf.Length() == 0 && c.action == None {
 		l.poll.ModRead(c.fd)
 	}
 	return nil
 }
 
 func loopWake(s *server, l *loop, c *conn) error {
-	if s.events.Data == nil {
+	if s.events.React == nil {
 		return nil
 	}
-	out, action := s.events.Data(c, nil)
+	out, action := s.events.React(c, c.inBuf)
 	c.action = action
 	if len(out) > 0 {
-		c.out = append([]byte{}, out...)
+		_, _ = c.outBuf.Write(out)
 	}
-	if len(c.out) != 0 || c.action != None {
+	if c.outBuf.Length() != 0 || c.action != None {
 		l.poll.ModReadWrite(c.fd)
 	}
 	return nil
 }
 
 func loopRead(s *server, l *loop, c *conn) error {
-	var in []byte
 	n, err := unix.Read(c.fd, l.packet)
 	if n == 0 || err != nil {
 		if err == unix.EAGAIN {
 			return nil
 		}
+		fmt.Printf("closing in read, conn: %d, err: %v\n", c.fd, err)
 		return loopCloseConn(s, l, c, err)
 	}
 
-	in = l.packet[:n]
-	in = append([]byte{}, in...)
-
-	if s.events.Data != nil {
-		out, action := s.events.Data(c, in)
+	_, _ = c.inBuf.Write(l.packet[:n])
+	if s.events.React != nil {
+		out, action := s.events.React(c, c.inBuf)
 		c.action = action
 		if len(out) > 0 {
-			c.out = append([]byte{}, out...)
+			_, _ = c.outBuf.Write(out)
 		}
 	}
-	if len(c.out) != 0 || c.action != None {
+	//fmt.Printf("c: %d, outBuf length %d in read", c.fd, c.outBuf.Length())
+	if c.outBuf.Length() != 0 || c.action != None {
 		l.poll.ModReadWrite(c.fd)
 	}
 	return nil
-}
-
-type detachedConn struct {
-	fd int
-}
-
-func (c *detachedConn) Close() error {
-	err := unix.Close(c.fd)
-	if err != nil {
-		return err
-	}
-	c.fd = -1
-	return nil
-}
-
-func (c *detachedConn) Read(p []byte) (n int, err error) {
-	n, err = unix.Read(c.fd, p)
-	if err != nil {
-		return n, err
-	}
-	if n == 0 {
-		if len(p) == 0 {
-			return 0, nil
-		}
-		return 0, io.EOF
-	}
-	return n, nil
-}
-
-func (c *detachedConn) Write(p []byte) (n int, err error) {
-	n = len(p)
-	for len(p) > 0 {
-		nn, err := unix.Write(c.fd, p)
-		if err != nil {
-			return n, err
-		}
-		p = p[nn:]
-	}
-	return n, nil
 }

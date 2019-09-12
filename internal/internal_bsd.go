@@ -16,6 +16,10 @@ type Poll struct {
 	notes   noteQueue
 }
 
+func (p *Poll) GetFD() int {
+	return p.fd
+}
+
 // OpenPoll ...
 func OpenPoll() *Poll {
 	l := new(Poll)
@@ -53,7 +57,7 @@ func (p *Poll) Trigger(note interface{}) error {
 }
 
 // Polling ...
-func (p *Poll) Wait(iter func(fd int, note interface{}) error) error {
+func (p *Poll) Polling(iter func(fd int, note interface{}) error) error {
 	events := make([]unix.Kevent_t, 128)
 	for {
 		n, err := unix.Kevent(p.fd, p.changes, events, nil)

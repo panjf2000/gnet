@@ -8,6 +8,8 @@
 package gnet
 
 import (
+	"fmt"
+	"log"
 	"net"
 	"os"
 	"runtime"
@@ -20,49 +22,15 @@ import (
 	"github.com/panjf2000/gnet/internal"
 )
 
-type conn struct {
-	fd         int           // file descriptor
-	lnidx      int           // listener index in the server lns list
-	out        []byte        // write buffer
-	sa         unix.Sockaddr // remote socket address
-	opened     bool          // connection opened event fired
-	action     Action        // next user action
-	ctx        interface{}   // user-defined context
-	addrIndex  int           // index of listening address
-	localAddr  net.Addr      // local addre
-	remoteAddr net.Addr      // remote addr
-	loop       *loop         // connected loop
-}
-
-func (c *conn) Context() interface{}       { return c.ctx }
-func (c *conn) SetContext(ctx interface{}) { c.ctx = ctx }
-func (c *conn) AddrIndex() int             { return c.addrIndex }
-func (c *conn) LocalAddr() net.Addr        { return c.localAddr }
-func (c *conn) RemoteAddr() net.Addr       { return c.remoteAddr }
-func (c *conn) Wake() {
-	if c.loop != nil {
-		c.loop.poll.Trigger(c)
-	}
-}
-
 type server struct {
 	events   Events // user events
 	mainLoop *loop
 	loops    []*loop            // all the loops
+	numLoops int                // number of loops
 	lns      []*listener        // all the listeners
 	wg       sync.WaitGroup     // loop close waitgroup
 	cond     *sync.Cond         // shutdown signaler
-	balance  LoadBalance        // load balancing method
-	accepted uintptr            // accept counter
 	tch      chan time.Duration // ticker channel
-}
-
-type loop struct {
-	idx     int            // loop index in the server loops list
-	poll    *internal.Poll // epoll or kqueue
-	packet  []byte         // read packet buffer
-	fdconns map[int]*conn  // loop connections fd -> conn
-	count   int32          // connection count
 }
 
 // waitForShutdown waits for a signal to shutdown
@@ -94,17 +62,16 @@ func serve(events Events, listeners []*listener, reusePort bool) error {
 	s.events = events
 	s.lns = listeners
 	s.cond = sync.NewCond(&sync.Mutex{})
-	s.balance = events.LoadBalance
 	s.tch = make(chan time.Duration)
 
-	if s.events.Serving != nil {
+	if s.events.OnInitComplete != nil {
 		var svr Server
 		svr.NumLoops = numLoops
 		svr.Addrs = make([]net.Addr, len(listeners))
 		for i, ln := range listeners {
 			svr.Addrs[i] = ln.lnaddr
 		}
-		action := s.events.Serving(svr)
+		action := s.events.OnInitComplete(svr)
 		switch action {
 		case None:
 		case Shutdown:
@@ -118,10 +85,10 @@ func serve(events Events, listeners []*listener, reusePort bool) error {
 
 		// notify all loops to close by closing all listeners
 		for _, l := range s.loops {
-			l.poll.Trigger(errClosing)
+			sniffError(l.poll.Trigger(errClosing))
 		}
 		if s.mainLoop != nil {
-			s.mainLoop.poll.Trigger(errClosing)
+			sniffError(s.mainLoop.poll.Trigger(errClosing))
 		}
 
 		// wait on all loops to complete reading events
@@ -130,9 +97,9 @@ func serve(events Events, listeners []*listener, reusePort bool) error {
 		// close loops and all outstanding connections
 		for _, l := range s.loops {
 			for _, c := range l.fdconns {
-				loopCloseConn(s, l, c, nil)
+				sniffError(loopCloseConn(s, l, c, nil))
 			}
-			l.poll.Close()
+			sniffError(l.poll.Close())
 		}
 	}()
 
@@ -158,26 +125,31 @@ func activateLoops(s *server, numLoops int) {
 		}
 		s.loops = append(s.loops, l)
 	}
+	s.numLoops = len(s.loops)
 	// start loops in background
-	s.wg.Add(len(s.loops))
+	s.wg.Add(s.numLoops)
 	for _, l := range s.loops {
 		go loopRun(s, l)
 	}
 }
 
 func activateReactors(s *server, numLoops int) {
+	if numLoops == 1 {
+		numLoops = 2
+	}
 	s.wg.Add(numLoops)
 
 	l := &loop{
-		idx:     -1,
-		poll:    internal.OpenPoll(),
-		fdconns: make(map[int]*conn),
+		idx:  -1,
+		poll: internal.OpenPoll(),
 	}
+	fmt.Printf("main reactor epoll: %d\n", l.poll.GetFD())
 	for _, ln := range s.lns {
 		l.poll.AddRead(ln.fd)
 	}
 	s.mainLoop = l
-	go activateMainReactor(s, l)
+	// start main reactor...
+	go activateMainReactor(s)
 
 	for i := 0; i < numLoops-1; i++ {
 		l := &loop{
@@ -186,13 +158,11 @@ func activateReactors(s *server, numLoops int) {
 			packet:  make([]byte, 0xFFFF),
 			fdconns: make(map[int]*conn),
 		}
-		for _, ln := range s.lns {
-			l.poll.AddRead(ln.fd)
-		}
+		fmt.Printf("sub reactor: %d epoll: %d\n", i, l.poll.GetFD())
 		s.loops = append(s.loops, l)
-
 	}
-
+	s.numLoops = len(s.loops)
+	// start sub reactors...
 	for _, l := range s.loops {
 		go activateSubReactor(s, l)
 	}
@@ -200,19 +170,19 @@ func activateReactors(s *server, numLoops int) {
 
 func (ln *listener) close() {
 	if ln.fd != 0 {
-		unix.Close(ln.fd)
+		sniffError(unix.Close(ln.fd))
 	}
 	if ln.f != nil {
-		ln.f.Close()
+		sniffError(ln.f.Close())
 	}
 	if ln.ln != nil {
-		ln.ln.Close()
+		sniffError(ln.ln.Close())
 	}
 	if ln.pconn != nil {
-		ln.pconn.Close()
+		sniffError(ln.pconn.Close())
 	}
 	if ln.network == "unix" {
-		os.RemoveAll(ln.addr)
+		sniffError(os.RemoveAll(ln.addr))
 	}
 }
 
@@ -237,6 +207,12 @@ func (ln *listener) system() error {
 	}
 	ln.fd = int(ln.f.Fd())
 	return unix.SetNonblock(ln.fd, true)
+}
+
+func sniffError(err error) {
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 func reuseportListenPacket(proto, addr string) (l net.PacketConn, err error) {

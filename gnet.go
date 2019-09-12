@@ -12,6 +12,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/panjf2000/gnet/ringbuffer"
 )
 
 var errClosing = errors.New("closing")
@@ -58,21 +60,12 @@ type Conn interface {
 	LocalAddr() net.Addr
 	// RemoteAddr is the connection's remote peer address.
 	RemoteAddr() net.Addr
-	// Wake triggers a Data event for this connection.
+	// Wake triggers a React event for this connection.
 	Wake()
 }
 
 // LoadBalance sets the load balancing method.
 type LoadBalance int
-
-const (
-	// RoundRobin requests that connections are distributed to a loop in a
-	// round-robin fashion.
-	RoundRobin = iota
-	// LeastConnections assigns the next accepted connection to the loop with
-	// the least number of active connections.
-	LeastConnections
-)
 
 // Events represents the server events for the Serve call.
 // Each event has an Action return value that is used manage the state
@@ -85,36 +78,33 @@ type Events struct {
 	// will run the server single-threaded. Setting to -1 will automatically
 	// assign this value equal to runtime.NumProcs().
 	NumLoops int
-	// LoadBalance sets the load balancing method. Load balancing is always a
-	// best effort to attempt to distribute the incoming connections between
-	// multiple loops. This option is only works when NumLoops is set.
-	LoadBalance LoadBalance
-	// Serving fires when the server can accept connections. The server
+	// OnInitComplete fires when the server can accept connections. The server
 	// parameter has information and various utilities.
-	Serving func(server Server) (action Action)
-	// Opened fires when a new connection has opened.
+	OnInitComplete func(server Server) (action Action)
+	// OnOpened fires when a new connection has opened.
 	// The info parameter has information about the connection such as
 	// it's local and remote address.
 	// Use the out return value to write data to the connection.
 	// The opts return value is used to set connection options.
-	Opened func(c Conn) (out []byte, opts Options, action Action)
-	// Closed fires when a connection has closed.
+	OnOpened func(c Conn) (out []byte, opts Options, action Action)
+	// OnClosed fires when a connection has closed.
 	// The err parameter is the last known connection error.
-	Closed func(c Conn, err error) (action Action)
-	// Detached fires when a connection has been previously detached.
+	OnClosed func(c Conn, err error) (action Action)
+	// OnDetached fires when a connection has been previously detached.
 	// Once detached it's up to the receiver of this event to manage the
-	// state of the connection. The Closed event will not be called for
+	// state of the connection. The OnClosed event will not be called for
 	// this connection.
 	// The conn parameter is a ReadWriteCloser that represents the
 	// underlying socket connection. It can be freely used in goroutines
 	// and should be closed when it's no longer needed.
-	Detached func(c Conn, rwc io.ReadWriteCloser) (action Action)
+	OnDetached func(c Conn, rwc io.ReadWriteCloser) (action Action)
+
 	// PreWrite fires just before any data is written to any client socket.
 	PreWrite func()
-	// Data fires when a connection sends the server data.
+	// React fires when a connection sends the server data.
 	// The in parameter is the incoming data.
 	// Use the out return value to write data to the connection.
-	Data func(c Conn, in []byte) (out []byte, action Action)
+	React func(c Conn, inBuf *ringbuffer.RingBuffer) (out []byte, action Action)
 	// Tick fires immediately after the server starts and will fire again
 	// following the duration specified by the delay return value.
 	Tick func() (delay time.Duration, action Action)
@@ -147,7 +137,7 @@ func Serve(events Events, addr ...string) error {
 		var ln listener
 		ln.network, ln.addr, ln.opts = parseAddr(addr)
 		if ln.network == "unix" {
-			os.RemoveAll(ln.addr)
+			sniffError(os.RemoveAll(ln.addr))
 		}
 		reusePort = reusePort || ln.opts.reusePort
 		var err error
@@ -178,32 +168,6 @@ func Serve(events Events, addr ...string) error {
 		lns = append(lns, &ln)
 	}
 	return serve(events, lns, reusePort)
-}
-
-// InputStream is a helper type for managing input streams from inside
-// the Data event.
-type InputStream struct{ b []byte }
-
-// Begin accepts a new packet and returns a working sequence of
-// unprocessed bytes.
-func (is *InputStream) Begin(packet []byte) (data []byte) {
-	data = packet
-	if len(is.b) > 0 {
-		is.b = append(is.b, data...)
-		data = is.b
-	}
-	return data
-}
-
-// End shifts the stream to match the unprocessed data.
-func (is *InputStream) End(data []byte) {
-	if len(data) > 0 {
-		if len(data) != len(is.b) {
-			is.b = append(is.b[:0], data...)
-		}
-	} else if len(is.b) > 0 {
-		is.b = is.b[:0]
-	}
 }
 
 type listener struct {

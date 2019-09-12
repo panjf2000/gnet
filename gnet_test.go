@@ -1,3 +1,4 @@
+// Copyright 2019 Andy Pan. All rights reserved.
 // Copyright 2017 Joshua J Baker. All rights reserved.
 // Use of this source code is governed by an MIT-style
 // license that can be found in the LICENSE file.
@@ -16,6 +17,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/panjf2000/gnet/ringbuffer"
 )
 
 func TestServe(t *testing.T) {
@@ -25,69 +28,44 @@ func TestServe(t *testing.T) {
 	// the writes to the server will be random sizes. 0KB - 1MB.
 	// the server will echo back the data.
 	// waits for graceful connection closing.
-	t.Run("stdlib", func(t *testing.T) {
-		t.Run("tcp", func(t *testing.T) {
-			t.Run("1-loop", func(t *testing.T) {
-				testServe("tcp-net", ":9997", false, 10, 1, Random)
-			})
-			t.Run("5-loop", func(t *testing.T) {
-				testServe("tcp-net", ":9998", false, 10, 5, LeastConnections)
-			})
-			t.Run("N-loop", func(t *testing.T) {
-				testServe("tcp-net", ":9999", false, 10, -1, RoundRobin)
-			})
-		})
-		t.Run("unix", func(t *testing.T) {
-			t.Run("1-loop", func(t *testing.T) {
-				testServe("tcp-net", ":9989", true, 10, 1, Random)
-			})
-			t.Run("5-loop", func(t *testing.T) {
-				testServe("tcp-net", ":9988", true, 10, 5, LeastConnections)
-			})
-			t.Run("N-loop", func(t *testing.T) {
-				testServe("tcp-net", ":9987", true, 10, -1, RoundRobin)
-			})
-		})
-	})
 	t.Run("poll", func(t *testing.T) {
 		t.Run("tcp", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe("tcp", ":9991", false, 10, 1, Random)
+				testServe("tcp", ":9991", false, 10, 1)
 			})
 			t.Run("5-loop", func(t *testing.T) {
-				testServe("tcp", ":9992", false, 10, 5, LeastConnections)
+				testServe("tcp", ":9992", false, 10, 5)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("tcp", ":9993", false, 10, -1, RoundRobin)
+				testServe("tcp", ":9993", false, 10, -1)
 			})
 		})
 		t.Run("unix", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe("tcp", ":9994", true, 10, 1, Random)
+				testServe("tcp", ":9994", true, 10, 1)
 			})
 			t.Run("5-loop", func(t *testing.T) {
-				testServe("tcp", ":9995", true, 10, 5, LeastConnections)
+				testServe("tcp", ":9995", true, 10, 5)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("tcp", ":9996", true, 10, -1, RoundRobin)
+				testServe("tcp", ":9996", true, 10, -1)
 			})
 		})
 	})
 
 }
 
-func testServe(network, addr string, unix bool, nclients, nloops int, balance LoadBalance) {
+func testServe(network, addr string, unix bool, nclients, nloops int) {
 	var started int32
 	var connected int32
 	var disconnected int32
 
 	var events Events
-	events.LoadBalance = balance
 	events.NumLoops = nloops
-	events.Serving = func(srv Server) (action Action) {
+	events.OnInitComplete = func(srv Server) (action Action) {
 		return
 	}
-	events.Opened = func(c Conn) (out []byte, opts Options, action Action) {
+	events.OnOpened = func(c Conn) (out []byte, opts Options, action Action) {
 		c.SetContext(c)
 		atomic.AddInt32(&connected, 1)
 		out = []byte("sweetness\r\n")
@@ -100,7 +78,7 @@ func testServe(network, addr string, unix bool, nclients, nloops int, balance Lo
 		}
 		return
 	}
-	events.Closed = func(c Conn, err error) (action Action) {
+	events.OnClosed = func(c Conn, err error) (action Action) {
 		if c.Context() != c {
 			panic("invalid context")
 		}
@@ -109,15 +87,19 @@ func testServe(network, addr string, unix bool, nclients, nloops int, balance Lo
 			atomic.LoadInt32(&disconnected) == int32(nclients) {
 			action = Shutdown
 		}
+		fmt.Printf("connection closing, action: %v\n", action)
 		return
 	}
-	events.Data = func(c Conn, in []byte) (out []byte, action Action) {
-		out = in
+	events.React = func(c Conn, inBuf *ringbuffer.RingBuffer) (out []byte, action Action) {
+		n := inBuf.Length()
+		out = inBuf.Bytes()
+		inBuf.Move(n)
 		return
 	}
 	events.Tick = func() (delay time.Duration, action Action) {
 		if atomic.LoadInt32(&started) == 0 {
 			for i := 0; i < nclients; i++ {
+				//fmt.Println("start client...")
 				go startClient(network, addr, nloops)
 			}
 			atomic.StoreInt32(&started, 1)
@@ -141,7 +123,6 @@ func testServe(network, addr string, unix bool, nclients, nloops int, balance Lo
 
 func startClient(network, addr string, nloops int) {
 	onetwork := network
-	network = strings.Replace(network, "-net", "", -1)
 	rand.Seed(time.Now().UnixNano())
 	c, err := net.Dial(network, addr)
 	if err != nil {
@@ -188,26 +169,16 @@ func TestTick(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		testTick("tcp", ":9991", false)
+		testTick("tcp", ":9991")
 	}()
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		testTick("tcp", ":9992", true)
-	}()
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		testTick("unix", "socket1", false)
-	}()
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		testTick("unix", "socket2", true)
+		testTick("unix", "socket1")
 	}()
 	wg.Wait()
 }
-func testTick(network, addr string, stdlib bool) {
+func testTick(network, addr string) {
 	var events Events
 	var count int
 	start := time.Now()
@@ -220,11 +191,7 @@ func testTick(network, addr string, stdlib bool) {
 		delay = time.Millisecond * 10
 		return
 	}
-	if stdlib {
-		must(Serve(events, network+"-net://"+addr))
-	} else {
-		must(Serve(events, network+"://"+addr))
-	}
+	must(Serve(events, network+"://"+addr))
 	dur := time.Since(start)
 	if dur < 250&time.Millisecond || dur > time.Second {
 		panic("bad ticker timing")
@@ -236,35 +203,25 @@ func TestShutdown(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		testShutdown("tcp", ":9991", false)
+		testShutdown("tcp", ":9991")
 	}()
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		testShutdown("tcp", ":9992", true)
-	}()
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		testShutdown("unix", "socket1", false)
-	}()
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		testShutdown("unix", "socket2", true)
+		testShutdown("unix", "socket1")
 	}()
 	wg.Wait()
 }
-func testShutdown(network, addr string, stdlib bool) {
+func testShutdown(network, addr string) {
 	var events Events
 	var count int
 	var clients int64
 	var N = 10
-	events.Opened = func(c Conn) (out []byte, opts Options, action Action) {
+	events.OnOpened = func(c Conn) (out []byte, opts Options, action Action) {
 		atomic.AddInt64(&clients, 1)
 		return
 	}
-	events.Closed = func(c Conn, err error) (action Action) {
+	events.OnClosed = func(c Conn, err error) (action Action) {
 		atomic.AddInt64(&clients, -1)
 		return
 	}
@@ -291,11 +248,7 @@ func testShutdown(network, addr string, stdlib bool) {
 		delay = time.Second / 20
 		return
 	}
-	if stdlib {
-		must(Serve(events, network+"-net://"+addr))
-	} else {
-		must(Serve(events, network+"://"+addr))
-	}
+	must(Serve(events, network+"://"+addr))
 	if clients != 0 {
 		panic("did not call close on all clients")
 	}
@@ -304,23 +257,15 @@ func testShutdown(network, addr string, stdlib bool) {
 func TestDetach(t *testing.T) {
 	t.Run("poll", func(t *testing.T) {
 		t.Run("tcp", func(t *testing.T) {
-			testDetach("tcp", ":9991", false)
+			testDetach("tcp", ":9991")
 		})
 		t.Run("unix", func(t *testing.T) {
-			testDetach("unix", "socket1", false)
-		})
-	})
-	t.Run("stdlib", func(t *testing.T) {
-		t.Run("tcp", func(t *testing.T) {
-			testDetach("tcp", ":9992", true)
-		})
-		t.Run("unix", func(t *testing.T) {
-			testDetach("unix", "socket2", true)
+			testDetach("unix", "socket1")
 		})
 	})
 }
 
-func testDetach(network, addr string, stdlib bool) {
+func testDetach(network, addr string) {
 	// we will write a bunch of data with the text "--detached--" in the
 	// middle followed by a bunch of data.
 	rand.Seed(time.Now().UnixNano())
@@ -331,19 +276,21 @@ func testDetach(network, addr string, stdlib bool) {
 	expected := []byte(string(rdat) + "--detached--" + string(rdat))
 	var cin []byte
 	var events Events
-	events.Data = func(c Conn, in []byte) (out []byte, action Action) {
-		cin = append(cin, in...)
+	events.React = func(c Conn, inBuf *ringbuffer.RingBuffer) (out []byte, action Action) {
+		n := inBuf.Length()
+		cin = append(cin, inBuf.Bytes()...)
 		if len(cin) >= len(expected) {
 			if string(cin) != string(expected) {
 				panic("mismatch client -> server")
 			}
+			inBuf.Move(n)
 			return cin, Detach
 		}
 		return
 	}
 
 	var done int64
-	events.Detached = func(c Conn, conn io.ReadWriteCloser) (action Action) {
+	events.OnDetached = func(c Conn, conn io.ReadWriteCloser) (action Action) {
 		go func() {
 			p := make([]byte, len(expected))
 			defer conn.Close()
@@ -354,7 +301,7 @@ func testDetach(network, addr string, stdlib bool) {
 		return
 	}
 
-	events.Serving = func(srv Server) (action Action) {
+	events.OnInitComplete = func(srv Server) (action Action) {
 		go func() {
 			p := make([]byte, len(expected))
 			_ = expected
@@ -378,16 +325,12 @@ func testDetach(network, addr string, stdlib bool) {
 		}
 		return
 	}
-	if stdlib {
-		must(Serve(events, network+"-net://"+addr))
-	} else {
-		must(Serve(events, network+"://"+addr))
-	}
+	must(Serve(events, network+"://"+addr))
 }
 
 func TestBadAddresses(t *testing.T) {
 	var events Events
-	events.Serving = func(srv Server) (action Action) {
+	events.OnInitComplete = func(srv Server) (action Action) {
 		return Shutdown
 	}
 	if err := Serve(events, "tulip://howdy"); err == nil {
@@ -401,65 +344,9 @@ func TestBadAddresses(t *testing.T) {
 	}
 }
 
-func TestInputStream(t *testing.T) {
-	var s InputStream
-	in := []byte("HELLO")
-	data := s.Begin(in)
-	if string(data) != string(in) {
-		t.Fatalf("expected '%v', got '%v'", in, data)
-	}
-	s.End(in[3:])
-	data = s.Begin([]byte("WLY"))
-	if string(data) != "LOWLY" {
-		t.Fatalf("expected '%v', got '%v'", "LOWLY", data)
-	}
-	s.End(nil)
-	data = s.Begin([]byte("PLAYER"))
-	if string(data) != "PLAYER" {
-		t.Fatalf("expected '%v', got '%v'", "PLAYER", data)
-	}
-}
-
-func TestReuseInputBuffer(t *testing.T) {
-	reuses := []bool{true, false}
-	for _, reuse := range reuses {
-		var events Events
-		events.Opened = func(c Conn) (out []byte, opts Options, action Action) {
-			opts.ReuseInputBuffer = reuse
-			return
-		}
-		var prev []byte
-		events.Data = func(c Conn, in []byte) (out []byte, action Action) {
-			if prev == nil {
-				prev = in
-			} else {
-				reused := string(in) == string(prev)
-				if reused != reuse {
-					t.Fatalf("expected %v, got %v", reuse, reused)
-				}
-				action = Shutdown
-			}
-			return
-		}
-		events.Serving = func(_ Server) (action Action) {
-			go func() {
-				c, err := net.Dial("tcp", ":9991")
-				must(err)
-				defer c.Close()
-				c.Write([]byte("packet1"))
-				time.Sleep(time.Second / 5)
-				c.Write([]byte("packet2"))
-			}()
-			return
-		}
-		must(Serve(events, "tcp://:9991"))
-	}
-
-}
-
 func TestReuseport(t *testing.T) {
 	var events Events
-	events.Serving = func(s Server) (action Action) {
+	events.OnInitComplete = func(s Server) (action Action) {
 		return Shutdown
 	}
 	var wg sync.WaitGroup

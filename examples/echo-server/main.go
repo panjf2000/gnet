@@ -31,7 +31,7 @@ func main() {
 
 	var events gnet.Events
 	events.NumLoops = loops
-	events.Serving = func(srv gnet.Server) (action gnet.Action) {
+	events.OnInitComplete = func(srv gnet.Server) (action gnet.Action) {
 		log.Printf("echo server started on port %d (loops: %d)", port, srv.NumLoops)
 		if reuseport {
 			log.Printf("reuseport")
@@ -41,7 +41,7 @@ func main() {
 		}
 		return
 	}
-	events.Data = func(c gnet.Conn, in []byte) (out []byte, action gnet.Action) {
+	events.React = func(c gnet.Conn, in []byte) (out []byte, action gnet.Action) {
 		if trace {
 			log.Printf("%s", strings.TrimSpace(string(in)))
 		}
