@@ -3,6 +3,7 @@ module github.com/panjf2000/gnet
 go 1.12
 
 require (
+	github.com/gobwas/pool v0.2.0 // indirect
 	github.com/kavu/go_reuseport v1.4.0
 	github.com/smartystreets-prototypes/go-disruptor v0.0.0-20180723194425-e0f8f9247cc2
 	github.com/tidwall/redcon v1.0.0
