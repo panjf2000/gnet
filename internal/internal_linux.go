@@ -38,6 +38,10 @@ func OpenPoll() *Poll {
 	return l
 }
 
+func (p *Poll) GetFD() int {
+	return p.fd
+}
+
 // Close ...
 func (p *Poll) Close() error {
 	if err := unix.Close(p.wfd); err != nil {
