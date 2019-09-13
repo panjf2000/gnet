@@ -62,9 +62,9 @@ func testServe(network, addr string, unix bool, nclients, nloops int) {
 
 	var events Events
 	events.NumLoops = nloops
-	events.OnInitComplete = func(srv Server) (action Action) {
-		return
-	}
+	//events.OnInitComplete = func(srv Server) (action Action) {
+	//	return
+	//}
 	events.OnOpened = func(c Conn) (out []byte, opts Options, action Action) {
 		c.SetContext(c)
 		atomic.AddInt32(&connected, 1)
@@ -87,7 +87,7 @@ func testServe(network, addr string, unix bool, nclients, nloops int) {
 			atomic.LoadInt32(&disconnected) == int32(nclients) {
 			action = Shutdown
 		}
-		fmt.Printf("connection closing, action: %v\n", action)
+		//fmt.Printf("connection closing, action: %v\n", action)
 		return
 	}
 	events.React = func(c Conn, inBuf *ringbuffer.RingBuffer) (out []byte, action Action) {
@@ -240,7 +240,9 @@ func testShutdown(network, addr string) {
 				}()
 			}
 		} else {
+			fmt.Printf("ticker clients: %d\n", atomic.LoadInt64(&clients))
 			if int(atomic.LoadInt64(&clients)) == N {
+				fmt.Printf("ticker shutdown...\n")
 				action = Shutdown
 			}
 		}
@@ -279,11 +281,11 @@ func testDetach(network, addr string) {
 	events.React = func(c Conn, inBuf *ringbuffer.RingBuffer) (out []byte, action Action) {
 		n := inBuf.Length()
 		cin = append(cin, inBuf.Bytes()...)
+		inBuf.Move(n)
 		if len(cin) >= len(expected) {
 			if string(cin) != string(expected) {
 				panic("mismatch client -> server")
 			}
-			inBuf.Move(n)
 			return cin, Detach
 		}
 		return

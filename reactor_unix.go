@@ -5,7 +5,6 @@
 package gnet
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/panjf2000/gnet/ringbuffer"
@@ -19,55 +18,55 @@ const (
 	DisruptorCleanup = time.Millisecond * 10
 )
 
-var connRingBuffer = [RingBufferSize]*conn{}
-
-type signal struct {
-	fd int
-	c  *conn
+type mail struct {
+	fd   int
+	conn *conn
 }
 
 type eventConsumer struct {
-	s *server
-	l *loop
+	numLoops       int
+	loop           *loop
+	connRingBuffer *[RingBufferSize]*conn
 }
 
 func (ec *eventConsumer) Consume(lower, upper int64) {
-	fmt.Printf("consumer with loop: %d, consuming message, lower: %d, upper: %d\n", ec.l.idx, lower, upper)
+	//fmt.Printf("consumer with loop: %d, consuming message, lower: %d, upper: %d\n", ec.loop.idx, lower, upper)
 	for ; lower <= upper; lower++ {
-		c := connRingBuffer[lower&RingBufferMask]
-		c.inBuf = ringbuffer.New(RingBufferSize)
-		c.outBuf = ringbuffer.New(RingBufferSize)
-		fmt.Printf("lower: %d, consuming fd: %d in poll: %d\n", lower, c.fd, ec.l.poll.GetFD())
-		c.loop = ec.l
+		conn := ec.connRingBuffer[lower&RingBufferMask]
+		conn.inBuf = ringbuffer.New(RingBufferSize)
+		conn.outBuf = ringbuffer.New(RingBufferSize)
+		//fmt.Printf("lower: %d, consuming fd: %d in loop: %d\n", lower, conn.fd, ec.loop.idx)
+		conn.loop = ec.loop
+
 		// Connections load balance under round-robin algorithm.
-		if ec.s.numLoops > 1 {
-			idx := int(lower) % ec.s.numLoops
-			if idx != ec.l.idx {
-				return // Don't match, ignore this connection.
+		if ec.numLoops > 1 {
+			idx := int(lower) % ec.numLoops
+			if idx != ec.loop.idx {
+				//fmt.Printf("lower: %d, ignoring fd: %d in loop: %d\n", lower, conn.fd, ec.loop.idx)
+				// Don't match the round-robin rule, ignore this connection.
+				continue
 			}
 		}
-		fmt.Printf("send fd: %d to epoll: %d\n", c.fd, ec.l.poll.GetFD())
-		_ = ec.l.poll.Trigger(&signal{fd: c.fd, c: c})
+		//fmt.Printf("lower: %d, sendOut fd: %d to loop: %d\n", lower, conn.fd, ec.loop.idx)
+		_ = ec.loop.poller.Trigger(&mail{fd: conn.fd, conn: conn})
 	}
 }
 
-func activateMainReactor(s *server) {
+func activateMainReactor(svr *server) {
 	defer func() {
 		time.Sleep(DisruptorCleanup)
-		s.signalShutdown()
-		s.wg.Done()
+		svr.signalShutdown()
+		svr.wg.Done()
 	}()
 
-	if s.events.Tick != nil {
-		fmt.Println("start ticker...")
-		go loopTicker(s, s.mainLoop)
-	}
+	var connRingBuffer = &[RingBufferSize]*conn{}
 
-	eventConsumers := make([]disruptor.Consumer, 0, s.numLoops)
-	for _, l := range s.loops {
-		ec := &eventConsumer{s, l}
+	eventConsumers := make([]disruptor.Consumer, 0, svr.numLoops)
+	for _, loop := range svr.loops {
+		ec := &eventConsumer{svr.numLoops, loop, connRingBuffer}
 		eventConsumers = append(eventConsumers, ec)
 	}
+	//fmt.Printf("length of loops: %d and consumers: %d\n", svr.numLoops, len(eventConsumers))
 
 	// Initialize go-disruptor with ring-buffer for dispatching events to loops.
 	controller := disruptor.Configure(RingBufferSize).WithConsumerGroup(eventConsumers...).Build()
@@ -78,16 +77,16 @@ func activateMainReactor(s *server) {
 	writer := controller.Writer()
 	sequence := disruptor.InitialSequenceValue
 
-	fmt.Println("main reactor polling...")
-	_ = s.mainLoop.poll.Polling(func(fd int, note interface{}) error {
+	//fmt.Println("main reactor polling...")
+	_ = svr.mainLoop.poller.Polling(func(fd int, note interface{}) error {
 		if fd == 0 {
-			return loopNote(s, s.mainLoop, note)
+			return svr.mainLoop.loopNote(svr, note)
 		}
 
-		for i, ln := range s.lns {
+		for i, ln := range svr.lns {
 			if ln.fd == fd {
 				if ln.pconn != nil {
-					return loopUDPRead(s, s.mainLoop, i, fd)
+					return svr.mainLoop.loopUDPRead(svr, i, fd)
 				}
 				nfd, sa, err := unix.Accept(fd)
 				if err != nil {
@@ -99,12 +98,11 @@ func activateMainReactor(s *server) {
 				if err := unix.SetNonblock(nfd, true); err != nil {
 					return err
 				}
-				c := &conn{fd: nfd, sa: sa, lnidx: i}
-				fmt.Printf("accepted fd: %d in main reactor\n", nfd)
+				conn := &conn{fd: nfd, sa: sa, lnidx: i}
+				//fmt.Printf("accepted fd: %d in main reactor\n", nfd)
 				sequence = writer.Reserve(1)
-				connRingBuffer[sequence&RingBufferMask] = c
+				connRingBuffer[sequence&RingBufferMask] = conn
 				writer.Commit(sequence, sequence)
-				//fmt.Printf("connections ringbuffer: %v\n", connRingBuffer)
 				return nil
 			}
 		}
@@ -112,36 +110,35 @@ func activateMainReactor(s *server) {
 	})
 }
 
-func activateSubReactor(s *server, l *loop) {
+func activateSubReactor(svr *server, loop *loop) {
 	defer func() {
-		s.signalShutdown()
-		s.wg.Done()
+		svr.signalShutdown()
+		svr.wg.Done()
 	}()
 
-	fmt.Printf("sub reactor polling, loop: %d\n", l.idx)
-	_ = l.poll.Polling(func(fd int, note interface{}) error {
+	if loop.idx == 0 && svr.events.Tick != nil {
+		//fmt.Println("start ticker...")
+		go loop.loopTicker(svr)
+	}
+
+	//fmt.Printf("sub reactor polling, loop: %d\n", loop.idx)
+	_ = loop.poller.Polling(func(fd int, note interface{}) error {
 		if fd == 0 {
-			fmt.Printf("loopnote %v\n", note)
-			return loopNote(s, l, note)
+			return loop.loopNote(svr, note)
 		}
 
-		//fmt.Printf("get event: %d\n", fd)
-		c := l.fdconns[fd]
-		if c == nil {
-			fmt.Printf("c: %d not in loop: %d, pool: %d\n", fd, l.idx, l.poll.GetFD())
+		if conn, ok := loop.fdconns[fd]; ok {
+			switch {
+			case !conn.opened:
+				return loop.loopOpened(svr, conn)
+			case conn.outBuf.Length() > 0:
+				return loop.loopWrite(svr, conn)
+			case conn.action != None:
+				return loop.loopAction(svr, conn)
+			default:
+				return loop.loopRead(svr, conn)
+			}
 		}
-		switch {
-		case !c.opened:
-			//fmt.Println("opened")
-			return loopOpened(s, l, c)
-		case c.outBuf.Length() > 0:
-			//fmt.Println("write")
-			return loopWrite(s, l, c)
-		case c.action != None:
-			return loopAction(s, l, c)
-		default:
-			//fmt.Println("read")
-			return loopRead(s, l, c)
-		}
+		return nil
 	})
 }

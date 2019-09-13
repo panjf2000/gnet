@@ -8,7 +8,6 @@
 package gnet
 
 import (
-	"fmt"
 	"net"
 	"time"
 
@@ -18,36 +17,37 @@ import (
 )
 
 type loop struct {
-	idx     int            // loop index in the server loops list
-	poll    *internal.Poll // epoll or kqueue
-	packet  []byte         // read packet buffer
-	fdconns map[int]*conn  // loop connections fd -> conn
+	idx     int              // loop index in the server loops list
+	poller  *internal.Poller // epoll or kqueue
+	packet  []byte           // read packet buffer
+	fdconns map[int]*conn    // loop connections fd -> conn
 }
 
-func loopCloseConn(s *server, l *loop, c *conn, err error) error {
-	delete(l.fdconns, c.fd)
-	fmt.Printf("closing fd: %d, err: %v\n", c.fd, unix.Close(c.fd))
-	if s.events.OnClosed != nil {
-		switch s.events.OnClosed(c, err) {
+func (l *loop) loopCloseConn(svr *server, conn *conn, err error) error {
+	delete(l.fdconns, conn.fd)
+	//fmt.Printf("closing fd: %d, err: %v\n", conn.fd, unix.Close(conn.fd))
+	if svr.events.OnClosed != nil {
+		switch svr.events.OnClosed(conn, err) {
 		case None:
 		case Shutdown:
+			//fmt.Printf("closing read action: shutdown...\n")
 			return errClosing
 		}
 	}
 	return nil
 }
 
-func loopDetachConn(s *server, l *loop, c *conn, err error) error {
-	if s.events.OnDetached == nil {
-		return loopCloseConn(s, l, c, err)
+func (l *loop) loopDetachConn(svr *server, conn *conn, err error) error {
+	if svr.events.OnDetached == nil {
+		return l.loopCloseConn(svr, conn, err)
 	}
-	l.poll.ModDetach(c.fd)
+	l.poller.ModDetach(conn.fd)
 
-	delete(l.fdconns, c.fd)
-	if err := unix.SetNonblock(c.fd, false); err != nil {
+	delete(l.fdconns, conn.fd)
+	if err := unix.SetNonblock(conn.fd, false); err != nil {
 		return err
 	}
-	switch s.events.OnDetached(c, &detachedConn{fd: c.fd}) {
+	switch svr.events.OnDetached(conn, &detachedConn{fd: conn.fd}) {
 	case None:
 	case Shutdown:
 		return errClosing
@@ -55,17 +55,17 @@ func loopDetachConn(s *server, l *loop, c *conn, err error) error {
 	return nil
 }
 
-func loopNote(s *server, l *loop, note interface{}) error {
+func (l *loop) loopNote(svr *server, note interface{}) error {
 	var err error
 	switch v := note.(type) {
 	case time.Duration:
-		delay, action := s.events.Tick()
+		delay, action := svr.events.Tick()
 		switch action {
 		case None:
 		case Shutdown:
 			err = errClosing
 		}
-		s.tch <- delay
+		svr.tch <- delay
 	case error: // shutdown
 		err = v
 	case *conn:
@@ -73,59 +73,63 @@ func loopNote(s *server, l *loop, note interface{}) error {
 		if l.fdconns[v.fd] != v {
 			return nil // ignore stale wakes
 		}
-		return loopWake(s, l, v)
-	case *signal:
-		fmt.Printf("trigger poll: %d with c: %d\n", l.poll.GetFD(), v.fd)
-		l.poll.AddReadWrite(v.fd)
-		l.fdconns[v.fd] = v.c
+		return l.loopWake(svr, v)
+	case *mail:
+		l.fdconns[v.fd] = v.conn
+		l.poller.AddReadWrite(v.fd)
+		//fmt.Printf("mail loop: %d with c: %d, loop pointer: %p, fdconns: %v\n", l.idx, v.fd, l, l.fdconns)
+		//case *detach:
+		//	delete(l.fdconns, v.fd)
+		//	l.poller.ModDetach(v.fd)
+		//	fmt.Printf("detach loop: %d with c: %d, loop pointer: %p, fdconns: %v\n", l.idx, v.fd, l, l.fdconns)
 	}
 	return err
 }
 
-func loopRun(s *server, l *loop) {
+func (l *loop) loopRun(svr *server) {
 	defer func() {
-		s.signalShutdown()
-		s.wg.Done()
+		svr.signalShutdown()
+		svr.wg.Done()
 	}()
 
-	if l.idx == 0 && s.events.Tick != nil {
-		go loopTicker(s, l)
+	if l.idx == 0 && svr.events.Tick != nil {
+		go l.loopTicker(svr)
 	}
 
-	_ = l.poll.Polling(func(fd int, note interface{}) error {
+	_ = l.poller.Polling(func(fd int, note interface{}) error {
 		if fd == 0 {
-			return loopNote(s, l, note)
+			return l.loopNote(svr, note)
 		}
-		c := l.fdconns[fd]
+		conn := l.fdconns[fd]
 		switch {
-		case c == nil:
-			return loopAccept(s, l, fd)
-		case !c.opened:
-			return loopOpened(s, l, c)
-		case c.outBuf.Length() > 0:
-			return loopWrite(s, l, c)
-		case c.action != None:
-			return loopAction(s, l, c)
+		case conn == nil:
+			return l.loopAccept(svr, fd)
+		case !conn.opened:
+			return l.loopOpened(svr, conn)
+		case conn.outBuf.Length() > 0:
+			return l.loopWrite(svr, conn)
+		case conn.action != None:
+			return l.loopAction(svr, conn)
 		default:
-			return loopRead(s, l, c)
+			return l.loopRead(svr, conn)
 		}
 	})
 }
 
-func loopTicker(s *server, l *loop) {
+func (l *loop) loopTicker(svr *server) {
 	for {
-		if err := l.poll.Trigger(time.Duration(0)); err != nil {
+		if err := l.poller.Trigger(time.Duration(0)); err != nil {
 			break
 		}
-		time.Sleep(<-s.tch)
+		time.Sleep(<-svr.tch)
 	}
 }
 
-func loopAccept(s *server, l *loop, fd int) error {
-	for i, ln := range s.lns {
+func (l *loop) loopAccept(svr *server, fd int) error {
+	for i, ln := range svr.lns {
 		if ln.fd == fd {
 			if ln.pconn != nil {
-				return loopUDPRead(s, l, i, fd)
+				return l.loopUDPRead(svr, i, fd)
 			}
 			nfd, sa, err := unix.Accept(fd)
 			if err != nil {
@@ -137,27 +141,27 @@ func loopAccept(s *server, l *loop, fd int) error {
 			if err := unix.SetNonblock(nfd, true); err != nil {
 				return err
 			}
-			c := &conn{fd: nfd,
+			conn := &conn{fd: nfd,
 				sa:     sa,
 				lnidx:  i,
 				inBuf:  ringbuffer.New(RingBufferSize),
 				outBuf: ringbuffer.New(RingBufferSize),
 				loop:   l,
 			}
-			l.fdconns[c.fd] = c
-			l.poll.AddReadWrite(c.fd)
+			l.fdconns[conn.fd] = conn
+			l.poller.AddReadWrite(conn.fd)
 			return nil
 		}
 	}
 	return nil
 }
 
-func loopUDPRead(s *server, l *loop, lnidx, fd int) error {
+func (l *loop) loopUDPRead(svr *server, lnidx, fd int) error {
 	n, sa, err := unix.Recvfrom(fd, l.packet, 0)
 	if err != nil || n == 0 {
 		return nil
 	}
-	if s.events.React != nil {
+	if svr.events.React != nil {
 		var sa6 unix.SockaddrInet6
 		switch sa := sa.(type) {
 		case *unix.SockaddrInet4:
@@ -173,17 +177,17 @@ func loopUDPRead(s *server, l *loop, lnidx, fd int) error {
 		case *unix.SockaddrInet6:
 			sa6 = *sa
 		}
-		c := &conn{
+		conn := &conn{
 			addrIndex:  lnidx,
-			localAddr:  s.lns[lnidx].lnaddr,
+			localAddr:  svr.lns[lnidx].lnaddr,
 			remoteAddr: internal.SockaddrToAddr(&sa6),
 			inBuf:      ringbuffer.New(RingBufferSize),
 		}
-		_, _ = c.inBuf.Write(l.packet[:n])
-		out, action := s.events.React(c, c.inBuf)
+		_, _ = conn.inBuf.Write(l.packet[:n])
+		out, action := svr.events.React(conn, conn.inBuf)
 		if len(out) > 0 {
-			if s.events.PreWrite != nil {
-				s.events.PreWrite()
+			if svr.events.PreWrite != nil {
+				svr.events.PreWrite()
 			}
 			sniffError(unix.Sendto(fd, out, 0, sa))
 		}
@@ -195,105 +199,108 @@ func loopUDPRead(s *server, l *loop, lnidx, fd int) error {
 	return nil
 }
 
-func loopOpened(s *server, l *loop, c *conn) error {
-	c.opened = true
-	c.addrIndex = c.lnidx
-	c.localAddr = s.lns[c.lnidx].lnaddr
-	c.remoteAddr = internal.SockaddrToAddr(c.sa)
-	if s.events.OnOpened != nil {
-		out, opts, action := s.events.OnOpened(c)
-		c.action = action
-		if len(out) > 0 {
-			_, _ = c.outBuf.Write(out)
-		}
+func (l *loop) loopOpened(svr *server, conn *conn) error {
+	conn.opened = true
+	conn.addrIndex = conn.lnidx
+	conn.localAddr = svr.lns[conn.lnidx].lnaddr
+	conn.remoteAddr = internal.SockaddrToAddr(conn.sa)
+	if svr.events.OnOpened != nil {
+		out, opts, action := svr.events.OnOpened(conn)
+		conn.action = action
 		if opts.TCPKeepAlive > 0 {
-			if _, ok := s.lns[c.lnidx].ln.(*net.TCPListener); ok {
-				sniffError(internal.SetKeepAlive(c.fd, int(opts.TCPKeepAlive/time.Second)))
+			if _, ok := svr.lns[conn.lnidx].ln.(*net.TCPListener); ok {
+				sniffError(internal.SetKeepAlive(conn.fd, int(opts.TCPKeepAlive/time.Second)))
 			}
 		}
+
+		if len(out) > 0 {
+			//fmt.Printf("c: %d, out length: %d in opened\n", conn.fd, len(out))
+			conn.sendOut(out)
+		}
 	}
-	//fmt.Printf("outBuf length: %d in opened\n", c.outBuf.Length())
-	if c.outBuf.Length() == 0 && c.action == None {
-		l.poll.ModRead(c.fd)
+	if conn.outBuf.Length() == 0 && conn.action == None {
+		//fmt.Printf("c: %d, outBuf length: %d in opened\n", conn.fd, conn.outBuf.Length())
+		l.poller.ModRead(conn.fd)
 	}
 	return nil
 }
 
-func loopWrite(s *server, l *loop, c *conn) error {
-	if s.events.PreWrite != nil {
-		s.events.PreWrite()
+func (l *loop) loopWrite(svr *server, conn *conn) error {
+	if svr.events.PreWrite != nil {
+		svr.events.PreWrite()
 	}
-	out := c.outBuf.Bytes()
-	n, err := unix.Write(c.fd, out)
+	out := conn.outBuf.Bytes()
+	n, err := unix.Write(conn.fd, out)
 	if err != nil {
 		if err == unix.EAGAIN {
 			return nil
 		}
-		fmt.Println("closing in write")
-		return loopCloseConn(s, l, c, err)
+		//fmt.Println("closing in write")
+		return l.loopCloseConn(svr, conn, err)
 	}
-	c.outBuf.Move(n)
+	conn.outBuf.Move(n)
 	ringbuffer.Recycle(out)
 	//fmt.Printf("c: %d, writing data length: %d", c.fd, n)
-	if c.outBuf.Length() == 0 && c.action == None {
-		l.poll.ModRead(c.fd)
+	if conn.outBuf.Length() == 0 && conn.action == None {
+		l.poller.ModRead(conn.fd)
 	}
 	return nil
 }
 
-func loopAction(s *server, l *loop, c *conn) error {
-	switch c.action {
+func (l *loop) loopAction(svr *server, conn *conn) error {
+	switch conn.action {
 	default:
-		c.action = None
+		conn.action = None
 	case Close:
-		return loopCloseConn(s, l, c, nil)
+		return l.loopCloseConn(svr, conn, nil)
 	case Shutdown:
 		return errClosing
 	case Detach:
-		return loopDetachConn(s, l, c, nil)
+		return l.loopDetachConn(svr, conn, nil)
 	}
-	if c.outBuf.Length() == 0 && c.action == None {
-		l.poll.ModRead(c.fd)
+	if conn.outBuf.Length() == 0 && conn.action == None {
+		l.poller.ModRead(conn.fd)
 	}
 	return nil
 }
 
-func loopWake(s *server, l *loop, c *conn) error {
-	if s.events.React == nil {
+func (l *loop) loopWake(svr *server, conn *conn) error {
+	if svr.events.React == nil {
 		return nil
 	}
-	out, action := s.events.React(c, c.inBuf)
-	c.action = action
+	out, action := svr.events.React(conn, conn.inBuf)
+	conn.action = action
 	if len(out) > 0 {
-		_, _ = c.outBuf.Write(out)
+		conn.sendOut(out)
 	}
-	if c.outBuf.Length() != 0 || c.action != None {
-		l.poll.ModReadWrite(c.fd)
+	if conn.outBuf.Length() != 0 || conn.action != None {
+		l.poller.ModReadWrite(conn.fd)
 	}
 	return nil
 }
 
-func loopRead(s *server, l *loop, c *conn) error {
-	n, err := unix.Read(c.fd, l.packet)
+func (l *loop) loopRead(svr *server, conn *conn) error {
+	n, err := unix.Read(conn.fd, l.packet)
 	if n == 0 || err != nil {
 		if err == unix.EAGAIN {
 			return nil
 		}
-		fmt.Printf("closing in read, conn: %d, err: %v\n", c.fd, err)
-		return loopCloseConn(s, l, c, err)
+		//fmt.Printf("closing in read, conn: %d, err: %v\n", conn.fd, err)
+		return l.loopCloseConn(svr, conn, err)
 	}
 
-	_, _ = c.inBuf.Write(l.packet[:n])
-	if s.events.React != nil {
-		out, action := s.events.React(c, c.inBuf)
-		c.action = action
+	_, _ = conn.inBuf.Write(l.packet[:n])
+	//fmt.Printf("reading data length: %d\n", conn.inBuf.Length())
+	if svr.events.React != nil {
+		out, action := svr.events.React(conn, conn.inBuf)
+		conn.action = action
 		if len(out) > 0 {
-			_, _ = c.outBuf.Write(out)
+			conn.sendOut(out)
 		}
 	}
 	//fmt.Printf("c: %d, outBuf length %d in read", c.fd, c.outBuf.Length())
-	if c.outBuf.Length() != 0 || c.action != None {
-		l.poll.ModReadWrite(c.fd)
+	if conn.outBuf.Length() != 0 || conn.action != None {
+		l.poller.ModReadWrite(conn.fd)
 	}
 	return nil
 }

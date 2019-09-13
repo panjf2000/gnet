@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/panjf2000/gnet"
+	"github.com/panjf2000/gnet/ringbuffer"
 )
 
 func main() {
@@ -19,14 +20,12 @@ func main() {
 	var udp bool
 	var trace bool
 	var reuseport bool
-	var stdlib bool
 
 	flag.IntVar(&port, "port", 5000, "server port")
 	flag.BoolVar(&udp, "udp", false, "listen on udp")
 	flag.BoolVar(&reuseport, "reuseport", false, "reuseport (SO_REUSEPORT)")
 	flag.BoolVar(&trace, "trace", false, "print packets to console")
 	flag.IntVar(&loops, "loops", 0, "num loops")
-	flag.BoolVar(&stdlib, "stdlib", false, "use stdlib")
 	flag.Parse()
 
 	var events gnet.Events
@@ -36,24 +35,21 @@ func main() {
 		if reuseport {
 			log.Printf("reuseport")
 		}
-		if stdlib {
-			log.Printf("stdlib")
-		}
 		return
 	}
-	events.React = func(c gnet.Conn, in []byte) (out []byte, action gnet.Action) {
+	events.React = func(c gnet.Conn, inBuf *ringbuffer.RingBuffer) (out []byte, action gnet.Action) {
+		n := inBuf.Length()
+		defer inBuf.Move(n)
+		//out = inBuf.Bytes()
+		defer ringbuffer.Recycle(out)
 		if trace {
-			log.Printf("%s", strings.TrimSpace(string(in)))
+			log.Printf("%s", strings.TrimSpace(string(out)))
 		}
-		out = in
 		return
 	}
 	scheme := "tcp"
 	if udp {
 		scheme = "udp"
-	}
-	if stdlib {
-		scheme += "-net"
 	}
 	log.Fatal(gnet.Serve(events, fmt.Sprintf("%s://:%d?reuseport=%t", scheme, port, reuseport)))
 }

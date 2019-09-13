@@ -1,0 +1,30 @@
+dist: trusty
+sudo: true
+
+language: go
+
+go:
+  - "1.6"
+  - "1.7"
+  - "1.8"
+  - "1.9"
+  - "1.10"
+  - "1.11"
+  - tip
+
+os:
+  - linux
+  - osx
+
+before_install:
+  - uname -a
+
+script: ./test.bash
+
+matrix:
+  allow_failures:
+    - os: osx
+    - go: tip
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)

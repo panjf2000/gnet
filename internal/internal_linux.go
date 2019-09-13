@@ -5,45 +5,37 @@
 
 package internal
 
-import (
-	"fmt"
+import "golang.org/x/sys/unix"
 
-	"golang.org/x/sys/unix"
-)
-
-// Poll ...
-type Poll struct {
+// Poller ...
+type Poller struct {
 	fd     int    // epoll fd
 	wfd    int    // wake fd
 	wfdBuf []byte // wfd buffer to read packet
 	notes  noteQueue
 }
 
-// OpenPoll ...
-func OpenPoll() *Poll {
-	l := new(Poll)
-	p, err := unix.EpollCreate1(0)
+// OpenPoller ...
+func OpenPoller() *Poller {
+	poller := new(Poller)
+	epd, err := unix.EpollCreate1(0)
 	if err != nil {
 		panic(err)
 	}
-	l.fd = p
+	poller.fd = epd
 	r0, _, e0 := unix.Syscall(unix.SYS_EVENTFD2, 0, 0, 0)
 	if e0 != 0 {
-		_ = unix.Close(p)
+		_ = unix.Close(epd)
 		panic(err)
 	}
-	l.wfd = int(r0)
-	l.wfdBuf = make([]byte, 8)
-	l.AddRead(l.wfd)
-	return l
-}
-
-func (p *Poll) GetFD() int {
-	return p.fd
+	poller.wfd = int(r0)
+	poller.wfdBuf = make([]byte, 8)
+	poller.AddRead(poller.wfd)
+	return poller
 }
 
 // Close ...
-func (p *Poll) Close() error {
+func (p *Poller) Close() error {
 	if err := unix.Close(p.wfd); err != nil {
 		return err
 	}
@@ -51,27 +43,25 @@ func (p *Poll) Close() error {
 }
 
 // Trigger ...
-func (p *Poll) Trigger(note interface{}) error {
+func (p *Poller) Trigger(note interface{}) error {
 	p.notes.Add(note)
 	_, err := unix.Write(p.wfd, []byte{0, 0, 0, 0, 0, 0, 0, 1})
 	return err
 }
 
 // Polling ...
-func (p *Poll) Polling(iter func(fd int, note interface{}) error) error {
+func (p *Poller) Polling(iter func(fd int, note interface{}) error) error {
 	events := make([]unix.EpollEvent, 64)
 	for {
 		n, err := unix.EpollWait(p.fd, events, -1)
 		if err != nil && err != unix.EINTR {
 			return err
 		}
-		fmt.Printf("poll: %d receives events...\n", p.fd)
 		if err := p.notes.ForEach(func(note interface{}) error {
 			return iter(0, note)
 		}); err != nil {
 			return err
 		}
-		fmt.Printf("notes pass\n")
 		for i := 0; i < n; i++ {
 			if fd := int(events[i].Fd); fd != p.wfd {
 				if err := iter(fd, nil); err != nil {
@@ -87,7 +77,7 @@ func (p *Poll) Polling(iter func(fd int, note interface{}) error) error {
 }
 
 // AddReadWrite ...
-func (p *Poll) AddReadWrite(fd int) {
+func (p *Poller) AddReadWrite(fd int) {
 	if err := unix.EpollCtl(p.fd, unix.EPOLL_CTL_ADD, fd,
 		&unix.EpollEvent{Fd: int32(fd),
 			Events: unix.EPOLLIN | unix.EPOLLOUT,
@@ -98,7 +88,7 @@ func (p *Poll) AddReadWrite(fd int) {
 }
 
 // AddRead ...
-func (p *Poll) AddRead(fd int) {
+func (p *Poller) AddRead(fd int) {
 	if err := unix.EpollCtl(p.fd, unix.EPOLL_CTL_ADD, fd,
 		&unix.EpollEvent{Fd: int32(fd),
 			Events: unix.EPOLLIN,
@@ -109,7 +99,7 @@ func (p *Poll) AddRead(fd int) {
 }
 
 // ModRead ...
-func (p *Poll) ModRead(fd int) {
+func (p *Poller) ModRead(fd int) {
 	if err := unix.EpollCtl(p.fd, unix.EPOLL_CTL_MOD, fd,
 		&unix.EpollEvent{Fd: int32(fd),
 			Events: unix.EPOLLIN,
@@ -120,7 +110,7 @@ func (p *Poll) ModRead(fd int) {
 }
 
 // ModReadWrite ...
-func (p *Poll) ModReadWrite(fd int) {
+func (p *Poller) ModReadWrite(fd int) {
 	if err := unix.EpollCtl(p.fd, unix.EPOLL_CTL_MOD, fd,
 		&unix.EpollEvent{Fd: int32(fd),
 			Events: unix.EPOLLIN | unix.EPOLLOUT,
@@ -131,7 +121,7 @@ func (p *Poll) ModReadWrite(fd int) {
 }
 
 // ModDetach ...
-func (p *Poll) ModDetach(fd int) {
+func (p *Poller) ModDetach(fd int) {
 	if err := unix.EpollCtl(p.fd, unix.EPOLL_CTL_DEL, fd,
 		&unix.EpollEvent{Fd: int32(fd),
 			Events: unix.EPOLLIN | unix.EPOLLOUT,

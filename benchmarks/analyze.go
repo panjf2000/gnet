@@ -42,7 +42,7 @@ func autoplot() {
 }
 
 func analyze() {
-	lines := readlines("out/http.txt", "out/echo.txt", "out/redis1.txt", "out/redis8.txt", "out/redis16.txt")
+	lines := readlines("out/http.txt", "out/echo.txt")
 	var err error
 	for _, line := range lines {
 		rlines := strings.Split(line, "\r")
@@ -88,12 +88,6 @@ func analyze() {
 				if strings.HasPrefix(line, "Reqs/sec ") {
 					rate, err = strconv.ParseFloat(
 						strings.Split(strings.TrimSpace(strings.Split(line, "Reqs/sec ")[1]), " ")[0], 64)
-					must(err)
-					output()
-				}
-			case strings.HasPrefix(category, "redis"):
-				if strings.HasPrefix(line, "PING_INLINE: ") {
-					rate, err = strconv.ParseFloat(strings.Split(strings.Split(line, ": ")[1], " ")[0], 64)
 					must(err)
 					output()
 				}

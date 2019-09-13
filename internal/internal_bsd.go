@@ -9,26 +9,22 @@ package internal
 
 import "golang.org/x/sys/unix"
 
-// Poll ...
-type Poll struct {
+// Poller ...
+type Poller struct {
 	fd      int
 	changes []unix.Kevent_t
 	notes   noteQueue
 }
 
-func (p *Poll) GetFD() int {
-	return p.fd
-}
-
-// OpenPoll ...
-func OpenPoll() *Poll {
-	l := new(Poll)
-	p, err := unix.Kqueue()
+// OpenPoller ...
+func OpenPoller() *Poller {
+	poller := new(Poller)
+	kfd, err := unix.Kqueue()
 	if err != nil {
 		panic(err)
 	}
-	l.fd = p
-	_, err = unix.Kevent(l.fd, []unix.Kevent_t{{
+	poller.fd = kfd
+	_, err = unix.Kevent(poller.fd, []unix.Kevent_t{{
 		Ident:  0,
 		Filter: unix.EVFILT_USER,
 		Flags:  unix.EV_ADD | unix.EV_CLEAR,
@@ -37,16 +33,16 @@ func OpenPoll() *Poll {
 		panic(err)
 	}
 
-	return l
+	return poller
 }
 
 // Close ...
-func (p *Poll) Close() error {
+func (p *Poller) Close() error {
 	return unix.Close(p.fd)
 }
 
 // Trigger ...
-func (p *Poll) Trigger(note interface{}) error {
+func (p *Poller) Trigger(note interface{}) error {
 	p.notes.Add(note)
 	_, err := unix.Kevent(p.fd, []unix.Kevent_t{{
 		Ident:  0,
@@ -57,7 +53,7 @@ func (p *Poll) Trigger(note interface{}) error {
 }
 
 // Polling ...
-func (p *Poll) Polling(iter func(fd int, note interface{}) error) error {
+func (p *Poller) Polling(iter func(fd int, note interface{}) error) error {
 	events := make([]unix.Kevent_t, 128)
 	for {
 		n, err := unix.Kevent(p.fd, p.changes, events, nil)
@@ -81,7 +77,7 @@ func (p *Poll) Polling(iter func(fd int, note interface{}) error) error {
 }
 
 // AddRead ...
-func (p *Poll) AddRead(fd int) {
+func (p *Poller) AddRead(fd int) {
 	p.changes = append(p.changes,
 		unix.Kevent_t{
 			Ident: uint64(fd), Flags: unix.EV_ADD, Filter: unix.EVFILT_READ,
@@ -90,7 +86,7 @@ func (p *Poll) AddRead(fd int) {
 }
 
 // AddReadWrite ...
-func (p *Poll) AddReadWrite(fd int) {
+func (p *Poller) AddReadWrite(fd int) {
 	p.changes = append(p.changes,
 		unix.Kevent_t{
 			Ident: uint64(fd), Flags: unix.EV_ADD, Filter: unix.EVFILT_READ,
@@ -102,21 +98,21 @@ func (p *Poll) AddReadWrite(fd int) {
 }
 
 // ModRead ...
-func (p *Poll) ModRead(fd int) {
+func (p *Poller) ModRead(fd int) {
 	p.changes = append(p.changes, unix.Kevent_t{
 		Ident: uint64(fd), Flags: unix.EV_DELETE, Filter: unix.EVFILT_WRITE,
 	})
 }
 
 // ModReadWrite ...
-func (p *Poll) ModReadWrite(fd int) {
+func (p *Poller) ModReadWrite(fd int) {
 	p.changes = append(p.changes, unix.Kevent_t{
 		Ident: uint64(fd), Flags: unix.EV_ADD, Filter: unix.EVFILT_WRITE,
 	})
 }
 
 // ModDetach ...
-func (p *Poll) ModDetach(fd int) {
+func (p *Poller) ModDetach(fd int) {
 	p.changes = append(p.changes,
 		unix.Kevent_t{
 			Ident: uint64(fd), Flags: unix.EV_DELETE, Filter: unix.EVFILT_READ,

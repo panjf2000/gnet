@@ -34,65 +34,65 @@ func New(size int) *RingBuffer {
 	}
 }
 
-func (r *RingBuffer) PreRead(len int) (first []byte, end []byte) {
-	if r.isEmpty {
-		return
-	}
-
-	if len <= 0 {
-		return
-	}
-
-	if r.w > r.r {
-		n := r.w - r.r // Length
-		if n > len {
-			n = len
-		}
-
-		first = r.buf[r.r : r.r+n]
-		return
-	}
-
-	n := r.size - r.r + r.w // Length
-	if n > len {
-		n = len
-	}
-
-	if r.r+n <= r.size {
-		first = r.buf[r.r : r.r+n]
-	} else {
-		c1 := r.size - r.r
-		first = r.buf[r.r:r.size]
-		c2 := n - c1
-		end = r.buf[0:c2]
-	}
-
-	return
-}
-
-func (r *RingBuffer) PreReadAll() (first []byte, end []byte) {
-	if r.isEmpty {
-		return
-	}
-
-	if r.w > r.r {
-		n := r.w - r.r // Length
-		first = r.buf[r.r : r.r+n]
-		return
-	}
-
-	n := r.size - r.r + r.w // Length
-	if r.r+n <= r.size {
-		first = r.buf[r.r : r.r+n]
-	} else {
-		c1 := r.size - r.r
-		first = r.buf[r.r:r.size]
-		c2 := n - c1
-		end = r.buf[0:c2]
-	}
-
-	return
-}
+//func (r *RingBuffer) PreRead(len int) (first []byte, end []byte) {
+//	if r.isEmpty {
+//		return
+//	}
+//
+//	if len <= 0 {
+//		return
+//	}
+//
+//	if r.w > r.r {
+//		n := r.w - r.r // Length
+//		if n > len {
+//			n = len
+//		}
+//
+//		first = r.buf[r.r : r.r+n]
+//		return
+//	}
+//
+//	n := r.size - r.r + r.w // Length
+//	if n > len {
+//		n = len
+//	}
+//
+//	if r.r+n <= r.size {
+//		first = r.buf[r.r : r.r+n]
+//	} else {
+//		c1 := r.size - r.r
+//		first = r.buf[r.r:r.size]
+//		c2 := n - c1
+//		end = r.buf[0:c2]
+//	}
+//
+//	return
+//}
+//
+//func (r *RingBuffer) PreReadAll() (first []byte, end []byte) {
+//	if r.isEmpty {
+//		return
+//	}
+//
+//	if r.w > r.r {
+//		n := r.w - r.r // Length
+//		first = r.buf[r.r : r.r+n]
+//		return
+//	}
+//
+//	n := r.size - r.r + r.w // Length
+//	if r.r+n <= r.size {
+//		first = r.buf[r.r : r.r+n]
+//	} else {
+//		c1 := r.size - r.r
+//		first = r.buf[r.r:r.size]
+//		c2 := n - c1
+//		end = r.buf[0:c2]
+//	}
+//
+//	return
+//}
 
 func (r *RingBuffer) Move(len int) {
 	if len <= 0 {

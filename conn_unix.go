@@ -8,6 +8,7 @@ package gnet
 import (
 	"io"
 	"net"
+	"syscall"
 
 	"github.com/panjf2000/gnet/ringbuffer"
 	"golang.org/x/sys/unix"
@@ -28,6 +29,23 @@ type conn struct {
 	loop       *loop         // connected loop
 }
 
+func (c *conn) sendOut(buf []byte) {
+	if !c.outBuf.IsFull() && !c.outBuf.IsEmpty() {
+		_, _ = c.outBuf.Write(buf)
+		return
+	}
+
+	n, err := syscall.Write(c.fd, buf)
+	if err != nil {
+		_, _ = c.outBuf.Write(buf)
+		return
+	}
+
+	if n < len(buf) {
+		_, _ = c.outBuf.Write(buf[n:])
+	}
+}
+
 func (c *conn) Context() interface{}       { return c.ctx }
 func (c *conn) SetContext(ctx interface{}) { c.ctx = ctx }
 func (c *conn) AddrIndex() int             { return c.addrIndex }
@@ -35,7 +53,7 @@ func (c *conn) LocalAddr() net.Addr        { return c.localAddr }
 func (c *conn) RemoteAddr() net.Addr       { return c.remoteAddr }
 func (c *conn) Wake() {
 	if c.loop != nil {
-		sniffError(c.loop.poll.Trigger(c))
+		sniffError(c.loop.poller.Trigger(c))
 	}
 }
 

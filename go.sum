@@ -18,8 +18,6 @@ github.com/klauspost/cpuid v0.0.0-20180405133222-e7e905edc00e/go.mod h1:Pj4uuM52
 github.com/remyoudompheng/bigfft v0.0.0-20170806203942-52369c62f446/go.mod h1:uYEyJGbgTkfkS4+E/PavXkNJcbFIpEtjt2B0KDQ5+9M=
 github.com/smartystreets-prototypes/go-disruptor v0.0.0-20180723194425-e0f8f9247cc2 h1:nQE8laUyz4HmJDejtrfORw6+a68+9Inpq1+uiIxrb+E=
 github.com/smartystreets-prototypes/go-disruptor v0.0.0-20180723194425-e0f8f9247cc2/go.mod h1:ACngBnuB+3ZLly6w2l5kkiUKwrH9kZRo+KKl7+jwhlA=
-github.com/tidwall/redcon v1.0.0 h1:D4AzzJ81Afeh144fgnj5H0aSVPBBJ5RI9Rzj0zThU+E=
-github.com/tidwall/redcon v1.0.0/go.mod h1:bdYBm4rlcWpst2XMwKVzWDF9CoUxEbUmM7CQrKeOZas=
 github.com/valyala/bytebufferpool v1.0.0 h1:GqA5TC/0021Y/b9FG4Oi9Mr3q7XYx6KllzawFIhcdPw=
 github.com/valyala/bytebufferpool v1.0.0/go.mod h1:6bBcMArwyJ5K/AmCkWv1jt77kVWyCJ6HpOuEn7z0Csc=
 github.com/valyala/fasthttp v1.4.0 h1:PuaTGZIw3mjYhhhbVbCQp8aciRZN9YdoB7MGX9Ko76A=
