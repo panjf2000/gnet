@@ -21,6 +21,9 @@ github.com/klauspost/compress/zlib
 github.com/klauspost/cpuid
 # github.com/smartystreets-prototypes/go-disruptor v0.0.0-20180723194425-e0f8f9247cc2
 github.com/smartystreets-prototypes/go-disruptor
+# github.com/tidwall/evio v1.0.2
+github.com/tidwall/evio
+github.com/tidwall/evio/internal
 # github.com/valyala/bytebufferpool v1.0.0
 github.com/valyala/bytebufferpool
 # github.com/valyala/fasthttp v1.4.0
