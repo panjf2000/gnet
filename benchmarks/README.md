@@ -32,9 +32,9 @@ Like all benchmarks ever made in the history of whatever, YMMV. Please tweak and
 
 ```powershell
 Machine: Amazon c5.2xlarge
-OS: Ubuntu 18.04
-CPU: 8 Virtual CPUs
-Memory: 16.0 GiB
+OS:      Ubuntu 18.04
+CPU:     8 Virtual CPUs
+Memory:  16.0 GiB
 ```
 
 ### Echo Server
@@ -51,9 +51,9 @@ Memory: 16.0 GiB
 
 ```powershell
 Machine: MacBook Pro
-OS: macOS Mojave 10.14.6
-CPU: 4 CPUs
-Memory: 8.0 GiB
+OS:      macOS Mojave 10.14.6
+CPU:     4 CPUs
+Memory:  8.0 GiB
 ```
 
 ### Echo Server

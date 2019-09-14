@@ -6,7 +6,9 @@
 
 The goal of this project is to create a server framework for Go that performs on par with [Redis](http://redis.io) and [Haproxy](http://www.haproxy.org) for packet handling.
 
-`gnet`sells itself as a high-performance, lightweight, nonblocking network library written in pure Go, derived from evio, but faster.
+`gnet` sells itself as a high-performance, lightweight, nonblocking network library written in pure Go.
+
+`gent` is derived from project `evio` while having higher performance.
 
 > gnet is still under active development, so if you are interested in gnet, please feel free to make your code contributions to it ~~
 
@@ -18,9 +20,9 @@ The goal of this project is to create a server framework for Go that performs on
 
 ```powershell
 Machine: Amazon c5.2xlarge
-OS: Ubuntu 18.04
-CPU: 8 Virtual CPUs
-Memory: 16.0 GiB
+OS:      Ubuntu 18.04
+CPU:     8 Virtual CPUs
+Memory:  16.0 GiB
 ```
 
 
@@ -39,9 +41,9 @@ Memory: 16.0 GiB
 
 ```powershell
 Machine: MacBook Pro
-OS: macOS Mojave 10.14.6
-CPU: 4 CPUs
-Memory: 8.0 GiB
+OS:      macOS Mojave 10.14.6
+CPU:     4 CPUs
+Memory:  8.0 GiB
 ```
 
 
