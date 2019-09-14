@@ -62,10 +62,10 @@ func main() {
 		return
 	}
 
-	events.OnClosed = func(c gnet.Conn, err error) (action gnet.Action) {
-		log.Printf("closed: %s: %s", c.LocalAddr().String(), c.RemoteAddr().String())
-		return
-	}
+	//events.OnClosed = func(c gnet.Conn, err error) (action gnet.Action) {
+	//	log.Printf("closed: %s: %s", c.LocalAddr().String(), c.RemoteAddr().String())
+	//	return
+	//}
 
 	events.React = func(c gnet.Conn, inBuf *ringbuffer.RingBuffer) (out []byte, action gnet.Action) {
 		top, tail := inBuf.PreReadAll()
