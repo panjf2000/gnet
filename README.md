@@ -14,6 +14,17 @@ The goal of this project is to create a server framework for Go that performs on
 
 ## On Linux (epoll)
 
+### Test Environment
+
+```powershell
+Machine: Amazon c5.2xlarge
+OS: Ubuntu 18.04
+CPU: 8 Virtual CPUs
+Memory: 16.0 GiB
+```
+
+
+
 ### Echo Server
 
 ![](benchmarks/results/echo_linux.png)
@@ -23,6 +34,17 @@ The goal of this project is to create a server framework for Go that performs on
 ![](benchmarks/results/http_linux.png)
 
 ## On MacOS (kqueue)
+
+### Test Environment
+
+```powershell
+Machine: MacBook Pro
+OS: macOS Mojave 10.14.6
+CPU: 4 CPUs
+Memory: 8.0 GiB
+```
+
+
 
 ### Echo Server
 
