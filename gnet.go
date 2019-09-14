@@ -48,7 +48,7 @@ type Server struct {
 	NumLoops int
 }
 
-// Conn is an evio connection.
+// Conn is an gnet connection.
 type Conn interface {
 	// Context returns a user-defined context.
 	Context() interface{}

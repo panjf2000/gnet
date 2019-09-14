@@ -1,4 +1,4 @@
-## evio benchmark tools
+## gnet benchmark tools
 
 Required tools:
 
@@ -23,3 +23,26 @@ Run `bench.sh` for all benchmarks.
 - Network clients connected over Ipv4 localhost.
 
 Like all benchmarks ever made in the history of whatever, YMMV. Please tweak and run in your environment and let me know if you see any glaring issues.
+
+# Benchmark Test
+
+## On Linux (epoll)
+
+### Echo Server
+
+![](results/echo_linux.png)
+
+### HTTP Server
+
+![](results/http_linux.png)
+
+## On MacOS (kqueue)
+
+### Echo Server
+
+![](results/echo_mac.png)
+
+### HTTP Server
+
+![](results/http_mac.png)
+
