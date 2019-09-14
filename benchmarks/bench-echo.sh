@@ -23,7 +23,7 @@ function gobench {
     if [ "$3" != "" ]; then
         go build -o $2 $3
     fi
-    GOMAXPROCS=1 $2 --port $4 &
+    GOMAXPROCS=4 $2 --port $4 &
     sleep 1
     echo "*** 50 connections, 10 seconds, 6 byte packets"
     nl=$'\r\n'
@@ -33,4 +33,4 @@ function gobench {
 }
 
 gobench "GO STDLIB" bin/net-echo-server net-echo-server/main.go 5001
-gobench "EVIO" bin/evio-echo-server ../examples/echo-server/main.go 5002
+gobench "GNET" bin/evio-echo-server ../examples/echo-server/main.go 5002
