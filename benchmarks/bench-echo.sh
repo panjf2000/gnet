@@ -26,9 +26,9 @@ function gobench {
     fi
 
     if [[ "$1" == "GO STDLIB" ]]; then
-        GOMAXPROCS=4 $2 --port $4 &
+        GOMAXPROCS=8 $2 --port $4 &
     else
-        GOMAXPROCS=4 $2 --port $4 --loops $5 &
+        GOMAXPROCS=8 $2 --port $4 --loops $5 &
     fi
 
     sleep 1
