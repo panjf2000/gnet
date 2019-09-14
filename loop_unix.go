@@ -25,6 +25,7 @@ type loop struct {
 
 func (l *loop) loopCloseConn(svr *server, conn *conn, err error) error {
 	delete(l.fdconns, conn.fd)
+	_ = unix.Close(conn.fd)
 	//fmt.Printf("closing fd: %d, err: %v\n", conn.fd, unix.Close(conn.fd))
 	if svr.events.OnClosed != nil {
 		switch svr.events.OnClosed(conn, err) {
@@ -285,7 +286,7 @@ func (l *loop) loopRead(svr *server, conn *conn) error {
 		if err == unix.EAGAIN {
 			return nil
 		}
-		//fmt.Printf("closing in read, conn: %d, err: %v\n", conn.fd, err)
+		//fmt.Printf("closing in read, conn: %d in loop: %d, err: %v\n", conn.fd, l.idx, err)
 		return l.loopCloseConn(svr, conn, err)
 	}
 

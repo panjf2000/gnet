@@ -127,18 +127,16 @@ func activateSubReactor(svr *server, loop *loop) {
 			return loop.loopNote(svr, note)
 		}
 
-		if conn, ok := loop.fdconns[fd]; ok {
-			switch {
-			case !conn.opened:
-				return loop.loopOpened(svr, conn)
-			case conn.outBuf.Length() > 0:
-				return loop.loopWrite(svr, conn)
-			case conn.action != None:
-				return loop.loopAction(svr, conn)
-			default:
-				return loop.loopRead(svr, conn)
-			}
+		conn := loop.fdconns[fd]
+		switch {
+		case !conn.opened:
+			return loop.loopOpened(svr, conn)
+		case conn.outBuf.Length() > 0:
+			return loop.loopWrite(svr, conn)
+		case conn.action != None:
+			return loop.loopAction(svr, conn)
+		default:
+			return loop.loopRead(svr, conn)
 		}
-		return nil
 	})
 }
