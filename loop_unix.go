@@ -78,11 +78,6 @@ func (l *loop) loopNote(svr *server, note interface{}) error {
 	case *mail:
 		l.fdconns[v.fd] = v.conn
 		l.poller.AddReadWrite(v.fd)
-		//fmt.Printf("mail loop: %d with c: %d, loop pointer: %p, fdconns: %v\n", l.idx, v.fd, l, l.fdconns)
-		//case *detach:
-		//	delete(l.fdconns, v.fd)
-		//	l.poller.ModDetach(v.fd)
-		//	fmt.Printf("detach loop: %d with c: %d, loop pointer: %p, fdconns: %v\n", l.idx, v.fd, l, l.fdconns)
 	}
 	return err
 }
@@ -230,18 +225,28 @@ func (l *loop) loopWrite(svr *server, conn *conn) error {
 	if svr.events.PreWrite != nil {
 		svr.events.PreWrite()
 	}
-	out := conn.outBuf.Bytes()
-	n, err := unix.Write(conn.fd, out)
+
+	top, tail := conn.outBuf.PreReadAll()
+	n, err := unix.Write(conn.fd, top)
 	if err != nil {
 		if err == unix.EAGAIN {
 			return nil
 		}
-		//fmt.Println("closing in write")
 		return l.loopCloseConn(svr, conn, err)
 	}
 	conn.outBuf.Move(n)
-	ringbuffer.Recycle(out)
-	//fmt.Printf("c: %d, writing data length: %d", c.fd, n)
+
+	if len(top) == n && len(tail) > 0 {
+		n, err := unix.Write(conn.fd, tail)
+		if err != nil {
+			if err == unix.EAGAIN {
+				return nil
+			}
+			return l.loopCloseConn(svr, conn, err)
+		}
+		conn.outBuf.Move(n)
+	}
+
 	if conn.outBuf.Length() == 0 && conn.action == None {
 		l.poller.ModRead(conn.fd)
 	}
