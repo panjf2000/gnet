@@ -17,13 +17,20 @@ trap cleanup EXIT
 mkdir -p bin
 $(pkill -9 net-echo-server || printf "")
 $(pkill -9 evio-echo-server || printf "")
+$(pkill -9 gnet-echo-server || printf "")
 
 function gobench {
     echo "--- $1 ---"
-    if [ "$3" != "" ]; then
+    if [[ "$3" != "" ]]; then
         go build -o $2 $3
     fi
-    GOMAXPROCS=4 $2 --port $4 &
+
+    if [[ "$1" == "GO STDLIB" ]]; then
+        GOMAXPROCS=4 $2 --port $4 &
+    else
+        GOMAXPROCS=4 $2 --port $4 --loops $5 &
+    fi
+
     sleep 1
     echo "*** 50 connections, 10 seconds, 6 byte packets"
     nl=$'\r\n'
@@ -33,5 +40,5 @@ function gobench {
 }
 
 gobench "GO STDLIB" bin/net-echo-server net-echo-server/main.go 5001
-gobench "EVIO" bin/evio-echo-server evio-echo-server/main.go 5002
-gobench "GNET" bin/evio-echo-server ../examples/echo-server/main.go 5003
+gobench "EVIO" bin/evio-echo-server evio-echo-server/main.go 5002 -1
+gobench "GNET" bin/gnet-echo-server ../examples/echo-server/main.go 5003 -1

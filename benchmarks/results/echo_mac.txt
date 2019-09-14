@@ -1,0 +1,50 @@
+--- BENCH ECHO START ---
+
+--- GO STDLIB ---
+2019/09/14 23:22:34 echo server started on port 5001
+*** 50 connections, 10 seconds, 6 byte packets
+Destination: [127.0.0.1]:5001
+Interface lo0 address [127.0.0.1]:0
+Using interface lo0 to connect to [127.0.0.1]:5001
+Ramped up to 50 connections.
+Total data sent:     4627.9 MiB (4852674280 bytes)
+Total data received: 4625.3 MiB (4849929917 bytes)
+Bandwidth per channel: 152.141⇅ Mbps (19017.7 kBps)
+Aggregate bandwidth: 3878.508↓, 3880.703↑ Mbps
+Packet rate estimate: 355929.8↓, 347003.5↑ (12↓, 20↑ TCP MSS/op)
+Test duration: 10.0037 s.
+--- DONE ---
+
+--- EVIO ---
+2019/09/14 23:22:46 echo server started on port 5002 (loops: 4)
+*** 50 connections, 10 seconds, 6 byte packets
+Destination: [127.0.0.1]:5002
+Interface lo0 address [127.0.0.1]:0
+Using interface lo0 to connect to [127.0.0.1]:5002
+Ramped up to 50 connections.
+Total data sent:     3581.7 MiB (3755665001 bytes)
+Total data received: 3562.7 MiB (3735713021 bytes)
+Bandwidth per channel: 119.811⇅ Mbps (14976.4 kBps)
+Aggregate bandwidth: 2987.303↓, 3003.258↑ Mbps
+Packet rate estimate: 273894.2↓, 262963.4↑ (12↓, 25↑ TCP MSS/op)
+Test duration: 10.0042 s.
+--- DONE ---
+
+--- GNET ---
+2019/09/14 23:22:58 echo server started on port 5003 (loops: 4)
+*** 50 connections, 10 seconds, 6 byte packets
+Destination: [127.0.0.1]:5003
+Interface lo0 address [127.0.0.1]:0
+Using interface lo0 to connect to [127.0.0.1]:5003
+Ramped up to 50 connections.
+2019/09/14 23:23:10 missing fd: 12 in loop: 2
+2019/09/14 23:23:10 missing fd: 14 in loop: 1
+Total data sent:     7178.2 MiB (7526897536 bytes)
+Total data received: 7177.2 MiB (7525849723 bytes)
+Bandwidth per channel: 231.482⇅ Mbps (28935.3 kBps)
+Aggregate bandwidth: 6018.121↓, 6018.959↑ Mbps
+Packet rate estimate: 550976.1↓, 534132.9↑ (12↓, 24↑ TCP MSS/op)
+Test duration: 10.0043 s.
+--- DONE ---
+
+--- BENCH ECHO DONE ---

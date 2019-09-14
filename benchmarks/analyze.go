@@ -42,7 +42,7 @@ func autoplot() {
 }
 
 func analyze() {
-	lines := readlines("results/http.txt", "results/echo.txt")
+	lines := readlines("results/http_mac.txt", "results/echo_mac.txt")
 	var err error
 	for _, line := range lines {
 		rlines := strings.Split(line, "\r")
