@@ -68,13 +68,12 @@ func main() {
 	}
 
 	events.React = func(c gnet.Conn, inBuf *ringbuffer.RingBuffer) (out []byte, action gnet.Action) {
-		n := inBuf.Length()
-		data := inBuf.Bytes()
-		defer ringbuffer.Recycle(data)
+		top, tail := inBuf.PreReadAll()
+		data := append(top, tail...)
 		if noparse && bytes.Contains(data, []byte("\r\n\r\n")) {
 			// for testing minimal single packet request -> response.
 			out = appendresp(nil, "200 OK", "", res)
-			inBuf.Move(n)
+			inBuf.Reset()
 			return
 		}
 		// process the pipeline
@@ -84,7 +83,6 @@ func main() {
 			// bad thing happened
 			out = appendresp(out, "500 Error", "", err.Error()+"\n")
 			action = gnet.Close
-			inBuf.Move(n)
 			return
 		} else if len(leftover) == len(data) {
 			// request not ready, yet
@@ -93,7 +91,7 @@ func main() {
 		// handle the request
 		req.remoteAddr = c.RemoteAddr().String()
 		out = appendhandle(out, &req)
-		inBuf.Move(n)
+		inBuf.Reset()
 		return
 	}
 	// We at least want the single http address.

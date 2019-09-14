@@ -39,15 +39,12 @@ func main() {
 		return
 	}
 	events.React = func(c gnet.Conn, inBuf *ringbuffer.RingBuffer) (out []byte, action gnet.Action) {
-		n := inBuf.Length()
-		defer inBuf.Move(n)
-
-		out = inBuf.Bytes()
-		defer ringbuffer.Recycle(out)
-
+		top, tail := inBuf.PreReadAll()
 		if trace {
-			log.Printf("%s", strings.TrimSpace(string(out)))
+			log.Printf("%s", strings.TrimSpace(string(top)+string(tail)))
 		}
+		out = append(top, tail...)
+		inBuf.Reset()
 		return
 	}
 	scheme := "tcp"

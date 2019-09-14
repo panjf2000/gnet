@@ -1,0 +1,46 @@
+--- BENCH HTTP START ---
+
+--- GO STDLIB ---
+2019/09/14 19:32:18 http server started on port 8081
+*** 50 connections, 10 seconds
+Bombarding http://127.0.0.1:8081 for 10s using 50 connection(s)
+[======================================================================================================================================================] 10s
+Done!
+Statistics        Avg      Stdev        Max
+  Reqs/sec     20666.82    9952.37   32307.30
+  Latency        2.42ms     4.38ms   204.47ms
+  HTTP codes:
+    1xx - 0, 2xx - 205934, 3xx - 0, 4xx - 0, 5xx - 0
+    others - 0
+  Throughput:     3.79MB/s
+--- DONE ---
+
+--- FASTHTTP ---
+2019/09/14 19:32:30 http server started on port 8083
+*** 50 connections, 10 seconds
+Bombarding http://127.0.0.1:8083 for 10s using 50 connection(s)
+[======================================================================================================================================================] 10s
+Done!
+Statistics        Avg      Stdev        Max
+  Reqs/sec     32694.02   16509.08   55638.24
+  Latency        1.49ms     3.37ms   209.20ms
+  HTTP codes:
+    1xx - 0, 2xx - 334322, 3xx - 0, 4xx - 0, 5xx - 0
+    others - 0
+  Throughput:     6.72MB/s
+--- DONE ---
+
+--- GNET ---
+2019/09/14 19:32:42 http server started on port 8084 (loops: 1)
+*** 50 connections, 10 seconds
+Bombarding http://127.0.0.1:8084 for 10s using 50 connection(s)
+[======================================================================================================================================================] 10s
+Done!
+Statistics        Avg      Stdev        Max
+  Reqs/sec     65502.32   22244.18   95625.41
+  Latency      762.79us     0.86ms    89.32ms
+  HTTP codes:
+    1xx - 0, 2xx - 653247, 3xx - 0, 4xx - 0, 5xx - 0
+    others - 0
+  Throughput:    10.34MB/s
+--- DONE ---
