@@ -45,7 +45,7 @@ Memory:  16.0 GiB
 
 ![](results/http_linux.png)
 
-## On MacOS (kqueue)
+## On FreeBSD (kqueue)
 
 ### Test Environment
 
