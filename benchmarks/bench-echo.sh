@@ -25,7 +25,7 @@ function gobench {
         go build -o $2 $3
     fi
 
-    if [[ "$1" == "GO STDLIB" ]]; then
+    if [[ "$1" == "GO-NET" ]]; then
         GOMAXPROCS=8 $2 --port $4 &
     else
         GOMAXPROCS=8 $2 --port $4 --loops $5 &
@@ -39,6 +39,6 @@ function gobench {
     echo ""
 }
 
-gobench "GO STDLIB" bin/net-echo-server net-echo-server/main.go 5001
+gobench "GO-NET" bin/net-echo-server net-echo-server/main.go 5001
 gobench "EVIO" bin/evio-echo-server evio-echo-server/main.go 5002 -1
 gobench "GNET" bin/gnet-echo-server ../examples/echo-server/main.go 5003 -1

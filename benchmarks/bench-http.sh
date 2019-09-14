@@ -38,6 +38,6 @@ function gobench {
     echo ""
 }
 
-gobench "GO STDLIB" bin/net-http-server net-http-server/main.go 8081
+gobench "GO-HTTP" bin/net-http-server net-http-server/main.go 8081
 gobench "FASTHTTP" bin/fasthttp-server fasthttp-server/main.go 8083
 gobench "GNET" bin/gnet-http-server ../examples/http-server/main.go 8084 -1

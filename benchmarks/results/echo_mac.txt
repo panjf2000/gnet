@@ -1,7 +1,7 @@
 
 --- BENCH ECHO START ---
 
---- GO STDLIB ---
+--- GO-NET ---
 2019/09/14 23:22:34 echo server started on port 5001
 *** 50 connections, 10 seconds, 6 byte packets
 Destination: [127.0.0.1]:5001
