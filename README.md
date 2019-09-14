@@ -8,7 +8,7 @@ The goal of this project is to create a server framework for Go that performs on
 
 `gnet`sells itself as a high-performance, lightweight, nonblocking network library written in pure Go, derived from evio, but faster.
 
-> gnet is still under active development, so if you are interested in gnet, please feel free to make your code contribution to it ~~
+> gnet is still under active development, so if you are interested in gnet, please feel free to make your code contributions to it ~~
 
 # Benchmark Test
 
