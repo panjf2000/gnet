@@ -30,7 +30,7 @@ func autoplot() {
 		return
 	}
 	var title = category
-	path := strings.Replace("out/"+category+".png", " ", "_", -1)
+	path := strings.Replace("results/"+category+".png", " ", "_", -1)
 
 	plotit(
 		path,
@@ -42,7 +42,7 @@ func autoplot() {
 }
 
 func analyze() {
-	lines := readlines("out/http.txt", "out/echo.txt")
+	lines := readlines("results/http.txt", "results/echo.txt")
 	var err error
 	for _, line := range lines {
 		rlines := strings.Split(line, "\r")
