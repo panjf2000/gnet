@@ -19,6 +19,20 @@ The goal of this project is to create a server framework for Go that performs on
 
 **`gent` is derived from project `evio` while having higher performance.**
 
+# Features
+
+- [High-performance](#Performance) event loop under multi-threads model
+- Built-in load balancing algorithm: Round-Robin
+- Concise APIs
+- Efficient memory usage: Ring-Buffer
+- Supporting multiple protocols: TCP, UDP, and Unix Sockets
+- Supporting two event-notification mechanisms: epoll in Linux and kqueue in FreeBSD
+- Supporting asynchronous write operation
+- Allowing multiple network binding on the same event loop
+- Flexible ticker event
+- Fallback for non-epoll/kqueue operating systems by simulating events with the [net](https://golang.org/pkg/net/) package
+- SO_REUSEPORT socket option
+
 # Key Designs
 
 ## Multiple-threads Model
@@ -47,7 +61,7 @@ and it works as the following sequence diagram:
 
 ## Communication Mechanism
 
-`gnet` builds its 『Multiple Reactors』Model under goroutines in Golang,  which means `gnet` needs a high-performance communication mechanism between goroutines, I choose the solution of disruptor(ring-buffer) instead of SCP(channel) for a higher performance of messages dispatching in networking.
+`gnet` builds its 『Multiple Reactors』Model under goroutines in Golang,  which means `gnet` needs a high-performance communication mechanism between goroutines, I choose the solution of disruptor(ring-buffer) instead of CSP(channel) for a higher performance of messages dispatching in networking.
 
 That is why I settle on [go-disruptor](https://github.com/smartystreets-prototypes/go-disruptor): the Golang port of the LMAX Disruptor(a high performance inter-thread messaging library).
 
@@ -59,19 +73,6 @@ That is why I settle on [go-disruptor](https://github.com/smartystreets-prototyp
 <img src="https://user-images.githubusercontent.com/7496278/64916810-4f8b6300-d7b8-11e9-9459-5517760da738.gif">
 </p>
 
-# Features
-
-- [High-performance](#Performance) event loop under multi-threads model
-- Built-in load balancing algorithm: round-robin
-- Concise APIs
-- Efficient memory usage: ring-buffer
-- Supporting multiple protocols: TCP, UDP, and Unix Sockets
-- Supporting two event-notification mechanisms: epoll in Linux and kqueue in FreeBSD
-- Supporting asynchronous write operation
-- Allowing multiple network binding on the same event loop
-- Flexible ticker event
-- Fallback for non-epoll/kqueue operating systems by simulating events with the [net](https://golang.org/pkg/net/) package
-- SO_REUSEPORT socket option
 
 # Getting Started
 
