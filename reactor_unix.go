@@ -16,7 +16,7 @@ import (
 
 const (
 	// RingBufferSize indicates the size of disruptor ring-buffer.
-	RingBufferSize = 1024
+	RingBufferSize = 1024 * 64
 	// RingBufferMask ...
 	RingBufferMask = RingBufferSize - 1
 	// DisruptorCleanup ...
