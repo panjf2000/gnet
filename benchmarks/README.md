@@ -31,10 +31,11 @@ Like all benchmarks ever made in the history of whatever, YMMV. Please tweak and
 ### Test Environment
 
 ```powershell
-Machine: Amazon c5.2xlarge
-OS:      Ubuntu 18.04
-CPU:     8 Virtual CPUs
-Memory:  16.0 GiB
+Go Version: go1.12.9 linux/amd64
+Machine:    Amazon c5.2xlarge
+OS:         Ubuntu 18.04
+CPU:        8 Virtual CPUs
+Memory:     16.0 GiB
 ```
 
 ### Echo Server
@@ -50,10 +51,11 @@ Memory:  16.0 GiB
 ### Test Environment
 
 ```powershell
-Machine: MacBook Pro
-OS:      macOS Mojave 10.14.6
-CPU:     4 CPUs
-Memory:  8.0 GiB
+Go Version: go version go1.12.9 darwin/amd64
+Machine:    MacBook Pro
+OS:         macOS Mojave 10.14.6
+CPU:        4 CPUs
+Memory:     8.0 GiB
 ```
 
 ### Echo Server
