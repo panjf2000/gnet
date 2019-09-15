@@ -47,7 +47,7 @@ func (svr *server) signalShutdown() {
 }
 
 func serve(events Events, listeners []*listener, reusePort bool) error {
-	// figure out the correct number of loops/goroutines to use.
+	// Figure out the correct number of loops/goroutines to use.
 	numLoops := events.NumLoops
 	if numLoops <= 0 {
 		if numLoops == 0 {
@@ -79,10 +79,10 @@ func serve(events Events, listeners []*listener, reusePort bool) error {
 	}
 
 	defer func() {
-		// wait on a signal for shutdown
+		// Wait on a signal for shutdown
 		svr.waitForShutdown()
 
-		// notify all loops to close by closing all listeners
+		// Notify all loops to close by closing all listeners
 		for _, loop := range svr.loops {
 			sniffError(loop.poller.Trigger(errClosing))
 		}
@@ -90,10 +90,10 @@ func serve(events Events, listeners []*listener, reusePort bool) error {
 			sniffError(svr.mainLoop.poller.Trigger(errClosing))
 		}
 
-		// wait on all loops to complete reading events
+		// Wait on all loops to complete reading events
 		svr.wg.Wait()
 
-		// close loops and all outstanding connections
+		// Close loops and all outstanding connections
 		for _, loop := range svr.loops {
 			for _, c := range loop.fdconns {
 				sniffError(loop.loopCloseConn(svr, c, nil))
@@ -111,7 +111,7 @@ func serve(events Events, listeners []*listener, reusePort bool) error {
 }
 
 func activateLoops(svr *server, numLoops int) {
-	// create loops locally and bind the listeners.
+	// Create loops locally and bind the listeners.
 	for i := 0; i < numLoops; i++ {
 		loop := &loop{
 			idx:     i,
@@ -125,7 +125,7 @@ func activateLoops(svr *server, numLoops int) {
 		svr.loops = append(svr.loops, loop)
 	}
 	svr.numLoops = len(svr.loops)
-	// start loops in background
+	// Start loops in background
 	svr.wg.Add(svr.numLoops)
 	for _, loop := range svr.loops {
 		go loop.loopRun(svr)
@@ -133,9 +133,10 @@ func activateLoops(svr *server, numLoops int) {
 }
 
 func activateReactors(svr *server, numLoops int) {
-	if numLoops == 1 {
-		numLoops = 2
-	}
+	// Convert numLoops to the least power of two integer value greater than or equal to n,
+	// e.g. 2, 4, 8, 16, 32, 64, etc, which will make a higher performance when dispatching messages later.
+	numLoops = internal.CeilToPowerOfTwo(numLoops) + 1
+
 	svr.wg.Add(numLoops)
 	for i := 0; i < numLoops-1; i++ {
 		loop := &loop{
@@ -147,7 +148,7 @@ func activateReactors(svr *server, numLoops int) {
 		svr.loops = append(svr.loops, loop)
 	}
 	svr.numLoops = len(svr.loops)
-	// start sub reactors...
+	// Start sub reactors...
 	for _, loop := range svr.loops {
 		go activateSubReactor(svr, loop)
 	}
@@ -160,7 +161,7 @@ func activateReactors(svr *server, numLoops int) {
 		loop.poller.AddRead(ln.fd)
 	}
 	svr.mainLoop = loop
-	// start main reactor...
+	// Start main reactor...
 	go activateMainReactor(svr)
 }
 
