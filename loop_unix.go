@@ -176,7 +176,7 @@ func (l *loop) loopUDPRead(svr *server, lnidx, fd int) error {
 		conn := &conn{
 			addrIndex:  lnidx,
 			localAddr:  svr.lns[lnidx].lnaddr,
-			remoteAddr: internal.SockaddrToAddr(&sa6),
+			remoteAddr: internal.SockaddrToUDPAddr(&sa6),
 			inBuf:      ringbuffer.New(RingBufferSize),
 		}
 		_, _ = conn.inBuf.Write(l.packet[:n])
@@ -199,7 +199,7 @@ func (l *loop) loopOpened(svr *server, conn *conn) error {
 	conn.opened = true
 	conn.addrIndex = conn.lnidx
 	conn.localAddr = svr.lns[conn.lnidx].lnaddr
-	conn.remoteAddr = internal.SockaddrToAddr(conn.sa)
+	conn.remoteAddr = internal.SockaddrToTCPOrUnixAddr(conn.sa)
 	if svr.events.OnOpened != nil {
 		out, opts, action := svr.events.OnOpened(conn)
 		conn.action = action

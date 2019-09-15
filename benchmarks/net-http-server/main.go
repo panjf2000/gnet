@@ -27,7 +27,7 @@ func main() {
 	}
 	log.Printf("http server started on port %d", port)
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(res))
+		_, _ = w.Write([]byte(res))
 	})
 	err := http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
 	if err != nil {

@@ -298,7 +298,7 @@ func testDetach(network, addr string) {
 			defer conn.Close()
 			_, err := io.ReadFull(conn, p)
 			must(err)
-			conn.Write(expected)
+			_, _ = conn.Write(expected)
 		}()
 		return
 	}
@@ -310,10 +310,10 @@ func testDetach(network, addr string) {
 			conn, err := net.Dial(network, addr)
 			must(err)
 			defer conn.Close()
-			conn.Write(expected)
+			_, _ = conn.Write(expected)
 			_, err = io.ReadFull(conn, p)
 			must(err)
-			conn.Write(expected)
+			_, _ = conn.Write(expected)
 			_, err = io.ReadFull(conn, p)
 			must(err)
 			atomic.StoreInt64(&done, 1)

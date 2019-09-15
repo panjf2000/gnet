@@ -261,9 +261,7 @@ func addCommas(s string) string {
 	for i := len(rev) - 1; i >= 0; i-- {
 		s += string(rev[i])
 	}
-	if strings.HasPrefix(s, ",") {
-		s = s[1:]
-	}
+	s = strings.TrimPrefix(s, ",")
 	return s
 }
 

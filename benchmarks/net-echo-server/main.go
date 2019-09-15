@@ -31,7 +31,7 @@ func main() {
 		go func(id int, conn net.Conn) {
 			defer func() {
 				//log.Printf("closed: %d", id)
-				conn.Close()
+				_ = conn.Close()
 			}()
 			//log.Printf("opened: %d: %s", id, conn.RemoteAddr().String())
 			var packet [0xFFF]byte
@@ -40,7 +40,7 @@ func main() {
 				if err != nil {
 					return
 				}
-				conn.Write(packet[:n])
+				_, _ = conn.Write(packet[:n])
 			}
 		}(id, conn)
 	}
