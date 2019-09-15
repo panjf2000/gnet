@@ -32,11 +32,10 @@ type conn struct {
 }
 
 func (c *conn) sendOut(buf []byte) {
-	if !c.outBuf.IsFull() && !c.outBuf.IsEmpty() {
-		_, _ = c.outBuf.Write(buf)
-		return
-	}
-
+	//if !c.outBuf.IsFull() && !c.outBuf.IsEmpty() {
+	//	_, _ = c.outBuf.Write(buf)
+	//	return
+	//}
 	n, err := syscall.Write(c.fd, buf)
 	if err != nil {
 		_, _ = c.outBuf.Write(buf)

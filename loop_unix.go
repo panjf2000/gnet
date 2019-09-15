@@ -140,8 +140,8 @@ func (l *loop) loopAccept(svr *server, fd int) error {
 			conn := &conn{fd: nfd,
 				sa:     sa,
 				lnidx:  i,
-				inBuf:  ringbuffer.New(RingBufferSize),
-				outBuf: ringbuffer.New(RingBufferSize),
+				inBuf:  ringbuffer.New(cacheRingBufferSize),
+				outBuf: ringbuffer.New(cacheRingBufferSize),
 				loop:   l,
 			}
 			l.fdconns[conn.fd] = conn
@@ -177,7 +177,7 @@ func (l *loop) loopUDPRead(svr *server, lnidx, fd int) error {
 			addrIndex:  lnidx,
 			localAddr:  svr.lns[lnidx].lnaddr,
 			remoteAddr: internal.SockaddrToUDPAddr(&sa6),
-			inBuf:      ringbuffer.New(RingBufferSize),
+			inBuf:      ringbuffer.New(cacheRingBufferSize),
 		}
 		_, _ = conn.inBuf.Write(l.packet[:n])
 		out, action := svr.events.React(conn, conn.inBuf)

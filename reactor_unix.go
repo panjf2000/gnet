@@ -15,12 +15,12 @@ import (
 )
 
 const (
-	// RingBufferSize indicates the size of disruptor ring-buffer.
-	RingBufferSize = 1024 * 64
-	// RingBufferMask ...
-	RingBufferMask = RingBufferSize - 1
-	// DisruptorCleanup ...
-	DisruptorCleanup = time.Millisecond * 10
+	// connRingBufferSize indicates the size of disruptor ring-buffer.
+	connRingBufferSize = 1024 * 64
+	connRingBufferMask = connRingBufferSize - 1
+	disruptorCleanup = time.Millisecond * 10
+
+	cacheRingBufferSize = 1024
 )
 
 type mail struct {
@@ -32,15 +32,15 @@ type eventConsumer struct {
 	numLoops       int
 	numLoopsMask   int
 	loop           *loop
-	connRingBuffer *[RingBufferSize]*conn
+	connRingBuffer *[connRingBufferSize]*conn
 }
 
 func (ec *eventConsumer) Consume(lower, upper int64) {
 	//fmt.Printf("consumer with loop: %d, consuming message, lower: %d, upper: %d\n", ec.loop.idx, lower, upper)
 	for ; lower <= upper; lower++ {
-		conn := ec.connRingBuffer[lower&RingBufferMask]
-		conn.inBuf = ringbuffer.New(RingBufferSize)
-		conn.outBuf = ringbuffer.New(RingBufferSize)
+		conn := ec.connRingBuffer[lower&connRingBufferMask]
+		conn.inBuf = ringbuffer.New(cacheRingBufferSize)
+		conn.outBuf = ringbuffer.New(cacheRingBufferSize)
 		//fmt.Printf("lower: %d, consuming fd: %d in loop: %d\n", lower, conn.fd, ec.loop.idx)
 		conn.loop = ec.loop
 
@@ -61,12 +61,12 @@ func (ec *eventConsumer) Consume(lower, upper int64) {
 
 func activateMainReactor(svr *server) {
 	defer func() {
-		time.Sleep(DisruptorCleanup)
+		time.Sleep(disruptorCleanup)
 		svr.signalShutdown()
 		svr.wg.Done()
 	}()
 
-	var connRingBuffer = &[RingBufferSize]*conn{}
+	var connRingBuffer = &[connRingBufferSize]*conn{}
 
 	eventConsumers := make([]disruptor.Consumer, 0, svr.numLoops)
 	for _, loop := range svr.loops {
@@ -76,7 +76,7 @@ func activateMainReactor(svr *server) {
 	//fmt.Printf("length of loops: %d and consumers: %d\n", svr.numLoops, len(eventConsumers))
 
 	// Initialize go-disruptor with ring-buffer for dispatching events to loops.
-	controller := disruptor.Configure(RingBufferSize).WithConsumerGroup(eventConsumers...).Build()
+	controller := disruptor.Configure(connRingBufferSize).WithConsumerGroup(eventConsumers...).Build()
 
 	controller.Start()
 	defer controller.Stop()
@@ -108,7 +108,7 @@ func activateMainReactor(svr *server) {
 				conn := &conn{fd: nfd, sa: sa, lnidx: i}
 				//fmt.Printf("accepted fd: %d in main reactor\n", nfd)
 				sequence = writer.Reserve(1)
-				connRingBuffer[sequence&RingBufferMask] = conn
+				connRingBuffer[sequence&connRingBufferMask] = conn
 				writer.Commit(sequence, sequence)
 				return nil
 			}

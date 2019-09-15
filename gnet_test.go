@@ -165,6 +165,9 @@ func testServe(network, addr string, unix, reuseport bool, nclients, nloops int)
 		n := inBuf.Length()
 		out = inBuf.Bytes()
 		inBuf.Advance(n)
+		if atomic.LoadInt32(&connected) == 1 {
+			c.Wake()
+		}
 		return
 	}
 	events.Tick = func() (delay time.Duration, action Action) {
