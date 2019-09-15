@@ -31,33 +31,103 @@ func TestServe(t *testing.T) {
 	t.Run("poll", func(t *testing.T) {
 		t.Run("tcp", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe("tcp", ":9991", false, 10, 1)
+				testServe("tcp", ":9991", false, false, 10, 1)
 			})
 			t.Run("5-loop", func(t *testing.T) {
-				testServe("tcp", ":9992", false, 10, 5)
+				testServe("tcp", ":9992", false, false, 10, 5)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("tcp", ":9993", false, 10, -1)
+				testServe("tcp", ":9993", false, false, 10, -1)
 			})
 		})
-		t.Run("unix", func(t *testing.T) {
+		t.Run("tcp-unix", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe("tcp", ":9994", true, 10, 1)
+				testServe("tcp", ":9994", true, false, 10, 1)
 			})
 			t.Run("5-loop", func(t *testing.T) {
-				testServe("tcp", ":9995", true, 10, 5)
+				testServe("tcp", ":9995", true, false, 10, 5)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("tcp", ":9996", true, 10, -1)
+				testServe("tcp", ":9996", true, false, 10, -1)
+			})
+		})
+
+		t.Run("udp", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				testServe("udp", ":9997", false, false, 10, 1)
+			})
+			t.Run("5-loop", func(t *testing.T) {
+				testServe("udp", ":9998", false, false, 10, 5)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				testServe("udp", ":9999", false, false, 10, -1)
+			})
+		})
+		t.Run("udp-unix-reuseport", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				testServe("udp", ":9981", true, false, 10, 1)
+			})
+			t.Run("5-loop", func(t *testing.T) {
+				testServe("udp", ":9982", true, false, 10, 5)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				testServe("udp", ":9983", true, false, 10, -1)
 			})
 		})
 	})
 
+	t.Run("poll-reuseport", func(t *testing.T) {
+		t.Run("tcp", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				testServe("tcp", ":9991", false, true, 10, 1)
+			})
+			t.Run("5-loop", func(t *testing.T) {
+				testServe("tcp", ":9992", false, true, 10, 5)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				testServe("tcp", ":9993", false, true, 10, -1)
+			})
+		})
+		t.Run("tcp-unix-reuseport", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				testServe("tcp", ":9994", true, true, 10, 1)
+			})
+			t.Run("5-loop", func(t *testing.T) {
+				testServe("tcp", ":9995", true, true, 10, 5)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				testServe("tcp", ":9996", true, true, 10, -1)
+			})
+		})
+		t.Run("udp", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				testServe("udp", ":9997", false, true, 10, 1)
+			})
+			t.Run("5-loop", func(t *testing.T) {
+				testServe("udp", ":9998", false, true, 10, 5)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				testServe("udp", ":9999", false, true, 10, -1)
+			})
+		})
+		t.Run("udp-unix-reuseport", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				testServe("udp", ":9981", true, true, 10, 1)
+			})
+			t.Run("5-loop", func(t *testing.T) {
+				testServe("udp", ":9982", true, true, 10, 5)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				testServe("udp", ":9983", true, true, 10, -1)
+			})
+		})
+	})
 }
 
-func testServe(network, addr string, unix bool, nclients, nloops int) {
+func testServe(network, addr string, unix, reuseport bool, nclients, nloops int) {
 	var started int32
 	var connected int32
+	var clientActive int32
 	var disconnected int32
 
 	var events Events
@@ -82,6 +152,7 @@ func testServe(network, addr string, unix bool, nclients, nloops int) {
 		if c.Context() != c {
 			panic("invalid context")
 		}
+
 		atomic.AddInt32(&disconnected, 1)
 		if atomic.LoadInt32(&connected) == atomic.LoadInt32(&disconnected) &&
 			atomic.LoadInt32(&disconnected) == int32(nclients) {
@@ -99,10 +170,18 @@ func testServe(network, addr string, unix bool, nclients, nloops int) {
 	events.Tick = func() (delay time.Duration, action Action) {
 		if atomic.LoadInt32(&started) == 0 {
 			for i := 0; i < nclients; i++ {
+				atomic.AddInt32(&clientActive, 1)
 				//fmt.Println("start client...")
-				go startClient(network, addr, nloops)
+				go func() {
+					startClient(network, addr, nloops)
+					atomic.AddInt32(&clientActive, -1)
+				}()
 			}
 			atomic.StoreInt32(&started, 1)
+		}
+		if network == "udp" && atomic.LoadInt32(&clientActive) == 0 {
+			action = Shutdown
+			return
 		}
 		delay = time.Second / 5
 		return
@@ -112,9 +191,17 @@ func testServe(network, addr string, unix bool, nclients, nloops int) {
 		socket := strings.Replace(addr, ":", "socket", 1)
 		os.RemoveAll(socket)
 		defer os.RemoveAll(socket)
-		err = Serve(events, network+"://"+addr, "unix://"+socket)
+		if reuseport {
+			err = Serve(events, network+"://"+addr+"?reuseport=t", "unix://"+socket)
+		} else {
+			err = Serve(events, network+"://"+addr, "unix://"+socket)
+		}
 	} else {
-		err = Serve(events, network+"://"+addr)
+		if reuseport {
+			err = Serve(events, network+"://"+addr+"?reuseport=t")
+		} else {
+			err = Serve(events, network+"://"+addr)
+		}
 	}
 	if err != nil {
 		panic(err)
@@ -130,18 +217,27 @@ func startClient(network, addr string, nloops int) {
 	}
 	defer c.Close()
 	rd := bufio.NewReader(c)
-	msg, err := rd.ReadBytes('\n')
-	if err != nil {
-		panic(err)
-	}
-	if string(msg) != "sweetness\r\n" {
-		panic("bad header")
+	if network != "udp" {
+		msg, err := rd.ReadBytes('\n')
+		if err != nil {
+			panic(err)
+		}
+		if string(msg) != "sweetness\r\n" {
+			panic("bad header")
+		}
 	}
 	duration := time.Duration((rand.Float64()*2+1)*float64(time.Second)) / 8
 	start := time.Now()
 	for time.Since(start) < duration {
 		sz := rand.Int() % (1024 * 1024)
 		data := make([]byte, sz)
+		if network == "udp" {
+			n := 64
+			if sz < 64 {
+				n = sz
+			}
+			data = data[:n]
+		}
 		if _, err := rand.Read(data); err != nil {
 			panic(err)
 		}

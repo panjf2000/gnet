@@ -158,6 +158,9 @@ func activateReactors(svr *server, numLoops int) {
 		poller: internal.OpenPoller(),
 	}
 	for _, ln := range svr.lns {
+		if ln.pconn != nil && loop.packet == nil {
+			loop.packet = make([]byte, 0xFFFF)
+		}
 		loop.poller.AddRead(ln.fd)
 	}
 	svr.mainLoop = loop
