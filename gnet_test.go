@@ -93,7 +93,7 @@ func testServe(network, addr string, unix bool, nclients, nloops int) {
 	events.React = func(c Conn, inBuf *ringbuffer.RingBuffer) (out []byte, action Action) {
 		n := inBuf.Length()
 		out = inBuf.Bytes()
-		inBuf.Move(n)
+		inBuf.Advance(n)
 		return
 	}
 	events.Tick = func() (delay time.Duration, action Action) {
@@ -281,7 +281,7 @@ func testDetach(network, addr string) {
 	events.React = func(c Conn, inBuf *ringbuffer.RingBuffer) (out []byte, action Action) {
 		n := inBuf.Length()
 		cin = append(cin, inBuf.Bytes()...)
-		inBuf.Move(n)
+		inBuf.Advance(n)
 		if len(cin) >= len(expected) {
 			if string(cin) != string(expected) {
 				panic("mismatch client -> server")

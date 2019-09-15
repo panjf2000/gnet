@@ -14,6 +14,7 @@ import (
 	"github.com/panjf2000/gnet/internal"
 )
 
+// ErrIsEmpty will be returned when trying to read a empty ring-buffer
 var ErrIsEmpty = errors.New("ringbuffer is empty")
 
 // RingBuffer is a circular buffer that implement io.ReaderWriter interface.
@@ -34,6 +35,7 @@ func New(size int) *RingBuffer {
 	}
 }
 
+// PreRead reads the bytes with given length but will not move the pointer of "read".
 func (r *RingBuffer) PreRead(len int) (top []byte, tail []byte) {
 	if r.isEmpty {
 		return
@@ -70,6 +72,7 @@ func (r *RingBuffer) PreRead(len int) (top []byte, tail []byte) {
 	return
 }
 
+// PreReadAll reads the all bytes in this ring-buffer but will not move the pointer of "read".
 func (r *RingBuffer) PreReadAll() (top []byte, tail []byte) {
 	if r.isEmpty {
 		return
@@ -94,7 +97,8 @@ func (r *RingBuffer) PreReadAll() (top []byte, tail []byte) {
 	return
 }
 
-func (r *RingBuffer) Move(len int) {
+// Advance advances the "read" pointer.
+func (r *RingBuffer) Advance(len int) {
 	if len <= 0 {
 		return
 	}
@@ -308,6 +312,7 @@ func (r *RingBuffer) Bytes() []byte {
 	return buf
 }
 
+// Recycle recycles slice of bytes.
 func Recycle(p []byte) {
 	pbytes.Put(p)
 }

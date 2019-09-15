@@ -11,6 +11,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// SetKeepAlive ...
 func SetKeepAlive(fd, secs int) error {
 	if err := unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_KEEPALIVE, 1); err != nil {
 		return err

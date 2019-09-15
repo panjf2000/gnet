@@ -162,7 +162,7 @@ func plotit(path, title string, values []float64, names []string) {
 }
 
 // PreciseTicks is suitable for the Tick.Marker field of an Axis, it returns a
-// set of tick marks with labels that have been rounded less agressively than
+// set of tick marks with labels that have been rounded less aggressively than
 // what DefaultTicks provides.
 type PreciseTicks struct{}
 

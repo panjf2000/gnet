@@ -12,7 +12,7 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-var res string
+//var res string
 
 func main() {
 	var port int

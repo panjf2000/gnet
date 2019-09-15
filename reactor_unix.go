@@ -15,8 +15,11 @@ import (
 )
 
 const (
-	RingBufferSize   = 1024
-	RingBufferMask   = RingBufferSize - 1
+	// RingBufferSize indicates the size of disruptor ring-buffer.
+	RingBufferSize = 1024
+	// RingBufferMask ...
+	RingBufferMask = RingBufferSize - 1
+	// DisruptorCleanup ...
 	DisruptorCleanup = time.Millisecond * 10
 )
 

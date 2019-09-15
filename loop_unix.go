@@ -234,7 +234,7 @@ func (l *loop) loopWrite(svr *server, conn *conn) error {
 		}
 		return l.loopCloseConn(svr, conn, err)
 	}
-	conn.outBuf.Move(n)
+	conn.outBuf.Advance(n)
 
 	if len(top) == n && len(tail) > 0 {
 		n, err := unix.Write(conn.fd, tail)
@@ -244,7 +244,7 @@ func (l *loop) loopWrite(svr *server, conn *conn) error {
 			}
 			return l.loopCloseConn(svr, conn, err)
 		}
-		conn.outBuf.Move(n)
+		conn.outBuf.Advance(n)
 	}
 
 	if conn.outBuf.Length() == 0 && conn.action == None {

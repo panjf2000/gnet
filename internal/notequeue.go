@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 )
 
-// this is a good candiate for a lock-free structure.
+// this is a good candidate for a lock-free structure.
 
 type spinlock struct{ lock uintptr }
 
