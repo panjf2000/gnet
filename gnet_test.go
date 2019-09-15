@@ -158,7 +158,6 @@ func testServe(network, addr string, unix, reuseport bool, nclients, nloops int)
 			atomic.LoadInt32(&disconnected) == int32(nclients) {
 			action = Shutdown
 		}
-		//fmt.Printf("connection closing, action: %v\n", action)
 		return
 	}
 	events.React = func(c Conn, inBuf *ringbuffer.RingBuffer) (out []byte, action Action) {
@@ -174,7 +173,6 @@ func testServe(network, addr string, unix, reuseport bool, nclients, nloops int)
 		if atomic.LoadInt32(&started) == 0 {
 			for i := 0; i < nclients; i++ {
 				atomic.AddInt32(&clientActive, 1)
-				//fmt.Println("start client...")
 				go func() {
 					startClient(network, addr, nloops)
 					atomic.AddInt32(&clientActive, -1)

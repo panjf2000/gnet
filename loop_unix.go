@@ -26,12 +26,10 @@ type loop struct {
 func (l *loop) loopCloseConn(svr *server, conn *conn, err error) error {
 	delete(l.fdconns, conn.fd)
 	_ = unix.Close(conn.fd)
-	//fmt.Printf("closing fd: %d, err: %v\n", conn.fd, unix.Close(conn.fd))
 	if svr.events.OnClosed != nil {
 		switch svr.events.OnClosed(conn, err) {
 		case None:
 		case Shutdown:
-			//fmt.Printf("closing read action: shutdown...\n")
 			return errClosing
 		}
 	}
@@ -210,12 +208,10 @@ func (l *loop) loopOpened(svr *server, conn *conn) error {
 		}
 
 		if len(out) > 0 {
-			//fmt.Printf("c: %d, out length: %d in opened\n", conn.fd, len(out))
 			conn.sendOut(out)
 		}
 	}
 	if conn.outBuf.Length() == 0 && conn.action == None {
-		//fmt.Printf("c: %d, outBuf length: %d in opened\n", conn.fd, conn.outBuf.Length())
 		l.poller.ModRead(conn.fd)
 	}
 	return nil
@@ -291,12 +287,10 @@ func (l *loop) loopRead(svr *server, conn *conn) error {
 		if err == unix.EAGAIN {
 			return nil
 		}
-		//fmt.Printf("closing in read, conn: %d in loop: %d, err: %v\n", conn.fd, l.idx, err)
 		return l.loopCloseConn(svr, conn, err)
 	}
 
 	_, _ = conn.inBuf.Write(l.packet[:n])
-	//fmt.Printf("reading data length: %d\n", conn.inBuf.Length())
 	if svr.events.React != nil {
 		out, action := svr.events.React(conn, conn.inBuf)
 		conn.action = action
@@ -304,7 +298,6 @@ func (l *loop) loopRead(svr *server, conn *conn) error {
 			conn.sendOut(out)
 		}
 	}
-	//fmt.Printf("c: %d, outBuf length %d in read", c.fd, c.outBuf.Length())
 	if conn.outBuf.Length() != 0 || conn.action != None {
 		l.poller.ModReadWrite(conn.fd)
 	}

@@ -36,12 +36,10 @@ type eventConsumer struct {
 }
 
 func (ec *eventConsumer) Consume(lower, upper int64) {
-	//fmt.Printf("consumer with loop: %d, consuming message, lower: %d, upper: %d\n", ec.loop.idx, lower, upper)
 	for ; lower <= upper; lower++ {
 		conn := ec.connRingBuffer[lower&connRingBufferMask]
 		conn.inBuf = ringbuffer.New(cacheRingBufferSize)
 		conn.outBuf = ringbuffer.New(cacheRingBufferSize)
-		//fmt.Printf("lower: %d, consuming fd: %d in loop: %d\n", lower, conn.fd, ec.loop.idx)
 		conn.loop = ec.loop
 
 		// Connections load balance under round-robin algorithm.
@@ -49,12 +47,10 @@ func (ec *eventConsumer) Consume(lower, upper int64) {
 			// Leverage "and" operator instead of "modulo" operator to speed up round-robin algorithm.
 			idx := int(lower) & ec.numLoopsMask
 			if idx != ec.loop.idx {
-				//fmt.Printf("lower: %d, ignoring fd: %d in loop: %d\n", lower, conn.fd, ec.loop.idx)
 				// Don't match the round-robin rule, ignore this connection.
 				continue
 			}
 		}
-		//fmt.Printf("lower: %d, sendOut fd: %d to loop: %d\n", lower, conn.fd, ec.loop.idx)
 		_ = ec.loop.poller.Trigger(&mail{fd: conn.fd, conn: conn})
 	}
 }
@@ -73,7 +69,6 @@ func activateMainReactor(svr *server) {
 		ec := &eventConsumer{svr.numLoops, svr.numLoops - 1, loop, connRingBuffer}
 		eventConsumers = append(eventConsumers, ec)
 	}
-	//fmt.Printf("length of loops: %d and consumers: %d\n", svr.numLoops, len(eventConsumers))
 
 	// Initialize go-disruptor with ring-buffer for dispatching events to loops.
 	controller := disruptor.Configure(connRingBufferSize).WithConsumerGroup(eventConsumers...).Build()
@@ -84,7 +79,6 @@ func activateMainReactor(svr *server) {
 	writer := controller.Writer()
 	sequence := disruptor.InitialSequenceValue
 
-	//fmt.Println("main reactor polling...")
 	_ = svr.mainLoop.poller.Polling(func(fd int, note interface{}) error {
 		if fd == 0 {
 			return svr.mainLoop.loopNote(svr, note)
@@ -106,7 +100,6 @@ func activateMainReactor(svr *server) {
 					return err
 				}
 				conn := &conn{fd: nfd, sa: sa, lnidx: i}
-				//fmt.Printf("accepted fd: %d in main reactor\n", nfd)
 				sequence = writer.Reserve(1)
 				connRingBuffer[sequence&connRingBufferMask] = conn
 				writer.Commit(sequence, sequence)
@@ -124,11 +117,9 @@ func activateSubReactor(svr *server, loop *loop) {
 	}()
 
 	if loop.idx == 0 && svr.events.Tick != nil {
-		//fmt.Println("start ticker...")
 		go loop.loopTicker(svr)
 	}
 
-	//fmt.Printf("sub reactor polling, loop: %d\n", loop.idx)
 	_ = loop.poller.Polling(func(fd int, note interface{}) error {
 		if fd == 0 {
 			return loop.loopNote(svr, note)
