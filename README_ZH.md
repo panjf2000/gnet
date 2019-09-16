@@ -10,79 +10,79 @@
 <a title="Release" target="_blank" href="https://github.com/panjf2000/gnet/releases"><img src="https://img.shields.io/github/release/panjf2000/gnet.svg?style=flat-square"></a>
 </p>
 
-# [[中文]](README_ZH.md)
+# [[英文]](README.md)
 
-`gnet` is an Event-Loop networking framework that is fast and small. It makes direct [epoll](https://en.wikipedia.org/wiki/Epoll) and [kqueue](https://en.wikipedia.org/wiki/Kqueue) syscalls rather than using the standard Go [net](https://golang.org/pkg/net/) package, and works in a similar manner as [libuv](https://github.com/libuv/libuv) and [libevent](https://github.com/libevent/libevent).
+`gnet` 是一个基于 Event-Loop 事件驱动的高性能和轻量级网络库。这个库直接使用 [epoll](https://en.wikipedia.org/wiki/Epoll) 和 [kqueue](https://en.wikipedia.org/wiki/Kqueue) 系统调用而非标准 Golang 网络包：[net](https://golang.org/pkg/net/) 来构建网络应用，它的工作原理类似两个开源的网络库：[libuv](https://github.com/libuv/libuv) 和 [libevent](https://github.com/libevent/libevent)。
 
-The goal of this project is to create a server framework for Go that performs on par with [Redis](http://redis.io) and [Haproxy](http://www.haproxy.org) for packet handling.
+这个项目存在的价值是提供一个在网络包处理方面能和 [Redis](http://redis.io)、[Haproxy](http://www.haproxy.org) 这两个项目具有相近性能的Go 语言网络服务器框架。
 
-`gnet` sells itself as a high-performance, lightweight, nonblocking network library written in pure Go.
+`gnet` 的亮点在于它是一个高性能、轻量级、非阻塞的纯 Go 实现的网络库。
 
-**`gent` is derived from project `evio` while having higher performance.**
+**`gnet` 是衍生自另一个项目：`evio`，但是性能更好。**
 
-# Features
+# 功能
 
-- [High-performance](#Performance) Event-Loop under multi-threads model
-- Built-in load balancing algorithm: Round-Robin
-- Concise APIs
-- Efficient memory usage: Ring-Buffer
-- Supporting multiple protocols: TCP, UDP, and Unix Sockets
-- Supporting two event-notification mechanisms: epoll in Linux and kqueue in FreeBSD
-- Supporting asynchronous write operation
-- Allowing multiple network binding on the same Event-Loop
-- Flexible ticker event
-- SO_REUSEPORT socket option
+- [高性能](#性能测试) 的基于多线程模型的 Event-Loop 事件驱动
+- 内置 Round-Robin 轮询负载均衡算法
+- 简洁的 APIs
+- 基于 Ring-Buffer 的高效内存利用
+- 支持多种网络协议：TCP、UDP、Unix Sockets
+- 支持两种事件驱动机制：Linux 里的 epoll 以及 FreeBSD 里的 kqueue
+- 支持异步写操作
+- 允许多个网络监听地址绑定在一个 Event-Loop上
+- 灵活的事件定时器
+- SO_REUSEPORT 端口重用
 
-# Key Designs
+# 核心设计
 
-## Multiple-threads Model
+## 多线程模型
 
-`gnet` implements a built-in multiple-threads model: 『Multiple Reactors』 which is also the default multiple-threads model of `netty`, Here's the schematic diagram:
+`gnet` 实现了一个内置的多线程模型：『主从 Reactor 多线程』，这也是 `netty` 默认的线程模型，下面是这个模型的原理图：
 
 <p align="center">
 <img width="820" alt="multi_reactor" src="https://user-images.githubusercontent.com/7496278/64916634-8f038080-d7b3-11e9-82c8-f77e9791df86.png">
 </p>
 
-and it works as the following sequence diagram:
+它的运行流程如下面的时序图：
 <p align="center">
 <img width="869" alt="reactor" src="https://user-images.githubusercontent.com/7496278/64918644-a5213900-d7d3-11e9-88d6-1ec1ec72c1cd.png">
 </p>
 
-The new multiple-threads model of `gnet`: 『Multiple Reactors with thread/goroutine pool』is under development and about to be delivered soon, the architecture diagram of new model is in here:
+现在我正在 `gnet` 里开发一个新的多线程模型：『带线程/go程的主从 Reactors 多线程』，很快就能完成它，这个模型的架构图如下所示：
 
 <p align="center">
 <img width="854" alt="multi_reactor_thread_pool" src="https://user-images.githubusercontent.com/7496278/64918783-90de3b80-d7d5-11e9-9190-ff8277c95db1.png">
 </p>
 
-and it works as the following sequence diagram:
+它的运行流程如下面的时序图：
 <p align="center">
 <img width="916" alt="multi-reactors" src="https://user-images.githubusercontent.com/7496278/64918646-a7839300-d7d3-11e9-804a-d021ddd23ca3.png">
 </p>
 
-## Communication Mechanism
+## 通信机制
 
-`gnet` builds its 『Multiple Reactors』Model under goroutines in Golang,  which means `gnet` needs a efficient communication mechanism between goroutines. I choose a tricky solution of Disruptor(Ring-Buffer) which provides a higher performance of messages dispatching in networking, instead of the recommended pattern: CSP(Channel) under Golang-Best-Practices.
+`gnet` 的『主从 Reactors 多线程』模型是基于 Golang 里的 goroutines的，所以 `gnet` 里必须要有一个能在 goroutines 之间进行高效率的通信的机制，我没有选择 Golang 里的主流方案：基于 channel 的 CSP 方案而是选择了性能更好的、基于 ring-buffer 的 disruptor 方案。
 
-That is why I finally settle on [go-disruptor](https://github.com/smartystreets-prototypes/go-disruptor): the Golang port of the LMAX Disruptor(a high performance inter-thread messaging library).
+所以我最终选择了 [go-disruptor](https://github.com/smartystreets-prototypes/go-disruptor)：高性能消息分发队列 LMAX Disruptor 的 Golang 实现。
 
-## Auto-scaling Ring Buffer
+## 自动扩容的 Ring-Buffer
 
-`gnet` leverages ring-buffer to cache TCP streams and manage memory in networking.
+`gnet` 利用 ring-buffer 来缓存 TCP 流数据以及管理内存使用。
 
 <p align="center">
 <img src="https://user-images.githubusercontent.com/7496278/64916810-4f8b6300-d7b8-11e9-9459-5517760da738.gif">
 </p>
 
 
-# Getting Started
+# 开始使用
 
-## Installation
+## 安装
 
 ```sh
 $ go get -u github.com/panjf2000/gnet
 ```
 
-## Example
+## 使用示例
 
 ```go
 // ======================== Echo Server implemented with gnet ===========================
@@ -141,23 +141,23 @@ func main() {
 
 ```
 
-## I/O Events
+## I/O 事件
 
-Current supported I/O events in `gnet`:
+ `gnet` 目前支持的 I/O 事件如下：
 
-- `OnInitComplete` is activated when the server is ready to accept new connections.
-- `OnOpened` is activated when a connection has opened.
-- `OnClosed` is activated when a connection has closed.
-- `OnDetached` is activated when a connection has been detached using the `Detach` return action.
-- `React` is activated when the server receives new data from a connection.
-- `Tick` is activated immediately after the server starts and will fire again after a specified interval.
-- `PreWrite` is activated just before any data is written to any client socket.
+- `OnInitComplete` 当 server 初始化完成之后调用。
+- `OnOpened` 当连接被打开的时候调用。
+- `OnClosed` 当连接被关闭的时候调用。
+- `OnDetached` 当主动摘除连接的时候的调用。
+- `React` 当 server 端接收到从 client 端发送来的数据的时候调用。（你的核心业务代码一般是写在这个方法里）
+- `Tick` 服务器启动的时候会调用一次，之后就以给定的时间间隔定时调用一次，是一个定时器方法。
+- `PreWrite` 预先写数据方法，在 server 端写数据回 client 端之前调用。
 
-# Performance
+# 性能测试
 
-## On Linux (epoll)
+## Linux (epoll)
 
-### Test Environment
+### 系统参数
 
 ```powershell
 Go Version: go1.12.9 linux/amd64
@@ -174,9 +174,9 @@ Memory:     16.0 GiB
 
 ![](benchmarks/results/http_linux.png)
 
-## On FreeBSD (kqueue)
+## FreeBSD (kqueue)
 
-### Test Environment
+### 系统参数
 
 ```powershell
 Go Version: go version go1.12.9 darwin/amd64
@@ -193,10 +193,10 @@ Memory:     8.0 GiB
 
 ![](benchmarks/results/http_mac.png)
 
-# License
+# 证书
 
-Source code in `gnet` is available under the MIT [License](/LICENSE).
+`gnet` 的源码允许用户在遵循 MIT [开源证书](/LICENSE) 规则的前提下使用。
 
-# TODO
+# 待做事项
 
-> gnet is still under active development so the code and documentation will continue to be updated, if you are interested in gnet, please feel free to make your code contributions to it~~
+> gnet 还在持续开发的过程中，所以这个仓库的代码和文档会一直持续更新，如果你对 gnet 感兴趣的话，欢迎给这个开源库贡献你的代码~~
