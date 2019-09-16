@@ -37,7 +37,7 @@
 
 ## 多线程模型
 
-`gnet` 实现了一个内置的多线程模型：『主从 Reactor 多线程』，这也是 `netty` 默认的线程模型，下面是这个模型的原理图：
+`gnet` 重新设计开发了一个新内置的多线程模型：『主从 Reactor 多线程』，这也是 `netty` 默认的线程模型，下面是这个模型的原理图：
 
 <p align="center">
 <img width="820" alt="multi_reactor" src="https://user-images.githubusercontent.com/7496278/64916634-8f038080-d7b3-11e9-82c8-f77e9791df86.png">
