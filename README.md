@@ -37,7 +37,7 @@ The goal of this project is to create a server framework for Go that performs on
 
 ## Multiple-threads Model
 
-`gnet` re-designs and implements a new built-in multiple-threads model: 『Multiple Reactors』 which is also the default multiple-threads model of `netty`, Here's the schematic diagram:
+`gnet` redesigns and implements a new built-in multiple-threads model: 『Multiple Reactors』 which is also the default multiple-threads model of `netty`, Here's the schematic diagram:
 
 <p align="center">
 <img width="820" alt="multi_reactor" src="https://user-images.githubusercontent.com/7496278/64916634-8f038080-d7b3-11e9-82c8-f77e9791df86.png">
@@ -61,13 +61,13 @@ and it works as the following sequence diagram:
 
 ## Communication Mechanism
 
-`gnet` builds its 『Multiple Reactors』Model under goroutines in Golang,  which means `gnet` needs a efficient communication mechanism between goroutines. I choose a tricky solution of Disruptor(Ring-Buffer) which provides a higher performance of messages dispatching in networking, instead of the recommended pattern: CSP(Channel) under Golang-Best-Practices.
+`gnet` builds its 『Multiple Reactors』Model under Goroutines in Golang, one Reactor per Goroutine, so there is a critical requirement handling extremely large amounts of messages between Goroutines in this networking model of `gnet`, which means `gnet` needs a efficient communication mechanism between Goroutines. I choose a tricky solution of Disruptor(Ring-Buffer) which provides a higher performance of messages dispatching in networking, instead of the recommended pattern: CSP(Channel) under Golang-Best-Practices.
 
 That is why I finally settle on [go-disruptor](https://github.com/smartystreets-prototypes/go-disruptor): the Golang port of the LMAX Disruptor(a high performance inter-thread messaging library).
 
 ## Auto-scaling Ring Buffer
 
-`gnet` leverages ring-buffer to cache TCP streams and manage memory in networking.
+`gnet` leverages Ring-Buffer to cache TCP streams and manage memory cache in networking.
 
 <p align="center">
 <img src="https://user-images.githubusercontent.com/7496278/64916810-4f8b6300-d7b8-11e9-9459-5517760da738.gif">

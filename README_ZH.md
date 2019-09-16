@@ -14,7 +14,7 @@
 
 `gnet` 是一个基于 Event-Loop 事件驱动的高性能和轻量级网络库。这个库直接使用 [epoll](https://en.wikipedia.org/wiki/Epoll) 和 [kqueue](https://en.wikipedia.org/wiki/Kqueue) 系统调用而非标准 Golang 网络包：[net](https://golang.org/pkg/net/) 来构建网络应用，它的工作原理类似两个开源的网络库：[libuv](https://github.com/libuv/libuv) 和 [libevent](https://github.com/libevent/libevent)。
 
-这个项目存在的价值是提供一个在网络包处理方面能和 [Redis](http://redis.io)、[Haproxy](http://www.haproxy.org) 这两个项目具有相近性能的Go 语言网络服务器框架。
+这个项目存在的价值是提供一个在网络包处理方面能和 [Redis](http://redis.io)、[Haproxy](http://www.haproxy.org) 这两个项目具有相近性能的 Go 语言网络服务器框架。
 
 `gnet` 的亮点在于它是一个高性能、轻量级、非阻塞的纯 Go 实现的网络库。
 
@@ -29,7 +29,7 @@
 - 支持多种网络协议：TCP、UDP、Unix Sockets
 - 支持两种事件驱动机制：Linux 里的 epoll 以及 FreeBSD 里的 kqueue
 - 支持异步写操作
-- 允许多个网络监听地址绑定在一个 Event-Loop上
+- 允许多个网络监听地址绑定在一个 Event-Loop 上
 - 灵活的事件定时器
 - SO_REUSEPORT 端口重用
 
@@ -48,7 +48,7 @@
 <img width="869" alt="reactor" src="https://user-images.githubusercontent.com/7496278/64918644-a5213900-d7d3-11e9-88d6-1ec1ec72c1cd.png">
 </p>
 
-现在我正在 `gnet` 里开发一个新的多线程模型：『带线程/go程的主从 Reactors 多线程』，很快就能完成它，这个模型的架构图如下所示：
+现在我正在 `gnet` 里开发一个新的多线程模型：『带线程/go程的主从 Reactors 多线程』，并且很快就能完成，这个模型的架构图如下所示：
 
 <p align="center">
 <img width="854" alt="multi_reactor_thread_pool" src="https://user-images.githubusercontent.com/7496278/64918783-90de3b80-d7d5-11e9-9190-ff8277c95db1.png">
@@ -61,13 +61,13 @@
 
 ## 通信机制
 
-`gnet` 的『主从 Reactors 多线程』模型是基于 Golang 里的 goroutines的，所以 `gnet` 里必须要有一个能在 goroutines 之间进行高效率的通信的机制，我没有选择 Golang 里的主流方案：基于 channel 的 CSP 方案而是选择了性能更好的、基于 ring-buffer 的 disruptor 方案。
+`gnet` 的『主从 Reactors 多线程』模型是基于 Golang 里的 Goroutines的，一个 Reactor 挂载在一个 Goroutine 上，所以在 `gnet` 的这个网络模型里主 Reactor/Goroutine 与从 Reactors/Goroutines 有海量通信的需求，因此 `gnet` 里必须要有一个能在 Goroutines 之间进行高效率的通信的机制，我没有选择 Golang 里的主流方案：基于 Channel 的 CSP 模型，而是选择了性能更好、基于 Ring-Buffer 的 Disruptor 方案。
 
 所以我最终选择了 [go-disruptor](https://github.com/smartystreets-prototypes/go-disruptor)：高性能消息分发队列 LMAX Disruptor 的 Golang 实现。
 
 ## 自动扩容的 Ring-Buffer
 
-`gnet` 利用 ring-buffer 来缓存 TCP 流数据以及管理内存使用。
+`gnet` 利用 Ring-Buffer 来缓存 TCP 流数据以及管理内存使用。
 
 <p align="center">
 <img src="https://user-images.githubusercontent.com/7496278/64916810-4f8b6300-d7b8-11e9-9459-5517760da738.gif">
