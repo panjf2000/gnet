@@ -18,7 +18,7 @@ const (
 	// connRingBufferSize indicates the size of disruptor ring-buffer.
 	connRingBufferSize = 1024 * 64
 	connRingBufferMask = connRingBufferSize - 1
-	disruptorCleanup = time.Millisecond * 10
+	disruptorCleanup   = time.Millisecond * 10
 
 	cacheRingBufferSize = 1024
 )
