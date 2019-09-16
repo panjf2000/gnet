@@ -48,7 +48,7 @@
 <img width="869" alt="reactor" src="https://user-images.githubusercontent.com/7496278/64918644-a5213900-d7d3-11e9-88d6-1ec1ec72c1cd.png">
 </p>
 
-现在我正在 `gnet` 里开发一个新的多线程模型：『带线程/go程的主从 Reactors 多线程』，并且很快就能完成，这个模型的架构图如下所示：
+现在我正在 `gnet` 里开发一个新的多线程模型：『带线程/go程池的主从 Reactors 多线程』，并且很快就能完成，这个模型的架构图如下所示：
 
 <p align="center">
 <img width="854" alt="multi_reactor_thread_pool" src="https://user-images.githubusercontent.com/7496278/64918783-90de3b80-d7d5-11e9-9190-ff8277c95db1.png">

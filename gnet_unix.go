@@ -17,7 +17,7 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	reuseport "github.com/kavu/go_reuseport"
+	"github.com/kavu/go_reuseport"
 	"github.com/panjf2000/gnet/internal"
 )
 
