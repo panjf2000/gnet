@@ -162,9 +162,14 @@ func testServe(network, addr string, unix, reuseport bool, nclients, nloops int)
 	}
 	events.React = func(c Conn, inBuf *ringbuffer.RingBuffer) (out []byte, action Action) {
 		n := inBuf.Length()
+		if n == 0 {
+			action = None
+		}
+		
 		out = inBuf.Bytes()
 		inBuf.Advance(n)
-		if atomic.LoadInt32(&connected) == 1 {
+
+		if reuseport {
 			c.Wake()
 		}
 		return
