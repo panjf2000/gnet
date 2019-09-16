@@ -164,8 +164,9 @@ func testServe(network, addr string, unix, reuseport bool, nclients, nloops int)
 		n := inBuf.Length()
 		if n == 0 {
 			action = None
+			return
 		}
-		
+
 		out = inBuf.Bytes()
 		inBuf.Advance(n)
 
