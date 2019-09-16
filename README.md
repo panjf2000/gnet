@@ -16,7 +16,7 @@
 
 The goal of this project is to create a server framework for Go that performs on par with [Redis](http://redis.io) and [Haproxy](http://www.haproxy.org) for packet handling.
 
-`gnet` sells itself as a high-performance, lightweight, nonblocking network library written in pure Go.
+`gnet` sells itself as a high-performance, lightweight, nonblocking network library written in pure Go, it works on transport layer with TCP/UDP/Unix-Socket protocols, so it allows developers to implement their own protocols of application layer upon `gnet` for building  diversified network applications, for instance, you get a HTTP Server or Web Framework if you implement HTTP protocol upon `gnet` while you have a Redis Server done with the implementation of Redis protocol upon `gnet` and so on.
 
 **`gent` is derived from project `evio` while having higher performance.**
 
