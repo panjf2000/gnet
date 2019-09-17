@@ -128,6 +128,8 @@ func activateSubReactor(svr *server, loop *loop) {
 
 		conn := loop.fdconns[fd]
 		switch {
+		case conn == nil:
+			return nil
 		case !conn.opened:
 			return loop.loopOpened(svr, conn)
 		case conn.outBuf.Length() > 0:
