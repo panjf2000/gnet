@@ -18,7 +18,7 @@
 
 `gnet` 的亮点在于它是一个高性能、轻量级、非阻塞的纯 Go 实现的传输层（TCP/UDP/Unix-Socket）网络库，开发者可以使用 `gnet` 来实现自己的应用层网络协议，从而构建出自己的应用层网络应用：比如在 `gnet` 上实现 HTTP 协议就可以创建出一个 HTTP 服务器 或者 Web 开发框架，实现 Redis 协议就可以创建出自己的 Redis 服务器等等。
 
-**`gnet` 是衍生自另一个项目：`evio`，但是性能更好。**
+**`gnet` 衍生自另一个项目：`evio`，但是性能更好。**
 
 # 功能
 
@@ -160,38 +160,38 @@ func main() {
 ### 系统参数
 
 ```powershell
-Go Version: go1.12.9 linux/amd64
-OS:         Ubuntu 18.04
-CPU:        8 Virtual CPUs
-Memory:     16.0 GiB
+Go Version : go1.12.9 linux/amd64
+        OS : Ubuntu 18.04/x86_64
+       CPU : 8 Virtual CPUs
+    Memory : 16.0 GiB
 ```
 
 ### Echo Server
 
-![](benchmarks/results/echo_linux.png)
+![](https://github.com/panjf2000/gnet_benchmarks/raw/master/results/echo_linux.png)
 
 ### HTTP Server
 
-![](benchmarks/results/http_linux.png)
+![](https://github.com/panjf2000/gnet_benchmarks/raw/master/results/http_linux.png)
 
 ## FreeBSD (kqueue)
 
 ### 系统参数
 
 ```powershell
-Go Version: go version go1.12.9 darwin/amd64
-OS:         macOS Mojave 10.14.6
-CPU:        4 CPUs
-Memory:     8.0 GiB
+Go Version : go version go1.12.9 darwin/amd64
+        OS : macOS Mojave 10.14.6/x86_64
+       CPU : 4 CPUs
+    Memory : 8.0 GiB
 ```
 
 ### Echo Server
 
-![](benchmarks/results/echo_mac.png)
+![](https://github.com/panjf2000/gnet_benchmarks/raw/master/results/echo_mac.png)
 
 ### HTTP Server
 
-![](benchmarks/results/http_mac.png)
+![](https://github.com/panjf2000/gnet_benchmarks/raw/master/results/http_mac.png)
 
 # 证书
 
@@ -199,4 +199,4 @@ Memory:     8.0 GiB
 
 # 待做事项
 
-> gnet 还在持续开发的过程中，所以这个仓库的代码和文档会一直持续更新，如果你对 gnet 感兴趣的话，欢迎给这个开源库贡献你的代码~~
+> gnet 还在持续开发的过程中，所以这个仓库的代码和文档会一直持续更新，如果你对 gnet 感兴趣的话，欢迎给这个开源库贡献你的代码，还有你要是喜欢 gnet 的话，可以给个星星鼓励一下哦 ~~

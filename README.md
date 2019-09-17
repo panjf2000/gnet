@@ -18,7 +18,7 @@ The goal of this project is to create a server framework for Go that performs on
 
 `gnet` sells itself as a high-performance, lightweight, nonblocking network library written in pure Go, it works on transport layer with TCP/UDP/Unix-Socket protocols, so it allows developers to implement their own protocols of application layer upon `gnet` for building  diversified network applications, for instance, you get a HTTP Server or Web Framework if you implement HTTP protocol upon `gnet` while you have a Redis Server done with the implementation of Redis protocol upon `gnet` and so on.
 
-**`gent` is derived from project `evio` while having higher performance.**
+**`gent` derives from project `evio` while having higher performance.**
 
 # Features
 
@@ -160,38 +160,38 @@ Current supported I/O events in `gnet`:
 ### Test Environment
 
 ```powershell
-Go Version: go1.12.9 linux/amd64
-OS:         Ubuntu 18.04
-CPU:        8 Virtual CPUs
-Memory:     16.0 GiB
+Go Version : go1.12.9 linux/amd64
+        OS : Ubuntu 18.04/x86_64
+       CPU : 8 Virtual CPUs
+    Memory : 16.0 GiB
 ```
 
 ### Echo Server
 
-![](benchmarks/results/echo_linux.png)
+![](https://github.com/panjf2000/gnet_benchmarks/raw/master/results/echo_linux.png)
 
 ### HTTP Server
 
-![](benchmarks/results/http_linux.png)
+![](https://github.com/panjf2000/gnet_benchmarks/raw/master/results/http_linux.png)
 
 ## On FreeBSD (kqueue)
 
 ### Test Environment
 
 ```powershell
-Go Version: go version go1.12.9 darwin/amd64
-OS:         macOS Mojave 10.14.6
-CPU:        4 CPUs
-Memory:     8.0 GiB
+Go Version : go version go1.12.9 darwin/amd64
+        OS : macOS Mojave 10.14.6/x86_64
+       CPU : 4 CPUs
+    Memory : 8.0 GiB
 ```
 
 ### Echo Server
 
-![](benchmarks/results/echo_mac.png)
+![](https://github.com/panjf2000/gnet_benchmarks/raw/master/results/echo_mac.png)
 
 ### HTTP Server
 
-![](benchmarks/results/http_mac.png)
+![](https://github.com/panjf2000/gnet_benchmarks/raw/master/results/http_mac.png)
 
 # License
 
@@ -199,4 +199,4 @@ Source code in `gnet` is available under the MIT [License](/LICENSE).
 
 # TODO
 
-> gnet is still under active development so the code and documentation will continue to be updated, if you are interested in gnet, please feel free to make your code contributions to it~~
+> gnet is still under active development so the code and documentation will continue to be updated, if you are interested in gnet, please feel free to make your code contributions to it, also if you like gnet, give it a star ~~
