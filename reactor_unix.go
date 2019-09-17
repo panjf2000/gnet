@@ -37,11 +37,6 @@ type eventConsumer struct {
 
 func (ec *eventConsumer) Consume(lower, upper int64) {
 	for ; lower <= upper; lower++ {
-		conn := ec.connRingBuffer[lower&connRingBufferMask]
-		conn.inBuf = ringbuffer.New(cacheRingBufferSize)
-		conn.outBuf = ringbuffer.New(cacheRingBufferSize)
-		conn.loop = ec.loop
-
 		// Connections load balance under round-robin algorithm.
 		if ec.numLoops > 1 {
 			// Leverage "and" operator instead of "modulo" operator to speed up round-robin algorithm.
@@ -51,6 +46,12 @@ func (ec *eventConsumer) Consume(lower, upper int64) {
 				continue
 			}
 		}
+
+		conn := ec.connRingBuffer[lower&connRingBufferMask]
+		conn.inBuf = ringbuffer.New(cacheRingBufferSize)
+		conn.outBuf = ringbuffer.New(cacheRingBufferSize)
+		conn.loop = ec.loop
+
 		_ = ec.loop.poller.Trigger(&mail{fd: conn.fd, conn: conn})
 	}
 }
