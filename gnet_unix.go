@@ -48,13 +48,11 @@ func (svr *server) signalShutdown() {
 
 func serve(events Events, listeners []*listener, reusePort bool) error {
 	// Figure out the correct number of loops/goroutines to use.
-	numLoops := events.NumLoops
-	if numLoops <= 0 {
-		if numLoops == 0 {
-			numLoops = 1
-		} else {
-			numLoops = runtime.NumCPU()
-		}
+	var numLoops int
+	if events.Multicore {
+		numLoops = runtime.NumCPU()
+	} else {
+		numLoops = 1
 	}
 
 	svr := &server{}
@@ -135,10 +133,21 @@ func activateLoops(svr *server, numLoops int) {
 func activateReactors(svr *server, numLoops int) {
 	// Convert numLoops to the least power of two integer value greater than or equal to n,
 	// e.g. 2, 4, 8, 16, 32, 64, etc, which will make a higher performance when dispatching messages later.
-	numLoops = internal.CeilToPowerOfTwo(numLoops) + 1
+	//powerOfTwoNumLoops := internal.CeilToPowerOfTwo(numLoops)
+	//numLoops = powerOfTwoNumLoops
+	//if numCPU := runtime.NumCPU(); numCPU < powerOfTwoNumLoops {
+	//	numLoops = internal.FloorToPowerOfTwo(numCPU)
+	//}
 
-	svr.wg.Add(numLoops)
-	for i := 0; i < numLoops-1; i++ {
+	if numLoops == 1 {
+		numLoops = 3
+	}
+
+	//fmt.Printf("=============================starts %d loops...\n", numLoops)
+
+	svr.wg.Add(1 + (numLoops-1)/2)
+
+	for i := 0; i < (numLoops-1)/2; i++ {
 		loop := &loop{
 			idx:     i,
 			poller:  internal.OpenPoller(),

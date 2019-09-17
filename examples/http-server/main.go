@@ -30,7 +30,7 @@ type request struct {
 
 func main() {
 	var port int
-	var loops int
+	var multicore bool
 	var aaaa bool
 	var noparse bool
 	var unixsocket string
@@ -39,7 +39,7 @@ func main() {
 	flag.IntVar(&port, "port", 8080, "server port")
 	flag.BoolVar(&aaaa, "aaaa", false, "aaaaa....")
 	flag.BoolVar(&noparse, "noparse", true, "do not parse requests")
-	flag.IntVar(&loops, "loops", 0, "num loops")
+	flag.BoolVar(&multicore, "multicore", true, "multicore")
 	flag.Parse()
 
 	if os.Getenv("NOPARSE") == "1" {
@@ -53,7 +53,7 @@ func main() {
 	}
 
 	var events gnet.Events
-	events.NumLoops = loops
+	events.Multicore = multicore
 	events.OnInitComplete = func(srv gnet.Server) (action gnet.Action) {
 		log.Printf("http server started on port %d (loops: %d)", port, srv.NumLoops)
 		if unixsocket != "" {

@@ -17,7 +17,7 @@ import (
 
 func main() {
 	var port int
-	var loops int
+	var multicore bool
 	var udp bool
 	var trace bool
 	var reuseport bool
@@ -26,11 +26,11 @@ func main() {
 	flag.BoolVar(&udp, "udp", false, "listen on udp")
 	flag.BoolVar(&reuseport, "reuseport", false, "reuseport (SO_REUSEPORT)")
 	flag.BoolVar(&trace, "trace", false, "print packets to console")
-	flag.IntVar(&loops, "loops", 0, "num loops")
+	flag.BoolVar(&multicore, "multicore", true, "multicore")
 	flag.Parse()
 
 	var events gnet.Events
-	events.NumLoops = loops
+	events.Multicore = multicore
 	events.OnInitComplete = func(srv gnet.Server) (action gnet.Action) {
 		log.Printf("echo server started on port %d (loops: %d)", port, srv.NumLoops)
 		if reuseport {

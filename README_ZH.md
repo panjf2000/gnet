@@ -84,64 +84,37 @@ $ go get -u github.com/panjf2000/gnet
 
 ## 使用示例
 
-```go
-// ======================== Echo Server implemented with gnet ===========================
+用 `gnet` 来构建网络服务器是非常简单的，只需要把你关心的事件注册到 `gnet.Events` 里面，然后把它和绑定的监听地址一起传递给 `gnet.Serve` 方法就完成了。在服务器开始工作之后，每一条到来的网络连接会在各个事件之间传递，如果你想在某个事件中关闭某条连接或者关掉整个服务器的话，直接把 `gnet.Action` 设置成 `Cosed` 或者 `Shutdown`就行了。
 
+Echo 服务器是一种最简单网络服务器，把它作为 `gnet` 的入门例子在再合适不过了，下面是一个最简单的 echo server，它监听了 9000 端口：
+
+```go
 package main
 
 import (
-	"flag"
-	"fmt"
 	"log"
-	"strings"
 
-	"github.com/panjf2000/gnet"
-	"github.com/panjf2000/gnet/ringbuffer"
+    "github.com/panjf2000/gnet"
+    "github.com/panjf2000/gnet/ringbuffer"
+
 )
 
 func main() {
-	var port int
-	var loops int
-	var udp bool
-	var trace bool
-	var reuseport bool
-
-	flag.IntVar(&port, "port", 5000, "server port")
-	flag.BoolVar(&udp, "udp", false, "listen on udp")
-	flag.BoolVar(&reuseport, "reuseport", false, "reuseport (SO_REUSEPORT)")
-	flag.BoolVar(&trace, "trace", false, "print packets to console")
-	flag.IntVar(&loops, "loops", 0, "num loops")
-	flag.Parse()
-
 	var events gnet.Events
-	events.NumLoops = loops
-	events.OnInitComplete = func(srv gnet.Server) (action gnet.Action) {
-		log.Printf("echo server started on port %d (loops: %d)", port, srv.NumLoops)
-		if reuseport {
-			log.Printf("reuseport")
-		}
-		return
-	}
+	events.Multicore = true
 	events.React = func(c gnet.Conn, inBuf *ringbuffer.RingBuffer) (out []byte, action gnet.Action) {
 		top, tail := inBuf.PreReadAll()
 		out = append(top, tail...)
 		inBuf.Reset()
-
-		if trace {
-			log.Printf("%s", strings.TrimSpace(string(top)+string(tail)))
-		}
 		return
 	}
-	scheme := "tcp"
-	if udp {
-		scheme = "udp"
-	}
-	log.Fatal(gnet.Serve(events, fmt.Sprintf("%s://:%d", scheme, port)))
+	log.Fatal(gnet.Serve(events, "tcp://:9000"))
 }
-
 ```
 
-## I/O 事件
+正如你所见，上面的例子里 `gnet` 实例只注册了一个 `React` 事件。一般来说，主要的业务逻辑代码会写在这个事件方法里，这个方法会在服务器接收到客户端写过来的数据之时被调用，然后处理输入数据（这里只是把数据 echo 回去）并且在处理完之后把需要输出的数据赋值给 `out` 变量然后返回，之后你就不用管了，`gnet` 会帮你把数据写回客户端的。
+
+### I/O 事件
 
  `gnet` 目前支持的 I/O 事件如下：
 
@@ -152,6 +125,53 @@ func main() {
 - `React` 当 server 端接收到从 client 端发送来的数据的时候调用。（你的核心业务代码一般是写在这个方法里）
 - `Tick` 服务器启动的时候会调用一次，之后就以给定的时间间隔定时调用一次，是一个定时器方法。
 - `PreWrite` 预先写数据方法，在 server 端写数据回 client 端之前调用。
+
+### 多地址绑定
+
+```go
+// 在同一个 Server 上同时绑定 TCP 和 Unix-Socket 两个地址
+gnet.Serve(events, "tcp://:9000", "unix://socket")
+```
+
+
+### 定时器
+
+`Tick` 会每隔一段时间触发一次，间隔时间你可以自己控制，设定返回的 `delay` 变量就行。
+
+定时器的第一次触发是在 `gnet.Serving` 事件之后。
+
+```go
+events.Tick = func() (delay time.Duration, action Action){
+	log.Printf("tick")
+	delay = time.Second
+	return
+}
+```
+
+## UDP 支持
+
+`gnet` 支持 UDP 协议，在 `gnet.Serve` 里绑定 UDP 地址即可，`gnet` 的 UDP 支持有如下的特性：
+
+- 数据进入服务器之后立刻写回客户端，不做缓存。
+-  `OnOpened` 和 `OnClosed` 这两个事件在 UDP 下不可用，唯一可用的事件是 `React`。
+
+## 使用多核
+
+`Events.Multicore` 参数指定了 `gnet` 是否会使用多核来进行服务，如果是 `true` 的话就会使用多核，否则就是单核运行，利用的核心数一般是机器的 CPU 数量。
+
+## 负载均衡
+
+`gnet` 目前内置的负载均衡算法是轮询调度 Round-Robin，暂时不支持自定制。
+
+## SO_REUSEPORT 端口复用
+
+服务器支持 [SO_REUSEPORT](https://lwn.net/Articles/542629/) 端口复用特性，允许多个 sockets 监听同一个端口，然后内核会帮你做好负载均衡，每次只唤醒一个 socket 来处理 accept 请求，避免惊群效应。
+
+开启这个功能也很简单，在要绑定的监听地址后面设置 `reuseport=true` 即可：
+
+```go
+gnet.Serve(events, "tcp://:9000?reuseport=true"))
+```
 
 # 性能测试
 
@@ -196,6 +216,11 @@ Go Version : go version go1.12.9 darwin/amd64
 # 证书
 
 `gnet` 的源码允许用户在遵循 MIT [开源证书](/LICENSE) 规则的前提下使用。
+
+# 鸣谢
+
+- [evio](https://github.com/tidwall/evio)
+- [go-disruptor](https://github.com/smartystreets-prototypes/go-disruptor)
 
 # 待做事项
 

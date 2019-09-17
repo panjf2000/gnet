@@ -31,47 +31,35 @@ func TestServe(t *testing.T) {
 	t.Run("poll", func(t *testing.T) {
 		t.Run("tcp", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe("tcp", ":9991", false, false, 10, 1)
-			})
-			t.Run("5-loop", func(t *testing.T) {
-				testServe("tcp", ":9992", false, false, 10, 5)
+				testServe("tcp", ":9991", false, false, false, 10)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("tcp", ":9993", false, false, 10, -1)
+				testServe("tcp", ":9993", false, false, true, 10)
 			})
 		})
 		t.Run("tcp-unix", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe("tcp", ":9994", true, false, 10, 1)
-			})
-			t.Run("5-loop", func(t *testing.T) {
-				testServe("tcp", ":9995", true, false, 10, 5)
+				testServe("tcp", ":9994", true, false, false, 10)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("tcp", ":9996", true, false, 10, -1)
+				testServe("tcp", ":9996", true, false, true, 10)
 			})
 		})
 
 		t.Run("udp", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe("udp", ":9997", false, false, 10, 1)
-			})
-			t.Run("5-loop", func(t *testing.T) {
-				testServe("udp", ":9998", false, false, 10, 5)
+				testServe("udp", ":9997", false, false, false, 10)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("udp", ":9999", false, false, 10, -1)
+				testServe("udp", ":9999", false, false, true, 10)
 			})
 		})
 		t.Run("udp-unix-reuseport", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe("udp", ":9981", true, false, 10, 1)
-			})
-			t.Run("5-loop", func(t *testing.T) {
-				testServe("udp", ":9982", true, false, 10, 5)
+				testServe("udp", ":9981", true, false, false, 10)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("udp", ":9983", true, false, 10, -1)
+				testServe("udp", ":9983", true, false, true, 10)
 			})
 		})
 	})
@@ -79,59 +67,47 @@ func TestServe(t *testing.T) {
 	t.Run("poll-reuseport", func(t *testing.T) {
 		t.Run("tcp", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe("tcp", ":9991", false, true, 10, 1)
-			})
-			t.Run("5-loop", func(t *testing.T) {
-				testServe("tcp", ":9992", false, true, 10, 5)
+				testServe("tcp", ":9991", false, true, false, 10)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("tcp", ":9993", false, true, 10, -1)
+				testServe("tcp", ":9993", false, true, true, 10)
 			})
 		})
 		t.Run("tcp-unix-reuseport", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe("tcp", ":9994", true, true, 10, 1)
-			})
-			t.Run("5-loop", func(t *testing.T) {
-				testServe("tcp", ":9995", true, true, 10, 5)
+				testServe("tcp", ":9994", true, true, false, 10)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("tcp", ":9996", true, true, 10, -1)
+				testServe("tcp", ":9996", true, true, true, 10)
 			})
 		})
 		t.Run("udp", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe("udp", ":9997", false, true, 10, 1)
-			})
-			t.Run("5-loop", func(t *testing.T) {
-				testServe("udp", ":9998", false, true, 10, 5)
+				testServe("udp", ":9997", false, true, false, 10)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("udp", ":9999", false, true, 10, -1)
+				testServe("udp", ":9999", false, true, true, 10)
 			})
 		})
 		t.Run("udp-unix-reuseport", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe("udp", ":9981", true, true, 10, 1)
-			})
-			t.Run("5-loop", func(t *testing.T) {
-				testServe("udp", ":9982", true, true, 10, 5)
+				testServe("udp", ":9981", true, true, false, 10)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("udp", ":9983", true, true, 10, -1)
+				testServe("udp", ":9983", true, true, true, 10)
 			})
 		})
 	})
 }
 
-func testServe(network, addr string, unix, reuseport bool, nclients, nloops int) {
+func testServe(network, addr string, unix, reuseport bool, multicore bool, nclients int) {
 	var started int32
 	var connected int32
 	var clientActive int32
 	var disconnected int32
 
 	var events Events
-	events.NumLoops = nloops
+	events.Multicore = multicore
 	//events.OnInitComplete = func(srv Server) (action Action) {
 	//	return
 	//}
@@ -180,7 +156,7 @@ func testServe(network, addr string, unix, reuseport bool, nclients, nloops int)
 			for i := 0; i < nclients; i++ {
 				atomic.AddInt32(&clientActive, 1)
 				go func() {
-					startClient(network, addr, nloops)
+					startClient(network, addr, multicore)
 					atomic.AddInt32(&clientActive, -1)
 				}()
 			}
@@ -215,8 +191,7 @@ func testServe(network, addr string, unix, reuseport bool, nclients, nloops int)
 	}
 }
 
-func startClient(network, addr string, nloops int) {
-	onetwork := network
+func startClient(network, addr string, multicore bool) {
 	rand.Seed(time.Now().UnixNano())
 	c, err := net.Dial(network, addr)
 	if err != nil {
@@ -256,7 +231,7 @@ func startClient(network, addr string, nloops int) {
 			panic(err)
 		}
 		if string(data) != string(data2) {
-			fmt.Printf("mismatch %s/%d: %d vs %d bytes\n", onetwork, nloops, len(data), len(data2))
+			fmt.Printf("mismatch %s/multi-core:%t: %d vs %d bytes\n", network, multicore, len(data), len(data2))
 			//panic("mismatch")
 		}
 	}

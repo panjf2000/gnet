@@ -16,7 +16,7 @@
 
 The goal of this project is to create a server framework for Go that performs on par with [Redis](http://redis.io) and [Haproxy](http://www.haproxy.org) for packet handling.
 
-`gnet` sells itself as a high-performance, lightweight, nonblocking network library written in pure Go, it works on transport layer with TCP/UDP/Unix-Socket protocols, so it allows developers to implement their own protocols of application layer upon `gnet` for building  diversified network applications, for instance, you get a HTTP Server or Web Framework if you implement HTTP protocol upon `gnet` while you have a Redis Server done with the implementation of Redis protocol upon `gnet` and so on.
+`gnet` sells itself as a high-performance, lightweight, nonblocking network library written in pure Go which works on transport layer with TCP/UDP/Unix-Socket protocols, so it allows developers to implement their own protocols of application layer upon `gnet` for building  diversified network applications, for instance, you get a HTTP Server or Web Framework if you implement HTTP protocol upon `gnet` while you have a Redis Server done with the implementation of Redis protocol upon `gnet` and so on.
 
 **`gent` derives from project `evio` while having higher performance.**
 
@@ -82,66 +82,38 @@ That is why I finally settle on [go-disruptor](https://github.com/smartystreets-
 $ go get -u github.com/panjf2000/gnet
 ```
 
-## Example
+## Usage
+
+It is easy to create a network server with `gnet`. All you have to do is just register your events to `gnet.Events` and pass it to the `gnet.Serve` function along with the binding address(es). Each connections is represented as an `gnet.Conn` object that is passed to various events to differentiate the clients. At any point you can close a client or shutdown the server by return a `Close` or `Shutdown` action from an event.
+
+The simplest example to get you started playing with `gnet` would be the echo server. So here you are, a simplest echo server upon `gnet` that is litsening on port 9000:
 
 ```go
-// ======================== Echo Server implemented with gnet ===========================
-
 package main
 
 import (
-	"flag"
-	"fmt"
 	"log"
-	"strings"
 
 	"github.com/panjf2000/gnet"
 	"github.com/panjf2000/gnet/ringbuffer"
 )
 
 func main() {
-	var port int
-	var loops int
-	var udp bool
-	var trace bool
-	var reuseport bool
-
-	flag.IntVar(&port, "port", 5000, "server port")
-	flag.BoolVar(&udp, "udp", false, "listen on udp")
-	flag.BoolVar(&reuseport, "reuseport", false, "reuseport (SO_REUSEPORT)")
-	flag.BoolVar(&trace, "trace", false, "print packets to console")
-	flag.IntVar(&loops, "loops", 0, "num loops")
-	flag.Parse()
-
 	var events gnet.Events
-	events.NumLoops = loops
-	events.OnInitComplete = func(srv gnet.Server) (action gnet.Action) {
-		log.Printf("echo server started on port %d (loops: %d)", port, srv.NumLoops)
-		if reuseport {
-			log.Printf("reuseport")
-		}
-		return
-	}
+	events.Multicore = true
 	events.React = func(c gnet.Conn, inBuf *ringbuffer.RingBuffer) (out []byte, action gnet.Action) {
 		top, tail := inBuf.PreReadAll()
 		out = append(top, tail...)
 		inBuf.Reset()
-
-		if trace {
-			log.Printf("%s", strings.TrimSpace(string(top)+string(tail)))
-		}
 		return
 	}
-	scheme := "tcp"
-	if udp {
-		scheme = "udp"
-	}
-	log.Fatal(gnet.Serve(events, fmt.Sprintf("%s://:%d", scheme, port)))
+	log.Fatal(gnet.Serve(events, "tcp://:9000"))
 }
-
 ```
 
-## I/O Events
+As you can see, this example of echo server only sets up the `React` function where you commonly write your main business code and it will be invoked once the server receives input data from a client. The output data will be then sent back to that client by assigning the `out` variable and return it after your business code finish processing data(in this case, it just echo the data back).
+
+### I/O Events
 
 Current supported I/O events in `gnet`:
 
@@ -152,6 +124,52 @@ Current supported I/O events in `gnet`:
 - `React` is activated when the server receives new data from a connection.
 - `Tick` is activated immediately after the server starts and will fire again after a specified interval.
 - `PreWrite` is activated just before any data is written to any client socket.
+
+### Multiple addresses
+
+```go
+// Binding both TCP and Unix-Socket to one gnet server.
+gnet.Serve(events, "tcp://:9000", "unix://socket")
+```
+
+
+### Ticker
+
+The `Tick` event fires ticks at a specified interval. 
+The first tick fires immediately after the `Serving` events.
+
+```go
+events.Tick = func() (delay time.Duration, action Action){
+	log.Printf("tick")
+	delay = time.Second
+	return
+}
+```
+
+## UDP
+
+The `Serve` function can bind to UDP addresses. 
+
+- All incoming and outgoing packets will not be buffered but sent individually.
+- The `OnOpened` and `OnClosed` events are not availble for UDP sockets, only the `React` event.
+
+## Multi-threads
+
+The `Events.Multicore` indicates whether the server will be effectively created with multi-cores, if so, then you must take care with synchonizing memory between all event callbacks, otherwise, it will run the server with single thread. The number of threads in the server will be automatically assigned to the value of `runtime.NumCPU()`.
+
+## Load balancing
+
+The current built-in load balancing algorithm in `gnet` is Round-Robin.
+
+## SO_REUSEPORT
+
+Servers can utilize the [SO_REUSEPORT](https://lwn.net/Articles/542629/) option which allows multiple sockets on the same host to bind to the same port and the OS kernel takes care of the load balancing for you, it wakes one socket per `accpet` event coming to resolved the `thundering herd`.
+
+Just provide `reuseport=true` to an address and you can enjoy this feature:
+
+```go
+gnet.Serve(events, "tcp://:9000?reuseport=true"))
+```
 
 # Performance
 
@@ -196,6 +214,11 @@ Go Version : go version go1.12.9 darwin/amd64
 # License
 
 Source code in `gnet` is available under the MIT [License](/LICENSE).
+
+# Thanks
+
+- [evio](https://github.com/tidwall/evio)
+- [go-disruptor](https://github.com/smartystreets-prototypes/go-disruptor)
 
 # TODO
 

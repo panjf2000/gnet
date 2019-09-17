@@ -64,20 +64,15 @@ type Conn interface {
 	Wake()
 }
 
-// LoadBalance sets the load balancing method.
-type LoadBalance int
-
 // Events represents the server events for the Serve call.
 // Each event has an Action return value that is used manage the state
 // of the connection and server.
 type Events struct {
-	// NumLoops sets the number of loops to use for the server. Setting this
-	// to a value greater than 1 will effectively make the server
-	// multithreaded for multi-core machines. Which means you must take care
-	// with synchonizing memory between all event callbacks. Setting to 0 or 1
-	// will run the server single-threaded. Setting to -1 will automatically
-	// assign this value equal to runtime.NumProcs().
-	NumLoops int
+	// Multicore indicates whether the server will be effectively created with multi-cores, if so,
+	// then you must take care with synchonizing memory between all event callbacks, otherwise,
+	// it will run the server with single thread. The number of threads in the server will be automatically
+	// assigned to the value of runtime.NumCPU().
+	Multicore bool
 	// OnInitComplete fires when the server can accept connections. The server
 	// parameter has information and various utilities.
 	OnInitComplete func(server Server) (action Action)
