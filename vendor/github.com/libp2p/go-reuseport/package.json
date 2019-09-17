@@ -1,0 +1,36 @@
+{
+  "author": "whyrusleeping",
+  "bugs": {
+    "url": "https://github.com/libp2p/go-reuseport"
+  },
+  "gx": {
+    "dvcsimport": "github.com/libp2p/go-reuseport"
+  },
+  "gxDependencies": [
+    {
+      "author": "The Go Authors",
+      "hash": "QmVGjyM9i2msKvLXwh9VosCTgP4mL91kC7hDmqnwTTx6Hu",
+      "name": "sys",
+      "version": "0.2.0"
+    },
+    {
+      "author": "whyrusleeping",
+      "hash": "QmVmDhyTTUcQXFD1rRQ64fGLMSAoaQvNH3hwuaCFAPq2hy",
+      "name": "errors",
+      "version": "0.0.1"
+    },
+    {
+      "author": "magik6k",
+      "hash": "QmPVkJMTeRC6iBByPWdrRkD3BE5UXsj5HPzb4kPqL186mS",
+      "name": "testify",
+      "version": "1.0.0"
+    }
+  ],
+  "gxVersion": "0.9.0",
+  "language": "go",
+  "license": "",
+  "name": "go-reuseport",
+  "releaseCmd": "git commit -a -m \"gx publish $VERSION\"",
+  "version": "0.2.2"
+}
+

@@ -20,4 +20,5 @@ _cgo_export.*
 _testmain.go
 
 *.exe
-.DS_Store
+*.test
+*.prof
