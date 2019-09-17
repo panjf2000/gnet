@@ -22,7 +22,7 @@ The goal of this project is to create a server framework for Go that performs on
 
 # Features
 
-- [High-performance](#Performance) Event-Loop under multi-threads model
+- [High-performance](#Performance) Event-Loop under multi-threads/goroutines model
 - Built-in load balancing algorithm: Round-Robin
 - Concise APIs
 - Efficient memory usage: Ring-Buffer
@@ -35,9 +35,9 @@ The goal of this project is to create a server framework for Go that performs on
 
 # Key Designs
 
-## Multiple-threads Model
+## Multiple-Threads/Goroutines Model
 
-`gnet` redesigns and implements a new built-in multiple-threads model: 『Multiple Reactors』 which is also the default multiple-threads model of `netty`, Here's the schematic diagram:
+`gnet` redesigns and implements a new built-in multiple-threads/goroutines model: 『Multiple Reactors』 which is also the default multiple-threads model of `netty`, Here's the schematic diagram:
 
 <p align="center">
 <img width="820" alt="multi_reactor" src="https://user-images.githubusercontent.com/7496278/64916634-8f038080-d7b3-11e9-82c8-f77e9791df86.png">
@@ -48,7 +48,7 @@ and it works as the following sequence diagram:
 <img width="869" alt="reactor" src="https://user-images.githubusercontent.com/7496278/64918644-a5213900-d7d3-11e9-88d6-1ec1ec72c1cd.png">
 </p>
 
-The subsequent multiple-threads model of `gnet`: 『Multiple Reactors with thread/goroutine pool』is under development and about to be delivered soon, the architecture diagram of new model is in here:
+The subsequent multiple-threads/goroutines model of `gnet`: 『Multiple Reactors with thread/goroutine pool』is under development and about to be delivered soon, the architecture diagram of new model is in here:
 
 <p align="center">
 <img width="854" alt="multi_reactor_thread_pool" src="https://user-images.githubusercontent.com/7496278/64918783-90de3b80-d7d5-11e9-9190-ff8277c95db1.png">

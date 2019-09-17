@@ -22,7 +22,7 @@
 
 # 功能
 
-- [高性能](#性能测试) 的基于多线程模型的 Event-Loop 事件驱动
+- [高性能](#性能测试) 的基于多线程/Go程模型的 Event-Loop 事件驱动
 - 内置 Round-Robin 轮询负载均衡算法
 - 简洁的 APIs
 - 基于 Ring-Buffer 的高效内存利用
@@ -35,9 +35,9 @@
 
 # 核心设计
 
-## 多线程模型
+## 多线程/Go程模型
 
-`gnet` 重新设计开发了一个新内置的多线程模型：『主从 Reactor 多线程』，这也是 `netty` 默认的线程模型，下面是这个模型的原理图：
+`gnet` 重新设计开发了一个新内置的多线程/Go程模型：『主从 Reactor 多线程/Go程』，这也是 `netty` 默认的线程模型，下面是这个模型的原理图：
 
 <p align="center">
 <img width="820" alt="multi_reactor" src="https://user-images.githubusercontent.com/7496278/64916634-8f038080-d7b3-11e9-82c8-f77e9791df86.png">
@@ -48,7 +48,7 @@
 <img width="869" alt="reactor" src="https://user-images.githubusercontent.com/7496278/64918644-a5213900-d7d3-11e9-88d6-1ec1ec72c1cd.png">
 </p>
 
-现在我正在 `gnet` 里开发一个新的多线程模型：『带线程/go程池的主从 Reactors 多线程』，并且很快就能完成，这个模型的架构图如下所示：
+现在我正在为 `gnet` 开发一个新的多线程/Go程模型：『带线程/Go程池的主从 Reactors 多线程/Go程』，并且很快就能完成，这个模型的架构图如下所示：
 
 <p align="center">
 <img width="854" alt="multi_reactor_thread_pool" src="https://user-images.githubusercontent.com/7496278/64918783-90de3b80-d7d5-11e9-9190-ff8277c95db1.png">
@@ -61,7 +61,7 @@
 
 ## 通信机制
 
-`gnet` 的『主从 Reactors 多线程』模型是基于 Golang 里的 Goroutines的，一个 Reactor 挂载在一个 Goroutine 上，所以在 `gnet` 的这个网络模型里主 Reactor/Goroutine 与从 Reactors/Goroutines 有海量通信的需求，因此 `gnet` 里必须要有一个能在 Goroutines 之间进行高效率的通信的机制，我没有选择 Golang 里的主流方案：基于 Channel 的 CSP 模型，而是选择了性能更好、基于 Ring-Buffer 的 Disruptor 方案。
+`gnet` 的『主从 Reactors 多线程/Go程』模型是基于 Golang 里的 Goroutines的，一个 Reactor 挂载在一个 Goroutine 上，所以在 `gnet` 的这个网络模型里主 Reactor/Goroutine 与从 Reactors/Goroutines 有海量通信的需求，因此 `gnet` 里必须要有一个能在 Goroutines 之间进行高效率的通信的机制，我没有选择 Golang 里的主流方案：基于 Channel 的 CSP 模型，而是选择了性能更好、基于 Ring-Buffer 的 Disruptor 方案。
 
 所以我最终选择了 [go-disruptor](https://github.com/smartystreets-prototypes/go-disruptor)：高性能消息分发队列 LMAX Disruptor 的 Golang 实现。
 
