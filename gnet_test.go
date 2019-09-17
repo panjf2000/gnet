@@ -34,32 +34,32 @@ func TestServe(t *testing.T) {
 				testServe("tcp", ":9991", false, false, false, 10)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("tcp", ":9993", false, false, true, 10)
+				testServe("tcp", ":9992", false, false, true, 10)
 			})
 		})
 		t.Run("tcp-unix", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe("tcp", ":9994", true, false, false, 10)
+				testServe("tcp", ":9993", true, false, false, 10)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("tcp", ":9996", true, false, true, 10)
+				testServe("tcp", ":9994", true, false, true, 10)
 			})
 		})
 
 		t.Run("udp", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe("udp", ":9997", false, false, false, 10)
+				testServe("udp", ":9995", false, false, false, 10)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("udp", ":9999", false, false, true, 10)
+				testServe("udp", ":9996", false, false, true, 10)
 			})
 		})
 		t.Run("udp-unix-reuseport", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe("udp", ":9981", true, false, false, 10)
+				testServe("udp", ":9997", true, false, false, 10)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("udp", ":9983", true, false, true, 10)
+				testServe("udp", ":9998", true, false, true, 10)
 			})
 		})
 	})
@@ -70,31 +70,31 @@ func TestServe(t *testing.T) {
 				testServe("tcp", ":9991", false, true, false, 10)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("tcp", ":9993", false, true, true, 10)
+				testServe("tcp", ":9992", false, true, true, 10)
 			})
 		})
 		t.Run("tcp-unix-reuseport", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe("tcp", ":9994", true, true, false, 10)
+				testServe("tcp", ":9993", true, true, false, 10)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("tcp", ":9996", true, true, true, 10)
+				testServe("tcp", ":9994", true, true, true, 10)
 			})
 		})
 		t.Run("udp", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe("udp", ":9997", false, true, false, 10)
+				testServe("udp", ":9995", false, true, false, 10)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("udp", ":9999", false, true, true, 10)
+				testServe("udp", ":9996", false, true, true, 10)
 			})
 		})
 		t.Run("udp-unix-reuseport", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe("udp", ":9981", true, true, false, 10)
+				testServe("udp", ":9997", true, true, false, 10)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("udp", ":9983", true, true, true, 10)
+				testServe("udp", ":9998", true, true, true, 10)
 			})
 		})
 	})

@@ -139,7 +139,7 @@ func activateReactors(svr *server, numLoops int) {
 	//	numLoops = internal.FloorToPowerOfTwo(numCPU)
 	//}
 
-	if numLoops == 1 {
+	if numLoops < 3 {
 		numLoops = 3
 	}
 
