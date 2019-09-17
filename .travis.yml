@@ -3,8 +3,6 @@ os:
   - linux
   - osx
 go:
-  - "1.9.x"
-  - "1.10.x"
   - "1.11.x"
   - "1.12.x"
   - "1.13.x"
@@ -13,7 +11,7 @@ before_install:
   - go get -t -v ./...
 
 script:
-  - go test -coverprofile=coverage.txt -covermode=count -v
+  - go test -coverprofile=coverage.txt -covermode=count -v -timeout 30s
 
 after_success:
   - bash <(curl -s https://codecov.io/bash)
