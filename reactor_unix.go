@@ -30,7 +30,7 @@ type mail struct {
 
 type eventConsumer struct {
 	numLoops       int
-	numLoopsMask   int
+	// numLoopsMask   int
 	loop           *loop
 	connRingBuffer *[connRingBufferSize]*conn
 }
@@ -40,7 +40,8 @@ func (ec *eventConsumer) Consume(lower, upper int64) {
 		// Connections load balance under round-robin algorithm.
 		if ec.numLoops > 1 {
 			// Leverage "and" operator instead of "modulo" operator to speed up round-robin algorithm.
-			idx := int(lower) & ec.numLoopsMask
+			// idx := int(lower) & ec.numLoopsMask
+			idx := int(lower) % ec.numLoops
 			if idx != ec.loop.idx {
 				// Don't match the round-robin rule, ignore this connection.
 				continue
@@ -67,7 +68,8 @@ func activateMainReactor(svr *server) {
 
 	eventConsumers := make([]disruptor.Consumer, 0, svr.numLoops)
 	for _, loop := range svr.loops {
-		ec := &eventConsumer{svr.numLoops, svr.numLoops - 1, loop, connRingBuffer}
+		// ec := &eventConsumer{svr.numLoops, svr.numLoops - 1, loop, connRingBuffer}
+		ec := &eventConsumer{svr.numLoops, loop, connRingBuffer}
 		eventConsumers = append(eventConsumers, ec)
 	}
 
