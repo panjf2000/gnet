@@ -146,7 +146,7 @@ func testServe(network, addr string, unix, reuseport bool, multicore bool, nclie
 		out = inBuf.Bytes()
 		inBuf.Advance(n)
 
-		if reuseport {
+		if !reuseport {
 			c.Wake()
 		}
 		return

@@ -143,8 +143,6 @@ func activateReactors(svr *server, numLoops int) {
 		numLoops = 3
 	}
 
-	//fmt.Printf("=============================starts %d loops...\n", numLoops)
-
 	svr.wg.Add(1 + (numLoops-1)/2)
 
 	for i := 0; i < (numLoops-1)/2; i++ {
