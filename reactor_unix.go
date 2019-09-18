@@ -29,7 +29,7 @@ type mail struct {
 }
 
 type eventConsumer struct {
-	numLoops       int
+	numLoops int
 	// numLoopsMask   int
 	loop           *loop
 	connRingBuffer *[connRingBufferSize]*conn

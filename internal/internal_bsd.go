@@ -32,7 +32,7 @@ func OpenPoller() *Poller {
 	if err != nil {
 		panic(err)
 	}
-
+	poller.notes.mu = new(spinLock)
 	return poller
 }
 

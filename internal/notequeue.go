@@ -1,3 +1,4 @@
+// Copyright 2019 Andy Pan. All rights reserved.
 // Copyright 2018 Joshua J Baker. All rights reserved.
 // Use of this source code is governed by an MIT-style
 // license that can be found in the LICENSE file.
@@ -6,24 +7,25 @@ package internal
 
 import (
 	"runtime"
+	"sync"
 	"sync/atomic"
 )
 
 // this is a good candidate for a lock-free structure.
+type spinLock uint32
 
-type spinlock struct{ lock uintptr }
-
-func (l *spinlock) Lock() {
-	for !atomic.CompareAndSwapUintptr(&l.lock, 0, 1) {
+func (sl *spinLock) Lock() {
+	for !atomic.CompareAndSwapUint32((*uint32)(sl), 0, 1) {
 		runtime.Gosched()
 	}
 }
-func (l *spinlock) Unlock() {
-	atomic.StoreUintptr(&l.lock, 0)
+
+func (sl *spinLock) Unlock() {
+	atomic.StoreUint32((*uint32)(sl), 0)
 }
 
 type noteQueue struct {
-	mu    spinlock
+	mu    sync.Locker
 	notes []interface{}
 }
 

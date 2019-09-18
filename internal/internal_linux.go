@@ -31,6 +31,7 @@ func OpenPoller() *Poller {
 	poller.wfd = int(r0)
 	poller.wfdBuf = make([]byte, 8)
 	poller.AddRead(poller.wfd)
+	poller.notes.mu = new(spinLock)
 	return poller
 }
 
