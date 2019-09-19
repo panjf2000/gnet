@@ -36,24 +36,6 @@ func (l *loop) loopCloseConn(svr *server, conn *conn, err error) error {
 	return nil
 }
 
-func (l *loop) loopDetachConn(svr *server, conn *conn, err error) error {
-	if svr.events.OnDetached == nil {
-		return l.loopCloseConn(svr, conn, err)
-	}
-	l.poller.ModDetach(conn.fd)
-
-	delete(l.fdconns, conn.fd)
-	if err := unix.SetNonblock(conn.fd, false); err != nil {
-		return err
-	}
-	switch svr.events.OnDetached(conn, &detachedConn{fd: conn.fd}) {
-	case None:
-	case Shutdown:
-		return errClosing
-	}
-	return nil
-}
-
 func (l *loop) loopNote(svr *server, note interface{}) error {
 	var err error
 	switch v := note.(type) {
@@ -102,8 +84,6 @@ func (l *loop) loopRun(svr *server) {
 			return l.loopOpened(svr, conn)
 		case conn.outBuf.Length() > 0:
 			return l.loopWrite(svr, conn)
-		case conn.action != None:
-			return l.loopAction(svr, conn)
 		default:
 			return l.loopRead(svr, conn)
 		}
@@ -211,10 +191,10 @@ func (l *loop) loopOpened(svr *server, conn *conn) error {
 			conn.sendOut(out)
 		}
 	}
-	if conn.outBuf.Length() == 0 && conn.action == None {
+	if conn.outBuf.Length() == 0 {
 		l.poller.ModRead(conn.fd)
 	}
-	return nil
+	return l.handleAction(svr, conn)
 }
 
 func (l *loop) loopWrite(svr *server, conn *conn) error {
@@ -243,27 +223,23 @@ func (l *loop) loopWrite(svr *server, conn *conn) error {
 		conn.outBuf.Advance(n)
 	}
 
-	if conn.outBuf.Length() == 0 && conn.action == None {
+	if conn.outBuf.Length() == 0 {
 		l.poller.ModRead(conn.fd)
 	}
 	return nil
 }
 
-func (l *loop) loopAction(svr *server, conn *conn) error {
+func (l *loop) handleAction(svr *server, conn *conn) error {
 	switch conn.action {
-	default:
-		conn.action = None
+	case None:
+		return nil
 	case Close:
 		return l.loopCloseConn(svr, conn, nil)
 	case Shutdown:
 		return errClosing
-	case Detach:
-		return l.loopDetachConn(svr, conn, nil)
+	default:
+		return nil
 	}
-	if conn.outBuf.Length() == 0 && conn.action == None {
-		l.poller.ModRead(conn.fd)
-	}
-	return nil
 }
 
 func (l *loop) loopWake(svr *server, conn *conn) error {
@@ -275,10 +251,10 @@ func (l *loop) loopWake(svr *server, conn *conn) error {
 	if len(out) > 0 {
 		conn.sendOut(out)
 	}
-	if conn.outBuf.Length() != 0 || conn.action != None {
+	if conn.outBuf.Length() != 0 {
 		l.poller.ModReadWrite(conn.fd)
 	}
-	return nil
+	return l.handleAction(svr, conn)
 }
 
 func (l *loop) loopRead(svr *server, conn *conn) error {
@@ -298,8 +274,8 @@ func (l *loop) loopRead(svr *server, conn *conn) error {
 			conn.sendOut(out)
 		}
 	}
-	if conn.outBuf.Length() != 0 || conn.action != None {
+	if conn.outBuf.Length() != 0 {
 		l.poller.ModReadWrite(conn.fd)
 	}
-	return nil
+	return l.handleAction(svr, conn)
 }

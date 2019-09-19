@@ -120,7 +120,6 @@ Current supported I/O events in `gnet`:
 - `OnInitComplete` is activated when the server is ready to accept new connections.
 - `OnOpened` is activated when a connection has opened.
 - `OnClosed` is activated when a connection has closed.
-- `OnDetached` is activated when a connection has been detached using the `Detach` return action.
 - `React` is activated when the server receives new data from a connection.
 - `Tick` is activated immediately after the server starts and will fire again after a specified interval.
 - `PreWrite` is activated just before any data is written to any client socket.

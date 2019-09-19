@@ -7,7 +7,6 @@ package gnet
 
 import (
 	"errors"
-	"io"
 	"net"
 	"os"
 	"strings"
@@ -24,8 +23,6 @@ type Action int
 const (
 	// None indicates that no action should occur following an event.
 	None Action = iota
-	// Detach detaches a connection. Not available for UDP connections.
-	Detach
 	// Close closes the connection.
 	Close
 	// Shutdown shutdowns the server.
@@ -85,14 +82,6 @@ type Events struct {
 	// OnClosed fires when a connection has closed.
 	// The err parameter is the last known connection error.
 	OnClosed func(c Conn, err error) (action Action)
-	// OnDetached fires when a connection has been previously detached.
-	// Once detached it's up to the receiver of this event to manage the
-	// state of the connection. The OnClosed event will not be called for
-	// this connection.
-	// The conn parameter is a ReadWriteCloser that represents the
-	// underlying socket connection. It can be freely used in goroutines
-	// and should be closed when it's no longer needed.
-	OnDetached func(c Conn, rwc io.ReadWriteCloser) (action Action)
 	// PreWrite fires just before any data is written to any client socket.
 	PreWrite func()
 	// React fires when a connection sends the server data.

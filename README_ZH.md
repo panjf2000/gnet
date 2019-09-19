@@ -121,7 +121,6 @@ func main() {
 - `OnInitComplete` 当 server 初始化完成之后调用。
 - `OnOpened` 当连接被打开的时候调用。
 - `OnClosed` 当连接被关闭的时候调用。
-- `OnDetached` 当主动摘除连接的时候的调用。
 - `React` 当 server 端接收到从 client 端发送来的数据的时候调用。（你的核心业务代码一般是写在这个方法里）
 - `Tick` 服务器启动的时候会调用一次，之后就以给定的时间间隔定时调用一次，是一个定时器方法。
 - `PreWrite` 预先写数据方法，在 server 端写数据回 client 端之前调用。

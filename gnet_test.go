@@ -101,6 +101,7 @@ func TestServe(t *testing.T) {
 }
 
 func testServe(network, addr string, unix, reuseport bool, multicore bool, nclients int) {
+	var once sync.Once
 	var started int32
 	var connected int32
 	var clientActive int32
@@ -137,18 +138,14 @@ func testServe(network, addr string, unix, reuseport bool, multicore bool, nclie
 		return
 	}
 	events.React = func(c Conn, inBuf *ringbuffer.RingBuffer) (out []byte, action Action) {
-		n := inBuf.Length()
-		if n == 0 {
-			action = None
-			return
-		}
-
-		out = inBuf.Bytes()
-		inBuf.Advance(n)
-
-		if !reuseport {
-			c.Wake()
-		}
+		top, tail := inBuf.PreReadAll()
+		out = append(top, tail...)
+		inBuf.Reset()
+		once.Do(func() {
+			if !reuseport {
+				c.Wake()
+			}
+		})
 		return
 	}
 	events.Tick = func() (delay time.Duration, action Action) {
@@ -332,80 +329,6 @@ func testShutdown(network, addr string) {
 	if clients != 0 {
 		panic("did not call close on all clients")
 	}
-}
-
-func TestDetach(t *testing.T) {
-	t.Run("poll", func(t *testing.T) {
-		t.Run("tcp", func(t *testing.T) {
-			testDetach("tcp", ":9991")
-		})
-		t.Run("unix", func(t *testing.T) {
-			testDetach("unix", "socket1")
-		})
-	})
-}
-
-func testDetach(network, addr string) {
-	// we will write a bunch of data with the text "--detached--" in the
-	// middle followed by a bunch of data.
-	rand.Seed(time.Now().UnixNano())
-	rdat := make([]byte, 10*1024)
-	if _, err := rand.Read(rdat); err != nil {
-		panic("random error: " + err.Error())
-	}
-	expected := []byte(string(rdat) + "--detached--" + string(rdat))
-	var cin []byte
-	var events Events
-	events.React = func(c Conn, inBuf *ringbuffer.RingBuffer) (out []byte, action Action) {
-		n := inBuf.Length()
-		cin = append(cin, inBuf.Bytes()...)
-		inBuf.Advance(n)
-		if len(cin) >= len(expected) {
-			if string(cin) != string(expected) {
-				panic("mismatch client -> server")
-			}
-			return cin, Detach
-		}
-		return
-	}
-
-	var done int64
-	events.OnDetached = func(c Conn, conn io.ReadWriteCloser) (action Action) {
-		go func() {
-			p := make([]byte, len(expected))
-			defer conn.Close()
-			_, err := io.ReadFull(conn, p)
-			must(err)
-			_, _ = conn.Write(expected)
-		}()
-		return
-	}
-
-	events.OnInitComplete = func(srv Server) (action Action) {
-		go func() {
-			p := make([]byte, len(expected))
-			_ = expected
-			conn, err := net.Dial(network, addr)
-			must(err)
-			defer conn.Close()
-			_, _ = conn.Write(expected)
-			_, err = io.ReadFull(conn, p)
-			must(err)
-			_, _ = conn.Write(expected)
-			_, err = io.ReadFull(conn, p)
-			must(err)
-			atomic.StoreInt64(&done, 1)
-		}()
-		return
-	}
-	events.Tick = func() (delay time.Duration, action Action) {
-		delay = time.Second / 5
-		if atomic.LoadInt64(&done) == 1 {
-			action = Shutdown
-		}
-		return
-	}
-	must(Serve(events, network+"://"+addr))
 }
 
 func TestBadAddresses(t *testing.T) {

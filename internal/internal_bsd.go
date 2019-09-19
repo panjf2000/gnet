@@ -112,13 +112,13 @@ func (p *Poller) ModReadWrite(fd int) {
 }
 
 // ModDetach ...
-func (p *Poller) ModDetach(fd int) {
-	p.changes = append(p.changes,
-		unix.Kevent_t{
-			Ident: uint64(fd), Flags: unix.EV_DELETE, Filter: unix.EVFILT_READ,
-		},
-		unix.Kevent_t{
-			Ident: uint64(fd), Flags: unix.EV_DELETE, Filter: unix.EVFILT_WRITE,
-		},
-	)
-}
+//func (p *Poller) ModDetach(fd int) {
+//	p.changes = append(p.changes,
+//		unix.Kevent_t{
+//			Ident: uint64(fd), Flags: unix.EV_DELETE, Filter: unix.EVFILT_READ,
+//		},
+//		unix.Kevent_t{
+//			Ident: uint64(fd), Flags: unix.EV_DELETE, Filter: unix.EVFILT_WRITE,
+//		},
+//	)
+//}

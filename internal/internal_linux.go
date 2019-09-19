@@ -122,12 +122,12 @@ func (p *Poller) ModReadWrite(fd int) {
 }
 
 // ModDetach ...
-func (p *Poller) ModDetach(fd int) {
-	if err := unix.EpollCtl(p.fd, unix.EPOLL_CTL_DEL, fd,
-		&unix.EpollEvent{Fd: int32(fd),
-			Events: unix.EPOLLIN | unix.EPOLLOUT,
-		},
-	); err != nil {
-		panic(err)
-	}
-}
+//func (p *Poller) ModDetach(fd int) {
+//	if err := unix.EpollCtl(p.fd, unix.EPOLL_CTL_DEL, fd,
+//		&unix.EpollEvent{Fd: int32(fd),
+//			Events: unix.EPOLLIN | unix.EPOLLOUT,
+//		},
+//	); err != nil {
+//		panic(err)
+//	}
+//}
