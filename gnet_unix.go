@@ -98,6 +98,9 @@ func serve(events Events, listeners []*listener, reusePort bool) error {
 			}
 			sniffError(loop.poller.Close())
 		}
+		if svr.mainLoop != nil {
+			sniffError(svr.mainLoop.poller.Close())
+		}
 	}()
 
 	if reusePort {
