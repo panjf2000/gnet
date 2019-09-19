@@ -179,9 +179,9 @@ func activateReactors(svr *server, numLoops int) {
 }
 
 func (ln *listener) close() {
-	if ln.fd != 0 {
-		sniffError(unix.Close(ln.fd))
-	}
+	//if ln.fd != 0 {
+	//	sniffError(unix.Close(ln.fd))
+	//}
 	if ln.f != nil {
 		sniffError(ln.f.Close())
 	}
