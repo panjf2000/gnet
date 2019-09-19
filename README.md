@@ -151,11 +151,11 @@ events.Tick = func() (delay time.Duration, action Action){
 The `Serve` function can bind to UDP addresses. 
 
 - All incoming and outgoing packets will not be buffered but sent individually.
-- The `OnOpened` and `OnClosed` events are not availble for UDP sockets, only the `React` event.
+- The `OnOpened` and `OnClosed` events are not available for UDP sockets, only the `React` event.
 
 ## Multi-threads
 
-The `Events.Multicore` indicates whether the server will be effectively created with multi-cores, if so, then you must take care with synchonizing memory between all event callbacks, otherwise, it will run the server with single thread. The number of threads in the server will be automatically assigned to the value of `runtime.NumCPU()`.
+The `Events.Multicore` indicates whether the server will be effectively created with multi-cores, if so, then you must take care with synchronizing memory between all event callbacks, otherwise, it will run the server with single thread. The number of threads in the server will be automatically assigned to the value of `runtime.NumCPU()`.
 
 ## Load balancing
 
