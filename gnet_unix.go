@@ -15,10 +15,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/panjf2000/gnet/netpoll"
 	"golang.org/x/sys/unix"
 
 	"github.com/libp2p/go-reuseport"
-	"github.com/panjf2000/gnet/internal"
 )
 
 type server struct {
@@ -116,7 +116,7 @@ func activateLoops(svr *server, numLoops int) {
 	for i := 0; i < numLoops; i++ {
 		loop := &loop{
 			idx:     i,
-			poller:  internal.OpenPoller(),
+			poller:  netpoll.OpenPoller(),
 			packet:  make([]byte, 0xFFFF),
 			fdconns: make(map[int]*conn),
 		}
@@ -136,10 +136,10 @@ func activateLoops(svr *server, numLoops int) {
 func activateReactors(svr *server, numLoops int) {
 	// Convert numLoops to the least power of two integer value greater than or equal to n,
 	// e.g. 2, 4, 8, 16, 32, 64, etc, which will make a higher performance when dispatching messages later.
-	//powerOfTwoNumLoops := internal.CeilToPowerOfTwo(numLoops)
+	//powerOfTwoNumLoops := netpoll.CeilToPowerOfTwo(numLoops)
 	//numLoops = powerOfTwoNumLoops
 	//if numCPU := runtime.NumCPU(); numCPU < powerOfTwoNumLoops {
-	//	numLoops = internal.FloorToPowerOfTwo(numCPU)
+	//	numLoops = netpoll.FloorToPowerOfTwo(numCPU)
 	//}
 
 	if numLoops < 3 {
@@ -151,7 +151,7 @@ func activateReactors(svr *server, numLoops int) {
 	for i := 0; i < (numLoops-1)/2; i++ {
 		loop := &loop{
 			idx:     i,
-			poller:  internal.OpenPoller(),
+			poller:  netpoll.OpenPoller(),
 			packet:  make([]byte, 0xFFFF),
 			fdconns: make(map[int]*conn),
 		}
@@ -165,7 +165,7 @@ func activateReactors(svr *server, numLoops int) {
 
 	loop := &loop{
 		idx:    -1,
-		poller: internal.OpenPoller(),
+		poller: netpoll.OpenPoller(),
 	}
 	for _, ln := range svr.lns {
 		if ln.pconn != nil && loop.packet == nil {

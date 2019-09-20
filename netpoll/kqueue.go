@@ -5,14 +5,17 @@
 
 // +build darwin netbsd freebsd openbsd dragonfly
 
-package internal
+package netpoll
 
-import "golang.org/x/sys/unix"
+import (
+	"github.com/panjf2000/gnet/internal"
+	"golang.org/x/sys/unix"
+)
 
 // Poller ...
 type Poller struct {
 	fd    int
-	notes noteQueue
+	notes internal.NoteQueue
 }
 
 // OpenPoller ...
@@ -31,7 +34,7 @@ func OpenPoller() *Poller {
 	if err != nil {
 		panic(err)
 	}
-	poller.notes.mu = new(spinLock)
+	poller.notes = internal.NewNoteQueue()
 	return poller
 }
 
@@ -111,15 +114,3 @@ func (p *Poller) ModReadWrite(fd int) {
 // Del ...
 func (p *Poller) Del(fd int) {
 }
-
-// ModDetach ...
-//func (p *Poller) ModDetach(fd int) {
-//	p.changes = append(p.changes,
-//		unix.Kevent_t{
-//			Ident: uint64(fd), Flags: unix.EV_DELETE, Filter: unix.EVFILT_READ,
-//		},
-//		unix.Kevent_t{
-//			Ident: uint64(fd), Flags: unix.EV_DELETE, Filter: unix.EVFILT_WRITE,
-//		},
-//	)
-//}

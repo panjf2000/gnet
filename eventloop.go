@@ -11,16 +11,16 @@ import (
 	"net"
 	"time"
 
-	"github.com/panjf2000/gnet/internal"
+	"github.com/panjf2000/gnet/netpoll"
 	"github.com/panjf2000/gnet/ringbuffer"
 	"golang.org/x/sys/unix"
 )
 
 type loop struct {
-	idx     int              // loop index in the server loops list
-	poller  *internal.Poller // epoll or kqueue
-	packet  []byte           // read packet buffer
-	fdconns map[int]*conn    // loop connections fd -> conn
+	idx     int           // loop index in the server loops list
+	poller  *netpoll.Poller       // epoll or kqueue
+	packet  []byte        // read packet buffer
+	fdconns map[int]*conn // loop connections fd -> conn
 }
 
 func (l *loop) loopCloseConn(svr *server, conn *conn, err error) error {
@@ -155,7 +155,7 @@ func (l *loop) loopUDPRead(svr *server, lnidx, fd int) error {
 		conn := &conn{
 			addrIndex:  lnidx,
 			localAddr:  svr.lns[lnidx].lnaddr,
-			remoteAddr: internal.SockaddrToUDPAddr(&sa6),
+			remoteAddr: netpoll.SockaddrToUDPAddr(&sa6),
 			inBuf:      ringbuffer.New(cacheRingBufferSize),
 		}
 		_, _ = conn.inBuf.Write(l.packet[:n])
@@ -178,13 +178,13 @@ func (l *loop) loopOpened(svr *server, conn *conn) error {
 	conn.opened = true
 	conn.addrIndex = conn.lnidx
 	conn.localAddr = svr.lns[conn.lnidx].lnaddr
-	conn.remoteAddr = internal.SockaddrToTCPOrUnixAddr(conn.sa)
+	conn.remoteAddr = netpoll.SockaddrToTCPOrUnixAddr(conn.sa)
 	if svr.events.OnOpened != nil {
 		out, opts, action := svr.events.OnOpened(conn)
 		conn.action = action
 		if opts.TCPKeepAlive > 0 {
 			if _, ok := svr.lns[conn.lnidx].ln.(*net.TCPListener); ok {
-				sniffError(internal.SetKeepAlive(conn.fd, int(opts.TCPKeepAlive/time.Second)))
+				sniffError(netpoll.SetKeepAlive(conn.fd, int(opts.TCPKeepAlive/time.Second)))
 			}
 		}
 

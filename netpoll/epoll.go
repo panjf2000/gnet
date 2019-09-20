@@ -3,16 +3,21 @@
 // Use of this source code is governed by an MIT-style
 // license that can be found in the LICENSE file.
 
-package internal
+// +build linux
 
-import "golang.org/x/sys/unix"
+package netpoll
+
+import (
+	"github.com/panjf2000/gnet/internal"
+	"golang.org/x/sys/unix"
+)
 
 // Poller ...
 type Poller struct {
 	fd     int    // epoll fd
 	wfd    int    // wake fd
 	wfdBuf []byte // wfd buffer to read packet
-	notes  noteQueue
+	notes  internal.NoteQueue
 }
 
 // OpenPoller ...
@@ -31,7 +36,7 @@ func OpenPoller() *Poller {
 	poller.wfd = int(r0)
 	poller.wfdBuf = make([]byte, 8)
 	poller.AddRead(poller.wfd)
-	poller.notes.mu = new(spinLock)
+	poller.notes = internal.NewNoteQueue()
 	return poller
 }
 
@@ -52,7 +57,7 @@ func (p *Poller) Trigger(note interface{}) error {
 
 // Polling ...
 func (p *Poller) Polling(iter func(fd int, note interface{}) error) error {
-	events := make([]unix.EpollEvent, 64)
+	events := make([]unix.EpollEvent, 256)
 	for {
 		n, err := unix.EpollWait(p.fd, events, -1)
 		if err != nil && err != unix.EINTR {
@@ -127,14 +132,3 @@ func (p *Poller) Del(fd int) {
 		panic(err)
 	}
 }
-
-// ModDetach ...
-//func (p *Poller) ModDetach(fd int) {
-//	if err := unix.EpollCtl(p.fd, unix.EPOLL_CTL_DEL, fd,
-//		&unix.EpollEvent{Fd: int32(fd),
-//			Events: unix.EPOLLIN | unix.EPOLLOUT,
-//		},
-//	); err != nil {
-//		panic(err)
-//	}
-//}

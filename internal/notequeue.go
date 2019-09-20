@@ -24,12 +24,12 @@ func (sl *spinLock) Unlock() {
 	atomic.StoreUint32((*uint32)(sl), 0)
 }
 
-type noteQueue struct {
+type NoteQueue struct {
 	mu    sync.Locker
 	notes []interface{}
 }
 
-func (q *noteQueue) Add(note interface{}) (one bool) {
+func (q *NoteQueue) Add(note interface{}) (one bool) {
 	q.mu.Lock()
 	q.notes = append(q.notes, note)
 	n := len(q.notes)
@@ -37,7 +37,7 @@ func (q *noteQueue) Add(note interface{}) (one bool) {
 	return n == 1
 }
 
-func (q *noteQueue) ForEach(iter func(note interface{}) error) error {
+func (q *NoteQueue) ForEach(iter func(note interface{}) error) error {
 	q.mu.Lock()
 	if len(q.notes) == 0 {
 		q.mu.Unlock()
@@ -52,4 +52,8 @@ func (q *noteQueue) ForEach(iter func(note interface{}) error) error {
 		}
 	}
 	return nil
+}
+
+func NewNoteQueue() NoteQueue {
+	return NoteQueue{mu: new(spinLock)}
 }

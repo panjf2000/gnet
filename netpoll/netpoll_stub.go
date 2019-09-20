@@ -2,7 +2,9 @@
 // Use of this source code is governed by an MIT-style
 // license that can be found in the LICENSE file.
 
-package internal
+// +build !linux,!darwin,!dragonfly,!freebsd,!netbsd
+
+package netpoll
 
 // SetKeepAlive sets the keepalive for the connection
 func SetKeepAlive(fd, secs int) error {

@@ -5,7 +5,7 @@
 
 // +build netbsd freebsd dragonfly linux
 
-package internal
+package netpoll
 
 import (
 	"golang.org/x/sys/unix"
