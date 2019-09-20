@@ -17,16 +17,17 @@ import (
 )
 
 type loop struct {
-	idx     int           // loop index in the server loops list
-	poller  *netpoll.Poller       // epoll or kqueue
-	packet  []byte        // read packet buffer
-	fdconns map[int]*conn // loop connections fd -> conn
+	idx     int             // loop index in the server loops list
+	poller  *netpoll.Poller // epoll or kqueue
+	packet  []byte          // read packet buffer
+	fdconns map[int]*conn   // loop connections fd -> conn
 }
 
 func (l *loop) loopCloseConn(svr *server, conn *conn, err error) error {
+	l.poller.Delete(conn.fd)
 	delete(l.fdconns, conn.fd)
-	l.poller.Del(conn.fd)
 	_ = unix.Close(conn.fd)
+
 	if svr.events.OnClosed != nil {
 		switch svr.events.OnClosed(conn, err) {
 		case None:

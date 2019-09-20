@@ -136,10 +136,10 @@ func activateLoops(svr *server, numLoops int) {
 func activateReactors(svr *server, numLoops int) {
 	// Convert numLoops to the least power of two integer value greater than or equal to n,
 	// e.g. 2, 4, 8, 16, 32, 64, etc, which will make a higher performance when dispatching messages later.
-	//powerOfTwoNumLoops := netpoll.CeilToPowerOfTwo(numLoops)
+	//powerOfTwoNumLoops := internal.CeilToPowerOfTwo(numLoops)
 	//numLoops = powerOfTwoNumLoops
 	//if numCPU := runtime.NumCPU(); numCPU < powerOfTwoNumLoops {
-	//	numLoops = netpoll.FloorToPowerOfTwo(numCPU)
+	//	numLoops = internal.FloorToPowerOfTwo(numCPU)
 	//}
 
 	if numLoops < 3 {

@@ -111,6 +111,6 @@ func (p *Poller) ModReadWrite(fd int) {
 	}
 }
 
-// Del ...
-func (p *Poller) Del(fd int) {
+// Delete ...
+func (p *Poller) Delete(fd int) {
 }
