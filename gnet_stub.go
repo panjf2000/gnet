@@ -30,7 +30,7 @@ func (ln *listener) system() error {
 }
 
 func serve(events Events, listeners []*listener) error {
-	return stdserve(events, listeners)
+	return errors.New("Unsupported platform in gnet")
 }
 
 func reuseportListenPacket(proto, addr string) (l net.PacketConn, err error) {
