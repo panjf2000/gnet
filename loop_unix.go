@@ -25,6 +25,7 @@ type loop struct {
 
 func (l *loop) loopCloseConn(svr *server, conn *conn, err error) error {
 	delete(l.fdconns, conn.fd)
+	l.poller.Del(conn.fd)
 	_ = unix.Close(conn.fd)
 	if svr.events.OnClosed != nil {
 		switch svr.events.OnClosed(conn, err) {

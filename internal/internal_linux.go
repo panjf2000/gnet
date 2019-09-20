@@ -121,6 +121,13 @@ func (p *Poller) ModReadWrite(fd int) {
 	}
 }
 
+// Del ...
+func (p *Poller) Del(fd int) {
+	if err := unix.EpollCtl(p.fd, unix.EPOLL_CTL_DEL, fd, nil); err != nil {
+		panic(err)
+	}
+}
+
 // ModDetach ...
 //func (p *Poller) ModDetach(fd int) {
 //	if err := unix.EpollCtl(p.fd, unix.EPOLL_CTL_DEL, fd,
