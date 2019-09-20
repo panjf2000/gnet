@@ -11,9 +11,8 @@ import "golang.org/x/sys/unix"
 
 // Poller ...
 type Poller struct {
-	fd      int
-	changes []unix.Kevent_t
-	notes   noteQueue
+	fd    int
+	notes noteQueue
 }
 
 // OpenPoller ...
@@ -56,11 +55,10 @@ func (p *Poller) Trigger(note interface{}) error {
 func (p *Poller) Polling(iter func(fd int, note interface{}) error) error {
 	events := make([]unix.Kevent_t, 128)
 	for {
-		n, err := unix.Kevent(p.fd, p.changes, events, nil)
+		n, err := unix.Kevent(p.fd, nil, events, nil)
 		if err != nil && err != unix.EINTR {
 			return err
 		}
-		p.changes = p.changes[:0]
 		if err := p.notes.ForEach(func(note interface{}) error {
 			return iter(0, note)
 		}); err != nil {
@@ -78,37 +76,40 @@ func (p *Poller) Polling(iter func(fd int, note interface{}) error) error {
 
 // AddRead ...
 func (p *Poller) AddRead(fd int) {
-	p.changes = append(p.changes,
-		unix.Kevent_t{
-			Ident: uint64(fd), Flags: unix.EV_ADD, Filter: unix.EVFILT_READ,
-		},
-	)
+	if _, err := unix.Kevent(p.fd, []unix.Kevent_t{
+		{Ident: uint64(fd), Flags: unix.EV_ADD, Filter: unix.EVFILT_READ}}, nil, nil); err != nil {
+		panic(err)
+	}
 }
 
 // AddReadWrite ...
 func (p *Poller) AddReadWrite(fd int) {
-	p.changes = append(p.changes,
-		unix.Kevent_t{
-			Ident: uint64(fd), Flags: unix.EV_ADD, Filter: unix.EVFILT_READ,
-		},
-		unix.Kevent_t{
-			Ident: uint64(fd), Flags: unix.EV_ADD, Filter: unix.EVFILT_WRITE,
-		},
-	)
+	if _, err := unix.Kevent(p.fd, []unix.Kevent_t{
+		{Ident: uint64(fd), Flags: unix.EV_ADD, Filter: unix.EVFILT_READ},
+		{Ident: uint64(fd), Flags: unix.EV_ADD, Filter: unix.EVFILT_WRITE},
+	}, nil, nil); err != nil {
+		panic(err)
+	}
 }
 
 // ModRead ...
 func (p *Poller) ModRead(fd int) {
-	p.changes = append(p.changes, unix.Kevent_t{
-		Ident: uint64(fd), Flags: unix.EV_DELETE, Filter: unix.EVFILT_WRITE,
-	})
+	if _, err := unix.Kevent(p.fd, []unix.Kevent_t{
+		{Ident: uint64(fd), Flags: unix.EV_DELETE, Filter: unix.EVFILT_WRITE}}, nil, nil); err != nil {
+		panic(err)
+	}
 }
 
 // ModReadWrite ...
 func (p *Poller) ModReadWrite(fd int) {
-	p.changes = append(p.changes, unix.Kevent_t{
-		Ident: uint64(fd), Flags: unix.EV_ADD, Filter: unix.EVFILT_WRITE,
-	})
+	if _, err := unix.Kevent(p.fd, []unix.Kevent_t{
+		{Ident: uint64(fd), Flags: unix.EV_ADD, Filter: unix.EVFILT_WRITE}}, nil, nil); err != nil {
+		panic(err)
+	}
+}
+
+// Del ...
+func (p *Poller) Del(fd int) {
 }
 
 // ModDetach ...
