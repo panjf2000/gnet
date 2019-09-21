@@ -158,14 +158,17 @@ func (l *loop) loopUDPRead(svr *server, lnidx, fd int) error {
 			localAddr:  svr.lns[lnidx].lnaddr,
 			remoteAddr: netpoll.SockaddrToUDPAddr(&sa6),
 			inBuf:      ringbuffer.New(cacheRingBufferSize),
+			outBuf:     ringbuffer.New(cacheRingBufferSize),
 		}
 		_, _ = conn.inBuf.Write(l.packet[:n])
-		out, action := svr.events.React(conn, conn.inBuf)
-		if len(out) > 0 {
+		action := svr.events.React(conn)
+		if conn.outBuf.Length() > 0 {
 			if svr.events.PreWrite != nil {
 				svr.events.PreWrite()
 			}
+			out := conn.outBuf.Bytes()
 			sniffError(unix.Sendto(fd, out, 0, sa))
+			ringbuffer.Recycle(out)
 		}
 		switch action {
 		case Shutdown:
@@ -181,7 +184,7 @@ func (l *loop) loopOpened(svr *server, conn *conn) error {
 	conn.localAddr = svr.lns[conn.lnidx].lnaddr
 	conn.remoteAddr = netpoll.SockaddrToTCPOrUnixAddr(conn.sa)
 	if svr.events.OnOpened != nil {
-		out, opts, action := svr.events.OnOpened(conn)
+		opts, action := svr.events.OnOpened(conn)
 		conn.action = action
 		if opts.TCPKeepAlive > 0 {
 			if _, ok := svr.lns[conn.lnidx].ln.(*net.TCPListener); ok {
@@ -189,8 +192,8 @@ func (l *loop) loopOpened(svr *server, conn *conn) error {
 			}
 		}
 
-		if len(out) > 0 {
-			conn.sendOut(out)
+		if conn.outBuf.Length() > 0 {
+			conn.write()
 		}
 	}
 	if conn.outBuf.Length() == 0 {
@@ -248,10 +251,9 @@ func (l *loop) loopWake(svr *server, conn *conn) error {
 	if svr.events.React == nil {
 		return nil
 	}
-	out, action := svr.events.React(conn, conn.inBuf)
-	conn.action = action
-	if len(out) > 0 {
-		conn.sendOut(out)
+	conn.action = svr.events.React(conn)
+	if conn.outBuf.Length() > 0 {
+		conn.write()
 	}
 	if conn.outBuf.Length() != 0 {
 		l.poller.ModReadWrite(conn.fd)
@@ -270,10 +272,9 @@ func (l *loop) loopRead(svr *server, conn *conn) error {
 
 	_, _ = conn.inBuf.Write(l.packet[:n])
 	if svr.events.React != nil {
-		out, action := svr.events.React(conn, conn.inBuf)
-		conn.action = action
-		if len(out) > 0 {
-			conn.sendOut(out)
+		conn.action = svr.events.React(conn)
+		if conn.outBuf.Length() > 0 {
+			conn.write()
 		}
 	}
 	if conn.outBuf.Length() != 0 {

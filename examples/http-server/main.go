@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/panjf2000/gnet"
-	"github.com/panjf2000/gnet/ringbuffer"
 )
 
 var res string
@@ -67,13 +66,14 @@ func main() {
 	//	return
 	//}
 
-	events.React = func(c gnet.Conn, inBuf *ringbuffer.RingBuffer) (out []byte, action gnet.Action) {
-		top, tail := inBuf.PreReadAll()
+	events.React = func(c gnet.Conn) (action gnet.Action) {
+		top, tail := c.Read()
 		data := append(top, tail...)
 		if noparse && bytes.Contains(data, []byte("\r\n\r\n")) {
 			// for testing minimal single packet request -> response.
-			out = appendresp(nil, "200 OK", "", res)
-			inBuf.Reset()
+			out := appendresp(nil, "200 OK", "", res)
+			c.Write(out)
+			c.ResetBuffer()
 			return
 		}
 		// process the pipeline
@@ -81,7 +81,8 @@ func main() {
 		leftover, err := parsereq(data, &req)
 		if err != nil {
 			// bad thing happened
-			out = appendresp(out, "500 Error", "", err.Error()+"\n")
+			out := appendresp([]byte{}, "500 Error", "", err.Error()+"\n")
+			c.Write(out)
 			action = gnet.Close
 			return
 		} else if len(leftover) == len(data) {
@@ -90,8 +91,9 @@ func main() {
 		}
 		// handle the request
 		req.remoteAddr = c.RemoteAddr().String()
-		out = appendhandle(out, &req)
-		inBuf.Reset()
+		out := appendhandle([]byte{}, &req)
+		c.Write(out)
+		c.ResetBuffer()
 		return
 	}
 	// We at least want the single http address.

@@ -106,16 +106,18 @@ import (
 	"log"
 
 	"github.com/panjf2000/gnet"
-	"github.com/panjf2000/gnet/ringbuffer"
 )
 
 func main() {
 	var events gnet.Events
 	events.Multicore = true
-	events.React = func(c gnet.Conn, inBuf *ringbuffer.RingBuffer) (out []byte, action gnet.Action) {
-		top, tail := inBuf.PreReadAll()
-		out = append(top, tail...)
-		inBuf.Reset()
+	events.React = func(c gnet.Conn) (action gnet.Action) {
+		top, tail := c.Read()
+		c.Write(append(top, tail...))
+		c.ResetBuffer()
+		if trace {
+			log.Printf("%s", strings.TrimSpace(string(top)+string(tail)))
+		}
 		return
 	}
 	log.Fatal(gnet.Serve(events, "tcp://:9000"))
@@ -131,7 +133,7 @@ Current supported I/O events in `gnet`:
 - `OnInitComplete` is activated when the server is ready to accept new connections.
 - `OnOpened` is activated when a connection has opened.
 - `OnClosed` is activated when a connection has closed.
-- `React` is activated when the server receives new data from a connection.
+- `React` is activated when the server receives new data from a connection, you usually put the business code in this function.
 - `Tick` is activated immediately after the server starts and will fire again after a specified interval.
 - `PreWrite` is activated just before any data is written to any client socket.
 

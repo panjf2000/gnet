@@ -104,18 +104,19 @@ package main
 import (
 	"log"
 
-    "github.com/panjf2000/gnet"
-    "github.com/panjf2000/gnet/ringbuffer"
-
+	"github.com/panjf2000/gnet"
 )
 
 func main() {
 	var events gnet.Events
 	events.Multicore = true
-	events.React = func(c gnet.Conn, inBuf *ringbuffer.RingBuffer) (out []byte, action gnet.Action) {
-		top, tail := inBuf.PreReadAll()
-		out = append(top, tail...)
-		inBuf.Reset()
+	events.React = func(c gnet.Conn) (action gnet.Action) {
+		top, tail := c.Read()
+		c.Write(append(top, tail...))
+		c.ResetBuffer()
+		if trace {
+			log.Printf("%s", strings.TrimSpace(string(top)+string(tail)))
+		}
 		return
 	}
 	log.Fatal(gnet.Serve(events, "tcp://:9000"))
@@ -131,7 +132,7 @@ func main() {
 - `OnInitComplete` 当 server 初始化完成之后调用。
 - `OnOpened` 当连接被打开的时候调用。
 - `OnClosed` 当连接被关闭的时候调用。
-- `React` 当 server 端接收到从 client 端发送来的数据的时候调用。（你的核心业务代码一般是写在这个方法里）
+- `React` 当 server 端接收到从 client 端发送来的数据的时候调用，业务代码一般是写在这个方法里。
 - `Tick` 服务器启动的时候会调用一次，之后就以给定的时间间隔定时调用一次，是一个定时器方法。
 - `PreWrite` 预先写数据方法，在 server 端写数据回 client 端之前调用。
 

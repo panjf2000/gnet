@@ -11,8 +11,6 @@ import (
 	"os"
 	"strings"
 	"time"
-
-	"github.com/panjf2000/gnet/ringbuffer"
 )
 
 var errClosing = errors.New("closing")
@@ -59,6 +57,14 @@ type Conn interface {
 	RemoteAddr() net.Addr
 	// Wake triggers a React event for this connection.
 	Wake()
+	// Read reads all data from connection.
+	Read() ([]byte, []byte)
+	// Write writes data to connection.
+	Write([]byte)
+	// Advance advances the read pointer with the given number.
+	Advance(int)
+	// ResetBuffer reset the read pointer.
+	ResetBuffer()
 }
 
 // Events represents the server events for the Serve call.
@@ -78,7 +84,7 @@ type Events struct {
 	// it's local and remote address.
 	// Use the out return value to write data to the connection.
 	// The opts return value is used to set connection options.
-	OnOpened func(c Conn) (out []byte, opts Options, action Action)
+	OnOpened func(c Conn) (opts Options, action Action)
 	// OnClosed fires when a connection has closed.
 	// The err parameter is the last known connection error.
 	OnClosed func(c Conn, err error) (action Action)
@@ -87,7 +93,7 @@ type Events struct {
 	// React fires when a connection sends the server data.
 	// The in parameter is the incoming data.
 	// Use the out return value to write data to the connection.
-	React func(c Conn, inBuf *ringbuffer.RingBuffer) (out []byte, action Action)
+	React func(c Conn) (action Action)
 	// Tick fires immediately after the server starts and will fire again
 	// following the duration specified by the delay return value.
 	Tick func() (delay time.Duration, action Action)

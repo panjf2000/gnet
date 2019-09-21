@@ -17,8 +17,6 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
-
-	"github.com/panjf2000/gnet/ringbuffer"
 )
 
 func TestServe(t *testing.T) {
@@ -112,10 +110,11 @@ func testServe(network, addr string, unix, reuseport bool, multicore bool, nclie
 	//events.OnInitComplete = func(srv Server) (action Action) {
 	//	return
 	//}
-	events.OnOpened = func(c Conn) (out []byte, opts Options, action Action) {
+	events.OnOpened = func(c Conn) (opts Options, action Action) {
 		c.SetContext(c)
 		atomic.AddInt32(&connected, 1)
-		out = []byte("sweetness\r\n")
+		out := []byte("sweetness\r\n")
+		c.Write(out)
 		opts.TCPKeepAlive = time.Minute * 5
 		if c.LocalAddr() == nil {
 			panic("nil local addr")
@@ -137,10 +136,10 @@ func testServe(network, addr string, unix, reuseport bool, multicore bool, nclie
 		}
 		return
 	}
-	events.React = func(c Conn, inBuf *ringbuffer.RingBuffer) (out []byte, action Action) {
-		top, tail := inBuf.PreReadAll()
-		out = append(top, tail...)
-		inBuf.Reset()
+	events.React = func(c Conn) (action Action) {
+		top, tail := c.Read()
+		c.Write(append(top, tail...))
+		c.ResetBuffer()
 		once.Do(func() {
 			if !reuseport {
 				c.Wake()
@@ -292,7 +291,7 @@ func testShutdown(network, addr string) {
 	var count int
 	var clients int64
 	var N = 10
-	events.OnOpened = func(c Conn) (out []byte, opts Options, action Action) {
+	events.OnOpened = func(c Conn) (opts Options, action Action) {
 		atomic.AddInt64(&clients, 1)
 		return
 	}

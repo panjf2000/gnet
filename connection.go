@@ -30,16 +30,32 @@ type conn struct {
 	loop       *loop         // connected loop
 }
 
-func (c *conn) sendOut(buf []byte) {
-	n, err := syscall.Write(c.fd, buf)
+func (c *conn) Read() (top, tail []byte) {
+	top, tail = c.inBuf.PreReadAll()
+	return
+}
+
+func (c *conn) Advance(n int) {
+	c.inBuf.Advance(n)
+}
+
+func (c *conn) ResetBuffer() {
+	c.inBuf.Reset()
+}
+
+func (c *conn) Write(buf []byte) {
+	_, _ = c.outBuf.Write(buf)
+}
+
+func (c *conn) write() {
+	//buf := c.outBuf.Bytes()
+	top, _ := c.outBuf.PreReadAll()
+	n, err := syscall.Write(c.fd, top)
 	if err != nil {
-		_, _ = c.outBuf.Write(buf)
 		return
 	}
-
-	if n < len(buf) {
-		_, _ = c.outBuf.Write(buf[n:])
-	}
+	c.outBuf.Advance(n)
+	//ringbuffer.Recycle(buf)
 }
 
 func (c *conn) Context() interface{}       { return c.ctx }

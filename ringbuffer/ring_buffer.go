@@ -36,7 +36,7 @@ func New(size int) *RingBuffer {
 }
 
 // PreRead reads the bytes with given length but will not move the pointer of "read".
-func (r *RingBuffer) PreRead(len int) (top []byte, tail []byte) {
+func (r *RingBuffer) PreRead(len int) (top, tail []byte) {
 	if r.isEmpty {
 		return
 	}
@@ -73,7 +73,7 @@ func (r *RingBuffer) PreRead(len int) (top []byte, tail []byte) {
 }
 
 // PreReadAll reads the all bytes in this ring-buffer but will not move the pointer of "read".
-func (r *RingBuffer) PreReadAll() (top []byte, tail []byte) {
+func (r *RingBuffer) PreReadAll() (top, tail []byte) {
 	if r.isEmpty {
 		return
 	}
