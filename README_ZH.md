@@ -34,10 +34,10 @@
 - SO_REUSEPORT 端口重用
 
 # 核心设计
-
 ## 多线程/Go程模型
+### 主从多 Reactors 模型
 
-`gnet` 重新设计开发了一个新内置的多线程/Go程模型：『主从 Reactor 多线程/Go程』，这也是 `netty` 默认的线程模型，下面是这个模型的原理图：
+`gnet` 重新设计开发了一个新内置的多线程/Go程模型：『主从多 Reactors』，这也是 `netty` 默认的线程模型，下面是这个模型的原理图：
 
 <p align="center">
 <img width="820" alt="multi_reactor" src="https://user-images.githubusercontent.com/7496278/64916634-8f038080-d7b3-11e9-82c8-f77e9791df86.png">
@@ -48,7 +48,13 @@
 <img width="869" alt="reactor" src="https://user-images.githubusercontent.com/7496278/64918644-a5213900-d7d3-11e9-88d6-1ec1ec72c1cd.png">
 </p>
 
-现在我正在为 `gnet` 开发一个新的多线程/Go程模型：『带线程/Go程池的主从 Reactors 多线程/Go程』，并且很快就能完成，这个模型的架构图如下所示：
+### 主从多 Reactors + 线程/Go程池
+
+你可能会问一个问题：如果我的业务逻辑是阻塞的，那么在 `Event.React()` 注册方法里的逻辑也会阻塞，从而导致阻塞 event-loop 线程，这时候怎么办？
+
+我的回答是，现在我正在为 `gnet` 开发一个新的多线程/Go程模型：『带线程/Go程池的主从多 Reactors』，这个新网络模型将通过引入一个 worker pool 来解决业务逻辑阻塞的问题：它会在启动的时候初始化一个 worker pool，然后在把 `Event.React()`里面的阻塞代码放到 worker pool 里执行，从而避免阻塞 event-loop 线程，
+
+这个模型还在持续开发中并且很快就能完成，模型的架构图如下所示：
 
 <p align="center">
 <img width="854" alt="multi_reactor_thread_pool" src="https://user-images.githubusercontent.com/7496278/64918783-90de3b80-d7d5-11e9-9190-ff8277c95db1.png">
@@ -58,6 +64,10 @@
 <p align="center">
 <img width="916" alt="multi-reactors" src="https://user-images.githubusercontent.com/7496278/64918646-a7839300-d7d3-11e9-804a-d021ddd23ca3.png">
 </p>
+
+不过，在这个新的网络模型开发完成之前，你依然可以通过一些其他的外部开源 goroutine pool 来处理你的阻塞业务逻辑，在这里我推荐个人开发的一个开源 goroutine pool：[ants](https://github.com/panjf2000/ants)，它是一个基于 Go 开发的高性能的 goroutine pool ，实现了对大规模 goroutine 的调度管理、goroutine 复用。
+
+你可以在开发 `gnet` 网络应用的时候集成 `ants` 库，然后把那些阻塞业务逻辑提交到 `ants` 池里去执行，从而避免阻塞 event-loop 线程。
 
 ## 通信机制
 
@@ -220,7 +230,14 @@ Go Version : go version go1.12.9 darwin/amd64
 
 - [evio](https://github.com/tidwall/evio)
 - [go-disruptor](https://github.com/smartystreets-prototypes/go-disruptor)
+- [ants](https://github.com/panjf2000/ants)
 - [eviop](https://github.com/Allenxuxu/eviop)
+
+# 相关文章
+
+- [A Million WebSockets and Go](https://www.freecodecamp.org/news/million-websockets-and-go-cc58418460bb/)
+- [Going Infinite, handling 1M websockets connections in Go](https://speakerdeck.com/eranyanay/going-infinite-handling-1m-websockets-connections-in-go)
+- [gnet: 一个轻量级且高性能的 Golang 网络库](https://taohuawu.club/go-event-loop-networking-library-gnet)
 
 # 待做事项
 

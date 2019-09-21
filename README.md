@@ -36,6 +36,7 @@ The goal of this project is to create a server framework for Go that performs on
 # Key Designs
 
 ## Multiple-Threads/Goroutines Model
+### Multiple Reactors Model
 
 `gnet` redesigns and implements a new built-in multiple-threads/goroutines model: 『Multiple Reactors』 which is also the default multiple-threads model of `netty`, Here's the schematic diagram:
 
@@ -48,7 +49,13 @@ and it works as the following sequence diagram:
 <img width="869" alt="reactor" src="https://user-images.githubusercontent.com/7496278/64918644-a5213900-d7d3-11e9-88d6-1ec1ec72c1cd.png">
 </p>
 
-The subsequent multiple-threads/goroutines model of `gnet`: 『Multiple Reactors with thread/goroutine pool』is under development and about to be delivered soon, the architecture diagram of new model is in here:
+### Multiple Reactors + Goroutine-Pool Model
+
+You may ask me a question: what if my business logic in `Event.React()`  contains some blocking code which leads to a blocking in event-loop of `gnet`, what is the solution for this kind of situation？
+
+And the solution for that would be found in the subsequent multiple-threads/goroutines model of `gnet`: 『Multiple Reactors with thread/goroutine pool』which pulls you out from the blocking mire, it will construct a worker-pool with fixed capacity and put those blocking jobs in `Event.React()` into the worker-pool to unblock the event-loop goroutines.
+
+This new networking model is under development and about to be delivered soon and its architecture diagram of new model is in here:
 
 <p align="center">
 <img width="854" alt="multi_reactor_thread_pool" src="https://user-images.githubusercontent.com/7496278/64918783-90de3b80-d7d5-11e9-9190-ff8277c95db1.png">
@@ -58,6 +65,10 @@ and it works as the following sequence diagram:
 <p align="center">
 <img width="916" alt="multi-reactors" src="https://user-images.githubusercontent.com/7496278/64918646-a7839300-d7d3-11e9-804a-d021ddd23ca3.png">
 </p>
+
+Before you can benefit from this new networking model in handling blocking business logic, there is still a way for you to handle your business logic in networking: you can leverage the open-source goroutine-pool to unblock your blocking code, and I now present you [ants](https://github.com/panjf2000/ants): a high-performance goroutine pool in Go that allows you to manage and recycle a massive number of goroutines in your concurrency programs.
+
+You can import `ants` to your `gnet` server and put your blocking code to the `ants` pool in `Event.React()`, which makes your business code nonblocking.
 
 ## Communication Mechanism
 
@@ -218,7 +229,14 @@ Source code in `gnet` is available under the MIT [License](/LICENSE).
 
 - [evio](https://github.com/tidwall/evio)
 - [go-disruptor](https://github.com/smartystreets-prototypes/go-disruptor)
+- [ants](https://github.com/panjf2000/ants)
 - [eviop](https://github.com/Allenxuxu/eviop)
+
+# Relevant Articles
+
+- [A Million WebSockets and Go](https://www.freecodecamp.org/news/million-websockets-and-go-cc58418460bb/)
+- [Going Infinite, handling 1M websockets connections in Go](https://speakerdeck.com/eranyanay/going-infinite-handling-1m-websockets-connections-in-go)
+- [gnet: 一个轻量级且高性能的 Golang 网络库](https://taohuawu.club/go-event-loop-networking-library-gnet)
 
 # TODO
 
