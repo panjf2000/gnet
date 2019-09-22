@@ -132,8 +132,8 @@ func activateSubReactor(svr *server, loop *loop) {
 		switch {
 		//case conn == nil:
 		//	return nil
-		case !conn.opened:
-			return loop.loopOpened(svr, conn)
+		//case !conn.opened:
+		//	return loop.loopOpened(svr, conn)
 		case conn.outBuf.Length() > 0:
 			return loop.loopWrite(svr, conn)
 		default:

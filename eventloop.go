@@ -59,7 +59,8 @@ func (l *loop) loopNote(svr *server, note interface{}) error {
 		return l.loopWake(svr, v)
 	case *mail:
 		l.fdconns[v.fd] = v.conn
-		l.poller.AddReadWrite(v.fd)
+		_ = l.loopOpened(svr, v.conn)
+		l.poller.AddRead(v.fd)
 	}
 	return err
 }
@@ -190,11 +191,11 @@ func (l *loop) loopOpened(svr *server, conn *conn) error {
 		}
 
 		if len(out) > 0 {
-			conn.write(out)
+			conn.open(out)
 		}
 	}
-	if conn.outBuf.Length() == 0 {
-		l.poller.ModRead(conn.fd)
+	if conn.outBuf.Length() != 0 {
+		l.poller.AddWrite(conn.fd)
 	}
 	return l.handleAction(svr, conn)
 }

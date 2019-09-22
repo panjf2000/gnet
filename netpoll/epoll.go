@@ -104,6 +104,17 @@ func (p *Poller) AddRead(fd int) {
 	}
 }
 
+// AddWrite ...
+func (p *Poller) AddWrite(fd int) {
+	if err := unix.EpollCtl(p.fd, unix.EPOLL_CTL_ADD, fd,
+		&unix.EpollEvent{Fd: int32(fd),
+			Events: unix.EPOLLOUT,
+		},
+	); err != nil {
+		panic(err)
+	}
+}
+
 // ModRead ...
 func (p *Poller) ModRead(fd int) {
 	if err := unix.EpollCtl(p.fd, unix.EPOLL_CTL_MOD, fd,

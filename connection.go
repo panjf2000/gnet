@@ -42,6 +42,18 @@ func (c *conn) ResetBuffer() {
 	c.inBuf.Reset()
 }
 
+func (c *conn) open(buf []byte) {
+	n, err := syscall.Write(c.fd, buf)
+	if err != nil {
+		_, _ = c.outBuf.Write(buf)
+		return
+	}
+
+	if n < len(buf) {
+		_, _ = c.outBuf.Write(buf[n:])
+	}
+}
+
 func (c *conn) write(buf []byte) {
 	n, err := syscall.Write(c.fd, buf)
 	if err != nil {
