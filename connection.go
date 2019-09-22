@@ -34,12 +34,22 @@ func (c *conn) ReadAll() ([]byte, []byte) {
 	return c.inBuf.PreReadAll()
 }
 
+func (c *conn) ReadBytes() []byte {
+	return c.inBuf.Bytes()
+}
+
 func (c *conn) AdvanceBuffer(n int) {
 	c.inBuf.Advance(n)
 }
 
 func (c *conn) ResetBuffer() {
 	c.inBuf.Reset()
+}
+
+func (c *conn) AsyncWrite(buf []byte) {
+	_ = c.loop.poller.Trigger(func() {
+		c.write(buf)
+	})
 }
 
 func (c *conn) open(buf []byte) {

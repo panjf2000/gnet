@@ -61,6 +61,8 @@ func (l *loop) loopNote(svr *server, note interface{}) error {
 		l.fdconns[v.fd] = v.conn
 		_ = l.loopOpened(svr, v.conn)
 		l.poller.AddRead(v.fd)
+	case func():
+		v()
 	}
 	return err
 }

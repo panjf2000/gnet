@@ -53,6 +53,8 @@ and it works as the following sequence diagram:
 
 You may ask me a question: what if my business logic in `Event.React()`  contains some blocking code which leads to a blocking in event-loop of `gnet`, what is the solution for this kind of situation？
 
+As you know, there is a most important tenet when writing code under `gnet`: you should never block the event-loop in the `Event.React()`, otherwise it will lead to a low throughput in your `gnet` server, which is also the most important tenet in `netty`. 
+
 And the solution for that would be found in the subsequent multiple-threads/goroutines model of `gnet`: 『Multiple Reactors with thread/goroutine pool』which pulls you out from the blocking mire, it will construct a worker-pool with fixed capacity and put those blocking jobs in `Event.React()` into the worker-pool to unblock the event-loop goroutines.
 
 This new networking model is under development and about to be delivered soon and its architecture diagram of new model is in here:
@@ -97,7 +99,9 @@ $ go get -u github.com/panjf2000/gnet
 
 It is easy to create a network server with `gnet`. All you have to do is just register your events to `gnet.Events` and pass it to the `gnet.Serve` function along with the binding address(es). Each connections is represented as an `gnet.Conn` object that is passed to various events to differentiate the clients. At any point you can close a client or shutdown the server by return a `Close` or `Shutdown` action from an event.
 
-The simplest example to get you started playing with `gnet` would be the echo server. So here you are, a simplest echo server upon `gnet` that is litsening on port 9000:
+The simplest example to get you started playing with `gnet` would be the echo server. So here you are, a simplest echo server upon `gnet` that is listening on port 9000:
+
+### Echo server without blocking logic
 
 ```go
 package main
@@ -106,7 +110,6 @@ import (
 	"log"
 
 	"github.com/panjf2000/gnet"
-	"github.com/panjf2000/gnet/ringbuffer"
 )
 
 func main() {
@@ -126,6 +129,43 @@ func main() {
 ```
 
 As you can see, this example of echo server only sets up the `React` function where you commonly write your main business code and it will be invoked once the server receives input data from a client. The output data will be then sent back to that client by assigning the `out` variable and return it after your business code finish processing data(in this case, it just echo the data back).
+
+### Echo server with blocking logic
+
+```go
+package main
+
+import (
+	"log"
+	"time"
+
+	"github.com/panjf2000/gnet"
+	"github.com/panjf2000/ants"
+)
+
+func main() {
+	var events gnet.Events
+	events.Multicore = true
+	
+	poolSize := 256 * 1024
+	pool, _ := ants.NewPool(poolSize, ants.WithNonblocking(true))
+	defer pool.Release()
+	
+	events.React = func(c gnet.Conn) (out []byte, action gnet.Action) {
+		data := c.ReadBytes()
+		c.ResetBuffer()
+		// Use ants pool unblock the event-loop.
+		_ = pool.Submit(func() {
+			time.Sleep(1 * time.Second)
+			c.AsyncWrite(data)
+		})
+		return
+	}
+	log.Fatal(gnet.Serve(events, "tcp://:9000"))
+}
+```
+
+Like I said in the 『Multiple Reactors + Goroutine-Pool Model』section, if your business logic contain blocking code, then you should turn them into unblocking code in any way, for instance you can wrap them into a goroutine, but it will result in a massive amount of goroutines if massive traffic is passing through your server so I would suggest you leverage a goroutine pool like `ants` to manage those goroutines and reduce the cost of system resource.
 
 ### I/O Events
 

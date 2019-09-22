@@ -29,20 +29,14 @@ type NoteQueue struct {
 	notes []interface{}
 }
 
-func (q *NoteQueue) Add(note interface{}) (one bool) {
+func (q *NoteQueue) Push(note interface{}) {
 	q.mu.Lock()
 	q.notes = append(q.notes, note)
-	n := len(q.notes)
 	q.mu.Unlock()
-	return n == 1
 }
 
 func (q *NoteQueue) ForEach(iter func(note interface{}) error) error {
 	q.mu.Lock()
-	if len(q.notes) == 0 {
-		q.mu.Unlock()
-		return nil
-	}
 	notes := q.notes
 	q.notes = nil
 	q.mu.Unlock()

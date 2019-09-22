@@ -52,6 +52,8 @@
 
 你可能会问一个问题：如果我的业务逻辑是阻塞的，那么在 `Event.React()` 注册方法里的逻辑也会阻塞，从而导致阻塞 event-loop 线程，这时候怎么办？
 
+正如你所知，基于 `gnet` 编写你的网络服务器有一条最重要的原则：永远不能让你业务逻辑（一般写在 `Event.React()` 里）阻塞 event-loop 线程，否则的话将会极大地降低服务器的吞吐量，这也是 `netty` 的一条最重要的原则。
+
 我的回答是，现在我正在为 `gnet` 开发一个新的多线程/Go程模型：『带线程/Go程池的主从多 Reactors』，这个新网络模型将通过引入一个 worker pool 来解决业务逻辑阻塞的问题：它会在启动的时候初始化一个 worker pool，然后在把 `Event.React()`里面的阻塞代码放到 worker pool 里执行，从而避免阻塞 event-loop 线程，
 
 这个模型还在持续开发中并且很快就能完成，模型的架构图如下所示：
@@ -97,7 +99,7 @@ $ go get -u github.com/panjf2000/gnet
 用 `gnet` 来构建网络服务器是非常简单的，只需要把你关心的事件注册到 `gnet.Events` 里面，然后把它和绑定的监听地址一起传递给 `gnet.Serve` 方法就完成了。在服务器开始工作之后，每一条到来的网络连接会在各个事件之间传递，如果你想在某个事件中关闭某条连接或者关掉整个服务器的话，直接把 `gnet.Action` 设置成 `Cosed` 或者 `Shutdown`就行了。
 
 Echo 服务器是一种最简单网络服务器，把它作为 `gnet` 的入门例子在再合适不过了，下面是一个最简单的 echo server，它监听了 9000 端口：
-
+### 不带阻塞逻辑的 echo 服务器
 ```go
 package main
 
@@ -105,8 +107,6 @@ import (
 	"log"
 
     "github.com/panjf2000/gnet"
-    "github.com/panjf2000/gnet/ringbuffer"
-
 )
 
 func main() {
@@ -126,6 +126,41 @@ func main() {
 ```
 
 正如你所见，上面的例子里 `gnet` 实例只注册了一个 `React` 事件。一般来说，主要的业务逻辑代码会写在这个事件方法里，这个方法会在服务器接收到客户端写过来的数据之时被调用，然后处理输入数据（这里只是把数据 echo 回去）并且在处理完之后把需要输出的数据赋值给 `out` 变量然后返回，之后你就不用管了，`gnet` 会帮你把数据写回客户端的。
+
+### 带阻塞逻辑的 echo 服务器
+```go
+package main
+
+import (
+	"log"
+	"time"
+
+	"github.com/panjf2000/gnet"
+	"github.com/panjf2000/ants"
+)
+
+func main() {
+	var events gnet.Events
+	events.Multicore = true
+	
+	poolSize := 256 * 1024
+	pool, _ := ants.NewPool(poolSize, ants.WithNonblocking(true))
+	defer pool.Release()
+	
+	events.React = func(c gnet.Conn) (out []byte, action gnet.Action) {
+		data := c.ReadBytes()
+		c.ResetBuffer()
+		// Use ants pool unblock the event-loop.
+		_ = pool.Submit(func() {
+			time.Sleep(1 * time.Second)
+			c.AsyncWrite(data)
+		})
+		return
+	}
+	log.Fatal(gnet.Serve(events, "tcp://:9000"))
+}
+```
+正如我在『主从多 Reactors + 线程/Go程池』那一节所说的那样，如果你的业务逻辑里包含阻塞代码，那么你应该把这些阻塞代码变成非阻塞的，比如通过把这部分代码通过 goroutine 去运行，但是要注意一点，如果你的服务器处理的流量足够的大，那么这种做法将会导致创建大量的 goroutines 极大地消耗系统资源，所以我一般建议你用 goroutine pool 来做 goroutines 的复用和管理，以及节省系统资源。
 
 ### I/O 事件
 

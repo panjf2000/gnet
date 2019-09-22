@@ -59,10 +59,14 @@ type Conn interface {
 	Wake()
 	// ReadAll reads all data from ring buffer.
 	ReadAll() ([]byte, []byte)
+	// ReadBytes reads all data and return a new slice.
+	ReadBytes() []byte
 	// AdvanceBuffer advances the read pointer of ring buffer.
 	AdvanceBuffer(int)
 	// ResetBuffer resets the ring buffer.
 	ResetBuffer()
+	// AyncWrite writes data asynchronously.
+	AsyncWrite(buf []byte)
 }
 
 // Events represents the server events for the Serve call.

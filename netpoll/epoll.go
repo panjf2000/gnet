@@ -50,22 +50,19 @@ func (p *Poller) Close() error {
 
 // Trigger ...
 func (p *Poller) Trigger(note interface{}) error {
-	p.notes.Add(note)
+	p.notes.Push(note)
 	_, err := unix.Write(p.wfd, []byte{0, 0, 0, 0, 0, 0, 0, 1})
 	return err
 }
 
+
 // Polling ...
 func (p *Poller) Polling(iter func(fd int, note interface{}) error) error {
 	events := make([]unix.EpollEvent, 256)
+	var note bool
 	for {
 		n, err := unix.EpollWait(p.fd, events, -1)
 		if err != nil && err != unix.EINTR {
-			return err
-		}
-		if err := p.notes.ForEach(func(note interface{}) error {
-			return iter(0, note)
-		}); err != nil {
 			return err
 		}
 		for i := 0; i < n; i++ {
@@ -77,6 +74,15 @@ func (p *Poller) Polling(iter func(fd int, note interface{}) error) error {
 				if _, err := unix.Read(p.wfd, p.wfdBuf); err != nil {
 					panic(err)
 				}
+				note = true
+			}
+		}
+		if note {
+			note = false
+			if err := p.notes.ForEach(func(note interface{}) error {
+				return iter(0, note)
+			}); err != nil {
+				return err
 			}
 		}
 	}

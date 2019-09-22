@@ -29,35 +29,43 @@ func TestServe(t *testing.T) {
 	t.Run("poll", func(t *testing.T) {
 		t.Run("tcp", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe("tcp", ":9991", false, false, false, 10)
+				testServe("tcp", ":9991", false, false, false, false, 10)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("tcp", ":9992", false, false, true, 10)
+				testServe("tcp", ":9992", false, false, true, false, 10)
+			})
+		})
+		t.Run("tcp-async", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				testServe("tcp", ":9991", false, false, false, true, 10)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				testServe("tcp", ":9992", false, false, true, true, 10)
 			})
 		})
 		t.Run("tcp-unix", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe("tcp", ":9993", true, false, false, 10)
+				testServe("tcp", ":9993", true, false, false, false, 10)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("tcp", ":9994", true, false, true, 10)
+				testServe("tcp", ":9994", true, false, true, false, 10)
 			})
 		})
 
 		t.Run("udp", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe("udp", ":9995", false, false, false, 10)
+				testServe("udp", ":9995", false, false, false, false, 10)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("udp", ":9996", false, false, true, 10)
+				testServe("udp", ":9996", false, false, true, false, 10)
 			})
 		})
 		t.Run("udp-unix-reuseport", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe("udp", ":9997", true, false, false, 10)
+				testServe("udp", ":9997", true, false, false, false, 10)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("udp", ":9998", true, false, true, 10)
+				testServe("udp", ":9998", true, false, true, false, 10)
 			})
 		})
 	})
@@ -65,40 +73,40 @@ func TestServe(t *testing.T) {
 	t.Run("poll-reuseport", func(t *testing.T) {
 		t.Run("tcp", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe("tcp", ":9991", false, true, false, 10)
+				testServe("tcp", ":9991", false, true, false, false, 10)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("tcp", ":9992", false, true, true, 10)
+				testServe("tcp", ":9992", false, true, true, false, 10)
 			})
 		})
 		t.Run("tcp-unix-reuseport", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe("tcp", ":9993", true, true, false, 10)
+				testServe("tcp", ":9993", true, true, false, false, 10)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("tcp", ":9994", true, true, true, 10)
+				testServe("tcp", ":9994", true, true, true, false, 10)
 			})
 		})
 		t.Run("udp", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe("udp", ":9995", false, true, false, 10)
+				testServe("udp", ":9995", false, true, false, false, 10)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("udp", ":9996", false, true, true, 10)
+				testServe("udp", ":9996", false, true, true, false, 10)
 			})
 		})
 		t.Run("udp-unix-reuseport", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe("udp", ":9997", true, true, false, 10)
+				testServe("udp", ":9997", true, true, false, false, 10)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("udp", ":9998", true, true, true, 10)
+				testServe("udp", ":9998", true, true, true, false, 10)
 			})
 		})
 	})
 }
 
-func testServe(network, addr string, unix, reuseport bool, multicore bool, nclients int) {
+func testServe(network, addr string, unix, reuseport, multicore, async bool, nclients int) {
 	var once sync.Once
 	var started int32
 	var connected int32
@@ -136,15 +144,27 @@ func testServe(network, addr string, unix, reuseport bool, multicore bool, nclie
 		return
 	}
 	events.React = func(c Conn) (out []byte, action Action) {
-		top, tail := c.ReadAll()
-		out = append(top, tail...)
-		c.ResetBuffer()
-		once.Do(func() {
-			if !reuseport {
-				c.Wake()
-			}
-		})
-		return
+		if async {
+			data := c.ReadBytes()
+			c.ResetBuffer()
+			//data := c.ReadBytes()
+			//c.ResetBuffer()
+			//c.AsyncWrite(data)
+			go func() {
+				c.AsyncWrite(data)
+			}()
+			return
+		} else {
+			top, tail := c.ReadAll()
+			out = append(top, tail...)
+			c.ResetBuffer()
+			once.Do(func() {
+				if !reuseport {
+					c.Wake()
+				}
+			})
+			return
+		}
 	}
 	events.Tick = func() (delay time.Duration, action Action) {
 		if atomic.LoadInt32(&started) == 0 {

@@ -45,7 +45,7 @@ func (p *Poller) Close() error {
 
 // Trigger ...
 func (p *Poller) Trigger(note interface{}) error {
-	p.notes.Add(note)
+	p.notes.Push(note)
 	_, err := unix.Kevent(p.fd, []unix.Kevent_t{{
 		Ident:  0,
 		Filter: unix.EVFILT_USER,
@@ -57,14 +57,10 @@ func (p *Poller) Trigger(note interface{}) error {
 // Polling ...
 func (p *Poller) Polling(iter func(fd int, note interface{}) error) error {
 	events := make([]unix.Kevent_t, 128)
+	var note bool
 	for {
 		n, err := unix.Kevent(p.fd, nil, events, nil)
 		if err != nil && err != unix.EINTR {
-			return err
-		}
-		if err := p.notes.ForEach(func(note interface{}) error {
-			return iter(0, note)
-		}); err != nil {
 			return err
 		}
 		for i := 0; i < n; i++ {
@@ -72,6 +68,16 @@ func (p *Poller) Polling(iter func(fd int, note interface{}) error) error {
 				if err := iter(fd, nil); err != nil {
 					return err
 				}
+			} else {
+				note = true
+			}
+		}
+		if note {
+			note = false
+			if err := p.notes.ForEach(func(note interface{}) error {
+				return iter(0, note)
+			}); err != nil {
+				return err
 			}
 		}
 	}
