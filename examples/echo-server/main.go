@@ -12,7 +12,6 @@ import (
 	"strings"
 
 	"github.com/panjf2000/gnet"
-	"github.com/panjf2000/gnet/ringbuffer"
 )
 
 func main() {
@@ -38,11 +37,10 @@ func main() {
 		}
 		return
 	}
-	events.React = func(c gnet.Conn, inBuf *ringbuffer.RingBuffer) (out []byte, action gnet.Action) {
-		top, tail := inBuf.PreReadAll()
+	events.React = func(c gnet.Conn) (out []byte, action gnet.Action) {
+		top, tail := c.ReadAll()
 		out = append(top, tail...)
-		inBuf.Reset()
-
+		c.ResetBuffer()
 		if trace {
 			log.Printf("%s", strings.TrimSpace(string(top)+string(tail)))
 		}

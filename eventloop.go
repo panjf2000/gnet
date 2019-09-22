@@ -160,7 +160,7 @@ func (l *loop) loopUDPRead(svr *server, lnidx, fd int) error {
 			inBuf:      ringbuffer.New(cacheRingBufferSize),
 		}
 		_, _ = conn.inBuf.Write(l.packet[:n])
-		out, action := svr.events.React(conn, conn.inBuf)
+		out, action := svr.events.React(conn)
 		if len(out) > 0 {
 			if svr.events.PreWrite != nil {
 				svr.events.PreWrite()
@@ -190,7 +190,7 @@ func (l *loop) loopOpened(svr *server, conn *conn) error {
 		}
 
 		if len(out) > 0 {
-			conn.sendOut(out)
+			conn.write(out)
 		}
 	}
 	if conn.outBuf.Length() == 0 {
@@ -248,14 +248,14 @@ func (l *loop) loopWake(svr *server, conn *conn) error {
 	if svr.events.React == nil {
 		return nil
 	}
-	out, action := svr.events.React(conn, conn.inBuf)
+	out, action := svr.events.React(conn)
 	conn.action = action
 	if len(out) > 0 {
-		conn.sendOut(out)
+		conn.write(out)
 	}
-	if conn.outBuf.Length() != 0 {
-		l.poller.ModReadWrite(conn.fd)
-	}
+	//if conn.outBuf.Length() != 0 {
+	//	l.poller.ModReadWrite(conn.fd)
+	//}
 	return l.handleAction(svr, conn)
 }
 
@@ -270,14 +270,14 @@ func (l *loop) loopRead(svr *server, conn *conn) error {
 
 	_, _ = conn.inBuf.Write(l.packet[:n])
 	if svr.events.React != nil {
-		out, action := svr.events.React(conn, conn.inBuf)
+		out, action := svr.events.React(conn)
 		conn.action = action
 		if len(out) > 0 {
-			conn.sendOut(out)
+			conn.write(out)
 		}
 	}
-	if conn.outBuf.Length() != 0 {
-		l.poller.ModReadWrite(conn.fd)
-	}
+	//if conn.outBuf.Length() != 0 {
+	//	l.poller.ModReadWrite(conn.fd)
+	//}
 	return l.handleAction(svr, conn)
 }

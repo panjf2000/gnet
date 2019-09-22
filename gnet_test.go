@@ -17,8 +17,6 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
-
-	"github.com/panjf2000/gnet/ringbuffer"
 )
 
 func TestServe(t *testing.T) {
@@ -137,10 +135,10 @@ func testServe(network, addr string, unix, reuseport bool, multicore bool, nclie
 		}
 		return
 	}
-	events.React = func(c Conn, inBuf *ringbuffer.RingBuffer) (out []byte, action Action) {
-		top, tail := inBuf.PreReadAll()
+	events.React = func(c Conn) (out []byte, action Action) {
+		top, tail := c.ReadAll()
 		out = append(top, tail...)
-		inBuf.Reset()
+		c.ResetBuffer()
 		once.Do(func() {
 			if !reuseport {
 				c.Wake()

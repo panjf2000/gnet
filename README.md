@@ -112,10 +112,13 @@ import (
 func main() {
 	var events gnet.Events
 	events.Multicore = true
-	events.React = func(c gnet.Conn, inBuf *ringbuffer.RingBuffer) (out []byte, action gnet.Action) {
-		top, tail := inBuf.PreReadAll()
+	events.React = func(c gnet.Conn) (out []byte, action gnet.Action) {
+		top, tail := c.ReadAll()
 		out = append(top, tail...)
-		inBuf.Reset()
+		c.ResetBuffer()
+		if trace {
+			log.Printf("%s", strings.TrimSpace(string(top)+string(tail)))
+		}
 		return
 	}
 	log.Fatal(gnet.Serve(events, "tcp://:9000"))

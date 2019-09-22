@@ -30,15 +30,29 @@ type conn struct {
 	loop       *loop         // connected loop
 }
 
-func (c *conn) sendOut(buf []byte) {
+func (c *conn) ReadAll() ([]byte, []byte) {
+	return c.inBuf.PreReadAll()
+}
+
+func (c *conn) AdvanceBuffer(n int) {
+	c.inBuf.Advance(n)
+}
+
+func (c *conn) ResetBuffer() {
+	c.inBuf.Reset()
+}
+
+func (c *conn) write(buf []byte) {
 	n, err := syscall.Write(c.fd, buf)
 	if err != nil {
 		_, _ = c.outBuf.Write(buf)
+		c.loop.poller.ModReadWrite(c.fd)
 		return
 	}
 
 	if n < len(buf) {
 		_, _ = c.outBuf.Write(buf[n:])
+		c.loop.poller.ModReadWrite(c.fd)
 	}
 }
 
