@@ -49,6 +49,7 @@ func (c *conn) ResetBuffer() {
 func (c *conn) AsyncWrite(buf []byte) {
 	_ = c.loop.poller.Trigger(func() {
 		c.write(buf)
+		ringbuffer.Recycle(buf)
 	})
 }
 
