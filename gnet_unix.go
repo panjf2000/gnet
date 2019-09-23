@@ -17,8 +17,6 @@ import (
 
 	"github.com/panjf2000/gnet/netpoll"
 	"golang.org/x/sys/unix"
-
-	"github.com/libp2p/go-reuseport"
 )
 
 type server struct {
@@ -223,12 +221,4 @@ func sniffError(err error) {
 	if err != nil {
 		log.Println(err)
 	}
-}
-
-func reuseportListenPacket(proto, addr string) (l net.PacketConn, err error) {
-	return reuseport.ListenPacket(proto, addr)
-}
-
-func reuseportListen(proto, addr string) (l net.Listener, err error) {
-	return reuseport.Listen(proto, addr)
 }

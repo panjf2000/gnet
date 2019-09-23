@@ -11,6 +11,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/panjf2000/gnet/netpoll"
 )
 
 var errClosing = errors.New("closing")
@@ -134,13 +136,13 @@ func Serve(events Events, addr ...string) error {
 		var err error
 		if ln.network == "udp" {
 			if ln.opts.reusePort {
-				ln.pconn, err = reuseportListenPacket(ln.network, ln.addr)
+				ln.pconn, err = netpoll.ReusePortListenPacket(ln.network, ln.addr)
 			} else {
 				ln.pconn, err = net.ListenPacket(ln.network, ln.addr)
 			}
 		} else {
 			if ln.opts.reusePort {
-				ln.ln, err = reuseportListen(ln.network, ln.addr)
+				ln.ln, err = netpoll.ReusePortListen(ln.network, ln.addr)
 			} else {
 				ln.ln, err = net.Listen(ln.network, ln.addr)
 			}
