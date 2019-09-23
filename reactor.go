@@ -135,16 +135,10 @@ func activateSubReactor(svr *server, loop *loop) {
 			return loop.loopNote(svr, note)
 		}
 
-		co, _ := loop.connections.Load(fd)
-		c := co.(*conn)
-		switch {
-		//case conn == nil:
-		//	return nil
-		//case !conn.opened:
-		//	return loop.loopOpened(svr, conn)
-		case c.outBuf.Length() > 0:
+		v, _ := loop.connections.Load(fd)
+		if c := v.(*conn); c.outBuf.Length() > 0 {
 			return loop.loopWrite(svr, c)
-		default:
+		} else {
 			return loop.loopRead(svr, c)
 		}
 	})

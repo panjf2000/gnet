@@ -147,9 +147,6 @@ func testServe(network, addr string, unix, reuseport, multicore, async bool, ncl
 		if async {
 			data := c.ReadBytes()
 			c.ResetBuffer()
-			//data := c.ReadBytes()
-			//c.ResetBuffer()
-			//c.AsyncWrite(data)
 			go func() {
 				c.AsyncWrite(data)
 			}()
@@ -284,6 +281,9 @@ func testTick(network, addr string) {
 		delay = time.Millisecond * 10
 		return
 	}
+	events.React = func(c Conn) (out []byte, action Action) {
+		return
+	}
 	must(Serve(events, network+"://"+addr))
 	dur := time.Since(start)
 	if dur < 250&time.Millisecond || dur > time.Second {
@@ -312,6 +312,9 @@ func testShutdown(network, addr string) {
 	var N = 10
 	events.OnOpened = func(c Conn) (out []byte, opts Options, action Action) {
 		atomic.AddInt64(&clients, 1)
+		return
+	}
+	events.React = func(c Conn) (out []byte, action Action) {
 		return
 	}
 	events.OnClosed = func(c Conn, err error) (action Action) {
@@ -354,6 +357,9 @@ func TestBadAddresses(t *testing.T) {
 	events.OnInitComplete = func(srv Server) (action Action) {
 		return Shutdown
 	}
+	events.React = func(c Conn) (out []byte, action Action) {
+		return
+	}
 	if err := Serve(events, "tulip://howdy"); err == nil {
 		t.Fatalf("expected error")
 	}
@@ -365,10 +371,26 @@ func TestBadAddresses(t *testing.T) {
 	}
 }
 
+func TestWithoutReact(t *testing.T) {
+	var events Events
+	events.OnInitComplete = func(s Server) (action Action) {
+		return Shutdown
+	}
+	//events.React = func(c Conn) (out []byte, action Action) {
+	//	return
+	//}
+	if err := Serve(events, "tcp://:9991?"); err != ErrReactNil{
+		panic(err)
+	}
+}
+
 func TestReuseport(t *testing.T) {
 	var events Events
 	events.OnInitComplete = func(s Server) (action Action) {
 		return Shutdown
+	}
+	events.React = func(c Conn) (out []byte, action Action) {
+		return
 	}
 	var wg sync.WaitGroup
 	wg.Add(5)

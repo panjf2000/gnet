@@ -34,7 +34,7 @@ func (l *loop) loopCloseConn(svr *server, conn *conn, err error) error {
 		switch svr.events.OnClosed(conn, err) {
 		case None:
 		case Shutdown:
-			return errClosing
+			return ErrClosing
 		}
 	}
 	return nil
@@ -48,7 +48,7 @@ func (l *loop) loopNote(svr *server, note interface{}) error {
 		switch action {
 		case None:
 		case Shutdown:
-			err = errClosing
+			err = ErrClosing
 		}
 		svr.tch <- delay
 	case error: // shutdown
@@ -83,8 +83,8 @@ func (l *loop) loopRun(svr *server) {
 		if fd == 0 {
 			return l.loopNote(svr, note)
 		}
-		if co, ok := l.connections.Load(fd); ok {
-			c := co.(*conn)
+		if v, ok := l.connections.Load(fd); ok {
+			c := v.(*conn)
 			switch {
 			case !c.opened:
 				return l.loopOpened(svr, c)
@@ -177,7 +177,7 @@ func (l *loop) loopUDPRead(svr *server, lnidx, fd int) error {
 		}
 		switch action {
 		case Shutdown:
-			return errClosing
+			return ErrClosing
 		}
 	}
 	return nil
@@ -236,24 +236,18 @@ func (l *loop) handleAction(svr *server, conn *conn) error {
 	case Close:
 		return l.loopCloseConn(svr, conn, nil)
 	case Shutdown:
-		return errClosing
+		return ErrClosing
 	default:
 		return nil
 	}
 }
 
 func (l *loop) loopWake(svr *server, conn *conn) error {
-	if svr.events.React == nil {
-		return nil
-	}
 	out, action := svr.events.React(conn)
 	conn.action = action
 	if len(out) > 0 {
 		conn.write(out)
 	}
-	//if conn.outBuf.Length() != 0 {
-	//	l.poller.ModReadWrite(conn.fd)
-	//}
 	return l.handleAction(svr, conn)
 }
 
@@ -267,15 +261,10 @@ func (l *loop) loopRead(svr *server, conn *conn) error {
 	}
 
 	_, _ = conn.inBuf.Write(l.packet[:n])
-	if svr.events.React != nil {
-		out, action := svr.events.React(conn)
-		conn.action = action
-		if len(out) > 0 {
-			conn.write(out)
-		}
+	out, action := svr.events.React(conn)
+	conn.action = action
+	if len(out) > 0 {
+		conn.write(out)
 	}
-	//if conn.outBuf.Length() != 0 {
-	//	l.poller.ModReadWrite(conn.fd)
-	//}
 	return l.handleAction(svr, conn)
 }

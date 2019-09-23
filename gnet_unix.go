@@ -80,10 +80,10 @@ func serve(events Events, listeners []*listener, reusePort bool) error {
 
 		// Notify all loops to close by closing all listeners
 		for _, loop := range svr.loops {
-			sniffError(loop.poller.Trigger(errClosing))
+			sniffError(loop.poller.Trigger(ErrClosing))
 		}
 		if svr.mainLoop != nil {
-			sniffError(svr.mainLoop.poller.Trigger(errClosing))
+			sniffError(svr.mainLoop.poller.Trigger(ErrClosing))
 		}
 
 		// Wait on all loops to complete reading events

@@ -15,7 +15,10 @@ import (
 	"github.com/panjf2000/gnet/netpoll"
 )
 
-var errClosing = errors.New("closing")
+var	(
+	ErrClosing  = errors.New("closing")
+	ErrReactNil = errors.New("must set up Event.React()")
+)
 
 // Action is an action that occurs after the completion of an event.
 type Action int
@@ -124,6 +127,10 @@ func Serve(events Events, addr ...string) error {
 			ln.close()
 		}
 	}()
+
+	if events.React == nil {
+		return ErrReactNil
+	}
 
 	var reusePort bool
 	for _, addr := range addr {
