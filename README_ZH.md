@@ -264,12 +264,11 @@ Go Version : go version go1.12.9 darwin/amd64
 
 `gnet` 的源码允许用户在遵循 MIT [开源证书](/LICENSE) 规则的前提下使用。
 
-# 鸣谢
+# 致谢
 
 - [evio](https://github.com/tidwall/evio)
 - [go-disruptor](https://github.com/smartystreets-prototypes/go-disruptor)
 - [ants](https://github.com/panjf2000/ants)
-- [eviop](https://github.com/Allenxuxu/eviop)
 
 # 相关文章
 

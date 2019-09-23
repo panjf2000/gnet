@@ -273,7 +273,6 @@ Source code in `gnet` is available under the MIT [License](/LICENSE).
 - [evio](https://github.com/tidwall/evio)
 - [go-disruptor](https://github.com/smartystreets-prototypes/go-disruptor)
 - [ants](https://github.com/panjf2000/ants)
-- [eviop](https://github.com/Allenxuxu/eviop)
 
 # Relevant Articles
 

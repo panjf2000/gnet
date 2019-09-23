@@ -207,8 +207,8 @@ func (l *loop) loopWrite(svr *server, conn *conn) error {
 		svr.events.PreWrite()
 	}
 
-	top, tail := conn.outBuf.PreReadAll()
-	n, err := unix.Write(conn.fd, top)
+	out := conn.outBuf.Bytes()
+	n, err := unix.Write(conn.fd, out)
 	if err != nil {
 		if err == unix.EAGAIN {
 			return nil
@@ -216,17 +216,7 @@ func (l *loop) loopWrite(svr *server, conn *conn) error {
 		return l.loopCloseConn(svr, conn, err)
 	}
 	conn.outBuf.Advance(n)
-
-	if len(top) == n && len(tail) > 0 {
-		n, err := unix.Write(conn.fd, tail)
-		if err != nil {
-			if err == unix.EAGAIN {
-				return nil
-			}
-			return l.loopCloseConn(svr, conn, err)
-		}
-		conn.outBuf.Advance(n)
-	}
+	ringbuffer.Recycle(out)
 
 	if conn.outBuf.Length() == 0 {
 		l.poller.ModRead(conn.fd)
