@@ -227,17 +227,23 @@ gnet.Serve(events, "tcp://:9000?reuseport=true"))
 ### 系统参数
 
 ```powershell
-Go Version : go1.12.9 linux/amd64
+# Machine information
         OS : Ubuntu 18.04/x86_64
        CPU : 8 Virtual CPUs
     Memory : 16.0 GiB
+
+# Go version and configurations
+Go Version : go1.12.9 linux/amd64
+GOMAXPROCS=8
 ```
 
-### Echo Server
+### 同类型的网络库性能对比：
+
+#### Echo Server
 
 ![](https://github.com/panjf2000/gnet_benchmarks/raw/master/results/echo_linux.png)
 
-### HTTP Server
+#### HTTP Server
 
 ![](https://github.com/panjf2000/gnet_benchmarks/raw/master/results/http_linux.png)
 
@@ -246,17 +252,21 @@ Go Version : go1.12.9 linux/amd64
 ### 系统参数
 
 ```powershell
-Go Version : go version go1.12.9 darwin/amd64
+# Machine information
         OS : macOS Mojave 10.14.6/x86_64
        CPU : 4 CPUs
     Memory : 8.0 GiB
+
+# Go version and configurations
+Go Version : go version go1.12.9 darwin/amd64
+GOMAXPROCS=4
 ```
 
-### Echo Server
+#### Echo Server
 
 ![](https://github.com/panjf2000/gnet_benchmarks/raw/master/results/echo_mac.png)
 
-### HTTP Server
+#### HTTP Server
 
 ![](https://github.com/panjf2000/gnet_benchmarks/raw/master/results/http_mac.png)
 
