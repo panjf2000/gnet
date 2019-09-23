@@ -30,7 +30,7 @@ type conn struct {
 	loop       *loop         // connected loop
 }
 
-func (c *conn) ReadAll() ([]byte, []byte) {
+func (c *conn) ReadPair() ([]byte, []byte) {
 	return c.inBuf.PreReadAll()
 }
 

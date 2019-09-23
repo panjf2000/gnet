@@ -155,7 +155,7 @@ func testServe(network, addr string, unix, reuseport, multicore, async bool, ncl
 			}()
 			return
 		} else {
-			top, tail := c.ReadAll()
+			top, tail := c.ReadPair()
 			out = append(top, tail...)
 			c.ResetBuffer()
 			once.Do(func() {

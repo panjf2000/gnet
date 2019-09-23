@@ -113,7 +113,7 @@ func main() {
 	var events gnet.Events
 	events.Multicore = true
 	events.React = func(c gnet.Conn) (out []byte, action gnet.Action) {
-		top, tail := c.ReadAll()
+		top, tail := c.ReadPair()
 		out = append(top, tail...)
 		c.ResetBuffer()
 		if trace {

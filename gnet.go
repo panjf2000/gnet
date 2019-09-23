@@ -57,8 +57,8 @@ type Conn interface {
 	RemoteAddr() net.Addr
 	// Wake triggers a React event for this connection.
 	Wake()
-	// ReadAll reads all data from ring buffer.
-	ReadAll() ([]byte, []byte)
+	// ReadPair reads all data from ring buffer.
+	ReadPair() ([]byte, []byte)
 	// ReadBytes reads all data and return a new slice.
 	ReadBytes() []byte
 	// AdvanceBuffer advances the read pointer of ring buffer.

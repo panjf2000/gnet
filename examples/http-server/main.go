@@ -67,7 +67,7 @@ func main() {
 	//}
 
 	events.React = func(c gnet.Conn) (out []byte, action gnet.Action) {
-		top, tail := c.ReadAll()
+		top, tail := c.ReadPair()
 		data := append(top, tail...)
 		if noparse && bytes.Contains(data, []byte("\r\n\r\n")) {
 			// for testing minimal single packet request -> response.
