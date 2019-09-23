@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/panjf2000/gnet/internal"
 	"github.com/panjf2000/gnet/netpoll"
 	"golang.org/x/sys/unix"
 )
@@ -117,9 +118,9 @@ func activateLoops(svr *server, numLoops int) {
 	// Create loops locally and bind the listeners.
 	for i := 0; i < numLoops; i++ {
 		loop := &loop{
-			idx:         i,
-			poller:      netpoll.OpenPoller(),
-			packet:      make([]byte, 0xFFFF),
+			idx:    i,
+			poller: netpoll.OpenPoller(),
+			packet: make([]byte, 0xFFFF),
 		}
 		for _, ln := range svr.lns {
 			loop.poller.AddRead(ln.fd)
@@ -135,25 +136,22 @@ func activateLoops(svr *server, numLoops int) {
 }
 
 func activateReactors(svr *server, numLoops int) {
+	//if numLoops < 3 {
+	//	numLoops = 3
+	//}
+	//
+	//svr.wg.Add(1 + (numLoops-1)/2)
+
 	// Convert numLoops to the least power of two integer value greater than or equal to n,
 	// e.g. 2, 4, 8, 16, 32, 64, etc, which will make a higher performance when dispatching messages later.
-	//powerOfTwoNumLoops := internal.CeilToPowerOfTwo(numLoops)
-	//numLoops = powerOfTwoNumLoops
-	//if numCPU := runtime.NumCPU(); numCPU < powerOfTwoNumLoops {
-	//	numLoops = internal.FloorToPowerOfTwo(numCPU)
-	//}
-
-	if numLoops < 3 {
-		numLoops = 3
-	}
-
-	svr.wg.Add(1 + (numLoops-1)/2)
-
-	for i := 0; i < (numLoops-1)/2; i++ {
+	powerOfTwoNumLoops := internal.CeilToPowerOfTwo(numLoops)
+	svr.wg.Add(1 + powerOfTwoNumLoops)
+	//for i := 0; i < (numLoops-1)/2; i++ {
+	for i := 0; i < powerOfTwoNumLoops; i++ {
 		loop := &loop{
-			idx:         i,
-			poller:      netpoll.OpenPoller(),
-			packet:      make([]byte, 0xFFFF),
+			idx:    i,
+			poller: netpoll.OpenPoller(),
+			packet: make([]byte, 0xFFFF),
 		}
 		svr.loops = append(svr.loops, loop)
 	}
