@@ -91,9 +91,13 @@ func serve(events Events, listeners []*listener, reusePort bool) error {
 
 		// Close loops and all outstanding connections
 		for _, loop := range svr.loops {
-			for _, c := range loop.fdconns {
-				sniffError(loop.loopCloseConn(svr, c, nil))
-			}
+			loop.connections.Range(func(key, value interface{}) bool {
+				sniffError(loop.loopCloseConn(svr, value.(*conn), nil))
+				return true
+			})
+			//for _, c := range loop.connections {
+			//	sniffError(loop.loopCloseConn(svr, c, nil))
+			//}
 			sniffError(loop.poller.Close())
 		}
 		if svr.mainLoop != nil {
@@ -113,10 +117,9 @@ func activateLoops(svr *server, numLoops int) {
 	// Create loops locally and bind the listeners.
 	for i := 0; i < numLoops; i++ {
 		loop := &loop{
-			idx:     i,
-			poller:  netpoll.OpenPoller(),
-			packet:  make([]byte, 0xFFFF),
-			fdconns: make(map[int]*conn),
+			idx:         i,
+			poller:      netpoll.OpenPoller(),
+			packet:      make([]byte, 0xFFFF),
 		}
 		for _, ln := range svr.lns {
 			loop.poller.AddRead(ln.fd)
@@ -148,10 +151,9 @@ func activateReactors(svr *server, numLoops int) {
 
 	for i := 0; i < (numLoops-1)/2; i++ {
 		loop := &loop{
-			idx:     i,
-			poller:  netpoll.OpenPoller(),
-			packet:  make([]byte, 0xFFFF),
-			fdconns: make(map[int]*conn),
+			idx:         i,
+			poller:      netpoll.OpenPoller(),
+			packet:      make([]byte, 0xFFFF),
 		}
 		svr.loops = append(svr.loops, loop)
 	}

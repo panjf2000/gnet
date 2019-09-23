@@ -9,6 +9,7 @@ package gnet
 
 import (
 	"net"
+	"sync"
 	"time"
 
 	"github.com/panjf2000/gnet/netpoll"
@@ -17,15 +18,16 @@ import (
 )
 
 type loop struct {
-	idx     int             // loop index in the server loops list
-	poller  *netpoll.Poller // epoll or kqueue
-	packet  []byte          // read packet buffer
-	fdconns map[int]*conn   // loop connections fd -> conn
+	idx         int             // loop index in the server loops list
+	poller      *netpoll.Poller // epoll or kqueue
+	packet      []byte          // read packet buffer
+	connections sync.Map        // loop connections fd -> conn
 }
 
 func (l *loop) loopCloseConn(svr *server, conn *conn, err error) error {
 	l.poller.Delete(conn.fd)
-	delete(l.fdconns, conn.fd)
+	//delete(l.connections, conn.fd)
+	l.connections.Delete(conn.fd)
 	_ = unix.Close(conn.fd)
 
 	if svr.events.OnClosed != nil {
@@ -53,14 +55,14 @@ func (l *loop) loopNote(svr *server, note interface{}) error {
 		err = v
 	case *conn:
 		// Wake called for connection
-		if l.fdconns[v.fd] != v {
+		if val, ok := l.connections.Load(v.fd); !ok || val != v {
 			return nil // ignore stale wakes
 		}
 		return l.loopWake(svr, v)
-	case *mail:
-		l.fdconns[v.fd] = v.conn
-		_ = l.loopOpened(svr, v.conn)
-		l.poller.AddRead(v.fd)
+	//case *mail:
+	//	l.fdconns[v.fd] = v.conn
+	//	_ = l.loopOpened(svr, v.conn)
+	//	l.poller.AddRead(v.fd)
 	case func():
 		v()
 	}
@@ -81,16 +83,18 @@ func (l *loop) loopRun(svr *server) {
 		if fd == 0 {
 			return l.loopNote(svr, note)
 		}
-		conn := l.fdconns[fd]
-		switch {
-		case conn == nil:
+		if co, ok := l.connections.Load(fd); ok {
+			c := co.(*conn)
+			switch {
+			case !c.opened:
+				return l.loopOpened(svr, c)
+			case c.outBuf.Length() > 0:
+				return l.loopWrite(svr, c)
+			default:
+				return l.loopRead(svr, c)
+			}
+		} else {
 			return l.loopAccept(svr, fd)
-		case !conn.opened:
-			return l.loopOpened(svr, conn)
-		case conn.outBuf.Length() > 0:
-			return l.loopWrite(svr, conn)
-		default:
-			return l.loopRead(svr, conn)
 		}
 	})
 }
@@ -127,7 +131,8 @@ func (l *loop) loopAccept(svr *server, fd int) error {
 				outBuf: ringbuffer.New(cacheRingBufferSize),
 				loop:   l,
 			}
-			l.fdconns[conn.fd] = conn
+			//l.connections[conn.fd] = conn
+			l.connections.Store(conn.fd, conn)
 			l.poller.AddReadWrite(conn.fd)
 			return nil
 		}

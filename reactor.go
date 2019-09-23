@@ -23,16 +23,17 @@ const (
 	cacheRingBufferSize = 1024
 )
 
-type mail struct {
-	fd   int
-	conn *conn
-}
+//type mail struct {
+//	fd   int
+//	conn *conn
+//}
 
 type eventConsumer struct {
 	numLoops int
 	// numLoopsMask   int
 	loop           *loop
 	connRingBuffer *[connRingBufferSize]*conn
+	onOpened       func(*conn)
 }
 
 func (ec *eventConsumer) Consume(lower, upper int64) {
@@ -53,7 +54,10 @@ func (ec *eventConsumer) Consume(lower, upper int64) {
 		conn.outBuf = ringbuffer.New(cacheRingBufferSize)
 		conn.loop = ec.loop
 
-		_ = ec.loop.poller.Trigger(&mail{fd: conn.fd, conn: conn})
+		ec.loop.connections.Store(conn.fd, conn)
+		ec.onOpened(conn)
+		ec.loop.poller.AddRead(conn.fd)
+		//_ = ec.loop.poller.Trigger(&mail{fd: conn.fd, conn: conn})
 	}
 }
 
@@ -69,7 +73,10 @@ func activateMainReactor(svr *server) {
 	eventConsumers := make([]disruptor.Consumer, 0, svr.numLoops)
 	for _, loop := range svr.loops {
 		// ec := &eventConsumer{svr.numLoops, svr.numLoops - 1, loop, connRingBuffer}
-		ec := &eventConsumer{svr.numLoops, loop, connRingBuffer}
+		onOpened := func(conn *conn) {
+			_ = loop.loopOpened(svr, conn)
+		}
+		ec := &eventConsumer{svr.numLoops, loop, connRingBuffer, onOpened}
 		eventConsumers = append(eventConsumers, ec)
 	}
 
@@ -128,16 +135,17 @@ func activateSubReactor(svr *server, loop *loop) {
 			return loop.loopNote(svr, note)
 		}
 
-		conn := loop.fdconns[fd]
+		co, _ := loop.connections.Load(fd)
+		c := co.(*conn)
 		switch {
 		//case conn == nil:
 		//	return nil
 		//case !conn.opened:
 		//	return loop.loopOpened(svr, conn)
-		case conn.outBuf.Length() > 0:
-			return loop.loopWrite(svr, conn)
+		case c.outBuf.Length() > 0:
+			return loop.loopWrite(svr, c)
 		default:
-			return loop.loopRead(svr, conn)
+			return loop.loopRead(svr, c)
 		}
 	})
 }
