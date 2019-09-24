@@ -214,6 +214,7 @@ func (l *loop) loopWrite(svr *server, conn *conn) error {
 
 	out := conn.outBuf.Bytes()
 	n, err := unix.Write(conn.fd, out)
+	ringbuffer.Recycle(out)
 	if err != nil {
 		if err == unix.EAGAIN {
 			return nil
@@ -221,7 +222,6 @@ func (l *loop) loopWrite(svr *server, conn *conn) error {
 		return l.loopCloseConn(svr, conn, err)
 	}
 	conn.outBuf.Advance(n)
-	ringbuffer.Recycle(out)
 
 	if conn.outBuf.Length() == 0 {
 		l.poller.ModRead(conn.fd)
