@@ -29,7 +29,6 @@
 - 支持多种网络协议：TCP、UDP、Unix Sockets
 - 支持两种事件驱动机制：Linux 里的 epoll 以及 FreeBSD 里的 kqueue
 - 支持异步写操作
-- 允许多个网络监听地址绑定在一个 Event-Loop 上
 - 灵活的事件定时器
 - SO_REUSEPORT 端口重用
 
@@ -71,12 +70,6 @@
 
 你可以在开发 `gnet` 网络应用的时候集成 `ants` 库，然后把那些阻塞业务逻辑提交到 `ants` 池里去执行，从而避免阻塞 event-loop 线程。
 
-## 通信机制
-
-`gnet` 的『主从 Reactors 多线程/Go程』模型是基于 Golang 里的 Goroutines的，一个 Reactor 挂载在一个 Goroutine 上，所以在 `gnet` 的这个网络模型里主 Reactor/Goroutine 与从 Reactors/Goroutines 有海量通信的需求，因此 `gnet` 里必须要有一个能在 Goroutines 之间进行高效率的通信的机制，我没有选择 Golang 里的主流方案：基于 Channel 的 CSP 模型，而是选择了性能更好、基于 Ring-Buffer 的 Disruptor 方案。
-
-所以我最终选择了 [go-disruptor](https://github.com/smartystreets-prototypes/go-disruptor)：高性能消息分发队列 LMAX Disruptor 的 Golang 实现。
-
 ## 自动扩容的 Ring-Buffer
 
 `gnet` 利用 Ring-Buffer 来缓存 TCP 流数据以及管理内存使用。
@@ -105,13 +98,14 @@ package main
 
 import (
 	"log"
+	"strings"
 
-    "github.com/panjf2000/gnet"
+	"github.com/panjf2000/gnet"
 )
 
 func main() {
+	var trace bool
 	var events gnet.Events
-	events.Multicore = true
 	events.React = func(c gnet.Conn) (out []byte, action gnet.Action) {
 		top, tail := c.ReadPair()
 		out = append(top, tail...)
@@ -121,7 +115,7 @@ func main() {
 		}
 		return
 	}
-	log.Fatal(gnet.Serve(events, "tcp://:9000"))
+	log.Fatal(gnet.Serve(events, "tcp://:9000", gnet.WithMulticore(true)))
 }
 ```
 
@@ -135,18 +129,18 @@ import (
 	"log"
 	"time"
 
-	"github.com/panjf2000/gnet"
 	"github.com/panjf2000/ants"
+	"github.com/panjf2000/gnet"
 )
 
 func main() {
 	var events gnet.Events
-	events.Multicore = true
-	
+
+	// Create a goroutine pool.
 	poolSize := 256 * 1024
 	pool, _ := ants.NewPool(poolSize, ants.WithNonblocking(true))
 	defer pool.Release()
-	
+
 	events.React = func(c gnet.Conn) (out []byte, action gnet.Action) {
 		data := c.ReadBytes()
 		c.ResetBuffer()
@@ -157,7 +151,7 @@ func main() {
 		})
 		return
 	}
-	log.Fatal(gnet.Serve(events, "tcp://:9000"))
+	log.Fatal(gnet.Serve(events, "tcp://:9000", gnet.WithMulticore(true)))
 }
 ```
 正如我在『主从多 Reactors + 线程/Go程池』那一节所说的那样，如果你的业务逻辑里包含阻塞代码，那么你应该把这些阻塞代码变成非阻塞的，比如通过把这部分代码通过 goroutine 去运行，但是要注意一点，如果你的服务器处理的流量足够的大，那么这种做法将会导致创建大量的 goroutines 极大地消耗系统资源，所以我一般建议你用 goroutine pool 来做 goroutines 的复用和管理，以及节省系统资源。
@@ -172,13 +166,6 @@ func main() {
 - `React` 当 server 端接收到从 client 端发送来的数据的时候调用。（你的核心业务代码一般是写在这个方法里）
 - `Tick` 服务器启动的时候会调用一次，之后就以给定的时间间隔定时调用一次，是一个定时器方法。
 - `PreWrite` 预先写数据方法，在 server 端写数据回 client 端之前调用。
-
-### 多地址绑定
-
-```go
-// 在同一个 Server 上同时绑定 TCP 和 Unix-Socket 两个地址
-gnet.Serve(events, "tcp://:9000", "unix://socket")
-```
 
 
 ### 定时器
@@ -214,10 +201,10 @@ events.Tick = func() (delay time.Duration, action Action){
 
 服务器支持 [SO_REUSEPORT](https://lwn.net/Articles/542629/) 端口复用特性，允许多个 sockets 监听同一个端口，然后内核会帮你做好负载均衡，每次只唤醒一个 socket 来处理 accept 请求，避免惊群效应。
 
-开启这个功能也很简单，在要绑定的监听地址后面设置 `reuseport=true` 即可：
+开启这个功能也很简单，使用 functional options 设置一下即可：
 
 ```go
-gnet.Serve(events, "tcp://:9000?reuseport=true"))
+gnet.Serve(events, "tcp://:9000", gnet.WithMulticore(true)))
 ```
 
 # 性能测试
@@ -277,7 +264,7 @@ GOMAXPROCS=4
 # 致谢
 
 - [evio](https://github.com/tidwall/evio)
-- [go-disruptor](https://github.com/smartystreets-prototypes/go-disruptor)
+- [netty](https://github.com/netty/netty)
 - [ants](https://github.com/panjf2000/ants)
 
 # 相关文章

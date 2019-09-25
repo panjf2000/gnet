@@ -29,84 +29,67 @@ func TestServe(t *testing.T) {
 	t.Run("poll", func(t *testing.T) {
 		t.Run("tcp", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe("tcp", ":9991", false, false, false, false, 10)
+				testServe("tcp", ":9991", false, false, false, 10)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("tcp", ":9992", false, false, true, false, 10)
+				testServe("tcp", ":9992", false, true, false, 10)
 			})
 		})
 		t.Run("tcp-async", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe("tcp", ":9991", false, false, false, true, 10)
+				testServe("tcp", ":9991", false, false, true, 10)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("tcp", ":9992", false, false, true, true, 10)
+				testServe("tcp", ":9992", false, true, true, 10)
 			})
 		})
-		t.Run("tcp-unix", func(t *testing.T) {
-			t.Run("1-loop", func(t *testing.T) {
-				testServe("tcp", ":9993", true, false, false, false, 10)
-			})
-			t.Run("N-loop", func(t *testing.T) {
-				testServe("tcp", ":9994", true, false, true, false, 10)
-			})
-		})
-
 		t.Run("udp", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe("udp", ":9995", false, false, false, false, 10)
+				testServe("udp", ":9991", false, false, false, 10)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("udp", ":9996", false, false, true, false, 10)
+				testServe("udp", ":9992", false, true, false, 10)
 			})
 		})
-		t.Run("udp-unix-reuseport", func(t *testing.T) {
-			t.Run("1-loop", func(t *testing.T) {
-				testServe("udp", ":9997", true, false, false, false, 10)
-			})
-			t.Run("N-loop", func(t *testing.T) {
-				testServe("udp", ":9998", true, false, true, false, 10)
-			})
-		})
+		//t.Run("unix", func(t *testing.T) {
+		//	t.Run("1-loop", func(t *testing.T) {
+		//		testServe("unix", ":9991", false, false, false, 10)
+		//	})
+		//	t.Run("N-loop", func(t *testing.T) {
+		//		testServe("unix", ":9992", false, true, false, 10)
+		//	})
+		//})
 	})
 
 	t.Run("poll-reuseport", func(t *testing.T) {
 		t.Run("tcp", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe("tcp", ":9991", false, true, false, false, 10)
+				testServe("tcp", ":9991", true, false, false, 10)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("tcp", ":9992", false, true, true, false, 10)
-			})
-		})
-		t.Run("tcp-unix-reuseport", func(t *testing.T) {
-			t.Run("1-loop", func(t *testing.T) {
-				testServe("tcp", ":9993", true, true, false, false, 10)
-			})
-			t.Run("N-loop", func(t *testing.T) {
-				testServe("tcp", ":9994", true, true, true, false, 10)
+				testServe("tcp", ":9992", true, true, false, 10)
 			})
 		})
 		t.Run("udp", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe("udp", ":9995", false, true, false, false, 10)
+				testServe("udp", ":9991", true, false, false, 10)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("udp", ":9996", false, true, true, false, 10)
+				testServe("udp", ":9992", true, true, false, 10)
 			})
 		})
-		t.Run("udp-unix-reuseport", func(t *testing.T) {
-			t.Run("1-loop", func(t *testing.T) {
-				testServe("udp", ":9997", true, true, false, false, 10)
-			})
-			t.Run("N-loop", func(t *testing.T) {
-				testServe("udp", ":9998", true, true, true, false, 10)
-			})
-		})
+		//t.Run("unix", func(t *testing.T) {
+		//	t.Run("1-loop", func(t *testing.T) {
+		//		testServe("unix", ":9991", true, false, false, 10)
+		//	})
+		//	t.Run("N-loop", func(t *testing.T) {
+		//		testServe("unix", ":9992", true, true, false, 10)
+		//	})
+		//})
 	})
 }
 
-func testServe(network, addr string, unix, reuseport, multicore, async bool, nclients int) {
+func testServe(network, addr string, reuseport, multicore, async bool, nclients int) {
 	var once sync.Once
 	var started int32
 	var connected int32
@@ -114,7 +97,6 @@ func testServe(network, addr string, unix, reuseport, multicore, async bool, ncl
 	var disconnected int32
 
 	var events Events
-	events.Multicore = multicore
 	//events.OnInitComplete = func(srv Server) (action Action) {
 	//	return
 	//}
@@ -182,20 +164,16 @@ func testServe(network, addr string, unix, reuseport, multicore, async bool, ncl
 		return
 	}
 	var err error
-	if unix {
+	if network == "unix" {
 		socket := strings.Replace(addr, ":", "socket", 1)
-		os.RemoveAll(socket)
+		_ = os.RemoveAll(socket)
 		defer os.RemoveAll(socket)
-		if reuseport {
-			err = Serve(events, network+"://"+addr+"?reuseport=t", "unix://"+socket)
-		} else {
-			err = Serve(events, network+"://"+addr, "unix://"+socket)
-		}
+		err = Serve(events, network+"://"+socket, WithMulticore(multicore))
 	} else {
 		if reuseport {
-			err = Serve(events, network+"://"+addr+"?reuseport=t")
+			err = Serve(events, network+"://"+addr, WithMulticore(multicore), WithReusePort(true))
 		} else {
-			err = Serve(events, network+"://"+addr)
+			err = Serve(events, network+"://"+addr, WithMulticore(multicore))
 		}
 	}
 	if err != nil {
@@ -379,30 +357,30 @@ func TestWithoutReact(t *testing.T) {
 	//events.React = func(c Conn) (out []byte, action Action) {
 	//	return
 	//}
-	if err := Serve(events, "tcp://:9991?"); err != ErrReactNil{
+	if err := Serve(events, "tcp://:9991?"); err != ErrReactNil {
 		panic(err)
 	}
 }
 
-func TestReuseport(t *testing.T) {
-	var events Events
-	events.OnInitComplete = func(s Server) (action Action) {
-		return Shutdown
-	}
-	events.React = func(c Conn) (out []byte, action Action) {
-		return
-	}
-	var wg sync.WaitGroup
-	wg.Add(5)
-	for i := 0; i < 5; i++ {
-		var t = "1"
-		if i%2 == 0 {
-			t = "true"
-		}
-		go func(t string) {
-			defer wg.Done()
-			must(Serve(events, "tcp://:9991?reuseport="+t))
-		}(t)
-	}
-	wg.Wait()
-}
+//func TestReuseport(t *testing.T) {
+//	var events Events
+//	events.OnInitComplete = func(s Server) (action Action) {
+//		return Shutdown
+//	}
+//	events.React = func(c Conn) (out []byte, action Action) {
+//		return
+//	}
+//	var wg sync.WaitGroup
+//	wg.Add(5)
+//	for i := 0; i < 5; i++ {
+//		var t = "1"
+//		if i%2 == 0 {
+//			t = "true"
+//		}
+//		go func(t string) {
+//			defer wg.Done()
+//			must(Serve(events, "tcp://:9991?reuseport="+t))
+//		}(t)
+//	}
+//	wg.Wait()
+//}

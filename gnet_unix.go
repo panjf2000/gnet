@@ -15,20 +15,20 @@ import (
 	"sync"
 	"time"
 
-	"github.com/panjf2000/gnet/internal"
 	"github.com/panjf2000/gnet/netpoll"
 	"golang.org/x/sys/unix"
 )
 
 type server struct {
-	events   Events // user events
-	mainLoop *loop
-	loops    []*loop            // all the loops
-	numLoops int                // number of loops
-	lns      []*listener        // all the listeners
-	wg       sync.WaitGroup     // loop close waitgroup
-	cond     *sync.Cond         // shutdown signaler
-	tch      chan time.Duration // ticker channel
+	events         Events // user events
+	mainLoop       *loop
+	eventLoopGroup eventLoopGrouper
+	loopGroupSize  int // number of loops
+	opts           *Options
+	ln             *listener          // all the listeners
+	wg             sync.WaitGroup     // loop close waitgroup
+	cond           *sync.Cond         // shutdown signaler
+	tch            chan time.Duration // ticker channel
 }
 
 // waitForShutdown waits for a signal to shutdown
@@ -45,28 +45,92 @@ func (svr *server) signalShutdown() {
 	svr.cond.L.Unlock()
 }
 
-func serve(events Events, listeners []*listener, reusePort bool) error {
-	// Figure out the correct number of loops/goroutines to use.
-	var numLoops int
-	if events.Multicore {
-		numLoops = runtime.NumCPU()
+func (svr *server) startLoop(loop *loop) {
+	svr.wg.Add(1)
+	go func() {
+		go loop.loopRun(svr)
+		svr.wg.Done()
+	}()
+}
+
+func (svr *server) activateLoops(numLoops int) {
+	// Create loops locally and bind the listeners.
+	for i := 0; i < numLoops; i++ {
+		loop := &loop{
+			idx:         i,
+			poller:      netpoll.OpenPoller(),
+			packet:      make([]byte, 0xFFFF),
+			connections: make(map[int]*conn),
+		}
+		loop.poller.AddRead(svr.ln.fd)
+		svr.eventLoopGroup.register(loop)
+
+		// Start loops in background
+		svr.startLoop(loop)
+	}
+	svr.loopGroupSize = svr.eventLoopGroup.len()
+}
+
+func (svr *server) activateReactors(numLoops int) {
+	svr.wg.Add(numLoops + 1)
+	for i := 0; i < numLoops; i++ {
+		loop := &loop{
+			idx:         i,
+			poller:      netpoll.OpenPoller(),
+			packet:      make([]byte, 0xFFFF),
+			connections: make(map[int]*conn),
+		}
+		svr.eventLoopGroup.register(loop)
+	}
+	svr.loopGroupSize = svr.eventLoopGroup.len()
+	// Start sub reactors...
+	svr.eventLoopGroup.iterate(func(i int, l *loop) bool {
+		go svr.activateSubReactor(l)
+		return true
+	})
+
+	loop := &loop{
+		idx:    -1,
+		poller: netpoll.OpenPoller(),
+	}
+	if svr.ln.pconn != nil && loop.packet == nil {
+		loop.packet = make([]byte, 0xFFFF)
+	}
+	loop.poller.AddRead(svr.ln.fd)
+	svr.mainLoop = loop
+	// Start main reactor...
+	go svr.activateMainReactor()
+}
+
+func (svr *server) start(numCPU int) {
+	if svr.opts.ReusePort {
+		svr.activateLoops(numCPU)
 	} else {
-		numLoops = 1
+		svr.activateReactors(numCPU)
+	}
+}
+
+func serve(events Events, listener *listener, options *Options) error {
+	// Figure out the correct number of loops/goroutines to use.
+	var numCPU int
+	if options.Multicore {
+		numCPU = runtime.NumCPU()
+	} else {
+		numCPU = 1
 	}
 
-	svr := &server{}
+	svr := new(server)
 	svr.events = events
-	svr.lns = listeners
+	svr.ln = listener
+	svr.eventLoopGroup = new(eventLoopGroup)
 	svr.cond = sync.NewCond(&sync.Mutex{})
 	svr.tch = make(chan time.Duration)
+	svr.opts = options
 
 	if svr.events.OnInitComplete != nil {
 		var server Server
-		server.NumLoops = numLoops
-		server.Addrs = make([]net.Addr, len(listeners))
-		for i, ln := range listeners {
-			server.Addrs[i] = ln.lnaddr
-		}
+		server.NumLoops = numCPU
+		server.Addr = listener.lnaddr
 		action := svr.events.OnInitComplete(server)
 		switch action {
 		case None:
@@ -80,9 +144,10 @@ func serve(events Events, listeners []*listener, reusePort bool) error {
 		svr.waitForShutdown()
 
 		// Notify all loops to close by closing all listeners
-		for _, loop := range svr.loops {
-			sniffError(loop.poller.Trigger(ErrClosing))
-		}
+		svr.eventLoopGroup.iterate(func(i int, l *loop) bool {
+			sniffError(l.poller.Trigger(ErrClosing))
+			return true
+		})
 		if svr.mainLoop != nil {
 			sniffError(svr.mainLoop.poller.Trigger(ErrClosing))
 		}
@@ -91,89 +156,20 @@ func serve(events Events, listeners []*listener, reusePort bool) error {
 		svr.wg.Wait()
 
 		// Close loops and all outstanding connections
-		for _, loop := range svr.loops {
-			loop.connections.Range(func(key, value interface{}) bool {
-				sniffError(loop.loopCloseConn(svr, value.(*conn), nil))
-				return true
-			})
-			//for _, c := range loop.connections {
-			//	sniffError(loop.loopCloseConn(svr, c, nil))
-			//}
-			sniffError(loop.poller.Close())
-		}
+		svr.eventLoopGroup.iterate(func(i int, l *loop) bool {
+			for _, c := range l.connections {
+				sniffError(l.loopCloseConn(svr, c, nil))
+			}
+			sniffError(l.poller.Close())
+			return true
+		})
 		if svr.mainLoop != nil {
 			sniffError(svr.mainLoop.poller.Close())
 		}
 	}()
 
-	if reusePort {
-		activateLoops(svr, numLoops)
-	} else {
-		activateReactors(svr, numLoops)
-	}
+	svr.start(numCPU)
 	return nil
-}
-
-func activateLoops(svr *server, numLoops int) {
-	// Create loops locally and bind the listeners.
-	for i := 0; i < numLoops; i++ {
-		loop := &loop{
-			idx:    i,
-			poller: netpoll.OpenPoller(),
-			packet: make([]byte, 0xFFFF),
-		}
-		for _, ln := range svr.lns {
-			loop.poller.AddRead(ln.fd)
-		}
-		svr.loops = append(svr.loops, loop)
-	}
-	svr.numLoops = len(svr.loops)
-	// Start loops in background
-	svr.wg.Add(svr.numLoops)
-	for _, loop := range svr.loops {
-		go loop.loopRun(svr)
-	}
-}
-
-func activateReactors(svr *server, numLoops int) {
-	//if numLoops < 3 {
-	//	numLoops = 3
-	//}
-	//
-	//svr.wg.Add(1 + (numLoops-1)/2)
-
-	// Convert numLoops to the least power of two integer value greater than or equal to n,
-	// e.g. 2, 4, 8, 16, 32, 64, etc, which will make a higher performance when dispatching messages later.
-	powerOfTwoNumLoops := internal.CeilToPowerOfTwo(numLoops)
-	svr.wg.Add(1 + powerOfTwoNumLoops)
-	//for i := 0; i < (numLoops-1)/2; i++ {
-	for i := 0; i < powerOfTwoNumLoops; i++ {
-		loop := &loop{
-			idx:    i,
-			poller: netpoll.OpenPoller(),
-			packet: make([]byte, 0xFFFF),
-		}
-		svr.loops = append(svr.loops, loop)
-	}
-	svr.numLoops = len(svr.loops)
-	// Start sub reactors...
-	for _, loop := range svr.loops {
-		go activateSubReactor(svr, loop)
-	}
-
-	loop := &loop{
-		idx:    -1,
-		poller: netpoll.OpenPoller(),
-	}
-	for _, ln := range svr.lns {
-		if ln.pconn != nil && loop.packet == nil {
-			loop.packet = make([]byte, 0xFFFF)
-		}
-		loop.poller.AddRead(ln.fd)
-	}
-	svr.mainLoop = loop
-	// Start main reactor...
-	go activateMainReactor(svr)
 }
 
 func (ln *listener) close() {

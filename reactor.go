@@ -7,119 +7,54 @@
 package gnet
 
 import (
-	"time"
-
 	"github.com/panjf2000/gnet/ringbuffer"
-	"github.com/smartystreets-prototypes/go-disruptor"
 	"golang.org/x/sys/unix"
 )
 
-const (
-	// connRingBufferSize indicates the size of disruptor ring-buffer.
-	connRingBufferSize = 1024 * 64
-	connRingBufferMask = connRingBufferSize - 1
-	disruptorCleanup   = time.Millisecond * 10
-
-	cacheRingBufferSize = 1024
-)
-
-//type mail struct {
-//	fd   int
-//	conn *conn
-//}
-
-type eventConsumer struct {
-	numLoops       int
-	numLoopsMask   int
-	loop           *loop
-	connRingBuffer *[connRingBufferSize]*conn
-	onOpened       func(*conn)
+type socket struct {
+	fd   int
+	conn *conn
 }
 
-func (ec *eventConsumer) Consume(lower, upper int64) {
-	for ; lower <= upper; lower++ {
-		// Connections load balance under round-robin algorithm.
-		if ec.numLoops > 1 {
-			// Leverage "and" operator instead of "modulo" operator to speed up round-robin algorithm.
-			idx := int(lower) & ec.numLoopsMask
-			//idx := int(lower) % ec.numLoops
-			if idx != ec.loop.idx {
-				// Don't match the round-robin rule, ignore this connection.
-				continue
-			}
-		}
-
-		conn := ec.connRingBuffer[lower&connRingBufferMask]
-		conn.inBuf = ringbuffer.New(cacheRingBufferSize)
-		conn.outBuf = ringbuffer.New(cacheRingBufferSize)
-		conn.loop = ec.loop
-
-		ec.loop.connections.Store(conn.fd, conn)
-		ec.onOpened(conn)
-		ec.loop.poller.AddRead(conn.fd)
-		//_ = ec.loop.poller.Trigger(&mail{fd: conn.fd, conn: conn})
-	}
-}
-
-func activateMainReactor(svr *server) {
+func (svr *server) activateMainReactor() {
 	defer func() {
-		time.Sleep(disruptorCleanup)
 		svr.signalShutdown()
 		svr.wg.Done()
 	}()
-
-	var connRingBuffer = &[connRingBufferSize]*conn{}
-
-	eventConsumers := make([]disruptor.Consumer, 0, svr.numLoops)
-	for _, loop := range svr.loops {
-		onOpened := func(conn *conn) {
-			_ = loop.loopOpened(svr, conn)
-		}
-		ec := &eventConsumer{svr.numLoops, svr.numLoops - 1, loop, connRingBuffer, onOpened}
-		eventConsumers = append(eventConsumers, ec)
-	}
-
-	// Initialize go-disruptor with ring-buffer for dispatching events to loops.
-	controller := disruptor.Configure(connRingBufferSize).WithConsumerGroup(eventConsumers...).Build()
-
-	controller.Start()
-	defer controller.Stop()
-
-	writer := controller.Writer()
-	sequence := disruptor.InitialSequenceValue
 
 	_ = svr.mainLoop.poller.Polling(func(fd int, note interface{}) error {
 		if fd == 0 {
 			return svr.mainLoop.loopNote(svr, note)
 		}
 
-		for i, ln := range svr.lns {
-			if ln.fd == fd {
-				if ln.pconn != nil {
-					return svr.mainLoop.loopUDPRead(svr, i, fd)
-				}
-				nfd, sa, err := unix.Accept(fd)
-				if err != nil {
-					if err == unix.EAGAIN {
-						return nil
-					}
-					return err
-				}
-				if err := unix.SetNonblock(nfd, true); err != nil {
-					return err
-				}
-				conn := &conn{fd: nfd, sa: sa, lnidx: i}
-				sequence = writer.Reserve(1)
-				connRingBuffer[sequence&connRingBufferMask] = conn
-				writer.Commit(sequence, sequence)
+		if svr.ln.pconn != nil {
+			return svr.mainLoop.loopUDPRead(svr, fd)
+		}
+		nfd, sa, err := unix.Accept(fd)
+		if err != nil {
+			if err == unix.EAGAIN {
 				return nil
 			}
+			return err
 		}
+		if err := unix.SetNonblock(nfd, true); err != nil {
+			return err
+		}
+		lp := svr.eventLoopGroup.next()
+		conn := &conn{
+			fd:     nfd,
+			sa:     sa,
+			loop:   lp,
+			inBuf:  ringbuffer.New(connRingBufferSize),
+			outBuf: ringbuffer.New(connRingBufferSize),
+		}
+		_ = lp.loopOpened(svr, conn)
+		_ = lp.poller.Trigger(&socket{fd: nfd, conn: conn})
 		return nil
 	})
 }
 
-func activateSubReactor(svr *server, loop *loop) {
+func (svr *server) activateSubReactor(loop *loop) {
 	defer func() {
 		svr.signalShutdown()
 		svr.wg.Done()
@@ -134,8 +69,7 @@ func activateSubReactor(svr *server, loop *loop) {
 			return loop.loopNote(svr, note)
 		}
 
-		v, _ := loop.connections.Load(fd)
-		if c := v.(*conn); c.outBuf.Length() > 0 {
+		if c := loop.connections[fd]; c.outBuf.Length() > 0 {
 			return loop.loopWrite(svr, c)
 		} else {
 			return loop.loopRead(svr, c)

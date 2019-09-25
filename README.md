@@ -72,12 +72,6 @@ Before you can benefit from this new networking model in handling blocking busin
 
 You can import `ants` to your `gnet` server and put your blocking code to the `ants` pool in `Event.React()`, which makes your business code nonblocking.
 
-## Communication Mechanism
-
-`gnet` builds its 『Multiple Reactors』Model under Goroutines in Golang, one Reactor per Goroutine, so there is a critical requirement handling extremely large amounts of messages between Goroutines in this networking model of `gnet`, which means `gnet` needs a efficient communication mechanism between Goroutines. I choose a tricky solution of Disruptor(Ring-Buffer) which provides a higher performance of messages dispatching in networking, instead of the recommended pattern: CSP(Channel) under Golang-Best-Practices.
-
-That is why I finally settle on [go-disruptor](https://github.com/smartystreets-prototypes/go-disruptor): the Golang port of the LMAX Disruptor(a high performance inter-thread messaging library).
-
 ## Auto-scaling Ring Buffer
 
 `gnet` leverages Ring-Buffer to cache TCP streams and manage memory cache in networking.
@@ -108,13 +102,14 @@ package main
 
 import (
 	"log"
+	"strings"
 
 	"github.com/panjf2000/gnet"
 )
 
 func main() {
+	var trace bool
 	var events gnet.Events
-	events.Multicore = true
 	events.React = func(c gnet.Conn) (out []byte, action gnet.Action) {
 		top, tail := c.ReadPair()
 		out = append(top, tail...)
@@ -124,7 +119,7 @@ func main() {
 		}
 		return
 	}
-	log.Fatal(gnet.Serve(events, "tcp://:9000"))
+	log.Fatal(gnet.Serve(events, "tcp://:9000", gnet.WithMulticore(true)))
 }
 ```
 
@@ -139,18 +134,18 @@ import (
 	"log"
 	"time"
 
-	"github.com/panjf2000/gnet"
 	"github.com/panjf2000/ants"
+	"github.com/panjf2000/gnet"
 )
 
 func main() {
 	var events gnet.Events
-	events.Multicore = true
-	
+
+	// Create a goroutine pool.
 	poolSize := 256 * 1024
 	pool, _ := ants.NewPool(poolSize, ants.WithNonblocking(true))
 	defer pool.Release()
-	
+
 	events.React = func(c gnet.Conn) (out []byte, action gnet.Action) {
 		data := c.ReadBytes()
 		c.ResetBuffer()
@@ -161,7 +156,7 @@ func main() {
 		})
 		return
 	}
-	log.Fatal(gnet.Serve(events, "tcp://:9000"))
+	log.Fatal(gnet.Serve(events, "tcp://:9000", gnet.WithMulticore(true)))
 }
 ```
 
@@ -177,13 +172,6 @@ Current supported I/O events in `gnet`:
 - `React` is activated when the server receives new data from a connection.
 - `Tick` is activated immediately after the server starts and will fire again after a specified interval.
 - `PreWrite` is activated just before any data is written to any client socket.
-
-### Multiple addresses
-
-```go
-// Binding both TCP and Unix-Socket to one gnet server.
-gnet.Serve(events, "tcp://:9000", "unix://socket")
-```
 
 
 ### Ticker
@@ -218,10 +206,10 @@ The current built-in load balancing algorithm in `gnet` is Round-Robin.
 
 Servers can utilize the [SO_REUSEPORT](https://lwn.net/Articles/542629/) option which allows multiple sockets on the same host to bind to the same port and the OS kernel takes care of the load balancing for you, it wakes one socket per `accpet` event coming to resolved the `thundering herd`.
 
-Just provide `reuseport=true` to an address and you can enjoy this feature:
+Just use functional options to set up `SO_REUSEPORT` and you can enjoy this feature:
 
 ```go
-gnet.Serve(events, "tcp://:9000?reuseport=true"))
+gnet.Serve(events, "tcp://:9000", gnet.WithMulticore(true)))
 ```
 
 # Performance
@@ -241,7 +229,7 @@ Go Version : go1.12.9 linux/amd64
 GOMAXPROCS=8
 ```
 
-### Contrast of the similar networking libraries:
+### Contrast to the similar networking libraries:
 
 #### Echo Server
 
@@ -281,7 +269,7 @@ Source code in `gnet` is available under the MIT [License](/LICENSE).
 # Thanks
 
 - [evio](https://github.com/tidwall/evio)
-- [go-disruptor](https://github.com/smartystreets-prototypes/go-disruptor)
+- [netty](https://github.com/netty/netty)
 - [ants](https://github.com/panjf2000/ants)
 
 # Relevant Articles

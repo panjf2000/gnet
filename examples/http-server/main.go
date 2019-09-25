@@ -32,9 +32,7 @@ func main() {
 	var multicore bool
 	var aaaa bool
 	var noparse bool
-	var unixsocket string
 
-	flag.StringVar(&unixsocket, "unixsocket", "", "unix socket")
 	flag.IntVar(&port, "port", 8080, "server port")
 	flag.BoolVar(&aaaa, "aaaa", false, "aaaaa....")
 	flag.BoolVar(&noparse, "noparse", true, "do not parse requests")
@@ -52,12 +50,8 @@ func main() {
 	}
 
 	var events gnet.Events
-	events.Multicore = multicore
 	events.OnInitComplete = func(srv gnet.Server) (action gnet.Action) {
 		log.Printf("http server started on port %d (loops: %d)", port, srv.NumLoops)
-		if unixsocket != "" {
-			log.Printf("http server started at %s", unixsocket)
-		}
 		return
 	}
 
@@ -94,12 +88,9 @@ func main() {
 		return
 	}
 	// We at least want the single http address.
-	addrs := []string{fmt.Sprintf("tcp"+"://:%d", port)}
-	if unixsocket != "" {
-		addrs = append(addrs, fmt.Sprintf("unix"+"://%s", unixsocket))
-	}
+	addr := fmt.Sprintf("tcp"+"://:%d", port)
 	// Start serving!
-	log.Fatal(gnet.Serve(events, addrs...))
+	log.Fatal(gnet.Serve(events, addr, gnet.WithMulticore(multicore)))
 }
 
 // appendhandle handles the incoming request and appends the response to

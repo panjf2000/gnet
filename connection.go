@@ -17,14 +17,12 @@ import (
 
 type conn struct {
 	fd         int // file descriptor
-	lnidx      int // listener index in the server lns list
 	inBuf      *ringbuffer.RingBuffer
 	outBuf     *ringbuffer.RingBuffer
 	sa         unix.Sockaddr // remote socket address
 	opened     bool          // connection opened event fired
 	action     Action        // next user action
 	ctx        interface{}   // user-defined context
-	addrIndex  int           // index of listening address
 	localAddr  net.Addr      // local addre
 	remoteAddr net.Addr      // remote addr
 	loop       *loop         // connected loop
@@ -81,7 +79,6 @@ func (c *conn) write(buf []byte) {
 
 func (c *conn) Context() interface{}       { return c.ctx }
 func (c *conn) SetContext(ctx interface{}) { c.ctx = ctx }
-func (c *conn) AddrIndex() int             { return c.addrIndex }
 func (c *conn) LocalAddr() net.Addr        { return c.localAddr }
 func (c *conn) RemoteAddr() net.Addr       { return c.remoteAddr }
 func (c *conn) Wake() {

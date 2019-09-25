@@ -15,10 +15,12 @@ import (
 	"github.com/panjf2000/gnet/netpoll"
 )
 
-var	(
+var (
 	ErrClosing  = errors.New("closing")
 	ErrReactNil = errors.New("must set up Event.React()")
 )
+
+const connRingBufferSize = 1024
 
 // Action is an action that occurs after the completion of an event.
 type Action int
@@ -32,18 +34,17 @@ const (
 	Shutdown
 )
 
-// Options are set when the client opens.
-type Options struct {
-	// TCPKeepAlive (SO_KEEPALIVE) socket option.
-	TCPKeepAlive time.Duration
-}
-
 // Server represents a server context which provides information about the
 // running server and has control functions for managing state.
 type Server struct {
+	// Multicore indicates whether the server will be effectively created with multi-cores, if so,
+	// then you must take care with synchonizing memory between all event callbacks, otherwise,
+	// it will run the server with single thread. The number of threads in the server will be automatically
+	// assigned to the value of runtime.NumCPU().
+	Multicore bool
 	// The addrs parameter is an array of listening addresses that align
 	// with the addr strings passed to the Serve function.
-	Addrs []net.Addr
+	Addr net.Addr
 	// NumLoops is the number of loops that the server is using.
 	NumLoops int
 }
@@ -54,8 +55,6 @@ type Conn interface {
 	Context() interface{}
 	// SetContext sets a user-defined context.
 	SetContext(interface{})
-	// AddrIndex is the index of server address that was passed to the Serve call.
-	AddrIndex() int
 	// LocalAddr is the connection's local socket address.
 	LocalAddr() net.Addr
 	// RemoteAddr is the connection's remote peer address.
@@ -74,15 +73,17 @@ type Conn interface {
 	AsyncWrite(buf []byte)
 }
 
+type eventLoopGrouper interface {
+	register(*loop)
+	next() *loop
+	iterate(func(int, *loop) bool)
+	len() int
+}
+
 // Events represents the server events for the Serve call.
 // Each event has an Action return value that is used manage the state
 // of the connection and server.
 type Events struct {
-	// Multicore indicates whether the server will be effectively created with multi-cores, if so,
-	// then you must take care with synchonizing memory between all event callbacks, otherwise,
-	// it will run the server with single thread. The number of threads in the server will be automatically
-	// assigned to the value of runtime.NumCPU().
-	Multicore bool
 	// OnInitComplete fires when the server can accept connections. The server
 	// parameter has information and various utilities.
 	OnInitComplete func(server Server) (action Action)
@@ -120,98 +121,64 @@ type Events struct {
 //  unix  - Unix Domain Socket
 //
 // The "tcp" network scheme is assumed when one is not specified.
-func Serve(events Events, addr ...string) error {
-	var lns []*listener
-	defer func() {
-		for _, ln := range lns {
-			ln.close()
-		}
-	}()
-
+func Serve(events Events, addr string, opts ...Option) error {
 	if events.React == nil {
 		return ErrReactNil
 	}
 
-	var reusePort bool
-	for _, addr := range addr {
-		var ln listener
-		ln.network, ln.addr, ln.opts = parseAddr(addr)
-		if ln.network == "unix" {
-			sniffError(os.RemoveAll(ln.addr))
-		}
-		reusePort = reusePort || ln.opts.reusePort
-		var err error
-		if ln.network == "udp" {
-			if ln.opts.reusePort {
-				ln.pconn, err = netpoll.ReusePortListenPacket(ln.network, ln.addr)
-			} else {
-				ln.pconn, err = net.ListenPacket(ln.network, ln.addr)
-			}
-		} else {
-			if ln.opts.reusePort {
-				ln.ln, err = netpoll.ReusePortListen(ln.network, ln.addr)
-			} else {
-				ln.ln, err = net.Listen(ln.network, ln.addr)
-			}
-		}
-		if err != nil {
-			return err
-		}
-		if ln.pconn != nil {
-			ln.lnaddr = ln.pconn.LocalAddr()
-		} else {
-			ln.lnaddr = ln.ln.Addr()
-		}
-		if err := ln.system(); err != nil {
-			return err
-		}
-		lns = append(lns, &ln)
+	var ln listener
+	defer ln.close()
+
+	options := initOptions(opts...)
+
+	ln.network, ln.addr = parseAddr(addr)
+	if ln.network == "unix" {
+		sniffError(os.RemoveAll(ln.addr))
 	}
-	return serve(events, lns, reusePort)
+	var err error
+	if ln.network == "udp" {
+		if options.ReusePort {
+			ln.pconn, err = netpoll.ReusePortListenPacket(ln.network, ln.addr)
+		} else {
+			ln.pconn, err = net.ListenPacket(ln.network, ln.addr)
+		}
+	} else {
+		if options.ReusePort {
+			ln.ln, err = netpoll.ReusePortListen(ln.network, ln.addr)
+		} else {
+			ln.ln, err = net.Listen(ln.network, ln.addr)
+		}
+	}
+	if err != nil {
+		return err
+	}
+	if ln.pconn != nil {
+		ln.lnaddr = ln.pconn.LocalAddr()
+	} else {
+		ln.lnaddr = ln.ln.Addr()
+	}
+	if err := ln.system(); err != nil {
+		return err
+	}
+	return serve(events, &ln, options)
 }
 
 type listener struct {
 	ln      net.Listener
 	lnaddr  net.Addr
 	pconn   net.PacketConn
-	opts    addrOpts
 	f       *os.File
 	fd      int
 	network string
 	addr    string
 }
 
-type addrOpts struct {
-	reusePort bool
-}
-
-func parseAddr(addr string) (network, address string, opts addrOpts) {
+func parseAddr(addr string) (network, address string) {
 	network = "tcp"
 	address = addr
-	opts.reusePort = false
 	if strings.Contains(address, "://") {
 		network = strings.Split(address, "://")[0]
 		address = strings.Split(address, "://")[1]
-	}
-	q := strings.Index(address, "?")
-	if q != -1 {
-		for _, part := range strings.Split(address[q+1:], "&") {
-			kv := strings.Split(part, "=")
-			if len(kv) == 2 {
-				switch kv[0] {
-				case "reuseport":
-					if len(kv[1]) != 0 {
-						switch kv[1][0] {
-						default:
-							opts.reusePort = kv[1][0] >= '1' && kv[1][0] <= '9'
-						case 'T', 't', 'Y', 'y':
-							opts.reusePort = true
-						}
-					}
-				}
-			}
-		}
-		address = address[:q]
 	}
 	return
 }

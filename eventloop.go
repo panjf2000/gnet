@@ -9,7 +9,6 @@ package gnet
 
 import (
 	"net"
-	"sync"
 	"time"
 
 	"github.com/panjf2000/gnet/netpoll"
@@ -21,13 +20,14 @@ type loop struct {
 	idx         int             // loop index in the server loops list
 	poller      *netpoll.Poller // epoll or kqueue
 	packet      []byte          // read packet buffer
-	connections sync.Map        // loop connections fd -> conn
+	connections map[int]*conn   // loop connections fd -> conn
+
+	asyncQueue func() // async tasks queue
 }
 
 func (l *loop) loopCloseConn(svr *server, conn *conn, err error) error {
 	l.poller.Delete(conn.fd)
-	//delete(l.connections, conn.fd)
-	l.connections.Delete(conn.fd)
+	delete(l.connections, conn.fd)
 	_ = unix.Close(conn.fd)
 
 	if svr.events.OnClosed != nil {
@@ -55,14 +55,13 @@ func (l *loop) loopNote(svr *server, note interface{}) error {
 		err = v
 	case *conn:
 		// Wake called for connection
-		if val, ok := l.connections.Load(v.fd); !ok || val != v {
+		if val, ok := l.connections[v.fd]; !ok || val != v {
 			return nil // ignore stale wakes
 		}
 		return l.loopWake(svr, v)
-	//case *mail:
-	//	l.fdconns[v.fd] = v.conn
-	//	_ = l.loopOpened(svr, v.conn)
-	//	l.poller.AddRead(v.fd)
+	case *socket:
+		l.connections[v.fd] = v.conn
+		l.poller.AddRead(v.fd)
 	case func():
 		v()
 	}
@@ -70,10 +69,7 @@ func (l *loop) loopNote(svr *server, note interface{}) error {
 }
 
 func (l *loop) loopRun(svr *server) {
-	defer func() {
-		svr.signalShutdown()
-		svr.wg.Done()
-	}()
+	defer svr.signalShutdown()
 
 	if l.idx == 0 && svr.events.Tick != nil {
 		go l.loopTicker(svr)
@@ -83,8 +79,7 @@ func (l *loop) loopRun(svr *server) {
 		if fd == 0 {
 			return l.loopNote(svr, note)
 		}
-		if v, ok := l.connections.Load(fd); ok {
-			c := v.(*conn)
+		if c, ok := l.connections[fd]; ok {
 			switch {
 			case !c.opened:
 				return l.loopOpened(svr, c)
@@ -109,38 +104,33 @@ func (l *loop) loopTicker(svr *server) {
 }
 
 func (l *loop) loopAccept(svr *server, fd int) error {
-	for i, ln := range svr.lns {
-		if ln.fd == fd {
-			if ln.pconn != nil {
-				return l.loopUDPRead(svr, i, fd)
-			}
-			nfd, sa, err := unix.Accept(fd)
-			if err != nil {
-				if err == unix.EAGAIN {
-					return nil
-				}
-				return err
-			}
-			if err := unix.SetNonblock(nfd, true); err != nil {
-				return err
-			}
-			conn := &conn{fd: nfd,
-				sa:     sa,
-				lnidx:  i,
-				inBuf:  ringbuffer.New(cacheRingBufferSize),
-				outBuf: ringbuffer.New(cacheRingBufferSize),
-				loop:   l,
-			}
-			//l.connections[conn.fd] = conn
-			l.connections.Store(conn.fd, conn)
-			l.poller.AddReadWrite(conn.fd)
-			return nil
+	if fd == svr.ln.fd {
+		if svr.ln.pconn != nil {
+			return l.loopUDPRead(svr, fd)
 		}
+		nfd, sa, err := unix.Accept(fd)
+		if err != nil {
+			if err == unix.EAGAIN {
+				return nil
+			}
+			return err
+		}
+		if err := unix.SetNonblock(nfd, true); err != nil {
+			return err
+		}
+		conn := &conn{fd: nfd,
+			sa:     sa,
+			inBuf:  ringbuffer.New(connRingBufferSize),
+			outBuf: ringbuffer.New(connRingBufferSize),
+			loop:   l,
+		}
+		l.connections[conn.fd] = conn
+		l.poller.AddReadWrite(conn.fd)
 	}
 	return nil
 }
 
-func (l *loop) loopUDPRead(svr *server, lnidx, fd int) error {
+func (l *loop) loopUDPRead(svr *server, fd int) error {
 	n, sa, err := unix.Recvfrom(fd, l.packet, 0)
 	if err != nil || n == 0 {
 		return nil
@@ -162,10 +152,9 @@ func (l *loop) loopUDPRead(svr *server, lnidx, fd int) error {
 			sa6 = *sa
 		}
 		conn := &conn{
-			addrIndex:  lnidx,
-			localAddr:  svr.lns[lnidx].lnaddr,
+			localAddr:  svr.ln.lnaddr,
 			remoteAddr: netpoll.SockaddrToUDPAddr(&sa6),
-			inBuf:      ringbuffer.New(cacheRingBufferSize),
+			inBuf:      ringbuffer.New(connRingBufferSize),
 		}
 		_, _ = conn.inBuf.Write(l.packet[:n])
 		out, action := svr.events.React(conn)
@@ -185,14 +174,13 @@ func (l *loop) loopUDPRead(svr *server, lnidx, fd int) error {
 
 func (l *loop) loopOpened(svr *server, conn *conn) error {
 	conn.opened = true
-	conn.addrIndex = conn.lnidx
-	conn.localAddr = svr.lns[conn.lnidx].lnaddr
+	conn.localAddr = svr.ln.lnaddr
 	conn.remoteAddr = netpoll.SockaddrToTCPOrUnixAddr(conn.sa)
 	if svr.events.OnOpened != nil {
 		out, opts, action := svr.events.OnOpened(conn)
 		conn.action = action
 		if opts.TCPKeepAlive > 0 {
-			if _, ok := svr.lns[conn.lnidx].ln.(*net.TCPListener); ok {
+			if _, ok := svr.ln.ln.(*net.TCPListener); ok {
 				sniffError(netpoll.SetKeepAlive(conn.fd, int(opts.TCPKeepAlive/time.Second)))
 			}
 		}
