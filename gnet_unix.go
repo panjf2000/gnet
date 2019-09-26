@@ -48,7 +48,7 @@ func (svr *server) signalShutdown() {
 func (svr *server) startLoop(loop *loop) {
 	svr.wg.Add(1)
 	go func() {
-		go loop.loopRun(svr)
+		loop.loopRun(svr)
 		svr.wg.Done()
 	}()
 }
