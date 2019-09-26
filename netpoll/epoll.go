@@ -58,7 +58,7 @@ func (p *Poller) Trigger(note interface{}) error {
 
 // Polling ...
 func (p *Poller) Polling(iter func(fd int, note interface{}) error) error {
-	events := make([]unix.EpollEvent, 256)
+	events := make([]unix.EpollEvent, 1024)
 	var note bool
 	for {
 		n, err := unix.EpollWait(p.fd, events, -1)
