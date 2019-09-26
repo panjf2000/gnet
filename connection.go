@@ -26,18 +26,21 @@ type conn struct {
 	localAddr  net.Addr      // local addre
 	remoteAddr net.Addr      // remote addr
 	loop       *loop         // connected loop
+	extra      []byte
 }
 
-func (c *conn) ReadPair() ([]byte, []byte) {
-	return c.inBuf.PreReadAll()
+func (c *conn) ReadPair() (top, tail []byte) {
+	if c.inBuf.IsEmpty() {
+		top = c.extra
+		return
+	}
+	top, _ = c.inBuf.PreReadAll()
+	tail = c.extra
+	return
 }
 
 func (c *conn) ReadBytes() []byte {
-	return c.inBuf.Bytes()
-}
-
-func (c *conn) AdvanceBuffer(n int) {
-	c.inBuf.Advance(n)
+	return append(c.inBuf.Bytes(), c.extra...)
 }
 
 func (c *conn) ResetBuffer() {

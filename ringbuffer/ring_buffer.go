@@ -11,7 +11,6 @@ import (
 	"unsafe"
 
 	"github.com/gobwas/pool/pbytes"
-	"github.com/panjf2000/gnet/internal"
 )
 
 // ErrIsEmpty will be returned when trying to read a empty ring-buffer
@@ -336,7 +335,8 @@ func (r *RingBuffer) Reset() {
 
 func (r *RingBuffer) malloc(cap int) {
 	newCap := r.size + cap
-	newBuf := make([]byte, internal.CeilToPowerOfTwo(newCap))
+	//newBuf := make([]byte, internal.CeilToPowerOfTwo(newCap))
+	newBuf := pbytes.GetLen(newCap)
 	oldLen := r.Length()
 	_, _ = r.Read(newBuf)
 	r.r = 0

@@ -65,8 +65,6 @@ type Conn interface {
 	ReadPair() ([]byte, []byte)
 	// ReadBytes reads all data and return a new slice.
 	ReadBytes() []byte
-	// AdvanceBuffer advances the read pointer of ring buffer.
-	AdvanceBuffer(int)
 	// ResetBuffer resets the ring buffer.
 	ResetBuffer()
 	// AyncWrite writes data asynchronously.

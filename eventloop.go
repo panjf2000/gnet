@@ -109,12 +109,14 @@ func (l *loop) loopRead(svr *server, conn *conn) error {
 		}
 		return l.loopCloseConn(svr, conn, err)
 	}
-
-	_, _ = conn.inBuf.Write(l.packet[:n])
+	conn.extra = l.packet[:n]
+	//_, _ = conn.inBuf.Write(l.packet[:n])
 	out, action := svr.events.React(conn)
 	conn.action = action
 	if len(out) > 0 {
 		conn.write(out)
+	} else {
+		_, _ = conn.inBuf.Write(conn.extra)
 	}
 	return l.handleAction(svr, conn)
 }
