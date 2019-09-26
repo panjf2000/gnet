@@ -129,13 +129,17 @@ func testServe(network, addr string, reuseport, multicore, async bool, nclients 
 		if async {
 			data := c.ReadBytes()
 			c.ResetBuffer()
+			action = DataRead
 			go func() {
 				c.AsyncWrite(data)
 			}()
 			return
 		} else {
 			top, tail := c.ReadPair()
-			out = append(top, tail...)
+			out = top
+			if len(tail) > 0 {
+				out = append(top, tail...)
+			}
 			c.ResetBuffer()
 			once.Do(func() {
 				if !reuseport {

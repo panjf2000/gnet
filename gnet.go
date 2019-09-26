@@ -28,6 +28,8 @@ type Action int
 const (
 	// None indicates that no action should occur following an event.
 	None Action = iota
+	// DataRead indicates data in buffer has been read.
+	DataRead
 	// Close closes the connection.
 	Close
 	// Shutdown shutdowns the server.

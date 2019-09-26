@@ -115,7 +115,7 @@ func (l *loop) loopRead(svr *server, conn *conn) error {
 	conn.action = action
 	if len(out) > 0 {
 		conn.write(out)
-	} else {
+	} else if action != DataRead {
 		_, _ = conn.inBuf.Write(conn.extra)
 	}
 	return l.handleAction(svr, conn)
