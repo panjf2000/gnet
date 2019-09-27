@@ -6,10 +6,9 @@ package gnet
 
 import "time"
 
-// Option ...
-type Option func(opts *Options)
+type option func(opts *Options)
 
-func initOptions(options ...Option) *Options {
+func initOptions(options ...option) *Options {
 	opts := new(Options)
 	for _, option := range options {
 		option(opts)
@@ -31,28 +30,28 @@ type Options struct {
 }
 
 // WithOptions ...
-func WithOptions(options Options) Option {
+func WithOptions(options Options) option {
 	return func(opts *Options) {
 		*opts = options
 	}
 }
 
 // WithMulticore ...
-func WithMulticore(multicore bool) Option {
+func WithMulticore(multicore bool) option {
 	return func(opts *Options) {
 		opts.Multicore = multicore
 	}
 }
 
 // WithReusePort ...
-func WithReusePort(reusePort bool) Option {
+func WithReusePort(reusePort bool) option {
 	return func(opts *Options) {
 		opts.ReusePort = reusePort
 	}
 }
 
 // WithTCPKeepAlive ...
-func WithTCPKeepAlive(tcpKeepAlive time.Duration) Option {
+func WithTCPKeepAlive(tcpKeepAlive time.Duration) option {
 	return func(opts *Options) {
 		opts.TCPKeepAlive = tcpKeepAlive
 	}

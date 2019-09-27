@@ -123,7 +123,7 @@ type Events struct {
 //  unix  - Unix Domain Socket
 //
 // The "tcp" network scheme is assumed when one is not specified.
-func Serve(events Events, addr string, opts ...Option) error {
+func Serve(events Events, addr string, opts ...option) error {
 	if events.React == nil {
 		return ErrReactNil
 	}
