@@ -127,7 +127,9 @@ func (p *Poller) ModReadWrite(fd int) {
 // Delete ...
 func (p *Poller) Delete(fd int) {
 	if _, err := unix.Kevent(p.fd, []unix.Kevent_t{
-		{Ident: uint64(fd), Flags: unix.EV_DELETE, Filter: unix.EVFILT_READ}}, nil, nil); err != nil {
+		{Ident: uint64(fd), Flags: unix.EV_DELETE, Filter: unix.EVFILT_READ},
+		{Ident: uint64(fd), Flags: unix.EV_DELETE, Filter: unix.EVFILT_WRITE}},
+		nil, nil); err != nil {
 		panic(err)
 	}
 }
