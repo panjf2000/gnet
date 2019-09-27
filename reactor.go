@@ -69,11 +69,10 @@ func (svr *server) activateSubReactor(loop *loop) {
 		if fd == 0 {
 			return loop.loopNote(note)
 		}
-
-		if c := loop.connections[fd]; c.outBuf.Length() > 0 {
-			return loop.loopWrite(c)
-		} else {
-			return loop.loopRead(c)
+		conn := loop.connections[fd]
+		if conn.outBuf.Length() > 0 {
+			return loop.loopWrite(conn)
 		}
+		return loop.loopRead(conn)
 	})
 }

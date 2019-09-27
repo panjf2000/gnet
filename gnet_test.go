@@ -139,16 +139,16 @@ func testServe(network, addr string, reuseport, multicore, async bool, nclients 
 				c.AsyncWrite(data)
 			}()
 			return
-		} else {
-			top, tail := c.ReadPair()
-			out = top
-			if tail != nil {
-				fmt.Println("appending tail buffer...")
-				out = append(top, tail...)
-			}
-			c.ResetBuffer()
-			return
 		}
+		top, tail := c.ReadPair()
+		out = top
+		if tail != nil {
+			fmt.Println("appending tail buffer...")
+			out = append(top, tail...)
+		}
+		c.ResetBuffer()
+		return
+
 	}
 	events.Tick = func() (delay time.Duration, action Action) {
 		if atomic.LoadInt32(&started) == 0 {

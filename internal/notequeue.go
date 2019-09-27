@@ -24,17 +24,20 @@ func (sl *spinLock) Unlock() {
 	atomic.StoreUint32((*uint32)(sl), 0)
 }
 
+// NoteQueue queues pending tasks.
 type NoteQueue struct {
 	mu    sync.Locker
 	notes []interface{}
 }
 
+// Push pushes a item into queue.
 func (q *NoteQueue) Push(note interface{}) {
 	q.mu.Lock()
 	q.notes = append(q.notes, note)
 	q.mu.Unlock()
 }
 
+// ForEach iterates this queue and executes each note with a given func.
 func (q *NoteQueue) ForEach(iter func(note interface{}) error) error {
 	q.mu.Lock()
 	notes := q.notes
@@ -48,6 +51,7 @@ func (q *NoteQueue) ForEach(iter func(note interface{}) error) error {
 	return nil
 }
 
+// NewNoteQueue creates a note-queue.
 func NewNoteQueue() NoteQueue {
 	return NoteQueue{mu: new(spinLock)}
 }

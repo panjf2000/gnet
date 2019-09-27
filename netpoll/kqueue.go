@@ -91,6 +91,7 @@ func (p *Poller) AddRead(fd int) {
 	}
 }
 
+// AddWrite ...
 func (p *Poller) AddWrite(fd int) {
 	if _, err := unix.Kevent(p.fd, []unix.Kevent_t{
 		{Ident: uint64(fd), Flags: unix.EV_ADD, Filter: unix.EVFILT_WRITE}}, nil, nil); err != nil {
