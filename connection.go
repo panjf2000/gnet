@@ -90,6 +90,7 @@ func (c *conn) Context() interface{}       { return c.ctx }
 func (c *conn) SetContext(ctx interface{}) { c.ctx = ctx }
 func (c *conn) LocalAddr() net.Addr        { return c.localAddr }
 func (c *conn) RemoteAddr() net.Addr       { return c.remoteAddr }
+
 //func (c *conn) Wake() {
 //	if c.loop != nil {
 //		sniffError(c.loop.poller.Trigger(c))

@@ -55,7 +55,6 @@ func (p *Poller) Trigger(note interface{}) error {
 	return err
 }
 
-
 // Polling ...
 func (p *Poller) Polling(iter func(fd int, note interface{}) error) error {
 	events := make([]unix.EpollEvent, 1024)
