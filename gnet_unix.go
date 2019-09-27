@@ -129,6 +129,7 @@ func serve(events Events, listener *listener, options *Options) error {
 
 	if svr.events.OnInitComplete != nil {
 		var server Server
+		server.Multicore = options.Multicore
 		server.NumLoops = numCPU
 		server.Addr = listener.lnaddr
 		action := svr.events.OnInitComplete(server)
