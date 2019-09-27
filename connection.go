@@ -67,13 +67,20 @@ func (c *conn) open(buf []byte) {
 }
 
 func (c *conn) write(buf []byte) {
-	n, err := syscall.Write(c.fd, buf)
-	if err != nil {
+	if !c.outBuf.IsEmpty() {
 		_, _ = c.outBuf.Write(buf)
-		c.loop.poller.ModReadWrite(c.fd)
 		return
 	}
-
+	n, err := syscall.Write(c.fd, buf)
+	if err != nil {
+		if err == unix.EAGAIN {
+			_, _ = c.outBuf.Write(buf)
+			c.loop.poller.ModReadWrite(c.fd)
+			return
+		}
+		_ = c.loop.loopCloseConn(c, err)
+		return
+	}
 	if n < len(buf) {
 		_, _ = c.outBuf.Write(buf[n:])
 		c.loop.poller.ModReadWrite(c.fd)

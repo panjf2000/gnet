@@ -21,40 +21,41 @@ type loop struct {
 	poller      *netpoll.Poller // epoll or kqueue
 	packet      []byte          // read packet buffer
 	connections map[int]*conn   // loop connections fd -> conn
+	svr         *server
 
 	asyncQueue func() // async tasks queue
 }
 
-func (l *loop) loopRun(svr *server) {
-	defer svr.signalShutdown()
+func (l *loop) loopRun() {
+	defer l.svr.signalShutdown()
 
-	if l.idx == 0 && svr.events.Tick != nil {
-		go l.loopTicker(svr)
+	if l.idx == 0 && l.svr.events.Tick != nil {
+		go l.loopTicker()
 	}
 
 	_ = l.poller.Polling(func(fd int, note interface{}) error {
 		if fd == 0 {
-			return l.loopNote(svr, note)
+			return l.loopNote(note)
 		}
 		if c, ok := l.connections[fd]; ok {
 			switch {
 			case !c.opened:
-				return l.loopOpened(svr, c)
+				return l.loopOpened(c)
 			case c.outBuf.Length() > 0:
-				return l.loopWrite(svr, c)
+				return l.loopWrite(c)
 			default:
-				return l.loopRead(svr, c)
+				return l.loopRead(c)
 			}
 		} else {
-			return l.loopAccept(svr, fd)
+			return l.loopAccept(fd)
 		}
 	})
 }
 
-func (l *loop) loopAccept(svr *server, fd int) error {
-	if fd == svr.ln.fd {
-		if svr.ln.pconn != nil {
-			return l.loopUDPRead(svr, fd)
+func (l *loop) loopAccept(fd int) error {
+	if fd == l.svr.ln.fd {
+		if l.svr.ln.pconn != nil {
+			return l.loopUDPRead(fd)
 		}
 		nfd, sa, err := unix.Accept(fd)
 		if err != nil {
@@ -78,15 +79,15 @@ func (l *loop) loopAccept(svr *server, fd int) error {
 	return nil
 }
 
-func (l *loop) loopOpened(svr *server, conn *conn) error {
+func (l *loop) loopOpened(conn *conn) error {
 	conn.opened = true
-	conn.localAddr = svr.ln.lnaddr
+	conn.localAddr = l.svr.ln.lnaddr
 	conn.remoteAddr = netpoll.SockaddrToTCPOrUnixAddr(conn.sa)
-	if svr.events.OnOpened != nil {
-		out, opts, action := svr.events.OnOpened(conn)
+	if l.svr.events.OnOpened != nil {
+		out, opts, action := l.svr.events.OnOpened(conn)
 		conn.action = action
 		if opts.TCPKeepAlive > 0 {
-			if _, ok := svr.ln.ln.(*net.TCPListener); ok {
+			if _, ok := l.svr.ln.ln.(*net.TCPListener); ok {
 				sniffError(netpoll.SetKeepAlive(conn.fd, int(opts.TCPKeepAlive/time.Second)))
 			}
 		}
@@ -98,43 +99,53 @@ func (l *loop) loopOpened(svr *server, conn *conn) error {
 	if conn.outBuf.Length() != 0 {
 		l.poller.AddWrite(conn.fd)
 	}
-	return l.handleAction(svr, conn)
+	return l.handleAction(conn)
 }
 
-func (l *loop) loopRead(svr *server, conn *conn) error {
+func (l *loop) loopRead(conn *conn) error {
 	n, err := unix.Read(conn.fd, l.packet)
 	if n == 0 || err != nil {
 		if err == unix.EAGAIN {
 			return nil
 		}
-		return l.loopCloseConn(svr, conn, err)
+		return l.loopCloseConn(conn, err)
 	}
 	conn.extra = l.packet[:n]
 	//_, _ = conn.inBuf.Write(l.packet[:n])
-	out, action := svr.events.React(conn)
+	out, action := l.svr.events.React(conn)
 	conn.action = action
 	if len(out) > 0 {
 		conn.write(out)
 	} else if action != DataRead {
 		_, _ = conn.inBuf.Write(conn.extra)
 	}
-	return l.handleAction(svr, conn)
+	return l.handleAction(conn)
 }
 
-func (l *loop) loopWrite(svr *server, conn *conn) error {
-	if svr.events.PreWrite != nil {
-		svr.events.PreWrite()
+func (l *loop) loopWrite(conn *conn) error {
+	if l.svr.events.PreWrite != nil {
+		l.svr.events.PreWrite()
 	}
 
-	top, _ := conn.outBuf.PreReadAll()
+	top, tail := conn.outBuf.PreReadAll()
 	n, err := unix.Write(conn.fd, top)
 	if err != nil {
 		if err == unix.EAGAIN {
 			return nil
 		}
-		return l.loopCloseConn(svr, conn, err)
+		return l.loopCloseConn(conn, err)
 	}
 	conn.outBuf.Advance(n)
+	if len(top) == n && tail != nil {
+		n, err = unix.Write(conn.fd, tail)
+		if err != nil {
+			if err == unix.EAGAIN {
+				return nil
+			}
+			return l.loopCloseConn(conn, err)
+		}
+		conn.outBuf.Advance(n)
+	}
 
 	if conn.outBuf.Length() == 0 {
 		l.poller.ModRead(conn.fd)
@@ -142,13 +153,13 @@ func (l *loop) loopWrite(svr *server, conn *conn) error {
 	return nil
 }
 
-func (l *loop) loopCloseConn(svr *server, conn *conn, err error) error {
+func (l *loop) loopCloseConn(conn *conn, err error) error {
 	l.poller.Delete(conn.fd)
 	delete(l.connections, conn.fd)
 	_ = unix.Close(conn.fd)
 
-	if svr.events.OnClosed != nil {
-		switch svr.events.OnClosed(conn, err) {
+	if l.svr.events.OnClosed != nil {
+		switch l.svr.events.OnClosed(conn, err) {
 		case None:
 		case Shutdown:
 			return ErrClosing
@@ -157,26 +168,26 @@ func (l *loop) loopCloseConn(svr *server, conn *conn, err error) error {
 	return nil
 }
 
-func (l *loop) loopWake(svr *server, conn *conn) error {
-	out, action := svr.events.React(conn)
+func (l *loop) loopWake(conn *conn) error {
+	out, action := l.svr.events.React(conn)
 	conn.action = action
 	if len(out) > 0 {
 		conn.write(out)
 	}
-	return l.handleAction(svr, conn)
+	return l.handleAction(conn)
 }
 
-func (l *loop) loopNote(svr *server, note interface{}) error {
+func (l *loop) loopNote(note interface{}) error {
 	var err error
 	switch v := note.(type) {
 	case time.Duration:
-		delay, action := svr.events.Tick()
+		delay, action := l.svr.events.Tick()
 		switch action {
 		case None:
 		case Shutdown:
 			err = ErrClosing
 		}
-		svr.tch <- delay
+		l.svr.tch <- delay
 	case error: // shutdown
 		err = v
 	case *conn:
@@ -184,7 +195,7 @@ func (l *loop) loopNote(svr *server, note interface{}) error {
 		if val, ok := l.connections[v.fd]; !ok || val != v {
 			return nil // ignore stale wakes
 		}
-		return l.loopWake(svr, v)
+		return l.loopWake(v)
 	case *socket:
 		l.connections[v.fd] = v.conn
 		l.poller.AddRead(v.fd)
@@ -194,21 +205,21 @@ func (l *loop) loopNote(svr *server, note interface{}) error {
 	return err
 }
 
-func (l *loop) loopTicker(svr *server) {
+func (l *loop) loopTicker() {
 	for {
 		if err := l.poller.Trigger(time.Duration(0)); err != nil {
 			break
 		}
-		time.Sleep(<-svr.tch)
+		time.Sleep(<-l.svr.tch)
 	}
 }
 
-func (l *loop) handleAction(svr *server, conn *conn) error {
+func (l *loop) handleAction(conn *conn) error {
 	switch conn.action {
 	case None:
 		return nil
 	case Close:
-		return l.loopCloseConn(svr, conn, nil)
+		return l.loopCloseConn(conn, nil)
 	case Shutdown:
 		return ErrClosing
 	default:
@@ -216,12 +227,12 @@ func (l *loop) handleAction(svr *server, conn *conn) error {
 	}
 }
 
-func (l *loop) loopUDPRead(svr *server, fd int) error {
+func (l *loop) loopUDPRead(fd int) error {
 	n, sa, err := unix.Recvfrom(fd, l.packet, 0)
 	if err != nil || n == 0 {
 		return nil
 	}
-	if svr.events.React != nil {
+	if l.svr.events.React != nil {
 		var sa6 unix.SockaddrInet6
 		switch sa := sa.(type) {
 		case *unix.SockaddrInet4:
@@ -238,15 +249,15 @@ func (l *loop) loopUDPRead(svr *server, fd int) error {
 			sa6 = *sa
 		}
 		conn := &conn{
-			localAddr:  svr.ln.lnaddr,
+			localAddr:  l.svr.ln.lnaddr,
 			remoteAddr: netpoll.SockaddrToUDPAddr(&sa6),
 			inBuf:      ringbuffer.New(connRingBufferSize),
 		}
 		_, _ = conn.inBuf.Write(l.packet[:n])
-		out, action := svr.events.React(conn)
+		out, action := l.svr.events.React(conn)
 		if len(out) > 0 {
-			if svr.events.PreWrite != nil {
-				svr.events.PreWrite()
+			if l.svr.events.PreWrite != nil {
+				l.svr.events.PreWrite()
 			}
 			sniffError(unix.Sendto(fd, out, 0, sa))
 		}

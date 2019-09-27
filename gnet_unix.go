@@ -48,7 +48,7 @@ func (svr *server) signalShutdown() {
 func (svr *server) startLoop(loop *loop) {
 	svr.wg.Add(1)
 	go func() {
-		loop.loopRun(svr)
+		loop.loopRun()
 		svr.wg.Done()
 	}()
 }
@@ -61,6 +61,7 @@ func (svr *server) activateLoops(numLoops int) {
 			poller:      netpoll.OpenPoller(),
 			packet:      make([]byte, 0xFFFF),
 			connections: make(map[int]*conn),
+			svr:         svr,
 		}
 		loop.poller.AddRead(svr.ln.fd)
 		svr.eventLoopGroup.register(loop)
@@ -79,6 +80,7 @@ func (svr *server) activateReactors(numLoops int) {
 			poller:      netpoll.OpenPoller(),
 			packet:      make([]byte, 0xFFFF),
 			connections: make(map[int]*conn),
+			svr:         svr,
 		}
 		svr.eventLoopGroup.register(loop)
 	}
@@ -92,6 +94,7 @@ func (svr *server) activateReactors(numLoops int) {
 	loop := &loop{
 		idx:    -1,
 		poller: netpoll.OpenPoller(),
+		svr:    svr,
 	}
 	if svr.ln.pconn != nil && loop.packet == nil {
 		loop.packet = make([]byte, 0xFFFF)
@@ -159,7 +162,7 @@ func serve(events Events, listener *listener, options *Options) error {
 		// Close loops and all outstanding connections
 		svr.eventLoopGroup.iterate(func(i int, l *loop) bool {
 			for _, c := range l.connections {
-				sniffError(l.loopCloseConn(svr, c, nil))
+				sniffError(l.loopCloseConn(c, nil))
 			}
 			sniffError(l.poller.Close())
 			return true

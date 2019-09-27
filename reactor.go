@@ -24,11 +24,11 @@ func (svr *server) activateMainReactor() {
 
 	_ = svr.mainLoop.poller.Polling(func(fd int, note interface{}) error {
 		if fd == 0 {
-			return svr.mainLoop.loopNote(svr, note)
+			return svr.mainLoop.loopNote(note)
 		}
 
 		if svr.ln.pconn != nil {
-			return svr.mainLoop.loopUDPRead(svr, fd)
+			return svr.mainLoop.loopUDPRead(fd)
 		}
 		nfd, sa, err := unix.Accept(fd)
 		if err != nil {
@@ -48,7 +48,7 @@ func (svr *server) activateMainReactor() {
 			inBuf:  ringbuffer.New(connRingBufferSize),
 			outBuf: ringbuffer.New(connRingBufferSize),
 		}
-		_ = lp.loopOpened(svr, conn)
+		_ = lp.loopOpened(conn)
 		_ = lp.poller.Trigger(&socket{fd: nfd, conn: conn})
 		return nil
 	})
@@ -61,18 +61,18 @@ func (svr *server) activateSubReactor(loop *loop) {
 	}()
 
 	if loop.idx == 0 && svr.events.Tick != nil {
-		go loop.loopTicker(svr)
+		go loop.loopTicker()
 	}
 
 	_ = loop.poller.Polling(func(fd int, note interface{}) error {
 		if fd == 0 {
-			return loop.loopNote(svr, note)
+			return loop.loopNote(note)
 		}
 
 		if c := loop.connections[fd]; c.outBuf.Length() > 0 {
-			return loop.loopWrite(svr, c)
+			return loop.loopWrite(c)
 		} else {
-			return loop.loopRead(svr, c)
+			return loop.loopRead(c)
 		}
 	})
 }
