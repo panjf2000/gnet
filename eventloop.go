@@ -111,7 +111,6 @@ func (l *loop) loopRead(conn *conn) error {
 		return l.loopCloseConn(conn, err)
 	}
 	conn.extra = l.packet[:n]
-	//_, _ = conn.inBuf.Write(l.packet[:n])
 	out, action := l.svr.events.React(conn)
 	conn.action = action
 	if len(out) > 0 {
@@ -168,18 +167,23 @@ func (l *loop) loopCloseConn(conn *conn, err error) error {
 	return nil
 }
 
-func (l *loop) loopWake(conn *conn) error {
-	out, action := l.svr.events.React(conn)
-	conn.action = action
-	if len(out) > 0 {
-		conn.write(out)
-	}
-	return l.handleAction(conn)
-}
+//func (l *loop) loopWake(conn *conn) error {
+//	out, action := l.svr.events.React(conn)
+//	conn.action = action
+//	if len(out) > 0 {
+//		conn.write(out)
+//	}
+//	return l.handleAction(conn)
+//}
 
 func (l *loop) loopNote(note interface{}) error {
 	var err error
 	switch v := note.(type) {
+	case *conn:
+		l.connections[v.fd] = v
+		l.poller.AddRead(v.fd)
+	case func():
+		v()
 	case time.Duration:
 		delay, action := l.svr.events.Tick()
 		switch action {
@@ -190,17 +194,12 @@ func (l *loop) loopNote(note interface{}) error {
 		l.svr.tch <- delay
 	case error: // shutdown
 		err = v
-	case *conn:
-		// Wake called for connection
-		if val, ok := l.connections[v.fd]; !ok || val != v {
-			return nil // ignore stale wakes
-		}
-		return l.loopWake(v)
-	case *socket:
-		l.connections[v.fd] = v.conn
-		l.poller.AddRead(v.fd)
-	case func():
-		v()
+		//case *conn:
+		//	// Wake called for connection
+		//	if val, ok := l.connections[v.fd]; !ok || val != v {
+		//		return nil // ignore stale wakes
+		//	}
+		//	return l.loopWake(v)
 	}
 	return err
 }

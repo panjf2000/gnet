@@ -90,7 +90,7 @@ func TestServe(t *testing.T) {
 }
 
 func testServe(network, addr string, reuseport, multicore, async bool, nclients int) {
-	var once sync.Once
+	//var once sync.Once
 	var started int32
 	var connected int32
 	var clientActive int32
@@ -111,6 +111,11 @@ func testServe(network, addr string, reuseport, multicore, async bool, nclients 
 		if c.RemoteAddr() == nil {
 			panic("nil local addr")
 		}
+		//once.Do(func() {
+		//	if !reuseport {
+		//		c.Wake()
+		//	}
+		//})
 		return
 	}
 	events.OnClosed = func(c Conn, err error) (action Action) {
@@ -137,15 +142,11 @@ func testServe(network, addr string, reuseport, multicore, async bool, nclients 
 		} else {
 			top, tail := c.ReadPair()
 			out = top
-			if len(tail) > 0 {
+			if tail != nil {
+				fmt.Println("appending tail buffer...")
 				out = append(top, tail...)
 			}
 			c.ResetBuffer()
-			once.Do(func() {
-				if !reuseport {
-					c.Wake()
-				}
-			})
 			return
 		}
 	}
@@ -154,7 +155,7 @@ func testServe(network, addr string, reuseport, multicore, async bool, nclients 
 			for i := 0; i < nclients; i++ {
 				atomic.AddInt32(&clientActive, 1)
 				go func() {
-					startClient(network, addr, multicore)
+					startClient(network, addr, multicore, async)
 					atomic.AddInt32(&clientActive, -1)
 				}()
 			}
@@ -185,7 +186,7 @@ func testServe(network, addr string, reuseport, multicore, async bool, nclients 
 	}
 }
 
-func startClient(network, addr string, multicore bool) {
+func startClient(network, addr string, multicore, async bool) {
 	rand.Seed(time.Now().UnixNano())
 	c, err := net.Dial(network, addr)
 	if err != nil {
@@ -224,9 +225,8 @@ func startClient(network, addr string, multicore bool) {
 		if _, err := io.ReadFull(rd, data2); err != nil {
 			panic(err)
 		}
-		if string(data) != string(data2) {
-			fmt.Printf("mismatch %s/multi-core:%t: %d vs %d bytes\n", network, multicore, len(data), len(data2))
-			//panic("mismatch")
+		if string(data) != string(data2) && !async {
+			panic(fmt.Sprintf("mismatch %s/multi-core:%t: %d vs %d bytes\n", network, multicore, len(data), len(data2)))
 		}
 	}
 }

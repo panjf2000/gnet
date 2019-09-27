@@ -9,7 +9,6 @@ package gnet
 
 import (
 	"net"
-	"syscall"
 
 	"github.com/panjf2000/gnet/ringbuffer"
 	"golang.org/x/sys/unix"
@@ -55,7 +54,7 @@ func (c *conn) AsyncWrite(buf []byte) {
 }
 
 func (c *conn) open(buf []byte) {
-	n, err := syscall.Write(c.fd, buf)
+	n, err := unix.Write(c.fd, buf)
 	if err != nil {
 		_, _ = c.outBuf.Write(buf)
 		return
@@ -71,7 +70,7 @@ func (c *conn) write(buf []byte) {
 		_, _ = c.outBuf.Write(buf)
 		return
 	}
-	n, err := syscall.Write(c.fd, buf)
+	n, err := unix.Write(c.fd, buf)
 	if err != nil {
 		if err == unix.EAGAIN {
 			_, _ = c.outBuf.Write(buf)
@@ -91,8 +90,8 @@ func (c *conn) Context() interface{}       { return c.ctx }
 func (c *conn) SetContext(ctx interface{}) { c.ctx = ctx }
 func (c *conn) LocalAddr() net.Addr        { return c.localAddr }
 func (c *conn) RemoteAddr() net.Addr       { return c.remoteAddr }
-func (c *conn) Wake() {
-	if c.loop != nil {
-		sniffError(c.loop.poller.Trigger(c))
-	}
-}
+//func (c *conn) Wake() {
+//	if c.loop != nil {
+//		sniffError(c.loop.poller.Trigger(c))
+//	}
+//}

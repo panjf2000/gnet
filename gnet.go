@@ -62,7 +62,7 @@ type Conn interface {
 	// RemoteAddr is the connection's remote peer address.
 	RemoteAddr() net.Addr
 	// Wake triggers a React event for this connection.
-	Wake()
+	//Wake()
 	// ReadPair reads all data from ring buffer.
 	ReadPair() ([]byte, []byte)
 	// ReadBytes reads all data and return a new slice.

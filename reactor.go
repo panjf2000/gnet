@@ -11,10 +11,10 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-type socket struct {
-	fd   int
-	conn *conn
-}
+//type socket struct {
+//	fd   int
+//	conn *conn
+//}
 
 func (svr *server) activateMainReactor() {
 	defer func() {
@@ -49,7 +49,8 @@ func (svr *server) activateMainReactor() {
 			outBuf: ringbuffer.New(connRingBufferSize),
 		}
 		_ = lp.loopOpened(conn)
-		_ = lp.poller.Trigger(&socket{fd: nfd, conn: conn})
+		_ = lp.poller.Trigger(conn)
+		//_ = lp.poller.Trigger(&socket{fd: nfd, conn: conn})
 		return nil
 	})
 }

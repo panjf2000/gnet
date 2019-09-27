@@ -29,7 +29,7 @@ func main() {
 	events.React = func(c gnet.Conn) (out []byte, action gnet.Action) {
 		top, tail := c.ReadPair()
 		out = top
-		if len(tail) > 0 {
+		if tail != nil {
 			out = append(top, tail...)
 		}
 		c.ResetBuffer()

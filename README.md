@@ -149,7 +149,7 @@ func main() {
 	events.React = func(c gnet.Conn) (out []byte, action gnet.Action) {
 		data := c.ReadBytes()
 		c.ResetBuffer()
-    action = DataRead
+		action = DataRead
 		// Use ants pool to unblock the event-loop.
 		_ = pool.Submit(func() {
 			time.Sleep(1 * time.Second)
