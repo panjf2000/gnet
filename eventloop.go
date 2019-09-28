@@ -11,6 +11,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/panjf2000/gnet/internal"
 	"github.com/panjf2000/gnet/netpoll"
 	"github.com/panjf2000/gnet/ringbuffer"
 	"golang.org/x/sys/unix"
@@ -22,8 +23,6 @@ type loop struct {
 	packet      []byte          // read packet buffer
 	connections map[int]*conn   // loop connections fd -> conn
 	svr         *server
-
-	asyncQueue func() // async tasks queue
 }
 
 func (l *loop) loopRun() {
@@ -33,9 +32,9 @@ func (l *loop) loopRun() {
 		go l.loopTicker()
 	}
 
-	_ = l.poller.Polling(func(fd int, note interface{}) error {
+	_ = l.poller.Polling(func(fd int, job internal.Job) error {
 		if fd == 0 {
-			return l.loopNote(note)
+			return job()
 		}
 		if c, ok := l.connections[fd]; ok {
 			switch {
@@ -176,37 +175,49 @@ func (l *loop) loopCloseConn(conn *conn, err error) error {
 //	return l.handleAction(conn)
 //}
 
-func (l *loop) loopNote(note interface{}) error {
-	var err error
-	switch v := note.(type) {
-	case *conn:
-		l.connections[v.fd] = v
-		l.poller.AddRead(v.fd)
-	case func():
-		v()
-	case time.Duration:
-		delay, action := l.svr.events.Tick()
-		switch action {
-		case None:
-		case Shutdown:
-			err = ErrClosing
-		}
-		l.svr.tch <- delay
-	case error: // shutdown
-		err = v
-		//case *conn:
-		//	// Wake called for connection
-		//	if val, ok := l.connections[v.fd]; !ok || val != v {
-		//		return nil // ignore stale wakes
-		//	}
-		//	return l.loopWake(v)
-	}
-	return err
-}
+//func (l *loop) loopNote(job internal.Job) error {
+//
+//	var err error
+//	switch v := job.(type) {
+//	case *conn:
+//		l.connections[v.fd] = v
+//		l.poller.AddRead(v.fd)
+//		return nil
+//	case func() error:
+//		return v()
+//	case time.Duration:
+//		delay, action := l.svr.events.Tick()
+//		switch action {
+//		case None:
+//		case Shutdown:
+//			err = ErrClosing
+//		}
+//		l.svr.tch <- delay
+//	case error: // shutdown
+//		err = v
+//		//case *conn:
+//		//	// Wake called for connection
+//		//	if val, ok := l.connections[v.fd]; !ok || val != v {
+//		//		return nil // ignore stale wakes
+//		//	}
+//		//	return l.loopWake(v)
+//	}
+//	return err
+//}
 
 func (l *loop) loopTicker() {
 	for {
-		if err := l.poller.Trigger(time.Duration(0)); err != nil {
+		if err := l.poller.Trigger(func() error {
+			var err error
+			delay, action := l.svr.events.Tick()
+			switch action {
+			case None:
+			case Shutdown:
+				err = ErrClosing
+			}
+			l.svr.tch <- delay
+			return err
+		}); err != nil {
 			break
 		}
 		time.Sleep(<-l.svr.tch)

@@ -14,8 +14,8 @@ import (
 
 // Poller ...
 type Poller struct {
-	fd    int
-	notes internal.NoteQueue
+	fd            int
+	asyncJobQueue internal.AsyncJobQueue
 }
 
 // OpenPoller ...
@@ -34,7 +34,7 @@ func OpenPoller() *Poller {
 	if err != nil {
 		panic(err)
 	}
-	poller.notes = internal.NewNoteQueue()
+	poller.asyncJobQueue = internal.NewAsyncJobQueue()
 	return poller
 }
 
@@ -44,8 +44,8 @@ func (p *Poller) Close() error {
 }
 
 // Trigger ...
-func (p *Poller) Trigger(note interface{}) error {
-	p.notes.Push(note)
+func (p *Poller) Trigger(job internal.Job) error {
+	p.asyncJobQueue.Push(job)
 	_, err := unix.Kevent(p.fd, []unix.Kevent_t{{
 		Ident:  0,
 		Filter: unix.EVFILT_USER,
@@ -55,7 +55,7 @@ func (p *Poller) Trigger(note interface{}) error {
 }
 
 // Polling ...
-func (p *Poller) Polling(iter func(fd int, note interface{}) error) error {
+func (p *Poller) Polling(iter func(fd int, job internal.Job) error) error {
 	events := make([]unix.Kevent_t, 128)
 	var note bool
 	for {
@@ -74,8 +74,8 @@ func (p *Poller) Polling(iter func(fd int, note interface{}) error) error {
 		}
 		if note {
 			note = false
-			if err := p.notes.ForEach(func(note interface{}) error {
-				return iter(0, note)
+			if err := p.asyncJobQueue.ForEach(func(job internal.Job) error {
+				return iter(0, job)
 			}); err != nil {
 				return err
 			}

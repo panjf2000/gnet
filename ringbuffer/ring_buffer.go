@@ -311,7 +311,7 @@ func (r *RingBuffer) Bytes() []byte {
 	return buf
 }
 
-// Bytes returns all available read bytes. It does not move the read pointer and only copy the available data.
+// WithBytes combines the available read bytes and the given bytes. It does not move the read pointer and only copy the available data.
 func (r *RingBuffer) WithBytes(b []byte) []byte {
 	bn := len(b)
 	if r.isEmpty {

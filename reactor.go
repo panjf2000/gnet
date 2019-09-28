@@ -7,14 +7,10 @@
 package gnet
 
 import (
+	"github.com/panjf2000/gnet/internal"
 	"github.com/panjf2000/gnet/ringbuffer"
 	"golang.org/x/sys/unix"
 )
-
-//type socket struct {
-//	fd   int
-//	conn *conn
-//}
 
 func (svr *server) activateMainReactor() {
 	defer func() {
@@ -22,9 +18,9 @@ func (svr *server) activateMainReactor() {
 		svr.wg.Done()
 	}()
 
-	_ = svr.mainLoop.poller.Polling(func(fd int, note interface{}) error {
+	_ = svr.mainLoop.poller.Polling(func(fd int, job internal.Job) error {
 		if fd == 0 {
-			return svr.mainLoop.loopNote(note)
+			return job()
 		}
 		nfd, sa, err := unix.Accept(fd)
 		if err != nil {
@@ -45,8 +41,11 @@ func (svr *server) activateMainReactor() {
 			outBuf: ringbuffer.New(connRingBufferSize),
 		}
 		_ = lp.loopOpened(conn)
-		_ = lp.poller.Trigger(conn)
-		//_ = lp.poller.Trigger(&socket{fd: nfd, conn: conn})
+		_ = lp.poller.Trigger(func() error {
+			lp.connections[nfd] = conn
+			lp.poller.AddRead(nfd)
+			return nil
+		})
 		return nil
 	})
 }
@@ -61,9 +60,9 @@ func (svr *server) activateSubReactor(loop *loop) {
 		go loop.loopTicker()
 	}
 
-	_ = loop.poller.Polling(func(fd int, note interface{}) error {
+	_ = loop.poller.Polling(func(fd int, job internal.Job) error {
 		if fd == 0 {
-			return loop.loopNote(note)
+			return job()
 		}
 		conn := loop.connections[fd]
 		if conn.outBuf.IsEmpty() {

@@ -146,11 +146,15 @@ func serve(events Events, listener *listener, options *Options) error {
 
 		// Notify all loops to close by closing all listeners
 		svr.eventLoopGroup.iterate(func(i int, l *loop) bool {
-			sniffError(l.poller.Trigger(ErrClosing))
+			sniffError(l.poller.Trigger(func() error {
+				return ErrClosing
+			}))
 			return true
 		})
 		if svr.mainLoop != nil {
-			sniffError(svr.mainLoop.poller.Trigger(ErrClosing))
+			sniffError(svr.mainLoop.poller.Trigger(func() error {
+				return ErrClosing
+			}))
 		}
 
 		// Wait on all loops to complete reading events

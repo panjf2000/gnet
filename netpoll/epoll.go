@@ -14,10 +14,10 @@ import (
 
 // Poller ...
 type Poller struct {
-	fd     int    // epoll fd
-	wfd    int    // wake fd
-	wfdBuf []byte // wfd buffer to read packet
-	notes  internal.NoteQueue
+	fd            int    // epoll fd
+	wfd           int    // wake fd
+	wfdBuf        []byte // wfd buffer to read packet
+	asyncJobQueue internal.AsyncJobQueue
 }
 
 // OpenPoller ...
@@ -36,7 +36,7 @@ func OpenPoller() *Poller {
 	poller.wfd = int(r0)
 	poller.wfdBuf = make([]byte, 8)
 	poller.AddRead(poller.wfd)
-	poller.notes = internal.NewNoteQueue()
+	poller.asyncJobQueue = internal.NewAsyncJobQueue()
 	return poller
 }
 
@@ -49,14 +49,14 @@ func (p *Poller) Close() error {
 }
 
 // Trigger ...
-func (p *Poller) Trigger(note interface{}) error {
-	p.notes.Push(note)
+func (p *Poller) Trigger(job internal.Job) error {
+	p.asyncJobQueue.Push(job)
 	_, err := unix.Write(p.wfd, []byte{0, 0, 0, 0, 0, 0, 0, 1})
 	return err
 }
 
 // Polling ...
-func (p *Poller) Polling(iter func(fd int, note interface{}) error) error {
+func (p *Poller) Polling(iter func(fd int, job internal.Job) error) error {
 	events := make([]unix.EpollEvent, 1024)
 	var note bool
 	for {
@@ -78,8 +78,8 @@ func (p *Poller) Polling(iter func(fd int, note interface{}) error) error {
 		}
 		if note {
 			note = false
-			if err := p.notes.ForEach(func(note interface{}) error {
-				return iter(0, note)
+			if err := p.asyncJobQueue.ForEach(func(job internal.Job) error {
+				return iter(0, job)
 			}); err != nil {
 				return err
 			}
