@@ -6,22 +6,12 @@
 package internal
 
 import (
-	"runtime"
 	"sync"
-	"sync/atomic"
 )
 
-// this is a good candidate for a lock-free structure.
-type spinLock uint32
-
-func (sl *spinLock) Lock() {
-	for !atomic.CompareAndSwapUint32((*uint32)(sl), 0, 1) {
-		runtime.Gosched()
-	}
-}
-
-func (sl *spinLock) Unlock() {
-	atomic.StoreUint32((*uint32)(sl), 0)
+// NewNoteQueue creates a note-queue.
+func NewNoteQueue() NoteQueue {
+	return NoteQueue{mu: SpinLock()}
 }
 
 // NoteQueue queues pending tasks.
@@ -49,9 +39,4 @@ func (q *NoteQueue) ForEach(iter func(note interface{}) error) error {
 		}
 	}
 	return nil
-}
-
-// NewNoteQueue creates a note-queue.
-func NewNoteQueue() NoteQueue {
-	return NoteQueue{mu: new(spinLock)}
 }
