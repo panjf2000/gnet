@@ -13,10 +13,7 @@ import (
 )
 
 func (svr *server) activateMainReactor() {
-	defer func() {
-		svr.signalShutdown()
-		svr.wg.Done()
-	}()
+	defer svr.signalShutdown()
 
 	_ = svr.mainLoop.poller.Polling(func(fd int, job internal.Job) error {
 		if fd == 0 {
@@ -41,20 +38,19 @@ func (svr *server) activateMainReactor() {
 			outBuf: ringbuffer.New(connRingBufferSize),
 		}
 		_ = lp.loopOpened(conn)
-		_ = lp.poller.Trigger(func() error {
-			lp.connections[nfd] = conn
-			lp.poller.AddRead(nfd)
-			return nil
+		_ = lp.poller.Trigger(func() (err error) {
+			if err = lp.poller.AddRead(nfd); err == nil {
+				lp.connections[nfd] = conn
+				return
+			}
+			return
 		})
 		return nil
 	})
 }
 
 func (svr *server) activateSubReactor(loop *loop) {
-	defer func() {
-		svr.signalShutdown()
-		svr.wg.Done()
-	}()
+	defer svr.signalShutdown()
 
 	if loop.idx == 0 && svr.events.Tick != nil {
 		go loop.loopTicker()

@@ -192,7 +192,7 @@ events.Tick = func() (delay time.Duration, action Action){
 
 ## 使用多核
 
-`Events.Multicore` 参数指定了 `gnet` 是否会使用多核来进行服务，如果是 `true` 的话就会使用多核，否则就是单核运行，利用的核心数一般是机器的 CPU 数量。
+`gnet.WithMulticore(true)` 参数指定了 `gnet` 是否会使用多核来进行服务，如果是 `true` 的话就会使用多核，否则就是单核运行，利用的核心数一般是机器的 CPU 数量。
 
 ## 负载均衡
 

@@ -197,7 +197,7 @@ The `Serve` function can bind to UDP addresses.
 
 ## Multi-threads
 
-The `Events.Multicore` indicates whether the server will be effectively created with multi-cores, if so, then you must take care with synchronizing memory between all event callbacks, otherwise, it will run the server with single thread. The number of threads in the server will be automatically assigned to the value of `runtime.NumCPU()`.
+The `gnet.WithMulticore(true)` indicates whether the server will be effectively created with multi-cores, if so, then you must take care with synchronizing memory between all event callbacks, otherwise, it will run the server with single thread. The number of threads in the server will be automatically assigned to the value of `runtime.NumCPU()`.
 
 ## Load balancing
 

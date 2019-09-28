@@ -19,11 +19,11 @@ type Poller struct {
 }
 
 // OpenPoller ...
-func OpenPoller() *Poller {
+func OpenPoller() (*Poller, error) {
 	poller := new(Poller)
 	kfd, err := unix.Kqueue()
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	poller.fd = kfd
 	_, err = unix.Kevent(poller.fd, []unix.Kevent_t{{
@@ -32,10 +32,10 @@ func OpenPoller() *Poller {
 		Flags:  unix.EV_ADD | unix.EV_CLEAR,
 	}}, nil, nil)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	poller.asyncJobQueue = internal.NewAsyncJobQueue()
-	return poller
+	return poller, nil
 }
 
 // Close ...
@@ -84,47 +84,53 @@ func (p *Poller) Polling(iter func(fd int, job internal.Job) error) error {
 }
 
 // AddRead ...
-func (p *Poller) AddRead(fd int) {
+func (p *Poller) AddRead(fd int) error {
 	if _, err := unix.Kevent(p.fd, []unix.Kevent_t{
 		{Ident: uint64(fd), Flags: unix.EV_ADD, Filter: unix.EVFILT_READ}}, nil, nil); err != nil {
-		panic(err)
+		return err
 	}
+	return nil
 }
 
 // AddWrite ...
-func (p *Poller) AddWrite(fd int) {
+func (p *Poller) AddWrite(fd int) error {
 	if _, err := unix.Kevent(p.fd, []unix.Kevent_t{
 		{Ident: uint64(fd), Flags: unix.EV_ADD, Filter: unix.EVFILT_WRITE}}, nil, nil); err != nil {
-		panic(err)
+		return err
 	}
+	return nil
 }
 
 // AddReadWrite ...
-func (p *Poller) AddReadWrite(fd int) {
+func (p *Poller) AddReadWrite(fd int) error {
 	if _, err := unix.Kevent(p.fd, []unix.Kevent_t{
 		{Ident: uint64(fd), Flags: unix.EV_ADD, Filter: unix.EVFILT_READ},
 		{Ident: uint64(fd), Flags: unix.EV_ADD, Filter: unix.EVFILT_WRITE},
 	}, nil, nil); err != nil {
-		panic(err)
+		return err
 	}
+	return nil
 }
 
 // ModRead ...
-func (p *Poller) ModRead(fd int) {
+func (p *Poller) ModRead(fd int) error {
 	if _, err := unix.Kevent(p.fd, []unix.Kevent_t{
 		{Ident: uint64(fd), Flags: unix.EV_DELETE, Filter: unix.EVFILT_WRITE}}, nil, nil); err != nil {
-		panic(err)
+		return err
 	}
+	return nil
 }
 
 // ModReadWrite ...
-func (p *Poller) ModReadWrite(fd int) {
+func (p *Poller) ModReadWrite(fd int) error {
 	if _, err := unix.Kevent(p.fd, []unix.Kevent_t{
 		{Ident: uint64(fd), Flags: unix.EV_ADD, Filter: unix.EVFILT_WRITE}}, nil, nil); err != nil {
-		panic(err)
+		return err
 	}
+	return nil
 }
 
 // Delete ...
-func (p *Poller) Delete(fd int) {
+func (p *Poller) Delete(fd int) error {
+	return nil
 }

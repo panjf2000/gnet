@@ -29,6 +29,7 @@ type server struct {
 	wg             sync.WaitGroup     // loop close waitgroup
 	cond           *sync.Cond         // shutdown signaler
 	tch            chan time.Duration // ticker channel
+	once           sync.Once          // make sure only signalShutdown once
 }
 
 // waitForShutdown waits for a signal to shutdown
@@ -40,73 +41,143 @@ func (svr *server) waitForShutdown() {
 
 // signalShutdown signals a shutdown an begins server closing
 func (svr *server) signalShutdown() {
-	svr.cond.L.Lock()
-	svr.cond.Signal()
-	svr.cond.L.Unlock()
+	svr.once.Do(func() {
+		svr.cond.L.Lock()
+		svr.cond.Signal()
+		svr.cond.L.Unlock()
+	})
 }
 
-func (svr *server) startLoop(loop *loop) {
-	svr.wg.Add(1)
-	go func() {
-		loop.loopRun()
-		svr.wg.Done()
-	}()
+func (svr *server) startLoops() {
+	svr.eventLoopGroup.iterate(func(i int, l *loop) bool {
+		svr.wg.Add(1)
+		go func() {
+			l.loopRun()
+			svr.wg.Done()
+		}()
+		return true
+	})
 }
 
-func (svr *server) activateLoops(numLoops int) {
+func (svr *server) closeLoops() {
+	svr.eventLoopGroup.iterate(func(i int, l *loop) bool {
+		_ = l.poller.Close()
+		return true
+	})
+}
+
+func (svr *server) startReactors() {
+	svr.eventLoopGroup.iterate(func(i int, l *loop) bool {
+		svr.wg.Add(1)
+		go func() {
+			svr.activateSubReactor(l)
+			svr.wg.Done()
+		}()
+		return true
+	})
+}
+
+func (svr *server) activateLoops(numLoops int) error {
 	// Create loops locally and bind the listeners.
 	for i := 0; i < numLoops; i++ {
-		loop := &loop{
-			idx:         i,
-			poller:      netpoll.OpenPoller(),
-			packet:      make([]byte, 0xFFFF),
-			connections: make(map[int]*conn),
-			svr:         svr,
+		if p, err := netpoll.OpenPoller(); err == nil {
+			loop := &loop{
+				idx:         i,
+				poller:      p,
+				packet:      make([]byte, 0xFFFF),
+				connections: make(map[int]*conn),
+				svr:         svr,
+			}
+			_ = loop.poller.AddRead(svr.ln.fd)
+			svr.eventLoopGroup.register(loop)
+		} else {
+			return err
 		}
-		loop.poller.AddRead(svr.ln.fd)
-		svr.eventLoopGroup.register(loop)
-
-		// Start loops in background
-		svr.startLoop(loop)
 	}
 	svr.loopGroupSize = svr.eventLoopGroup.len()
+	// Start loops in background
+	svr.startLoops()
+	return nil
 }
 
-func (svr *server) activateReactors(numLoops int) {
-	svr.wg.Add(numLoops + 1)
+func (svr *server) activateReactors(numLoops int) error {
 	for i := 0; i < numLoops; i++ {
-		loop := &loop{
-			idx:         i,
-			poller:      netpoll.OpenPoller(),
-			packet:      make([]byte, 0xFFFF),
-			connections: make(map[int]*conn),
-			svr:         svr,
+		if p, err := netpoll.OpenPoller(); err == nil {
+			loop := &loop{
+				idx:         i,
+				poller:      p,
+				packet:      make([]byte, 0xFFFF),
+				connections: make(map[int]*conn),
+				svr:         svr,
+			}
+			svr.eventLoopGroup.register(loop)
+		} else {
+			return err
 		}
-		svr.eventLoopGroup.register(loop)
 	}
 	svr.loopGroupSize = svr.eventLoopGroup.len()
 	// Start sub reactors...
+	svr.startReactors()
+
+	if p, err := netpoll.OpenPoller(); err == nil {
+		loop := &loop{
+			idx:    -1,
+			poller: p,
+			svr:    svr,
+		}
+		_ = loop.poller.AddRead(svr.ln.fd)
+		svr.mainLoop = loop
+		// Start main reactor...
+		svr.wg.Add(1)
+		go func() {
+			svr.activateMainReactor()
+			svr.wg.Done()
+		}()
+	} else {
+		return err
+	}
+	return nil
+}
+
+func (svr *server) start(numCPU int) error {
+	if svr.opts.ReusePort || svr.ln.pconn != nil {
+		return svr.activateLoops(numCPU)
+	}
+	return svr.activateReactors(numCPU)
+}
+
+func (svr *server) stop() {
+	// Wait on a signal for shutdown
+	svr.waitForShutdown()
+
+	// Notify all loops to close by closing all listeners
 	svr.eventLoopGroup.iterate(func(i int, l *loop) bool {
-		go svr.activateSubReactor(l)
+		sniffError(l.poller.Trigger(func() error {
+			return ErrClosing
+		}))
 		return true
 	})
 
-	loop := &loop{
-		idx:    -1,
-		poller: netpoll.OpenPoller(),
-		svr:    svr,
+	if svr.mainLoop != nil {
+		sniffError(svr.mainLoop.poller.Trigger(func() error {
+			return ErrClosing
+		}))
 	}
-	loop.poller.AddRead(svr.ln.fd)
-	svr.mainLoop = loop
-	// Start main reactor...
-	go svr.activateMainReactor()
-}
 
-func (svr *server) start(numCPU int) {
-	if svr.opts.ReusePort || svr.ln.pconn != nil {
-		svr.activateLoops(numCPU)
-	} else {
-		svr.activateReactors(numCPU)
+	// Wait on all loops to complete reading events
+	svr.wg.Wait()
+
+	// Close loops and all outstanding connections
+	svr.eventLoopGroup.iterate(func(i int, l *loop) bool {
+		for _, c := range l.connections {
+			sniffError(l.loopCloseConn(c, nil))
+		}
+		return true
+	})
+	svr.closeLoops()
+
+	if svr.mainLoop != nil {
+		sniffError(svr.mainLoop.poller.Close())
 	}
 }
 
@@ -140,47 +211,17 @@ func serve(events Events, listener *listener, options *Options) error {
 		}
 	}
 
-	defer func() {
-		// Wait on a signal for shutdown
-		svr.waitForShutdown()
+	if err := svr.start(numCPU); err != nil {
+		svr.closeLoops()
+		log.Printf("gnet server is stoping with error: %v\n", err)
+		return err
+	}
+	defer svr.stop()
 
-		// Notify all loops to close by closing all listeners
-		svr.eventLoopGroup.iterate(func(i int, l *loop) bool {
-			sniffError(l.poller.Trigger(func() error {
-				return ErrClosing
-			}))
-			return true
-		})
-		if svr.mainLoop != nil {
-			sniffError(svr.mainLoop.poller.Trigger(func() error {
-				return ErrClosing
-			}))
-		}
-
-		// Wait on all loops to complete reading events
-		svr.wg.Wait()
-
-		// Close loops and all outstanding connections
-		svr.eventLoopGroup.iterate(func(i int, l *loop) bool {
-			for _, c := range l.connections {
-				sniffError(l.loopCloseConn(c, nil))
-			}
-			sniffError(l.poller.Close())
-			return true
-		})
-		if svr.mainLoop != nil {
-			sniffError(svr.mainLoop.poller.Close())
-		}
-	}()
-
-	svr.start(numCPU)
 	return nil
 }
 
 func (ln *listener) close() {
-	//if ln.fd != 0 {
-	//	sniffError(unix.Close(ln.fd))
-	//}
 	if ln.f != nil {
 		sniffError(ln.f.Close())
 	}

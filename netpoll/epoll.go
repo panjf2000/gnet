@@ -21,23 +21,25 @@ type Poller struct {
 }
 
 // OpenPoller ...
-func OpenPoller() *Poller {
+func OpenPoller() (*Poller, error) {
 	poller := new(Poller)
-	epd, err := unix.EpollCreate1(0)
+	epollFD, err := unix.EpollCreate1(0)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	poller.fd = epd
-	r0, _, e0 := unix.Syscall(unix.SYS_EVENTFD2, 0, 0, 0)
-	if e0 != 0 {
-		_ = unix.Close(epd)
-		panic(err)
+	poller.fd = epollFD
+	r0, _, errno := unix.Syscall(unix.SYS_EVENTFD2, 0, 0, 0)
+	if errno != 0 {
+		_ = unix.Close(epollFD)
+		return nil, errno
 	}
 	poller.wfd = int(r0)
 	poller.wfdBuf = make([]byte, 8)
-	poller.AddRead(poller.wfd)
+	if err = poller.AddRead(poller.wfd); err != nil {
+		return nil, err
+	}
 	poller.asyncJobQueue = internal.NewAsyncJobQueue()
-	return poller
+	return poller, nil
 }
 
 // Close ...
@@ -88,63 +90,33 @@ func (p *Poller) Polling(iter func(fd int, job internal.Job) error) error {
 }
 
 // AddReadWrite ...
-func (p *Poller) AddReadWrite(fd int) {
-	if err := unix.EpollCtl(p.fd, unix.EPOLL_CTL_ADD, fd,
-		&unix.EpollEvent{Fd: int32(fd),
-			Events: unix.EPOLLIN | unix.EPOLLOUT,
-		},
-	); err != nil {
-		panic(err)
-	}
+func (p *Poller) AddReadWrite(fd int) error {
+	return unix.EpollCtl(p.fd, unix.EPOLL_CTL_ADD, fd, &unix.EpollEvent{Fd: int32(fd),
+		Events: unix.EPOLLIN | unix.EPOLLOUT})
 }
 
 // AddRead ...
-func (p *Poller) AddRead(fd int) {
-	if err := unix.EpollCtl(p.fd, unix.EPOLL_CTL_ADD, fd,
-		&unix.EpollEvent{Fd: int32(fd),
-			Events: unix.EPOLLIN,
-		},
-	); err != nil {
-		panic(err)
-	}
+func (p *Poller) AddRead(fd int) error {
+	return unix.EpollCtl(p.fd, unix.EPOLL_CTL_ADD, fd, &unix.EpollEvent{Fd: int32(fd), Events: unix.EPOLLIN})
 }
 
 // AddWrite ...
-func (p *Poller) AddWrite(fd int) {
-	if err := unix.EpollCtl(p.fd, unix.EPOLL_CTL_ADD, fd,
-		&unix.EpollEvent{Fd: int32(fd),
-			Events: unix.EPOLLOUT,
-		},
-	); err != nil {
-		panic(err)
-	}
+func (p *Poller) AddWrite(fd int) error {
+	return unix.EpollCtl(p.fd, unix.EPOLL_CTL_ADD, fd, &unix.EpollEvent{Fd: int32(fd), Events: unix.EPOLLOUT})
 }
 
 // ModRead ...
-func (p *Poller) ModRead(fd int) {
-	if err := unix.EpollCtl(p.fd, unix.EPOLL_CTL_MOD, fd,
-		&unix.EpollEvent{Fd: int32(fd),
-			Events: unix.EPOLLIN,
-		},
-	); err != nil {
-		panic(err)
-	}
+func (p *Poller) ModRead(fd int) error {
+	return unix.EpollCtl(p.fd, unix.EPOLL_CTL_MOD, fd, &unix.EpollEvent{Fd: int32(fd), Events: unix.EPOLLIN})
 }
 
 // ModReadWrite ...
-func (p *Poller) ModReadWrite(fd int) {
-	if err := unix.EpollCtl(p.fd, unix.EPOLL_CTL_MOD, fd,
-		&unix.EpollEvent{Fd: int32(fd),
-			Events: unix.EPOLLIN | unix.EPOLLOUT,
-		},
-	); err != nil {
-		panic(err)
-	}
+func (p *Poller) ModReadWrite(fd int) error {
+	return unix.EpollCtl(p.fd, unix.EPOLL_CTL_MOD, fd, &unix.EpollEvent{Fd: int32(fd),
+		Events: unix.EPOLLIN | unix.EPOLLOUT})
 }
 
 // Delete ...
-func (p *Poller) Delete(fd int) {
-	if err := unix.EpollCtl(p.fd, unix.EPOLL_CTL_DEL, fd, nil); err != nil {
-		panic(err)
-	}
+func (p *Poller) Delete(fd int) error {
+	return unix.EpollCtl(p.fd, unix.EPOLL_CTL_DEL, fd, nil)
 }

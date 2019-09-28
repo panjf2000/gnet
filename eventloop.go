@@ -72,8 +72,11 @@ func (l *loop) loopAccept(fd int) error {
 			outBuf: ringbuffer.New(connRingBufferSize),
 			loop:   l,
 		}
-		l.connections[conn.fd] = conn
-		l.poller.AddReadWrite(conn.fd)
+		if err = l.poller.AddReadWrite(conn.fd); err == nil {
+			l.connections[conn.fd] = conn
+		} else {
+			return err
+		}
 	}
 	return nil
 }
@@ -96,7 +99,7 @@ func (l *loop) loopOpened(conn *conn) error {
 		}
 	}
 	if conn.outBuf.Length() != 0 {
-		l.poller.AddWrite(conn.fd)
+		_ = l.poller.AddWrite(conn.fd)
 	}
 	return l.handleAction(conn)
 }
@@ -146,15 +149,16 @@ func (l *loop) loopWrite(conn *conn) error {
 	}
 
 	if conn.outBuf.Length() == 0 {
-		l.poller.ModRead(conn.fd)
+		_ = l.poller.ModRead(conn.fd)
 	}
 	return nil
 }
 
 func (l *loop) loopCloseConn(conn *conn, err error) error {
-	l.poller.Delete(conn.fd)
-	delete(l.connections, conn.fd)
-	_ = unix.Close(conn.fd)
+	if err := l.poller.Delete(conn.fd); err == nil {
+		delete(l.connections, conn.fd)
+		_ = unix.Close(conn.fd)
+	}
 
 	if l.svr.events.OnClosed != nil {
 		switch l.svr.events.OnClosed(conn, err) {
@@ -207,15 +211,14 @@ func (l *loop) loopCloseConn(conn *conn, err error) error {
 
 func (l *loop) loopTicker() {
 	for {
-		if err := l.poller.Trigger(func() error {
-			var err error
+		if err := l.poller.Trigger(func() (err error) {
 			delay, action := l.svr.events.Tick()
+			l.svr.tch <- delay
 			switch action {
 			case None:
 			case Shutdown:
 				err = ErrClosing
 			}
-			l.svr.tch <- delay
 			return err
 		}); err != nil {
 			break
