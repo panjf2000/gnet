@@ -39,7 +39,7 @@ func (c *conn) ReadPair() (top, tail []byte) {
 }
 
 func (c *conn) ReadBytes() []byte {
-	return append(c.inBuf.Bytes(), c.extra...)
+	return c.inBuf.WithBytes(c.extra)
 }
 
 func (c *conn) ResetBuffer() {

@@ -311,6 +311,41 @@ func (r *RingBuffer) Bytes() []byte {
 	return buf
 }
 
+// Bytes returns all available read bytes. It does not move the read pointer and only copy the available data.
+func (r *RingBuffer) WithBytes(b []byte) []byte {
+	bn := len(b)
+	if r.isEmpty {
+		return b
+	} else if r.r == r.w {
+		buf := pbytes.GetLen(r.size + bn)
+		copy(buf, r.buf)
+		copy(buf[r.size:], b)
+		return buf
+	}
+
+	if r.w > r.r {
+		buf := pbytes.GetLen(r.w - r.r + bn)
+		copy(buf, r.buf[r.r:r.w])
+		copy(buf[r.w-r.r:], b)
+		return buf
+	}
+
+	n := r.size - r.r + r.w
+	buf := pbytes.GetLen(n + bn)
+
+	if r.r+n < r.size {
+		copy(buf, r.buf[r.r:r.r+n])
+	} else {
+		c1 := r.size - r.r
+		copy(buf, r.buf[r.r:r.size])
+		c2 := n - c1
+		copy(buf[c1:], r.buf[0:c2])
+	}
+	copy(buf[n:], b)
+
+	return buf
+}
+
 // Recycle recycles slice of bytes.
 func Recycle(p []byte) {
 	pbytes.Put(p)
