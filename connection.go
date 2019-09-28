@@ -75,7 +75,7 @@ func (c *conn) write(buf []byte) {
 	if err != nil {
 		if err == unix.EAGAIN {
 			_, _ = c.outBuf.Write(buf)
-			c.loop.poller.ModReadWrite(c.fd)
+			_ = c.loop.poller.ModReadWrite(c.fd)
 			return
 		}
 		_ = c.loop.loopCloseConn(c, err)
@@ -83,7 +83,7 @@ func (c *conn) write(buf []byte) {
 	}
 	if n < len(buf) {
 		_, _ = c.outBuf.Write(buf[n:])
-		c.loop.poller.ModReadWrite(c.fd)
+		_ = c.loop.poller.ModReadWrite(c.fd)
 	}
 }
 
