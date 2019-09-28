@@ -26,10 +26,6 @@ func (svr *server) activateMainReactor() {
 		if fd == 0 {
 			return svr.mainLoop.loopNote(note)
 		}
-
-		if svr.ln.pconn != nil {
-			return svr.mainLoop.loopUDPRead(fd)
-		}
 		nfd, sa, err := unix.Accept(fd)
 		if err != nil {
 			if err == unix.EAGAIN {
@@ -70,9 +66,9 @@ func (svr *server) activateSubReactor(loop *loop) {
 			return loop.loopNote(note)
 		}
 		conn := loop.connections[fd]
-		if conn.outBuf.Length() > 0 {
-			return loop.loopWrite(conn)
+		if conn.outBuf.IsEmpty() {
+			return loop.loopRead(conn)
 		}
-		return loop.loopRead(conn)
+		return loop.loopWrite(conn)
 	})
 }

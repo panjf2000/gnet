@@ -96,9 +96,6 @@ func (svr *server) activateReactors(numLoops int) {
 		poller: netpoll.OpenPoller(),
 		svr:    svr,
 	}
-	if svr.ln.pconn != nil && loop.packet == nil {
-		loop.packet = make([]byte, 0xFFFF)
-	}
 	loop.poller.AddRead(svr.ln.fd)
 	svr.mainLoop = loop
 	// Start main reactor...
@@ -106,7 +103,7 @@ func (svr *server) activateReactors(numLoops int) {
 }
 
 func (svr *server) start(numCPU int) {
-	if svr.opts.ReusePort {
+	if svr.opts.ReusePort || svr.ln.pconn != nil {
 		svr.activateLoops(numCPU)
 	} else {
 		svr.activateReactors(numCPU)

@@ -17,7 +17,7 @@ import (
 
 var (
 	// ErrClosing indicates this server is closing.
-	ErrClosing  = errors.New("closing")
+	ErrClosing = errors.New("closing")
 	// ErrReactNil indicates the Event.React() is missing.
 	ErrReactNil = errors.New("must set up Event.React()")
 )
