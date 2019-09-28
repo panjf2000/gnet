@@ -16,7 +16,7 @@
 
 The goal of this project is to create a server framework for Go that performs on par with [Redis](http://redis.io) and [Haproxy](http://www.haproxy.org) for packet handling.
 
-`gnet` sells itself as a high-performance, lightweight, nonblocking network library written in pure Go which works on transport layer with TCP/UDP/Unix-Socket protocols, so it allows developers to implement their own protocols of application layer upon `gnet` for building  diversified network applications, for instance, you get a HTTP Server or Web Framework if you implement HTTP protocol upon `gnet` while you have a Redis Server done with the implementation of Redis protocol upon `gnet` and so on.
+`gnet` sells itself as a high-performance, lightweight, non-blocking network library written in pure Go which works on transport layer with TCP/UDP/Unix-Socket protocols, so it allows developers to implement their own protocols of application layer upon `gnet` for building  diversified network applications, for instance, you get a HTTP Server or Web Framework if you implement HTTP protocol upon `gnet` while you have a Redis Server done with the implementation of Redis protocol upon `gnet` and so on.
 
 **`gnet` derives from project `evio` while having higher performance.**
 
@@ -68,13 +68,13 @@ and it works as the following sequence diagram:
 <img width="916" alt="multi-reactors" src="https://user-images.githubusercontent.com/7496278/64918646-a7839300-d7d3-11e9-804a-d021ddd23ca3.png">
 </p>
 
-Before you can benefit from this new networking model in handling blocking business logic, there is still a way for you to handle your business logic in networking: you can leverage the open-source goroutine-pool to unblock your blocking code, and I now present you [ants](https://github.com/panjf2000/ants): a high-performance goroutine pool in Go that allows you to manage and recycle a massive number of goroutines in your concurrency programs.
+Before you can benefit from this new networking model in handling blocking business logic, there is still a way for you to handle your business logic in networking: you can utilize the open-source goroutine-pool to unblock your blocking code, and I now present you [ants](https://github.com/panjf2000/ants): a high-performance goroutine pool in Go that allows you to manage and recycle a massive number of goroutines in your concurrency programs.
 
-You can import `ants` to your `gnet` server and put your blocking code to the `ants` pool in `Event.React()`, which makes your business code nonblocking.
+You can import `ants` to your `gnet` server and put your blocking code to the `ants` pool in `Event.React()`, which makes your business code non-blocking.
 
 ## Auto-scaling Ring Buffer
 
-`gnet` leverages Ring-Buffer to cache TCP streams and manage memory cache in networking.
+`gnet` utilizes Ring-Buffer to cache TCP streams and manage memory cache in networking.
 
 <p align="center">
 <img src="https://user-images.githubusercontent.com/7496278/64916810-4f8b6300-d7b8-11e9-9459-5517760da738.gif">
@@ -161,7 +161,7 @@ func main() {
 }
 ```
 
-Like I said in the 『Multiple Reactors + Goroutine-Pool Model』section, if your business logic contain blocking code, then you should turn them into unblocking code in any way, for instance you can wrap them into a goroutine, but it will result in a massive amount of goroutines if massive traffic is passing through your server so I would suggest you leverage a goroutine pool like `ants` to manage those goroutines and reduce the cost of system resource.
+Like I said in the 『Multiple Reactors + Goroutine-Pool Model』section, if there are blocking code in your business logic, then you ought to turn them into non-blocking code in any way, for instance you can wrap them into a goroutine, but it will result in a massive amount of goroutines if massive traffic is passing through your server so I would suggest you utilize a goroutine pool like `ants` to manage those goroutines and reduce the cost of system resource.
 
 ### I/O Events
 
