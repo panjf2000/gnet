@@ -59,21 +59,21 @@ func (p *Poller) Trigger(job internal.Job) error {
 
 // Polling ...
 func (p *Poller) Polling(iter func(fd int, job internal.Job) error) error {
-	events := make([]unix.EpollEvent, 1024)
+	es := newEventSlice(initEvents)
 	var note bool
 	for {
-		n, err := unix.EpollWait(p.fd, events, -1)
+		n, err := unix.EpollWait(p.fd, es.events, -1)
 		if err != nil && err != unix.EINTR {
 			return err
 		}
 		for i := 0; i < n; i++ {
-			if fd := int(events[i].Fd); fd != p.wfd {
+			if fd := int(es.events[i].Fd); fd != p.wfd {
 				if err := iter(fd, nil); err != nil {
 					return err
 				}
 			} else {
 				if _, err := unix.Read(p.wfd, p.wfdBuf); err != nil {
-					panic(err)
+					return err
 				}
 				note = true
 			}
@@ -85,6 +85,9 @@ func (p *Poller) Polling(iter func(fd int, job internal.Job) error) error {
 			}); err != nil {
 				return err
 			}
+		}
+		if n == es.size {
+			es.increase()
 		}
 	}
 }
