@@ -27,6 +27,45 @@ type request struct {
 	remoteAddr    string
 }
 
+type httpServer struct {
+	*gnet.EventServer
+	port    int
+	noparse bool
+}
+
+func (hs *httpServer) OnInitComplete(srv gnet.Server) (action gnet.Action) {
+	log.Printf("http server started on port %d (loops: %d)", hs.port, srv.NumLoops)
+	return
+}
+
+func (hs *httpServer) React(c gnet.Conn) (out []byte, action gnet.Action) {
+	top, tail := c.ReadPair()
+	data := append(top, tail...)
+	if hs.noparse && bytes.Contains(data, []byte("\r\n\r\n")) {
+		// for testing minimal single packet request -> response.
+		out = appendresp(nil, "200 OK", "", res)
+		c.ResetBuffer()
+		return
+	}
+	// process the pipeline
+	var req request
+	leftover, err := parsereq(data, &req)
+	if err != nil {
+		// bad thing happened
+		out = appendresp(out, "500 Error", "", err.Error()+"\n")
+		action = gnet.Close
+		return
+	} else if len(leftover) == len(data) {
+		// request not ready, yet
+		return
+	}
+	// handle the request
+	req.remoteAddr = c.RemoteAddr().String()
+	out = appendhandle(out, &req)
+	c.ResetBuffer()
+	return
+}
+
 func main() {
 	var port int
 	var multicore bool
@@ -49,48 +88,11 @@ func main() {
 		res = "Hello World!\r\n"
 	}
 
-	var events gnet.Events
-	events.OnInitComplete = func(srv gnet.Server) (action gnet.Action) {
-		log.Printf("http server started on port %d (loops: %d)", port, srv.NumLoops)
-		return
-	}
-
-	//events.OnClosed = func(c gnet.Conn, err error) (action gnet.Action) {
-	//	log.Printf("closed: %s: %s", c.LocalAddr().String(), c.RemoteAddr().String())
-	//	return
-	//}
-
-	events.React = func(c gnet.Conn) (out []byte, action gnet.Action) {
-		top, tail := c.ReadPair()
-		data := append(top, tail...)
-		if noparse && bytes.Contains(data, []byte("\r\n\r\n")) {
-			// for testing minimal single packet request -> response.
-			out = appendresp(nil, "200 OK", "", res)
-			c.ResetBuffer()
-			return
-		}
-		// process the pipeline
-		var req request
-		leftover, err := parsereq(data, &req)
-		if err != nil {
-			// bad thing happened
-			out = appendresp(out, "500 Error", "", err.Error()+"\n")
-			action = gnet.Close
-			return
-		} else if len(leftover) == len(data) {
-			// request not ready, yet
-			return
-		}
-		// handle the request
-		req.remoteAddr = c.RemoteAddr().String()
-		out = appendhandle(out, &req)
-		c.ResetBuffer()
-		return
-	}
+	http := &httpServer{port: port, noparse: noparse}
 	// We at least want the single http address.
 	addr := fmt.Sprintf("tcp"+"://:%d", port)
 	// Start serving!
-	log.Fatal(gnet.Serve(events, addr, gnet.WithMulticore(multicore)))
+	log.Fatal(gnet.Serve(http, addr, gnet.WithMulticore(multicore)))
 }
 
 // appendhandle handles the incoming request and appends the response to

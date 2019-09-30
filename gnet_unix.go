@@ -20,7 +20,7 @@ import (
 )
 
 type server struct {
-	events         Events // user events
+	eventHandler   EventHandler // user eventHandler
 	mainLoop       *loop
 	eventLoopGroup eventLoopGrouper
 	loopGroupSize  int // number of loops
@@ -181,7 +181,7 @@ func (svr *server) stop() {
 	}
 }
 
-func serve(events Events, listener *listener, options *Options) error {
+func serve(eventHandler EventHandler, listener *listener, options *Options) error {
 	// Figure out the correct number of loops/goroutines to use.
 	var numCPU int
 	if options.Multicore {
@@ -191,24 +191,19 @@ func serve(events Events, listener *listener, options *Options) error {
 	}
 
 	svr := new(server)
-	svr.events = events
+	svr.eventHandler = eventHandler
 	svr.ln = listener
 	svr.eventLoopGroup = new(eventLoopGroup)
 	svr.cond = sync.NewCond(&sync.Mutex{})
 	svr.tch = make(chan time.Duration)
 	svr.opts = options
 
-	if svr.events.OnInitComplete != nil {
-		var server Server
-		server.Multicore = options.Multicore
-		server.NumLoops = numCPU
-		server.Addr = listener.lnaddr
-		action := svr.events.OnInitComplete(server)
-		switch action {
-		case None:
-		case Shutdown:
-			return nil
-		}
+	server := Server{options.Multicore, listener.lnaddr, numCPU}
+	action := svr.eventHandler.OnInitComplete(server)
+	switch action {
+	case None:
+	case Shutdown:
+		return nil
 	}
 
 	if err := svr.start(numCPU); err != nil {

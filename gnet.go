@@ -18,8 +18,6 @@ import (
 var (
 	// ErrClosing indicates this server is closing.
 	ErrClosing = errors.New("closing")
-	// ErrReactNil indicates the Event.React() is missing.
-	ErrReactNil = errors.New("must set up Event.React()")
 )
 
 const connRingBufferSize = 1024
@@ -82,31 +80,74 @@ type eventLoopGrouper interface {
 	len() int
 }
 
-// Events represents the server events for the Serve call.
+// EventHandler represents the server events' callbacks for the Serve call.
 // Each event has an Action return value that is used manage the state
 // of the connection and server.
-type Events struct {
+type EventHandler interface {
 	// OnInitComplete fires when the server can accept connections. The server
 	// parameter has information and various utilities.
-	OnInitComplete func(server Server) (action Action)
+	OnInitComplete(server Server) (action Action)
 	// OnOpened fires when a new connection has opened.
 	// The info parameter has information about the connection such as
 	// it's local and remote address.
 	// Use the out return value to write data to the connection.
 	// The opts return value is used to set connection options.
-	OnOpened func(c Conn) (out []byte, opts Options, action Action)
+	OnOpened(c Conn) (out []byte, action Action)
 	// OnClosed fires when a connection has closed.
 	// The err parameter is the last known connection error.
-	OnClosed func(c Conn, err error) (action Action)
+	OnClosed(c Conn, err error) (action Action)
 	// PreWrite fires just before any data is written to any client socket.
-	PreWrite func()
+	PreWrite()
 	// React fires when a connection sends the server data.
 	// The in parameter is the incoming data.
 	// Use the out return value to write data to the connection.
-	React func(c Conn) (out []byte, action Action)
+	React(c Conn) (out []byte, action Action)
 	// Tick fires immediately after the server starts and will fire again
 	// following the duration specified by the delay return value.
-	Tick func() (delay time.Duration, action Action)
+	Tick() (delay time.Duration, action Action)
+}
+
+// EventServer is a built-in implementation of EventHandler which sets up each method with a default implementation,
+// you can compose it with your own implementation of EventHandler when you don't want to implement all methods in EventHandler.
+type EventServer struct {
+}
+
+// OnInitComplete fires when the server can accept connections. The server
+// parameter has information and various utilities.
+func (es *EventServer) OnInitComplete(svr Server) (action Action) {
+	return
+}
+
+// OnOpened fires when a new connection has opened.
+// The info parameter has information about the connection such as
+// it's local and remote address.
+// Use the out return value to write data to the connection.
+// The opts return value is used to set connection options.
+func (es *EventServer) OnOpened(c Conn) (out []byte, action Action) {
+	return
+}
+
+// OnClosed fires when a connection has closed.
+// The err parameter is the last known connection error.
+func (es *EventServer) OnClosed(c Conn, err error) (action Action) {
+	return
+}
+
+// PreWrite fires just before any data is written to any client socket.
+func (es *EventServer) PreWrite() {
+}
+
+// React fires when a connection sends the server data.
+// The in parameter is the incoming data.
+// Use the out return value to write data to the connection.
+func (es *EventServer) React(c Conn) (out []byte, action Action) {
+	return
+}
+
+// Tick fires immediately after the server starts and will fire again
+// following the duration specified by the delay return value.
+func (es *EventServer) Tick() (delay time.Duration, action Action) {
+	return
 }
 
 // Serve starts handling events for the specified addresses.
@@ -123,11 +164,7 @@ type Events struct {
 //  unix  - Unix Domain Socket
 //
 // The "tcp" network scheme is assumed when one is not specified.
-func Serve(events Events, addr string, opts ...Option) error {
-	if events.React == nil {
-		return ErrReactNil
-	}
-
+func Serve(eventHandler EventHandler, addr string, opts ...Option) error {
 	var ln listener
 	defer ln.close()
 
@@ -162,7 +199,7 @@ func Serve(events Events, addr string, opts ...Option) error {
 	if err := ln.system(); err != nil {
 		return err
 	}
-	return serve(events, &ln, options)
+	return serve(eventHandler, &ln, options)
 }
 
 type listener struct {

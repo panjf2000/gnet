@@ -13,6 +13,24 @@ import (
 	"github.com/panjf2000/gnet"
 )
 
+type echoServer struct {
+	*gnet.EventServer
+}
+
+func (es *echoServer) OnInitComplete(srv gnet.Server) (action gnet.Action) {
+	log.Printf("Server is running under multi-core: %t, loops: %d\n", srv.Multicore, srv.NumLoops)
+	return
+}
+func (es *echoServer) React(c gnet.Conn) (out []byte, action gnet.Action) {
+	top, tail := c.ReadPair()
+	out = top
+	if tail != nil {
+		out = append(top, tail...)
+	}
+	c.ResetBuffer()
+	return
+}
+
 func main() {
 	var port int
 	var multicore bool
@@ -20,21 +38,6 @@ func main() {
 	flag.IntVar(&port, "port", 5000, "server port")
 	flag.BoolVar(&multicore, "multicore", true, "multicore")
 	flag.Parse()
-
-	var events gnet.Events
-	events.OnInitComplete = func(srv gnet.Server) (action gnet.Action) {
-		log.Printf("Server is running under multi-core: %t, loops: %d\n", srv.Multicore, srv.NumLoops)
-		return
-	}
-	events.React = func(c gnet.Conn) (out []byte, action gnet.Action) {
-		top, tail := c.ReadPair()
-		out = top
-		if tail != nil {
-			out = append(top, tail...)
-		}
-		c.ResetBuffer()
-		return
-	}
-	scheme := "tcp"
-	log.Fatal(gnet.Serve(events, fmt.Sprintf("%s://:%d", scheme, port), gnet.WithMulticore(multicore)))
+	echo := new(echoServer)
+	log.Fatal(gnet.Serve(echo, fmt.Sprintf("tcp://:%d", port), gnet.WithMulticore(multicore)))
 }

@@ -28,7 +28,7 @@ type loop struct {
 func (l *loop) loopRun() {
 	defer l.svr.signalShutdown()
 
-	if l.idx == 0 && l.svr.events.Tick != nil {
+	if l.idx == 0 && l.svr.opts.Ticker {
 		go l.loopTicker()
 	}
 
@@ -85,18 +85,16 @@ func (l *loop) loopOpened(conn *conn) error {
 	conn.opened = true
 	conn.localAddr = l.svr.ln.lnaddr
 	conn.remoteAddr = netpoll.SockaddrToTCPOrUnixAddr(conn.sa)
-	if l.svr.events.OnOpened != nil {
-		out, opts, action := l.svr.events.OnOpened(conn)
-		conn.action = action
-		if opts.TCPKeepAlive > 0 {
-			if _, ok := l.svr.ln.ln.(*net.TCPListener); ok {
-				sniffError(netpoll.SetKeepAlive(conn.fd, int(opts.TCPKeepAlive/time.Second)))
-			}
+	out, action := l.svr.eventHandler.OnOpened(conn)
+	conn.action = action
+	if l.svr.opts.TCPKeepAlive > 0 {
+		if _, ok := l.svr.ln.ln.(*net.TCPListener); ok {
+			sniffError(netpoll.SetKeepAlive(conn.fd, int(l.svr.opts.TCPKeepAlive/time.Second)))
 		}
+	}
 
-		if len(out) > 0 {
-			conn.open(out)
-		}
+	if len(out) > 0 {
+		conn.open(out)
 	}
 	if conn.outBuf.Length() != 0 {
 		_ = l.poller.AddWrite(conn.fd)
@@ -113,7 +111,7 @@ func (l *loop) loopRead(conn *conn) error {
 		return l.loopCloseConn(conn, err)
 	}
 	conn.extra = l.packet[:n]
-	out, action := l.svr.events.React(conn)
+	out, action := l.svr.eventHandler.React(conn)
 	conn.action = action
 	if len(out) > 0 {
 		conn.write(out)
@@ -124,9 +122,7 @@ func (l *loop) loopRead(conn *conn) error {
 }
 
 func (l *loop) loopWrite(conn *conn) error {
-	if l.svr.events.PreWrite != nil {
-		l.svr.events.PreWrite()
-	}
+	l.svr.eventHandler.PreWrite()
 
 	top, tail := conn.outBuf.PreReadAll()
 	n, err := unix.Write(conn.fd, top)
@@ -160,18 +156,16 @@ func (l *loop) loopCloseConn(conn *conn, err error) error {
 		_ = unix.Close(conn.fd)
 	}
 
-	if l.svr.events.OnClosed != nil {
-		switch l.svr.events.OnClosed(conn, err) {
-		case None:
-		case Shutdown:
-			return ErrClosing
-		}
+	switch l.svr.eventHandler.OnClosed(conn, err) {
+	case None:
+	case Shutdown:
+		return ErrClosing
 	}
 	return nil
 }
 
 //func (l *loop) loopWake(conn *conn) error {
-//	out, action := l.svr.events.React(conn)
+//	out, action := l.svr.eventHandler.React(conn)
 //	conn.action = action
 //	if len(out) > 0 {
 //		conn.write(out)
@@ -190,7 +184,7 @@ func (l *loop) loopCloseConn(conn *conn, err error) error {
 //	case func() error:
 //		return v()
 //	case time.Duration:
-//		delay, action := l.svr.events.Tick()
+//		delay, action := l.svr.eventHandler.Tick()
 //		switch action {
 //		case None:
 //		case Shutdown:
@@ -212,14 +206,14 @@ func (l *loop) loopCloseConn(conn *conn, err error) error {
 func (l *loop) loopTicker() {
 	for {
 		if err := l.poller.Trigger(func() (err error) {
-			delay, action := l.svr.events.Tick()
+			delay, action := l.svr.eventHandler.Tick()
 			l.svr.tch <- delay
 			switch action {
 			case None:
 			case Shutdown:
 				err = ErrClosing
 			}
-			return err
+			return
 		}); err != nil {
 			break
 		}
@@ -245,39 +239,35 @@ func (l *loop) loopUDPRead(fd int) error {
 	if err != nil || n == 0 {
 		return nil
 	}
-	if l.svr.events.React != nil {
-		var sa6 unix.SockaddrInet6
-		switch sa := sa.(type) {
-		case *unix.SockaddrInet4:
-			sa6.ZoneId = 0
-			sa6.Port = sa.Port
-			for i := 0; i < 12; i++ {
-				sa6.Addr[i] = 0
-			}
-			sa6.Addr[12] = sa.Addr[0]
-			sa6.Addr[13] = sa.Addr[1]
-			sa6.Addr[14] = sa.Addr[2]
-			sa6.Addr[15] = sa.Addr[3]
-		case *unix.SockaddrInet6:
-			sa6 = *sa
+	var sa6 unix.SockaddrInet6
+	switch sa := sa.(type) {
+	case *unix.SockaddrInet4:
+		sa6.ZoneId = 0
+		sa6.Port = sa.Port
+		for i := 0; i < 12; i++ {
+			sa6.Addr[i] = 0
 		}
-		conn := &conn{
-			localAddr:  l.svr.ln.lnaddr,
-			remoteAddr: netpoll.SockaddrToUDPAddr(&sa6),
-			inBuf:      ringbuffer.New(connRingBufferSize),
-		}
-		_, _ = conn.inBuf.Write(l.packet[:n])
-		out, action := l.svr.events.React(conn)
-		if len(out) > 0 {
-			if l.svr.events.PreWrite != nil {
-				l.svr.events.PreWrite()
-			}
-			sniffError(unix.Sendto(fd, out, 0, sa))
-		}
-		switch action {
-		case Shutdown:
-			return ErrClosing
-		}
+		sa6.Addr[12] = sa.Addr[0]
+		sa6.Addr[13] = sa.Addr[1]
+		sa6.Addr[14] = sa.Addr[2]
+		sa6.Addr[15] = sa.Addr[3]
+	case *unix.SockaddrInet6:
+		sa6 = *sa
+	}
+	conn := &conn{
+		localAddr:  l.svr.ln.lnaddr,
+		remoteAddr: netpoll.SockaddrToUDPAddr(&sa6),
+		inBuf:      ringbuffer.New(connRingBufferSize),
+	}
+	_, _ = conn.inBuf.Write(l.packet[:n])
+	out, action := l.svr.eventHandler.React(conn)
+	if len(out) > 0 {
+		l.svr.eventHandler.PreWrite()
+		sniffError(unix.Sendto(fd, out, 0, sa))
+	}
+	switch action {
+	case Shutdown:
+		return ErrClosing
 	}
 	return nil
 }

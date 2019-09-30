@@ -29,7 +29,7 @@ func (ln *listener) system() error {
 	return nil
 }
 
-func serve(events Events, listeners []*listener) error {
+func serve(events EventHandler, listeners []*listener) error {
 	return errors.New("Unsupported platform in gnet")
 }
 

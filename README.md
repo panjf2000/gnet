@@ -30,7 +30,6 @@ The goal of this project is to create a server framework for Go that performs on
 - Supporting multiple protocols: TCP, UDP, and Unix Sockets
 - Supporting two event-notification mechanisms: epoll in Linux and kqueue in FreeBSD
 - Supporting asynchronous write operation
-- Allowing multiple network binding on the same Event-Loop
 - Flexible ticker event
 - SO_REUSEPORT socket option
 
@@ -52,11 +51,11 @@ and it works as the following sequence diagram:
 
 ### Multiple Reactors + Goroutine-Pool Model
 
-You may ask me a question: what if my business logic in `Event.React()`  contains some blocking code which leads to a blocking in event-loop of `gnet`, what is the solution for this kind of situation？
+You may ask me a question: what if my business logic in `EventHandler.React`  contains some blocking code which leads to a blocking in event-loop of `gnet`, what is the solution for this kind of situation？
 
-As you know, there is a most important tenet when writing code under `gnet`: you should never block the event-loop in the `Event.React()`, otherwise it will lead to a low throughput in your `gnet` server, which is also the most important tenet in `netty`. 
+As you know, there is a most important tenet when writing code under `gnet`: you should never block the event-loop in the `EventHandler.React`, otherwise it will lead to a low throughput in your `gnet` server, which is also the most important tenet in `netty`. 
 
-And the solution for that would be found in the subsequent multiple-threads/goroutines model of `gnet`: 『Multiple Reactors with thread/goroutine pool』which pulls you out from the blocking mire, it will construct a worker-pool with fixed capacity and put those blocking jobs in `Event.React()` into the worker-pool to unblock the event-loop goroutines.
+And the solution for that would be found in the subsequent multiple-threads/goroutines model of `gnet`: 『Multiple Reactors with thread/goroutine pool』which pulls you out from the blocking mire, it will construct a worker-pool with fixed capacity and put those blocking jobs in `EventHandler.React` into the worker-pool to unblock the event-loop goroutines.
 
 This new networking model is under development and about to be delivered soon and its architecture diagram of new model is in here:
 
@@ -71,7 +70,7 @@ and it works as the following sequence diagram:
 
 Before you can benefit from this new networking model in handling blocking business logic, there is still a way for you to handle your business logic in networking: you can utilize the open-source goroutine-pool to unblock your blocking code, and I now present you [ants](https://github.com/panjf2000/ants): a high-performance goroutine pool in Go that allows you to manage and recycle a massive number of goroutines in your concurrency programs.
 
-You can import `ants` to your `gnet` server and put your blocking code to the `ants` pool in `Event.React()`, which makes your business code non-blocking.
+You can import `ants` to your `gnet` server and put your blocking code to the `ants` pool in `EventHandler.React`, which makes your business code non-blocking.
 
 ## Auto-scaling Ring Buffer
 
@@ -92,7 +91,7 @@ $ go get -u github.com/panjf2000/gnet
 
 ## Usage
 
-It is easy to create a network server with `gnet`. All you have to do is just register your events to `gnet.Events` and pass it to the `gnet.Serve` function along with the binding address(es). Each connections is represented as an `gnet.Conn` object that is passed to various events to differentiate the clients. At any point you can close a client or shutdown the server by return a `Close` or `Shutdown` action from an event.
+It is easy to create a network server with `gnet`. All you have to do is just make your implementaion of `gnet.EventHandler` interface and register your event-handler functions to it, then pass it to the `gnet.Serve` function along with the binding address(es). Each connection is represented as a `gnet.Conn` interface that is passed to various events to differentiate the clients. At any point you can close a client or shutdown the server by return a `Close` or `Shutdown` action from an event.
 
 The simplest example to get you started playing with `gnet` would be the echo server. So here you are, a simplest echo server upon `gnet` that is listening on port 9000:
 
@@ -103,28 +102,31 @@ package main
 
 import (
 	"log"
-	"strings"
 
 	"github.com/panjf2000/gnet"
 )
 
-func main() {
-	var trace bool
-	var events gnet.Events
-	events.React = func(c gnet.Conn) (out []byte, action gnet.Action) {
-		top, tail := c.ReadPair()
+type echoServer struct {
+	*gnet.EventServer
+}
+
+func (es *echoServer) React(c gnet.Conn) (out []byte, action gnet.Action) {
+	top, tail := c.ReadPair()
+	out = top
+	if tail != nil {
 		out = append(top, tail...)
-		c.ResetBuffer()
-		if trace {
-			log.Printf("%s", strings.TrimSpace(string(top)+string(tail)))
-		}
-		return
 	}
-	log.Fatal(gnet.Serve(events, "tcp://:9000", gnet.WithMulticore(true)))
+	c.ResetBuffer()
+	return
+}
+
+func main() {
+	echo := new(echoServer)
+	log.Fatal(gnet.Serve(echo, "tcp://:9000", gnet.WithMulticore(true)))
 }
 ```
 
-As you can see, this example of echo server only sets up the `React` function where you commonly write your main business code and it will be invoked once the server receives input data from a client. The output data will be then sent back to that client by assigning the `out` variable and return it after your business code finish processing data(in this case, it just echo the data back).
+As you can see, this example of echo server only sets up the `EventHandler.React` function where you commonly write your main business code and it will be invoked once the server receives input data from a client. The output data will be then sent back to that client by assigning the `out` variable and return it after your business code finish processing data(in this case, it just echo the data back).
 
 ### Echo server with blocking logic
 
@@ -139,26 +141,32 @@ import (
 	"github.com/panjf2000/gnet"
 )
 
-func main() {
-	var events gnet.Events
+type echoServer struct {
+	*gnet.EventServer
+	pool *ants.Pool
+}
 
+func (es *echoServer) React(c gnet.Conn) (out []byte, action gnet.Action) {
+	data := c.ReadBytes()
+	c.ResetBuffer()
+
+	// Use ants pool to unblock the event-loop.
+	_ = es.pool.Submit(func() {
+		time.Sleep(1 * time.Second)
+		c.AsyncWrite(data)
+	})
+
+	action = gnet.DataRead
+	return
+}
+
+func main() {
 	// Create a goroutine pool.
-	poolSize := 256 * 1024
+	poolSize := 64 * 1024
 	pool, _ := ants.NewPool(poolSize, ants.WithNonblocking(true))
 	defer pool.Release()
-
-	events.React = func(c gnet.Conn) (out []byte, action gnet.Action) {
-		data := c.ReadBytes()
-		c.ResetBuffer()
-		action = DataRead
-		// Use ants pool to unblock the event-loop.
-		_ = pool.Submit(func() {
-			time.Sleep(1 * time.Second)
-			c.AsyncWrite(data)
-		})
-		return
-	}
-	log.Fatal(gnet.Serve(events, "tcp://:9000", gnet.WithMulticore(true)))
+	echo := &echoServer{pool: pool}
+	log.Fatal(gnet.Serve(echo, "tcp://:9000", gnet.WithMulticore(true)))
 }
 ```
 
@@ -168,18 +176,18 @@ Like I said in the 『Multiple Reactors + Goroutine-Pool Model』section, if the
 
 Current supported I/O events in `gnet`:
 
-- `OnInitComplete` is activated when the server is ready to accept new connections.
-- `OnOpened` is activated when a connection has opened.
-- `OnClosed` is activated when a connection has closed.
-- `React` is activated when the server receives new data from a connection.
-- `Tick` is activated immediately after the server starts and will fire again after a specified interval.
-- `PreWrite` is activated just before any data is written to any client socket.
+- `EventHandler.OnInitComplete` is activated when the server is ready to accept new connections.
+- `EventHandler.OnOpened` is activated when a connection has opened.
+- `EventHandler.OnClosed` is activated when a connection has closed.
+- `EventHandler.React` is activated when the server receives new data from a connection.
+- `EventHandler.Tick` is activated immediately after the server starts and will fire again after a specified interval.
+- `EventHandler.PreWrite` is activated just before any data is written to any client socket.
 
 
 ### Ticker
 
-The `Tick` event fires ticks at a specified interval. 
-The first tick fires immediately after the `Serving` events.
+The `EventHandler.Tick` event fires ticks at a specified interval. 
+The first tick fires immediately after the `Serving` events and if you intend to set up a ticker event, remember to pass a option: `gnet.WithTicker(true)` to `gnet.Serve`.
 
 ```go
 events.Tick = func() (delay time.Duration, action Action){
@@ -191,10 +199,10 @@ events.Tick = func() (delay time.Duration, action Action){
 
 ## UDP
 
-The `Serve` function can bind to UDP addresses. 
+The `gnet.Serve` function can bind to UDP addresses. 
 
 - All incoming and outgoing packets will not be buffered but sent individually.
-- The `OnOpened` and `OnClosed` events are not available for UDP sockets, only the `React` event.
+- The `EventHandler.OnOpened` and `EventHandler.OnClosed` events are not available for UDP sockets, only the `React` event.
 
 ## Multi-threads
 

@@ -24,8 +24,10 @@ type Options struct {
 	// it will run the server with single thread. The number of threads in the server will be automatically
 	// assigned to the value of runtime.NumCPU().
 	Multicore bool
-	//ReusePort
+	//ReusePort ..
 	ReusePort bool
+	// Ticker ...
+	Ticker bool
 	// TCPKeepAlive (SO_KEEPALIVE) socket option.
 	TCPKeepAlive time.Duration
 }
@@ -55,5 +57,12 @@ func WithReusePort(reusePort bool) Option {
 func WithTCPKeepAlive(tcpKeepAlive time.Duration) Option {
 	return func(opts *Options) {
 		opts.TCPKeepAlive = tcpKeepAlive
+	}
+}
+
+// WithTicker ...
+func WithTicker(ticker bool) Option {
+	return func(opts *Options) {
+		opts.Ticker = ticker
 	}
 }

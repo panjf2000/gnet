@@ -89,96 +89,96 @@ func TestServe(t *testing.T) {
 	})
 }
 
-func testServe(network, addr string, reuseport, multicore, async bool, nclients int) {
-	//var once sync.Once
-	var started int32
-	var connected int32
-	var clientActive int32
-	var disconnected int32
+type testServer struct {
+	*EventServer
+	network      string
+	addr         string
+	multicore    bool
+	async        bool
+	nclients     int
+	started      int32
+	connected    int32
+	clientActive int32
+	disconnected int32
+}
 
-	var events Events
-	//events.OnInitComplete = func(srv Server) (action Action) {
-	//	return
-	//}
-	events.OnOpened = func(c Conn) (out []byte, opts Options, action Action) {
-		c.SetContext(c)
-		atomic.AddInt32(&connected, 1)
-		out = []byte("sweetness\r\n")
-		opts.TCPKeepAlive = time.Minute * 5
-		if c.LocalAddr() == nil {
-			panic("nil local addr")
-		}
-		if c.RemoteAddr() == nil {
-			panic("nil local addr")
-		}
-		//once.Do(func() {
-		//	if !reuseport {
-		//		c.Wake()
-		//	}
-		//})
-		return
+func (s *testServer) OnOpened(c Conn) (out []byte, action Action) {
+	c.SetContext(c)
+	atomic.AddInt32(&s.connected, 1)
+	out = []byte("sweetness\r\n")
+	if c.LocalAddr() == nil {
+		panic("nil local addr")
 	}
-	events.OnClosed = func(c Conn, err error) (action Action) {
-		if c.Context() != c {
-			panic("invalid context")
-		}
+	if c.RemoteAddr() == nil {
+		panic("nil local addr")
+	}
+	return
+}
+func (s *testServer) OnClosed(c Conn, err error) (action Action) {
+	if c.Context() != c {
+		panic("invalid context")
+	}
 
-		atomic.AddInt32(&disconnected, 1)
-		if atomic.LoadInt32(&connected) == atomic.LoadInt32(&disconnected) &&
-			atomic.LoadInt32(&disconnected) == int32(nclients) {
-			action = Shutdown
-		}
-		return
+	atomic.AddInt32(&s.disconnected, 1)
+	if atomic.LoadInt32(&s.connected) == atomic.LoadInt32(&s.disconnected) &&
+		atomic.LoadInt32(&s.disconnected) == int32(s.nclients) {
+		action = Shutdown
 	}
-	events.React = func(c Conn) (out []byte, action Action) {
-		if async {
-			data := c.ReadBytes()
-			c.ResetBuffer()
-			action = DataRead
-			go func() {
-				c.AsyncWrite(data)
-			}()
-			return
-		}
-		top, tail := c.ReadPair()
-		out = top
-		if tail != nil {
-			fmt.Println("appending tail buffer...")
-			out = append(top, tail...)
-		}
+
+	return
+}
+func (s *testServer) React(c Conn) (out []byte, action Action) {
+	if s.async {
+		data := c.ReadBytes()
 		c.ResetBuffer()
+		action = DataRead
+		go func() {
+			c.AsyncWrite(data)
+		}()
 		return
+	}
+	top, tail := c.ReadPair()
+	out = top
+	if tail != nil {
+		fmt.Println("appending tail buffer...")
+		out = append(top, tail...)
+	}
+	c.ResetBuffer()
+	return
 
+}
+func (s *testServer) Tick() (delay time.Duration, action Action) {
+	if atomic.LoadInt32(&s.started) == 0 {
+		for i := 0; i < s.nclients; i++ {
+			atomic.AddInt32(&s.clientActive, 1)
+			go func() {
+				startClient(s.network, s.addr, s.multicore, s.async)
+				atomic.AddInt32(&s.clientActive, -1)
+			}()
+		}
+		atomic.StoreInt32(&s.started, 1)
 	}
-	events.Tick = func() (delay time.Duration, action Action) {
-		if atomic.LoadInt32(&started) == 0 {
-			for i := 0; i < nclients; i++ {
-				atomic.AddInt32(&clientActive, 1)
-				go func() {
-					startClient(network, addr, multicore, async)
-					atomic.AddInt32(&clientActive, -1)
-				}()
-			}
-			atomic.StoreInt32(&started, 1)
-		}
-		if network == "udp" && atomic.LoadInt32(&clientActive) == 0 {
-			action = Shutdown
-			return
-		}
-		delay = time.Second / 5
+	if s.network == "udp" && atomic.LoadInt32(&s.clientActive) == 0 {
+		action = Shutdown
 		return
 	}
+	delay = time.Second / 5
+	return
+}
+
+func testServe(network, addr string, reuseport, multicore, async bool, nclients int) {
 	var err error
+	ts := &testServer{network: network, addr: addr, multicore: multicore, async: async, nclients: nclients}
 	if network == "unix" {
 		socket := strings.Replace(addr, ":", "socket", 1)
 		_ = os.RemoveAll(socket)
 		defer os.RemoveAll(socket)
-		err = Serve(events, network+"://"+socket, WithMulticore(multicore))
+		err = Serve(ts, network+"://"+socket, WithMulticore(multicore), WithTicker(true), WithTCPKeepAlive(time.Minute*5))
 	} else {
 		if reuseport {
-			err = Serve(events, network+"://"+addr, WithMulticore(multicore), WithReusePort(true))
+			err = Serve(ts, network+"://"+addr, WithMulticore(multicore), WithReusePort(true), WithTicker(true), WithTCPKeepAlive(time.Minute*5))
 		} else {
-			err = Serve(events, network+"://"+addr, WithMulticore(multicore))
+			err = Serve(ts, network+"://"+addr, WithMulticore(multicore), WithTicker(true), WithTCPKeepAlive(time.Minute*5))
 		}
 	}
 	if err != nil {
@@ -250,23 +250,25 @@ func TestTick(t *testing.T) {
 	}()
 	wg.Wait()
 }
+
+type testTickServer struct {
+	*EventServer
+	count int
+}
+
+func (t *testTickServer) Tick() (delay time.Duration, action Action) {
+	if t.count == 25 {
+		action = Shutdown
+		return
+	}
+	t.count++
+	delay = time.Millisecond * 10
+	return
+}
 func testTick(network, addr string) {
-	var events Events
-	var count int
+	events := &testTickServer{}
 	start := time.Now()
-	events.Tick = func() (delay time.Duration, action Action) {
-		if count == 25 {
-			action = Shutdown
-			return
-		}
-		count++
-		delay = time.Millisecond * 10
-		return
-	}
-	events.React = func(c Conn) (out []byte, action Action) {
-		return
-	}
-	must(Serve(events, network+"://"+addr))
+	must(Serve(events, network+"://"+addr, WithTicker(true)))
 	dur := time.Since(start)
 	if dur < 250&time.Millisecond || dur > time.Second {
 		panic("bad ticker timing")
@@ -287,61 +289,65 @@ func TestShutdown(t *testing.T) {
 	}()
 	wg.Wait()
 }
-func testShutdown(network, addr string) {
-	var events Events
-	var count int
-	var clients int64
-	var N = 10
-	events.OnOpened = func(c Conn) (out []byte, opts Options, action Action) {
-		atomic.AddInt64(&clients, 1)
-		return
-	}
-	events.React = func(c Conn) (out []byte, action Action) {
-		return
-	}
-	events.OnClosed = func(c Conn, err error) (action Action) {
-		atomic.AddInt64(&clients, -1)
-		return
-	}
-	events.Tick = func() (delay time.Duration, action Action) {
-		if count == 0 {
-			// start clients
-			for i := 0; i < N; i++ {
-				go func() {
-					conn, err := net.Dial(network, addr)
-					must(err)
-					defer conn.Close()
-					_, err = conn.Read([]byte{0})
-					if err == nil {
-						panic("expected error")
-					}
-				}()
-			}
-		} else {
-			fmt.Printf("ticker clients: %d\n", atomic.LoadInt64(&clients))
-			if int(atomic.LoadInt64(&clients)) == N {
-				fmt.Printf("ticker shutdown...\n")
-				action = Shutdown
-			}
+
+type testShutdownServer struct {
+	*EventServer
+	network string
+	addr    string
+	count   int
+	clients int64
+	N       int
+}
+
+func (t *testShutdownServer) OnOpened(c Conn) (out []byte, action Action) {
+	atomic.AddInt64(&t.clients, 1)
+	return
+}
+func (t *testShutdownServer) OnClosed(c Conn, err error) (action Action) {
+	atomic.AddInt64(&t.clients, -1)
+	return
+}
+func (t *testShutdownServer) Tick() (delay time.Duration, action Action) {
+	if t.count == 0 {
+		// start clients
+		for i := 0; i < t.N; i++ {
+			go func() {
+				conn, err := net.Dial(t.network, t.addr)
+				must(err)
+				defer conn.Close()
+				_, err = conn.Read([]byte{0})
+				if err == nil {
+					panic("expected error")
+				}
+			}()
 		}
-		count++
-		delay = time.Second / 20
-		return
+	} else {
+		if int(atomic.LoadInt64(&t.clients)) == t.N {
+			action = Shutdown
+		}
 	}
-	must(Serve(events, network+"://"+addr))
-	if clients != 0 {
+	t.count++
+	delay = time.Second / 20
+	return
+}
+func testShutdown(network, addr string) {
+	events := &testShutdownServer{network: network, addr: addr, N: 10}
+	must(Serve(events, network+"://"+addr, WithTicker(true)))
+	if events.clients != 0 {
 		panic("did not call close on all clients")
 	}
 }
 
+type testBadAddrServer struct {
+	*EventServer
+}
+
+func (t *testBadAddrServer) OnInitComplete(srv Server) (action Action) {
+	return Shutdown
+}
+
 func TestBadAddresses(t *testing.T) {
-	var events Events
-	events.OnInitComplete = func(srv Server) (action Action) {
-		return Shutdown
-	}
-	events.React = func(c Conn) (out []byte, action Action) {
-		return
-	}
+	events := new(testBadAddrServer)
 	if err := Serve(events, "tulip://howdy"); err == nil {
 		t.Fatalf("expected error")
 	}
@@ -352,39 +358,3 @@ func TestBadAddresses(t *testing.T) {
 		t.Fatalf("expected nil, got '%v'", err)
 	}
 }
-
-func TestWithoutReact(t *testing.T) {
-	var events Events
-	events.OnInitComplete = func(s Server) (action Action) {
-		return Shutdown
-	}
-	//events.React = func(c Conn) (out []byte, action Action) {
-	//	return
-	//}
-	if err := Serve(events, "tcp://:9991?"); err != ErrReactNil {
-		panic(err)
-	}
-}
-
-//func TestReuseport(t *testing.T) {
-//	var events Events
-//	events.OnInitComplete = func(s Server) (action Action) {
-//		return Shutdown
-//	}
-//	events.React = func(c Conn) (out []byte, action Action) {
-//		return
-//	}
-//	var wg sync.WaitGroup
-//	wg.Add(5)
-//	for i := 0; i < 5; i++ {
-//		var t = "1"
-//		if i%2 == 0 {
-//			t = "true"
-//		}
-//		go func(t string) {
-//			defer wg.Done()
-//			must(Serve(events, "tcp://:9991?reuseport="+t))
-//		}(t)
-//	}
-//	wg.Wait()
-//}

@@ -52,7 +52,7 @@ func (svr *server) activateMainReactor() {
 func (svr *server) activateSubReactor(loop *loop) {
 	defer svr.signalShutdown()
 
-	if loop.idx == 0 && svr.events.Tick != nil {
+	if loop.idx == 0 && svr.opts.Ticker {
 		go loop.loopTicker()
 	}
 
