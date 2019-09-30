@@ -8,6 +8,7 @@
 <a title="" target="_blank" href="https://golangci.com/r/github.com/panjf2000/gnet"><img src="https://golangci.com/badges/github.com/panjf2000/gnet.svg"></a>
 <a title="Doc for gnet" target="_blank" href="https://gowalker.org/github.com/panjf2000/gnet?lang=zh-CN"><img src="https://img.shields.io/badge/api-reference-blue.svg?style=flat-square"></a>
 <a title="Release" target="_blank" href="https://github.com/panjf2000/gnet/releases"><img src="https://img.shields.io/github/release/panjf2000/gnet.svg?style=flat-square"></a>
+<a title="Awesome" target="_blank" href="https://github.com/avelino/awesome-go"><img src="https://awesome.re/badge-flat2.svg"></a>
 </p>
 
 # [[英文](README.md)]
@@ -210,6 +211,8 @@ gnet.Serve(events, "tcp://:9000", gnet.WithMulticore(true)))
 
 # 性能测试
 
+## 同类型的网络库性能对比
+
 ## Linux (epoll)
 
 ### 系统参数
@@ -224,8 +227,6 @@ gnet.Serve(events, "tcp://:9000", gnet.WithMulticore(true)))
 Go Version : go1.12.9 linux/amd64
 GOMAXPROCS=8
 ```
-
-### 同类型的网络库性能对比：
 
 #### Echo Server
 

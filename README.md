@@ -8,6 +8,7 @@
 <a title="" target="_blank" href="https://golangci.com/r/github.com/panjf2000/gnet"><img src="https://golangci.com/badges/github.com/panjf2000/gnet.svg"></a>
 <a title="Doc for gnet" target="_blank" href="https://gowalker.org/github.com/panjf2000/gnet?lang=en-US"><img src="https://img.shields.io/badge/api-reference-blue.svg?style=flat-square"></a>
 <a title="Release" target="_blank" href="https://github.com/panjf2000/gnet/releases"><img src="https://img.shields.io/github/release/panjf2000/gnet.svg?style=flat-square"></a>
+<a title="Awesome" target="_blank" href="https://github.com/avelino/awesome-go"><img src="https://awesome.re/badge-flat2.svg"></a>
 </p>
 
 # [[中文](README_ZH.md)]
@@ -215,6 +216,8 @@ gnet.Serve(events, "tcp://:9000", gnet.WithMulticore(true)))
 
 # Performance
 
+## Contrasts to the similar networking libraries
+
 ## On Linux (epoll)
 
 ### Test Environment
@@ -230,7 +233,7 @@ Go Version : go1.12.9 linux/amd64
 GOMAXPROCS=8
 ```
 
-### Contrast to the similar networking libraries:
+### 
 
 #### Echo Server
 
