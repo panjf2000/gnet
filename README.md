@@ -137,7 +137,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/panjf2000/ants"
+	"github.com/panjf2000/ants/v2"
 	"github.com/panjf2000/gnet"
 )
 
