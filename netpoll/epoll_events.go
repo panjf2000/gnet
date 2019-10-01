@@ -8,16 +8,16 @@ package netpoll
 
 import "golang.org/x/sys/unix"
 
-type eventSlice struct {
+type eventList struct {
 	size   int
 	events []unix.EpollEvent
 }
 
-func newEventSlice(size int) *eventSlice {
-	return &eventSlice{size, make([]unix.EpollEvent, size)}
+func newEventList(size int) *eventList {
+	return &eventList{size, make([]unix.EpollEvent, size)}
 }
 
-func (es *eventSlice) increase() {
-	es.size <<= 1
-	es.events = make([]unix.EpollEvent, es.size)
+func (el *eventList) increase() {
+	el.size <<= 1
+	el.events = make([]unix.EpollEvent, el.size)
 }

@@ -29,18 +29,18 @@ func (svr *server) activateMainReactor() {
 		if err := unix.SetNonblock(nfd, true); err != nil {
 			return err
 		}
-		lp := svr.eventLoopGroup.next()
-		conn := &conn{
+		lp := svr.loopGroup.next()
+		c := &conn{
 			fd:     nfd,
 			sa:     sa,
 			loop:   lp,
 			inBuf:  ringbuffer.New(connRingBufferSize),
 			outBuf: ringbuffer.New(connRingBufferSize),
 		}
-		_ = lp.loopOpened(conn)
+		_ = lp.loopOpened(c)
 		_ = lp.poller.Trigger(func() (err error) {
 			if err = lp.poller.AddRead(nfd); err == nil {
-				lp.connections[nfd] = conn
+				lp.connections[nfd] = c
 				return
 			}
 			return
@@ -49,21 +49,21 @@ func (svr *server) activateMainReactor() {
 	})
 }
 
-func (svr *server) activateSubReactor(loop *loop) {
+func (svr *server) activateSubReactor(lp *loop) {
 	defer svr.signalShutdown()
 
-	if loop.idx == 0 && svr.opts.Ticker {
-		go loop.loopTicker()
+	if lp.idx == 0 && svr.opts.Ticker {
+		go lp.loopTicker()
 	}
 
-	_ = loop.poller.Polling(func(fd int, job internal.Job) error {
+	_ = lp.poller.Polling(func(fd int, job internal.Job) error {
 		if fd == 0 {
 			return job()
 		}
-		conn := loop.connections[fd]
-		if conn.outBuf.IsEmpty() {
-			return loop.loopRead(conn)
+		c := lp.connections[fd]
+		if c.outBuf.IsEmpty() {
+			return lp.loopRead(c)
 		}
-		return loop.loopWrite(conn)
+		return lp.loopWrite(c)
 	})
 }

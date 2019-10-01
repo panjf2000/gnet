@@ -18,6 +18,14 @@ package gnet
 //	LeastConnections
 //)
 
+// IEventLoopGroup ...
+type IEventLoopGroup interface {
+	register(*loop)
+	next() *loop
+	iterate(func(int, *loop) bool)
+	len() int
+}
+
 type eventLoopGroup struct {
 	//loadBalance   LoadBalance
 	nextLoopIndex int
@@ -51,9 +59,9 @@ func (g *eventLoopGroup) next() (lp *loop) {
 //	return
 //}
 
-func (g *eventLoopGroup) iterate(f func(idx int, lp *loop) bool) {
-	for i, l := range g.eventLoops {
-		if !f(i, l) {
+func (g *eventLoopGroup) iterate(f func(int, *loop) bool) {
+	for i, lp := range g.eventLoops {
+		if !f(i, lp) {
 			break
 		}
 	}

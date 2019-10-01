@@ -73,13 +73,6 @@ type Conn interface {
 	AsyncWrite(buf []byte)
 }
 
-type eventLoopGrouper interface {
-	register(*loop)
-	next() *loop
-	iterate(func(int, *loop) bool)
-	len() int
-}
-
 // EventHandler represents the server events' callbacks for the Serve call.
 // Each event has an Action return value that is used manage the state
 // of the connection and server.
@@ -202,16 +195,6 @@ func Serve(eventHandler EventHandler, addr string, opts ...Option) error {
 	return serve(eventHandler, &ln, options)
 }
 
-type listener struct {
-	ln      net.Listener
-	lnaddr  net.Addr
-	pconn   net.PacketConn
-	f       *os.File
-	fd      int
-	network string
-	addr    string
-}
-
 func parseAddr(addr string) (network, address string) {
 	network = "tcp"
 	address = addr
@@ -220,4 +203,14 @@ func parseAddr(addr string) (network, address string) {
 		address = strings.Split(address, "://")[1]
 	}
 	return
+}
+
+type listener struct {
+	ln      net.Listener
+	lnaddr  net.Addr
+	pconn   net.PacketConn
+	f       *os.File
+	fd      int
+	network string
+	addr    string
 }

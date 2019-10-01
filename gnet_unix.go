@@ -20,16 +20,16 @@ import (
 )
 
 type server struct {
-	eventHandler   EventHandler // user eventHandler
-	mainLoop       *loop
-	eventLoopGroup eventLoopGrouper
-	loopGroupSize  int // number of loops
-	opts           *Options
-	ln             *listener          // all the listeners
-	wg             sync.WaitGroup     // loop close waitgroup
-	cond           *sync.Cond         // shutdown signaler
-	tch            chan time.Duration // ticker channel
-	once           sync.Once          // make sure only signalShutdown once
+	eventHandler  EventHandler // user eventHandler
+	mainLoop      *loop
+	loopGroup     IEventLoopGroup
+	loopGroupSize int // number of loops
+	opts          *Options
+	ln            *listener          // all the listeners
+	wg            sync.WaitGroup     // loop close waitgroup
+	cond          *sync.Cond         // shutdown signaler
+	tch           chan time.Duration // ticker channel
+	once          sync.Once          // make sure only signalShutdown once
 }
 
 // waitForShutdown waits for a signal to shutdown
@@ -49,10 +49,10 @@ func (svr *server) signalShutdown() {
 }
 
 func (svr *server) startLoops() {
-	svr.eventLoopGroup.iterate(func(i int, l *loop) bool {
+	svr.loopGroup.iterate(func(i int, lp *loop) bool {
 		svr.wg.Add(1)
 		go func() {
-			l.loopRun()
+			lp.loopRun()
 			svr.wg.Done()
 		}()
 		return true
@@ -60,17 +60,17 @@ func (svr *server) startLoops() {
 }
 
 func (svr *server) closeLoops() {
-	svr.eventLoopGroup.iterate(func(i int, l *loop) bool {
-		_ = l.poller.Close()
+	svr.loopGroup.iterate(func(i int, lp *loop) bool {
+		_ = lp.poller.Close()
 		return true
 	})
 }
 
 func (svr *server) startReactors() {
-	svr.eventLoopGroup.iterate(func(i int, l *loop) bool {
+	svr.loopGroup.iterate(func(i int, lp *loop) bool {
 		svr.wg.Add(1)
 		go func() {
-			svr.activateSubReactor(l)
+			svr.activateSubReactor(lp)
 			svr.wg.Done()
 		}()
 		return true
@@ -81,20 +81,20 @@ func (svr *server) activateLoops(numLoops int) error {
 	// Create loops locally and bind the listeners.
 	for i := 0; i < numLoops; i++ {
 		if p, err := netpoll.OpenPoller(); err == nil {
-			loop := &loop{
+			lp := &loop{
 				idx:         i,
 				poller:      p,
 				packet:      make([]byte, 0xFFFF),
 				connections: make(map[int]*conn),
 				svr:         svr,
 			}
-			_ = loop.poller.AddRead(svr.ln.fd)
-			svr.eventLoopGroup.register(loop)
+			_ = lp.poller.AddRead(svr.ln.fd)
+			svr.loopGroup.register(lp)
 		} else {
 			return err
 		}
 	}
-	svr.loopGroupSize = svr.eventLoopGroup.len()
+	svr.loopGroupSize = svr.loopGroup.len()
 	// Start loops in background
 	svr.startLoops()
 	return nil
@@ -103,30 +103,30 @@ func (svr *server) activateLoops(numLoops int) error {
 func (svr *server) activateReactors(numLoops int) error {
 	for i := 0; i < numLoops; i++ {
 		if p, err := netpoll.OpenPoller(); err == nil {
-			loop := &loop{
+			lp := &loop{
 				idx:         i,
 				poller:      p,
 				packet:      make([]byte, 0xFFFF),
 				connections: make(map[int]*conn),
 				svr:         svr,
 			}
-			svr.eventLoopGroup.register(loop)
+			svr.loopGroup.register(lp)
 		} else {
 			return err
 		}
 	}
-	svr.loopGroupSize = svr.eventLoopGroup.len()
+	svr.loopGroupSize = svr.loopGroup.len()
 	// Start sub reactors...
 	svr.startReactors()
 
 	if p, err := netpoll.OpenPoller(); err == nil {
-		loop := &loop{
+		lp := &loop{
 			idx:    -1,
 			poller: p,
 			svr:    svr,
 		}
-		_ = loop.poller.AddRead(svr.ln.fd)
-		svr.mainLoop = loop
+		_ = lp.poller.AddRead(svr.ln.fd)
+		svr.mainLoop = lp
 		// Start main reactor...
 		svr.wg.Add(1)
 		go func() {
@@ -151,8 +151,8 @@ func (svr *server) stop() {
 	svr.waitForShutdown()
 
 	// Notify all loops to close by closing all listeners
-	svr.eventLoopGroup.iterate(func(i int, l *loop) bool {
-		sniffError(l.poller.Trigger(func() error {
+	svr.loopGroup.iterate(func(i int, lp *loop) bool {
+		sniffError(lp.poller.Trigger(func() error {
 			return ErrClosing
 		}))
 		return true
@@ -168,9 +168,9 @@ func (svr *server) stop() {
 	svr.wg.Wait()
 
 	// Close loops and all outstanding connections
-	svr.eventLoopGroup.iterate(func(i int, l *loop) bool {
-		for _, c := range l.connections {
-			sniffError(l.loopCloseConn(c, nil))
+	svr.loopGroup.iterate(func(i int, lp *loop) bool {
+		for _, c := range lp.connections {
+			sniffError(lp.loopCloseConn(c, nil))
 		}
 		return true
 	})
@@ -193,7 +193,7 @@ func serve(eventHandler EventHandler, listener *listener, options *Options) erro
 	svr := new(server)
 	svr.eventHandler = eventHandler
 	svr.ln = listener
-	svr.eventLoopGroup = new(eventLoopGroup)
+	svr.loopGroup = new(eventLoopGroup)
 	svr.cond = sync.NewCond(&sync.Mutex{})
 	svr.tch = make(chan time.Duration)
 	svr.opts = options

@@ -56,15 +56,15 @@ func (p *Poller) Trigger(job internal.Job) error {
 
 // Polling ...
 func (p *Poller) Polling(iter func(fd int, job internal.Job) error) error {
-	es := newEventSlice(initEvents)
+	el := newEventList(initEvents)
 	var note bool
 	for {
-		n, err := unix.Kevent(p.fd, nil, es.events, nil)
+		n, err := unix.Kevent(p.fd, nil, el.events, nil)
 		if err != nil && err != unix.EINTR {
 			return err
 		}
 		for i := 0; i < n; i++ {
-			if fd := int(es.events[i].Ident); fd != 0 {
+			if fd := int(el.events[i].Ident); fd != 0 {
 				if err := iter(fd, nil); err != nil {
 					return err
 				}
@@ -80,8 +80,8 @@ func (p *Poller) Polling(iter func(fd int, job internal.Job) error) error {
 				return err
 			}
 		}
-		if n == es.size {
-			es.increase()
+		if n == el.size {
+			el.increase()
 		}
 	}
 }

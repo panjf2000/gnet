@@ -29,14 +29,14 @@ func (ln *listener) system() error {
 	return nil
 }
 
-func serve(events EventHandler, listeners []*listener) error {
+func serve(eventHandler EventHandler, listeners []*listener) error {
 	return errors.New("Unsupported platform in gnet")
 }
 
-func reuseportListenPacket(proto, addr string) (l net.PacketConn, err error) {
+func ReusePortListenPacket(proto, addr string) (net.PacketConn, error) {
 	return nil, errors.New("reuseport is not available")
 }
 
-func reuseportListen(proto, addr string) (l net.Listener, err error) {
+func ReusePortListen(proto, addr string) (net.Listener, error) {
 	return nil, errors.New("reuseport is not available")
 }

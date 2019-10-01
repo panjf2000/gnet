@@ -25,36 +25,36 @@ type loop struct {
 	svr         *server
 }
 
-func (l *loop) loopRun() {
-	defer l.svr.signalShutdown()
+func (lp *loop) loopRun() {
+	defer lp.svr.signalShutdown()
 
-	if l.idx == 0 && l.svr.opts.Ticker {
-		go l.loopTicker()
+	if lp.idx == 0 && lp.svr.opts.Ticker {
+		go lp.loopTicker()
 	}
 
-	_ = l.poller.Polling(func(fd int, job internal.Job) error {
+	_ = lp.poller.Polling(func(fd int, job internal.Job) error {
 		if fd == 0 {
 			return job()
 		}
-		if c, ok := l.connections[fd]; ok {
+		if c, ok := lp.connections[fd]; ok {
 			switch {
 			case !c.opened:
-				return l.loopOpened(c)
+				return lp.loopOpened(c)
 			case c.outBuf.Length() > 0:
-				return l.loopWrite(c)
+				return lp.loopWrite(c)
 			default:
-				return l.loopRead(c)
+				return lp.loopRead(c)
 			}
 		} else {
-			return l.loopAccept(fd)
+			return lp.loopAccept(fd)
 		}
 	})
 }
 
-func (l *loop) loopAccept(fd int) error {
-	if fd == l.svr.ln.fd {
-		if l.svr.ln.pconn != nil {
-			return l.loopUDPRead(fd)
+func (lp *loop) loopAccept(fd int) error {
+	if fd == lp.svr.ln.fd {
+		if lp.svr.ln.pconn != nil {
+			return lp.loopUDPRead(fd)
 		}
 		nfd, sa, err := unix.Accept(fd)
 		if err != nil {
@@ -66,14 +66,14 @@ func (l *loop) loopAccept(fd int) error {
 		if err := unix.SetNonblock(nfd, true); err != nil {
 			return err
 		}
-		conn := &conn{fd: nfd,
+		c := &conn{fd: nfd,
 			sa:     sa,
 			inBuf:  ringbuffer.New(connRingBufferSize),
 			outBuf: ringbuffer.New(connRingBufferSize),
-			loop:   l,
+			loop:   lp,
 		}
-		if err = l.poller.AddReadWrite(conn.fd); err == nil {
-			l.connections[conn.fd] = conn
+		if err = lp.poller.AddReadWrite(c.fd); err == nil {
+			lp.connections[c.fd] = c
 		} else {
 			return err
 		}
@@ -81,82 +81,82 @@ func (l *loop) loopAccept(fd int) error {
 	return nil
 }
 
-func (l *loop) loopOpened(conn *conn) error {
-	conn.opened = true
-	conn.localAddr = l.svr.ln.lnaddr
-	conn.remoteAddr = netpoll.SockaddrToTCPOrUnixAddr(conn.sa)
-	out, action := l.svr.eventHandler.OnOpened(conn)
-	conn.action = action
-	if l.svr.opts.TCPKeepAlive > 0 {
-		if _, ok := l.svr.ln.ln.(*net.TCPListener); ok {
-			sniffError(netpoll.SetKeepAlive(conn.fd, int(l.svr.opts.TCPKeepAlive/time.Second)))
+func (lp *loop) loopOpened(c *conn) error {
+	c.opened = true
+	c.localAddr = lp.svr.ln.lnaddr
+	c.remoteAddr = netpoll.SockaddrToTCPOrUnixAddr(c.sa)
+	out, action := lp.svr.eventHandler.OnOpened(c)
+	c.action = action
+	if lp.svr.opts.TCPKeepAlive > 0 {
+		if _, ok := lp.svr.ln.ln.(*net.TCPListener); ok {
+			sniffError(netpoll.SetKeepAlive(c.fd, int(lp.svr.opts.TCPKeepAlive/time.Second)))
 		}
 	}
 
 	if len(out) > 0 {
-		conn.open(out)
+		c.open(out)
 	}
-	if conn.outBuf.Length() != 0 {
-		_ = l.poller.AddWrite(conn.fd)
+	if c.outBuf.Length() != 0 {
+		_ = lp.poller.AddWrite(c.fd)
 	}
-	return l.handleAction(conn)
+	return lp.handleAction(c)
 }
 
-func (l *loop) loopRead(conn *conn) error {
-	n, err := unix.Read(conn.fd, l.packet)
+func (lp *loop) loopRead(c *conn) error {
+	n, err := unix.Read(c.fd, lp.packet)
 	if n == 0 || err != nil {
 		if err == unix.EAGAIN {
 			return nil
 		}
-		return l.loopCloseConn(conn, err)
+		return lp.loopCloseConn(c, err)
 	}
-	conn.extra = l.packet[:n]
-	out, action := l.svr.eventHandler.React(conn)
-	conn.action = action
+	c.extra = lp.packet[:n]
+	out, action := lp.svr.eventHandler.React(c)
+	c.action = action
 	if len(out) > 0 {
-		conn.write(out)
+		c.write(out)
 	} else if action != DataRead {
-		_, _ = conn.inBuf.Write(conn.extra)
+		_, _ = c.inBuf.Write(c.extra)
 	}
-	return l.handleAction(conn)
+	return lp.handleAction(c)
 }
 
-func (l *loop) loopWrite(conn *conn) error {
-	l.svr.eventHandler.PreWrite()
+func (lp *loop) loopWrite(c *conn) error {
+	lp.svr.eventHandler.PreWrite()
 
-	top, tail := conn.outBuf.PreReadAll()
-	n, err := unix.Write(conn.fd, top)
+	top, tail := c.outBuf.PreReadAll()
+	n, err := unix.Write(c.fd, top)
 	if err != nil {
 		if err == unix.EAGAIN {
 			return nil
 		}
-		return l.loopCloseConn(conn, err)
+		return lp.loopCloseConn(c, err)
 	}
-	conn.outBuf.Advance(n)
+	c.outBuf.Advance(n)
 	if len(top) == n && tail != nil {
-		n, err = unix.Write(conn.fd, tail)
+		n, err = unix.Write(c.fd, tail)
 		if err != nil {
 			if err == unix.EAGAIN {
 				return nil
 			}
-			return l.loopCloseConn(conn, err)
+			return lp.loopCloseConn(c, err)
 		}
-		conn.outBuf.Advance(n)
+		c.outBuf.Advance(n)
 	}
 
-	if conn.outBuf.Length() == 0 {
-		_ = l.poller.ModRead(conn.fd)
+	if c.outBuf.Length() == 0 {
+		_ = lp.poller.ModRead(c.fd)
 	}
 	return nil
 }
 
-func (l *loop) loopCloseConn(conn *conn, err error) error {
-	if err := l.poller.Delete(conn.fd); err == nil {
-		delete(l.connections, conn.fd)
-		_ = unix.Close(conn.fd)
+func (lp *loop) loopCloseConn(c *conn, err error) error {
+	if err := lp.poller.Delete(c.fd); err == nil {
+		delete(lp.connections, c.fd)
+		_ = unix.Close(c.fd)
 	}
 
-	switch l.svr.eventHandler.OnClosed(conn, err) {
+	switch lp.svr.eventHandler.OnClosed(c, err) {
 	case None:
 	case Shutdown:
 		return ErrClosing
@@ -203,11 +203,11 @@ func (l *loop) loopCloseConn(conn *conn, err error) error {
 //	return err
 //}
 
-func (l *loop) loopTicker() {
+func (lp *loop) loopTicker() {
 	for {
-		if err := l.poller.Trigger(func() (err error) {
-			delay, action := l.svr.eventHandler.Tick()
-			l.svr.tch <- delay
+		if err := lp.poller.Trigger(func() (err error) {
+			delay, action := lp.svr.eventHandler.Tick()
+			lp.svr.tch <- delay
 			switch action {
 			case None:
 			case Shutdown:
@@ -217,16 +217,16 @@ func (l *loop) loopTicker() {
 		}); err != nil {
 			break
 		}
-		time.Sleep(<-l.svr.tch)
+		time.Sleep(<-lp.svr.tch)
 	}
 }
 
-func (l *loop) handleAction(conn *conn) error {
-	switch conn.action {
+func (lp *loop) handleAction(c *conn) error {
+	switch c.action {
 	case None:
 		return nil
 	case Close:
-		return l.loopCloseConn(conn, nil)
+		return lp.loopCloseConn(c, nil)
 	case Shutdown:
 		return ErrClosing
 	default:
@@ -234,8 +234,8 @@ func (l *loop) handleAction(conn *conn) error {
 	}
 }
 
-func (l *loop) loopUDPRead(fd int) error {
-	n, sa, err := unix.Recvfrom(fd, l.packet, 0)
+func (lp *loop) loopUDPRead(fd int) error {
+	n, sa, err := unix.Recvfrom(fd, lp.packet, 0)
 	if err != nil || n == 0 {
 		return nil
 	}
@@ -254,15 +254,15 @@ func (l *loop) loopUDPRead(fd int) error {
 	case *unix.SockaddrInet6:
 		sa6 = *sa
 	}
-	conn := &conn{
-		localAddr:  l.svr.ln.lnaddr,
+	c := &conn{
+		localAddr:  lp.svr.ln.lnaddr,
 		remoteAddr: netpoll.SockaddrToUDPAddr(&sa6),
 		inBuf:      ringbuffer.New(connRingBufferSize),
 	}
-	_, _ = conn.inBuf.Write(l.packet[:n])
-	out, action := l.svr.eventHandler.React(conn)
+	_, _ = c.inBuf.Write(lp.packet[:n])
+	out, action := lp.svr.eventHandler.React(c)
 	if len(out) > 0 {
-		l.svr.eventHandler.PreWrite()
+		lp.svr.eventHandler.PreWrite()
 		sniffError(unix.Sendto(fd, out, 0, sa))
 	}
 	switch action {
