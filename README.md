@@ -17,7 +17,7 @@
 
 The goal of this project is to create a server framework for Go that performs on par with [Redis](http://redis.io) and [Haproxy](http://www.haproxy.org) for packet handling.
 
-`gnet` sells itself as a high-performance, lightweight, non-blocking network library written in pure Go which works on transport layer with TCP/UDP/Unix-Socket protocols, so it allows developers to implement their own protocols of application layer upon `gnet` for building  diversified network applications, for instance, you get a HTTP Server or Web Framework if you implement HTTP protocol upon `gnet` while you have a Redis Server done with the implementation of Redis protocol upon `gnet` and so on.
+`gnet` sells itself as a high-performance, lightweight, non-blocking network library written in pure Go which works on transport layer with TCP/UDP/Unix-Socket protocols, so it allows developers to implement their own protocols of application layer upon `gnet` for building  diversified network applications, for instance, you get an HTTP Server or Web Framework if you implement HTTP protocol upon `gnet` while you have a Redis Server done with the implementation of Redis protocol upon `gnet` and so on.
 
 **`gnet` derives from project `evio` while having higher performance.**
 
@@ -28,7 +28,7 @@ The goal of this project is to create a server framework for Go that performs on
 - Concise APIs
 - Efficient memory usage: Ring-Buffer
 - Supporting multiple protocols: TCP, UDP, and Unix Sockets
-- Supporting two event-notification mechanisms: epoll in Linux and kqueue in FreeBSD
+- Supporting two event-notification mechanisms: epoll on Linux and kqueue on FreeBSD
 - Supporting asynchronous write operation
 - Flexible ticker event
 - SO_REUSEPORT socket option
@@ -51,13 +51,13 @@ and it works as the following sequence diagram:
 
 ### Multiple Reactors + Goroutine-Pool Model
 
-You may ask me a question: what if my business logic in `EventHandler.React`  contains some blocking code which leads to a blocking in event-loop of `gnet`, what is the solution for this kind of situation？
+You may ask me a question: what if my business logic in `EventHandler.React`  contains some blocking code which leads to blocking in event-loop of `gnet`, what is the solution for this kind of situation？
 
-As you know, there is a most important tenet when writing code under `gnet`: you should never block the event-loop in the `EventHandler.React`, otherwise it will lead to a low throughput in your `gnet` server, which is also the most important tenet in `netty`. 
+As you know, there is a most important tenet when writing code under `gnet`: you should never block the event-loop in the `EventHandler.React`, otherwise, it will lead to a low throughput in your `gnet` server, which is also the most important tenet in `netty`. 
 
 And the solution for that would be found in the subsequent multiple-threads/goroutines model of `gnet`: 『Multiple Reactors with thread/goroutine pool』which pulls you out from the blocking mire, it will construct a worker-pool with fixed capacity and put those blocking jobs in `EventHandler.React` into the worker-pool to unblock the event-loop goroutines.
 
-This new networking model is under development and about to be delivered soon and its architecture diagram of new model is in here:
+This new networking model is under development and about to be delivered soon and its architecture diagram of the new model is in here:
 
 <p align="center">
 <img width="854" alt="multi_reactor_thread_pool" src="https://user-images.githubusercontent.com/7496278/64918783-90de3b80-d7d5-11e9-9190-ff8277c95db1.png">
@@ -68,7 +68,7 @@ and it works as the following sequence diagram:
 <img width="916" alt="multi-reactors" src="https://user-images.githubusercontent.com/7496278/64918646-a7839300-d7d3-11e9-804a-d021ddd23ca3.png">
 </p>
 
-Before you can benefit from this new networking model in handling blocking business logic, there is still a way for you to handle your business logic in networking: you can utilize the open-source goroutine-pool to unblock your blocking code, and I now present you [ants](https://github.com/panjf2000/ants): a high-performance goroutine pool in Go that allows you to manage and recycle a massive number of goroutines in your concurrency programs.
+Before you can benefit from this new networking model in handling blocking business logic, there is still a way for you to handle your business logic in networking: you can utilize the open-source goroutine-pool to unblock your blocking code, and I now present you [ants](https://github.com/panjf2000/ants): a high-performance goroutine pool in Go that allows you to manage and recycle a massive number of goroutines in your concurrent programs.
 
 You can import `ants` to your `gnet` server and put your blocking code to the `ants` pool in `EventHandler.React`, which makes your business code non-blocking.
 
@@ -91,7 +91,7 @@ $ go get -u github.com/panjf2000/gnet
 
 ## Usage
 
-It is easy to create a network server with `gnet`. All you have to do is just make your implementaion of `gnet.EventHandler` interface and register your event-handler functions to it, then pass it to the `gnet.Serve` function along with the binding address(es). Each connection is represented as a `gnet.Conn` interface that is passed to various events to differentiate the clients. At any point you can close a client or shutdown the server by return a `Close` or `Shutdown` action from an event.
+It is easy to create a network server with `gnet`. All you have to do is just make your implementation of `gnet.EventHandler` interface and register your event-handler functions to it, then pass it to the `gnet.Serve` function along with the binding address(es). Each connection is represented as a `gnet.Conn` interface that is passed to various events to differentiate the clients. At any point you can close a client or shutdown the server by return a `Close` or `Shutdown` action from an event.
 
 The simplest example to get you started playing with `gnet` would be the echo server. So here you are, a simplest echo server upon `gnet` that is listening on port 9000:
 
@@ -170,7 +170,7 @@ func main() {
 }
 ```
 
-Like I said in the 『Multiple Reactors + Goroutine-Pool Model』section, if there are blocking code in your business logic, then you ought to turn them into non-blocking code in any way, for instance you can wrap them into a goroutine, but it will result in a massive amount of goroutines if massive traffic is passing through your server so I would suggest you utilize a goroutine pool like `ants` to manage those goroutines and reduce the cost of system resource.
+Like I said in the 『Multiple Reactors + Goroutine-Pool Model』section, if there are blocking code in your business logic, then you ought to turn them into non-blocking code in any way, for instance you can wrap them into a goroutine, but it will result in a massive amount of goroutines if massive traffic is passing through your server so I would suggest you utilize a goroutine pool like `ants` to manage those goroutines and reduce the cost of system resources.
 
 ### I/O Events
 
@@ -187,7 +187,7 @@ Current supported I/O events in `gnet`:
 ### Ticker
 
 The `EventHandler.Tick` event fires ticks at a specified interval. 
-The first tick fires immediately after the `Serving` events and if you intend to set up a ticker event, remember to pass a option: `gnet.WithTicker(true)` to `gnet.Serve`.
+The first tick fires immediately after the `Serving` events and if you intend to set up a ticker event, remember to pass an option: `gnet.WithTicker(true)` to `gnet.Serve`.
 
 ```go
 events.Tick = func() (delay time.Duration, action Action){
@@ -206,7 +206,7 @@ The `gnet.Serve` function can bind to UDP addresses.
 
 ## Multi-threads
 
-The `gnet.WithMulticore(true)` indicates whether the server will be effectively created with multi-cores, if so, then you must take care with synchronizing memory between all event callbacks, otherwise, it will run the server with single thread. The number of threads in the server will be automatically assigned to the value of `runtime.NumCPU()`.
+The `gnet.WithMulticore(true)` indicates whether the server will be effectively created with multi-cores, if so, then you must take care of synchronizing memory between all event callbacks, otherwise, it will run the server with a single thread. The number of threads in the server will be automatically assigned to the value of `runtime.NumCPU()`.
 
 ## Load balancing
 

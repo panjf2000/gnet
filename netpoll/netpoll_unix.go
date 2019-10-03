@@ -7,9 +7,8 @@
 
 package netpoll
 
-import (
-	"golang.org/x/sys/unix"
-)
+import "golang.org/x/sys/unix"
+
 
 // SetKeepAlive ...
 func SetKeepAlive(fd, secs int) error {
