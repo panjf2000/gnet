@@ -27,7 +27,6 @@ type IEventLoopGroup interface {
 }
 
 type eventLoopGroup struct {
-	//loadBalance   LoadBalance
 	nextLoopIndex int
 	eventLoops    []*loop
 	size          int
@@ -41,7 +40,6 @@ func (g *eventLoopGroup) register(lp *loop) {
 // Built-in load-balance algorithm is Round-Robin.
 // TODO: support more load-balance algorithms.
 func (g *eventLoopGroup) next() (lp *loop) {
-	//return g.nextByRoundRobin()
 	lp = g.eventLoops[g.nextLoopIndex]
 	g.nextLoopIndex++
 	if g.nextLoopIndex >= g.size {
@@ -49,15 +47,6 @@ func (g *eventLoopGroup) next() (lp *loop) {
 	}
 	return
 }
-
-//func (g *eventLoopGroup) nextByRoundRobin() (lp *loop) {
-//	lp = g.eventLoops[g.nextLoopIndex]
-//	g.nextLoopIndex++
-//	if g.nextLoopIndex >= g.size {
-//		g.nextLoopIndex = 0
-//	}
-//	return
-//}
 
 func (g *eventLoopGroup) iterate(f func(int, *loop) bool) {
 	for i, lp := range g.eventLoops {

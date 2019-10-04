@@ -8,6 +8,15 @@ package netpoll
 
 import "golang.org/x/sys/unix"
 
+const (
+	// ErrEvents ...
+	ErrEvents = unix.EPOLLERR | unix.EPOLLHUP
+	// OutEvents ...
+	OutEvents = unix.EPOLLOUT
+	// InEvents ...
+	InEvents = ErrEvents | unix.EPOLLRDHUP | unix.EPOLLIN
+)
+
 type eventList struct {
 	size   int
 	events []unix.EpollEvent

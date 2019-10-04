@@ -8,6 +8,8 @@
 package netpoll
 
 import (
+	"log"
+
 	"github.com/panjf2000/gnet/internal"
 	"golang.org/x/sys/unix"
 )
@@ -58,30 +60,32 @@ func (p *Poller) Trigger(job internal.Job) error {
 }
 
 // Polling ...
-func (p *Poller) Polling(iter func(fd int, job internal.Job) error) error {
+func (p *Poller) Polling(callback func(fd int, ev uint32, job internal.Job) error) error {
 	el := newEventList(initEvents)
-	var note bool
+	var wakenUp bool
 	for {
 		n, err := unix.EpollWait(p.fd, el.events, -1)
 		if err != nil && err != unix.EINTR {
-			return err
+			log.Println(err)
+			continue
 		}
 		for i := 0; i < n; i++ {
 			if fd := int(el.events[i].Fd); fd != p.wfd {
-				if err := iter(fd, nil); err != nil {
+				if err := callback(fd, el.events[i].Events, nil); err != nil {
 					return err
 				}
 			} else {
+				wakenUp = true
 				if _, err := unix.Read(p.wfd, p.wfdBuf); err != nil {
-					return err
+					log.Println(err)
+					continue
 				}
-				note = true
 			}
 		}
-		if note {
-			note = false
+		if wakenUp {
+			wakenUp = false
 			if err := p.asyncJobQueue.ForEach(func(job internal.Job) error {
-				return iter(0, job)
+				return callback(0, 0, job)
 			}); err != nil {
 				return err
 			}

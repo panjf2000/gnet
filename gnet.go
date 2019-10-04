@@ -7,6 +7,7 @@ package gnet
 
 import (
 	"errors"
+	"log"
 	"net"
 	"os"
 	"strings"
@@ -20,7 +21,7 @@ var (
 	ErrClosing = errors.New("closing")
 )
 
-const connRingBufferSize = 1024
+const socketRingBufferSize = 1024
 
 // Action is an action that occurs after the completion of an event.
 type Action int
@@ -28,10 +29,13 @@ type Action int
 const (
 	// None indicates that no action should occur following an event.
 	None Action = iota
+
 	// DataRead indicates data in buffer has been read.
 	DataRead
+
 	// Close closes the connection.
 	Close
+
 	// Shutdown shutdowns the server.
 	Shutdown
 )
@@ -44,9 +48,11 @@ type Server struct {
 	// it will run the server with single thread. The number of threads in the server will be automatically
 	// assigned to the value of runtime.NumCPU().
 	Multicore bool
+
 	// The addrs parameter is an array of listening addresses that align
 	// with the addr strings passed to the Serve function.
 	Addr net.Addr
+
 	// NumLoops is the number of loops that the server is using.
 	NumLoops int
 }
@@ -55,20 +61,28 @@ type Server struct {
 type Conn interface {
 	// Context returns a user-defined context.
 	Context() interface{}
+
 	// SetContext sets a user-defined context.
 	SetContext(interface{})
+
 	// LocalAddr is the connection's local socket address.
 	LocalAddr() net.Addr
+
 	// RemoteAddr is the connection's remote peer address.
 	RemoteAddr() net.Addr
+
 	// Wake triggers a React event for this connection.
 	//Wake()
+
 	// ReadPair reads all data from ring buffer.
 	ReadPair() ([]byte, []byte)
+
 	// ReadBytes reads all data and return a new slice.
 	ReadBytes() []byte
+
 	// ResetBuffer resets the ring buffer.
 	ResetBuffer()
+
 	// AyncWrite writes data asynchronously.
 	AsyncWrite(buf []byte)
 }
@@ -80,21 +94,26 @@ type EventHandler interface {
 	// OnInitComplete fires when the server can accept connections. The server
 	// parameter has information and various utilities.
 	OnInitComplete(server Server) (action Action)
+
 	// OnOpened fires when a new connection has opened.
 	// The info parameter has information about the connection such as
 	// it's local and remote address.
 	// Use the out return value to write data to the connection.
 	// The opts return value is used to set connection options.
 	OnOpened(c Conn) (out []byte, action Action)
+
 	// OnClosed fires when a connection has closed.
 	// The err parameter is the last known connection error.
 	OnClosed(c Conn, err error) (action Action)
+
 	// PreWrite fires just before any data is written to any client socket.
 	PreWrite()
+
 	// React fires when a connection sends the server data.
 	// The in parameter is the incoming data.
 	// Use the out return value to write data to the connection.
 	React(c Conn) (out []byte, action Action)
+
 	// Tick fires immediately after the server starts and will fire again
 	// following the duration specified by the delay return value.
 	Tick() (delay time.Duration, action Action)
@@ -213,4 +232,10 @@ type listener struct {
 	fd      int
 	network string
 	addr    string
+}
+
+func sniffError(err error) {
+	if err != nil {
+		log.Println(err)
+	}
 }

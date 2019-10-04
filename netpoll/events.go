@@ -1,3 +1,3 @@
 package netpoll
 
-const initEvents = 512
+const initEvents = 1024

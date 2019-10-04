@@ -9,27 +9,24 @@ package gnet
 
 import (
 	"log"
-	"net"
-	"os"
 	"runtime"
 	"sync"
 	"time"
 
 	"github.com/panjf2000/gnet/netpoll"
-	"golang.org/x/sys/unix"
 )
 
 type server struct {
-	eventHandler  EventHandler // user eventHandler
-	mainLoop      *loop
-	loopGroup     IEventLoopGroup
-	loopGroupSize int // number of loops
-	opts          *Options
-	ln            *listener          // all the listeners
-	wg            sync.WaitGroup     // loop close waitgroup
-	cond          *sync.Cond         // shutdown signaler
-	tch           chan time.Duration // ticker channel
-	once          sync.Once          // make sure only signalShutdown once
+	ln               *listener          // all the listeners
+	wg               sync.WaitGroup     // loop close waitgroup
+	tch              chan time.Duration // ticker channel
+	opts             *Options           // options with server
+	once             sync.Once          // make sure only signalShutdown once
+	cond             *sync.Cond         // shutdown signaler
+	mainLoop         *loop              // main loop for accepting connections
+	eventHandler     EventHandler       // user eventHandler
+	subLoopGroup     IEventLoopGroup    // loops for handling events
+	subLoopGroupSize int                // number of loops
 }
 
 // waitForShutdown waits for a signal to shutdown
@@ -49,7 +46,7 @@ func (svr *server) signalShutdown() {
 }
 
 func (svr *server) startLoops() {
-	svr.loopGroup.iterate(func(i int, lp *loop) bool {
+	svr.subLoopGroup.iterate(func(i int, lp *loop) bool {
 		svr.wg.Add(1)
 		go func() {
 			lp.loopRun()
@@ -60,14 +57,14 @@ func (svr *server) startLoops() {
 }
 
 func (svr *server) closeLoops() {
-	svr.loopGroup.iterate(func(i int, lp *loop) bool {
+	svr.subLoopGroup.iterate(func(i int, lp *loop) bool {
 		_ = lp.poller.Close()
 		return true
 	})
 }
 
 func (svr *server) startReactors() {
-	svr.loopGroup.iterate(func(i int, lp *loop) bool {
+	svr.subLoopGroup.iterate(func(i int, lp *loop) bool {
 		svr.wg.Add(1)
 		go func() {
 			svr.activateSubReactor(lp)
@@ -89,12 +86,12 @@ func (svr *server) activateLoops(numLoops int) error {
 				svr:         svr,
 			}
 			_ = lp.poller.AddRead(svr.ln.fd)
-			svr.loopGroup.register(lp)
+			svr.subLoopGroup.register(lp)
 		} else {
 			return err
 		}
 	}
-	svr.loopGroupSize = svr.loopGroup.len()
+	svr.subLoopGroupSize = svr.subLoopGroup.len()
 	// Start loops in background
 	svr.startLoops()
 	return nil
@@ -110,12 +107,12 @@ func (svr *server) activateReactors(numLoops int) error {
 				connections: make(map[int]*conn),
 				svr:         svr,
 			}
-			svr.loopGroup.register(lp)
+			svr.subLoopGroup.register(lp)
 		} else {
 			return err
 		}
 	}
-	svr.loopGroupSize = svr.loopGroup.len()
+	svr.subLoopGroupSize = svr.subLoopGroup.len()
 	// Start sub reactors...
 	svr.startReactors()
 
@@ -151,7 +148,7 @@ func (svr *server) stop() {
 	svr.waitForShutdown()
 
 	// Notify all loops to close by closing all listeners
-	svr.loopGroup.iterate(func(i int, lp *loop) bool {
+	svr.subLoopGroup.iterate(func(i int, lp *loop) bool {
 		sniffError(lp.poller.Trigger(func() error {
 			return ErrClosing
 		}))
@@ -168,7 +165,7 @@ func (svr *server) stop() {
 	svr.wg.Wait()
 
 	// Close loops and all outstanding connections
-	svr.loopGroup.iterate(func(i int, lp *loop) bool {
+	svr.subLoopGroup.iterate(func(i int, lp *loop) bool {
 		for _, c := range lp.connections {
 			sniffError(lp.loopCloseConn(c, nil))
 		}
@@ -193,7 +190,7 @@ func serve(eventHandler EventHandler, listener *listener, options *Options) erro
 	svr := new(server)
 	svr.eventHandler = eventHandler
 	svr.ln = listener
-	svr.loopGroup = new(eventLoopGroup)
+	svr.subLoopGroup = new(eventLoopGroup)
 	svr.cond = sync.NewCond(&sync.Mutex{})
 	svr.tch = make(chan time.Duration)
 	svr.opts = options
@@ -214,48 +211,4 @@ func serve(eventHandler EventHandler, listener *listener, options *Options) erro
 	defer svr.stop()
 
 	return nil
-}
-
-func (ln *listener) close() {
-	if ln.f != nil {
-		sniffError(ln.f.Close())
-	}
-	if ln.ln != nil {
-		sniffError(ln.ln.Close())
-	}
-	if ln.pconn != nil {
-		sniffError(ln.pconn.Close())
-	}
-	if ln.network == "unix" {
-		sniffError(os.RemoveAll(ln.addr))
-	}
-}
-
-// system takes the net listener and detaches it from it's parent
-// event loop, grabs the file descriptor, and makes it non-blocking.
-func (ln *listener) system() error {
-	var err error
-	switch netln := ln.ln.(type) {
-	case nil:
-		switch pconn := ln.pconn.(type) {
-		case *net.UDPConn:
-			ln.f, err = pconn.File()
-		}
-	case *net.TCPListener:
-		ln.f, err = netln.File()
-	case *net.UnixListener:
-		ln.f, err = netln.File()
-	}
-	if err != nil {
-		ln.close()
-		return err
-	}
-	ln.fd = int(ln.f.Fd())
-	return unix.SetNonblock(ln.fd, true)
-}
-
-func sniffError(err error) {
-	if err != nil {
-		log.Println(err)
-	}
 }

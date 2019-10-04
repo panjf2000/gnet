@@ -11,7 +11,6 @@ import (
 	"net"
 	"time"
 
-	"github.com/panjf2000/gnet/internal"
 	"github.com/panjf2000/gnet/netpoll"
 	"github.com/panjf2000/gnet/ringbuffer"
 	"golang.org/x/sys/unix"
@@ -19,10 +18,10 @@ import (
 
 type loop struct {
 	idx         int             // loop index in the server loops list
-	poller      *netpoll.Poller // epoll or kqueue
+	svr         *server         // server in loop
 	packet      []byte          // read packet buffer
+	poller      *netpoll.Poller // epoll or kqueue
 	connections map[int]*conn   // loop connections fd -> conn
-	svr         *server
 }
 
 func (lp *loop) loopRun() {
@@ -32,29 +31,13 @@ func (lp *loop) loopRun() {
 		go lp.loopTicker()
 	}
 
-	_ = lp.poller.Polling(func(fd int, job internal.Job) error {
-		if fd == 0 {
-			return job()
-		}
-		if c, ok := lp.connections[fd]; ok {
-			switch {
-			case !c.opened:
-				return lp.loopOpened(c)
-			case c.outBuf.Length() > 0:
-				return lp.loopWrite(c)
-			default:
-				return lp.loopRead(c)
-			}
-		} else {
-			return lp.loopAccept(fd)
-		}
-	})
+	_ = lp.poller.Polling(lp.handleEvent)
 }
 
 func (lp *loop) loopAccept(fd int) error {
 	if fd == lp.svr.ln.fd {
 		if lp.svr.ln.pconn != nil {
-			return lp.loopUDPRead(fd)
+			return lp.loopUDPIn(fd)
 		}
 		nfd, sa, err := unix.Accept(fd)
 		if err != nil {
@@ -67,10 +50,10 @@ func (lp *loop) loopAccept(fd int) error {
 			return err
 		}
 		c := &conn{fd: nfd,
-			sa:     sa,
-			inBuf:  ringbuffer.New(connRingBufferSize),
-			outBuf: ringbuffer.New(connRingBufferSize),
-			loop:   lp,
+			sa:             sa,
+			inboundBuffer:  ringbuffer.New(socketRingBufferSize),
+			outboundBuffer: ringbuffer.New(socketRingBufferSize),
+			loop:           lp,
 		}
 		if err = lp.poller.AddReadWrite(c.fd); err == nil {
 			lp.connections[c.fd] = c
@@ -81,7 +64,7 @@ func (lp *loop) loopAccept(fd int) error {
 	return nil
 }
 
-func (lp *loop) loopOpened(c *conn) error {
+func (lp *loop) loopOpen(c *conn) error {
 	c.opened = true
 	c.localAddr = lp.svr.ln.lnaddr
 	c.remoteAddr = netpoll.SockaddrToTCPOrUnixAddr(c.sa)
@@ -96,13 +79,13 @@ func (lp *loop) loopOpened(c *conn) error {
 	if len(out) > 0 {
 		c.open(out)
 	}
-	if c.outBuf.Length() != 0 {
+	if !c.outboundBuffer.IsEmpty() {
 		_ = lp.poller.AddWrite(c.fd)
 	}
 	return lp.handleAction(c)
 }
 
-func (lp *loop) loopRead(c *conn) error {
+func (lp *loop) loopIn(c *conn) error {
 	n, err := unix.Read(c.fd, lp.packet)
 	if n == 0 || err != nil {
 		if err == unix.EAGAIN {
@@ -116,15 +99,15 @@ func (lp *loop) loopRead(c *conn) error {
 	if len(out) > 0 {
 		c.write(out)
 	} else if action != DataRead {
-		_, _ = c.inBuf.Write(c.extra)
+		_, _ = c.inboundBuffer.Write(c.extra)
 	}
 	return lp.handleAction(c)
 }
 
-func (lp *loop) loopWrite(c *conn) error {
+func (lp *loop) loopOut(c *conn) error {
 	lp.svr.eventHandler.PreWrite()
 
-	top, tail := c.outBuf.PreReadAll()
+	top, tail := c.outboundBuffer.PreReadAll()
 	n, err := unix.Write(c.fd, top)
 	if err != nil {
 		if err == unix.EAGAIN {
@@ -132,7 +115,7 @@ func (lp *loop) loopWrite(c *conn) error {
 		}
 		return lp.loopCloseConn(c, err)
 	}
-	c.outBuf.Advance(n)
+	c.outboundBuffer.Advance(n)
 	if len(top) == n && tail != nil {
 		n, err = unix.Write(c.fd, tail)
 		if err != nil {
@@ -141,10 +124,10 @@ func (lp *loop) loopWrite(c *conn) error {
 			}
 			return lp.loopCloseConn(c, err)
 		}
-		c.outBuf.Advance(n)
+		c.outboundBuffer.Advance(n)
 	}
 
-	if c.outBuf.Length() == 0 {
+	if c.outboundBuffer.IsEmpty() {
 		_ = lp.poller.ModRead(c.fd)
 	}
 	return nil
@@ -234,7 +217,7 @@ func (lp *loop) handleAction(c *conn) error {
 	}
 }
 
-func (lp *loop) loopUDPRead(fd int) error {
+func (lp *loop) loopUDPIn(fd int) error {
 	n, sa, err := unix.Recvfrom(fd, lp.packet, 0)
 	if err != nil || n == 0 {
 		return nil
@@ -255,15 +238,16 @@ func (lp *loop) loopUDPRead(fd int) error {
 		sa6 = *sa
 	}
 	c := &conn{
-		localAddr:  lp.svr.ln.lnaddr,
-		remoteAddr: netpoll.SockaddrToUDPAddr(&sa6),
-		inBuf:      ringbuffer.New(connRingBufferSize),
+		fd:            fd,
+		localAddr:     lp.svr.ln.lnaddr,
+		remoteAddr:    netpoll.SockaddrToUDPAddr(&sa6),
+		inboundBuffer: ringbuffer.New(socketRingBufferSize),
 	}
-	_, _ = c.inBuf.Write(lp.packet[:n])
+	_, _ = c.inboundBuffer.Write(lp.packet[:n])
 	out, action := lp.svr.eventHandler.React(c)
 	if len(out) > 0 {
 		lp.svr.eventHandler.PreWrite()
-		sniffError(unix.Sendto(fd, out, 0, sa))
+		c.SendTo(out, sa)
 	}
 	switch action {
 	case Shutdown:

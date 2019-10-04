@@ -12,7 +12,6 @@ import (
 	"math/rand"
 	"net"
 	"os"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -53,10 +52,10 @@ func TestServe(t *testing.T) {
 		})
 		//t.Run("unix", func(t *testing.T) {
 		//	t.Run("1-loop", func(t *testing.T) {
-		//		testServe("unix", ":9991", false, false, false, 10)
+		//		testServe("unix", "socket9991", false, false, false, 10)
 		//	})
 		//	t.Run("N-loop", func(t *testing.T) {
-		//		testServe("unix", ":9992", false, true, false, 10)
+		//		testServe("unix", "socket9992", false, true, false, 10)
 		//	})
 		//})
 	})
@@ -80,10 +79,10 @@ func TestServe(t *testing.T) {
 		})
 		//t.Run("unix", func(t *testing.T) {
 		//	t.Run("1-loop", func(t *testing.T) {
-		//		testServe("unix", ":9991", true, false, false, 10)
+		//		testServe("unix", "socket9991", true, false, false, 10)
 		//	})
 		//	t.Run("N-loop", func(t *testing.T) {
-		//		testServe("unix", ":9992", true, true, false, 10)
+		//		testServe("unix", "socket9992", true, true, false, 10)
 		//	})
 		//})
 	})
@@ -170,10 +169,9 @@ func testServe(network, addr string, reuseport, multicore, async bool, nclients 
 	var err error
 	ts := &testServer{network: network, addr: addr, multicore: multicore, async: async, nclients: nclients}
 	if network == "unix" {
-		socket := strings.Replace(addr, ":", "socket", 1)
-		_ = os.RemoveAll(socket)
-		defer os.RemoveAll(socket)
-		err = Serve(ts, network+"://"+socket, WithMulticore(multicore), WithTicker(true), WithTCPKeepAlive(time.Minute*5))
+		_ = os.RemoveAll(addr)
+		defer os.RemoveAll(addr)
+		err = Serve(ts, network+"://"+addr, WithMulticore(multicore), WithTicker(true), WithTCPKeepAlive(time.Minute*5))
 	} else {
 		if reuseport {
 			err = Serve(ts, network+"://"+addr, WithMulticore(multicore), WithReusePort(true), WithTicker(true), WithTCPKeepAlive(time.Minute*5))

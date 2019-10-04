@@ -13,7 +13,7 @@
 
 # [[中文](README_ZH.md)]
 
-`gnet` is an Event-Loop networking framework that is fast and small. It makes direct [epoll](https://en.wikipedia.org/wiki/Epoll) and [kqueue](https://en.wikipedia.org/wiki/Kqueue) syscalls rather than using the standard Go [net](https://golang.org/pkg/net/) package, and works in a similar manner as [libuv](https://github.com/libuv/libuv) and [libevent](https://github.com/libevent/libevent).
+`gnet` is an Event-Loop networking framework that is fast and small. It makes direct [epoll](https://en.wikipedia.org/wiki/Epoll) and [kqueue](https://en.wikipedia.org/wiki/Kqueue) syscalls rather than using the standard Go [net](https://golang.org/pkg/net/) package, and works in a similar manner as [netty](https://github.com/netty/netty) and [libuv](https://github.com/libuv/libuv).
 
 The goal of this project is to create a server framework for Go that performs on par with [Redis](http://redis.io) and [Haproxy](http://www.haproxy.org) for packet handling.
 
@@ -219,7 +219,7 @@ Servers can utilize the [SO_REUSEPORT](https://lwn.net/Articles/542629/) option 
 Just use functional options to set up `SO_REUSEPORT` and you can enjoy this feature:
 
 ```go
-gnet.Serve(events, "tcp://:9000", gnet.WithMulticore(true)))
+gnet.Serve(events, "tcp://:9000", gnet.WithMulticore(true), gnet.WithReusePort(true)))
 ```
 
 # Performance
