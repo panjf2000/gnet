@@ -35,14 +35,14 @@ func (svr *server) activateSubReactor(lp *loop) {
 		}
 
 		c := lp.connections[fd]
-		if !c.outboundBuffer.IsEmpty() {
+		switch {
+		case !c.outboundBuffer.IsEmpty():
 			if ev&netpoll.OutEvents != 0 {
 				return lp.loopOut(c)
 			}
-		} else if ev&netpoll.InEvents != 0 {
+		case ev&netpoll.InEvents != 0:
 			return lp.loopIn(c)
 		}
-
 		return nil
 	})
 }

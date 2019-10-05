@@ -16,18 +16,15 @@ func (lp *loop) handleEvent(fd int, ev uint32, job internal.Job) error {
 		return job()
 	}
 	if c, ok := lp.connections[fd]; ok {
-		if !c.opened {
+		switch {
+		case !c.opened:
 			return lp.loopOpen(c)
-		}
-		if ev&netpoll.InEvents != 0 {
-			if err := lp.loopIn(c); err != nil {
-				return err
+		case !c.outboundBuffer.IsEmpty():
+			if ev&netpoll.OutEvents != 0 {
+				return lp.loopOut(c)
 			}
-		}
-		if ev&netpoll.OutEvents != 0 && !c.outboundBuffer.IsEmpty() {
-			if err := lp.loopOut(c); err != nil {
-				return err
-			}
+		case ev&netpoll.InEvents != 0:
+			return lp.loopIn(c)
 		}
 	} else {
 		return lp.loopAccept(fd)

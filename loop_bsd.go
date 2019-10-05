@@ -16,13 +16,16 @@ func (lp *loop) handleEvent(fd int, filter int16, job internal.Job) error {
 		return job()
 	}
 	if c, ok := lp.connections[fd]; ok {
-		if !c.opened {
+		switch {
+		case !c.opened:
 			return lp.loopOpen(c)
-		} else if filter == netpoll.EVFilterWrite && !c.outboundBuffer.IsEmpty() {
-			return lp.loopOut(c)
-		} else if filter == netpoll.EVFilterRead {
+		case !c.outboundBuffer.IsEmpty():
+			if filter == netpoll.EVFilterWrite {
+				return lp.loopOut(c)
+			}
+		case filter == netpoll.EVFilterRead:
 			return lp.loopIn(c)
-		} else if filter == netpoll.EVFilterSock {
+		case filter == netpoll.EVFilterSock:
 			return lp.loopCloseConn(c, nil)
 		}
 	} else {

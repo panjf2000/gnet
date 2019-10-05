@@ -35,14 +35,16 @@ func (svr *server) activateSubReactor(lp *loop) {
 		}
 
 		c := lp.connections[fd]
-		if filter == netpoll.EVFilterWrite && !c.outboundBuffer.IsEmpty() {
-			return lp.loopOut(c)
-		} else if filter == netpoll.EVFilterRead {
+		switch {
+		case !c.outboundBuffer.IsEmpty():
+			if filter == netpoll.EVFilterWrite {
+				return lp.loopOut(c)
+			}
+		case filter == netpoll.EVFilterRead:
 			return lp.loopIn(c)
-		} else if filter == netpoll.EVFilterSock {
+		case filter == netpoll.EVFilterSock:
 			return lp.loopCloseConn(c, nil)
 		}
-
 		return nil
 	})
 }
