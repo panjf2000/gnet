@@ -76,15 +76,19 @@ type Conn interface {
 
 	// ReadPair reads all data from ring buffer.
 	ReadPair() ([]byte, []byte)
+	// ResetBuffer resets the ring buffer.
+	ResetBuffer()
+
+	// ReadN reads bytes with the given length from ring buffer.
+	ReadN(int) (int, []byte, []byte)
+	// ShiftN shifts the "read" pointer in ring buffer with the given length.
+	ShiftN(int)
 
 	// ReadBytes reads all data and return a new slice.
 	ReadBytes() []byte
 
-	// ResetBuffer resets the ring buffer.
-	ResetBuffer()
-
 	// AyncWrite writes data asynchronously.
-	AsyncWrite(buf []byte)
+	AsyncWrite([]byte)
 }
 
 // EventHandler represents the server events' callbacks for the Serve call.

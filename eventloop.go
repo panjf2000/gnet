@@ -115,7 +115,7 @@ func (lp *loop) loopOut(c *conn) error {
 		}
 		return lp.loopCloseConn(c, err)
 	}
-	c.outboundBuffer.Advance(n)
+	c.outboundBuffer.Shift(n)
 	if len(top) == n && tail != nil {
 		n, err = unix.Write(c.fd, tail)
 		if err != nil {
@@ -124,7 +124,7 @@ func (lp *loop) loopOut(c *conn) error {
 			}
 			return lp.loopCloseConn(c, err)
 		}
-		c.outboundBuffer.Advance(n)
+		c.outboundBuffer.Shift(n)
 	}
 
 	if c.outboundBuffer.IsEmpty() {

@@ -73,7 +73,7 @@
 
 ## 自动扩容的 Ring-Buffer
 
-`gnet` 利用 Ring-Buffer 来缓存 TCP 流数据以及管理内存使用。
+`gnet` 利用 Ring-Buffer 来缓冲网络数据以及管理内存。
 
 <p align="center">
 <img src="https://user-images.githubusercontent.com/7496278/64916810-4f8b6300-d7b8-11e9-9459-5517760da738.gif">

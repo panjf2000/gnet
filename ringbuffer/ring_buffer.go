@@ -102,8 +102,8 @@ func (r *RingBuffer) PreReadAll() (top []byte, tail []byte) {
 	return
 }
 
-// Advance advances the "read" pointer.
-func (r *RingBuffer) Advance(len int) {
+// Shift shifts the "read" pointer.
+func (r *RingBuffer) Shift(len int) {
 	if len <= 0 {
 		return
 	}

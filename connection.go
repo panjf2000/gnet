@@ -37,13 +37,24 @@ func (c *conn) ReadPair() (top, tail []byte) {
 	tail = c.extra
 	return
 }
+func (c *conn) ResetBuffer() {
+	c.inboundBuffer.Reset()
+}
+
+func (c *conn) ReadN(n int) (num int, top, tail []byte) {
+	if c.inboundBuffer.Length() < n {
+		return
+	}
+	num = n
+	top, tail = c.inboundBuffer.PreRead(n)
+	return
+}
+func (c *conn) ShiftN(n int) {
+	c.inboundBuffer.Shift(n)
+}
 
 func (c *conn) ReadBytes() []byte {
 	return c.inboundBuffer.WithBytes(c.extra)
-}
-
-func (c *conn) ResetBuffer() {
-	c.inboundBuffer.Reset()
 }
 
 func (c *conn) AsyncWrite(buf []byte) {

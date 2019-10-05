@@ -74,7 +74,7 @@ You can import `ants` to your `gnet` server and put your blocking code to the `a
 
 ## Auto-scaling Ring Buffer
 
-`gnet` utilizes Ring-Buffer to cache TCP streams and manage memory cache in networking.
+`gnet` utilizes Ring-Buffer to buffer network data and manage memories in networking.
 
 <p align="center">
 <img src="https://user-images.githubusercontent.com/7496278/64916810-4f8b6300-d7b8-11e9-9459-5517760da738.gif">
