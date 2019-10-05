@@ -19,7 +19,7 @@ The goal of this project is to create a server framework for Go that performs on
 
 `gnet` sells itself as a high-performance, lightweight, non-blocking network library written in pure Go which works on transport layer with TCP/UDP/Unix-Socket protocols, so it allows developers to implement their own protocols of application layer upon `gnet` for building  diversified network applications, for instance, you get an HTTP Server or Web Framework if you implement HTTP protocol upon `gnet` while you have a Redis Server done with the implementation of Redis protocol upon `gnet` and so on.
 
-**`gnet` derives from project `evio` while having higher performance.**
+**`gnet` derives from the project: `evio` while having a much higher performance.**
 
 # Features
 
