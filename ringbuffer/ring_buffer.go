@@ -11,15 +11,17 @@ import (
 	"unsafe"
 
 	"github.com/gobwas/pool/pbytes"
+	"github.com/panjf2000/gnet/internal"
 )
 
 // ErrIsEmpty will be returned when trying to read a empty ring-buffer
-var ErrIsEmpty = errors.New("ringbuffer is empty")
+var ErrIsEmpty = errors.New("ring-buffer is empty")
 
 // RingBuffer is a circular buffer that implement io.ReaderWriter interface.
 type RingBuffer struct {
 	buf     []byte
 	size    int
+	mask    int
 	r       int // next position to read
 	w       int // next position to write
 	isEmpty bool
@@ -27,9 +29,13 @@ type RingBuffer struct {
 
 // New returns a new RingBuffer whose buffer has the given size.
 func New(size int) *RingBuffer {
+	if !internal.IsPowerOfTwo(size) {
+		panic("the size of ring-buffer must be power of two integer value, e.g. 2, 4, 8, 16, 32, 64, etc.")
+	}
 	return &RingBuffer{
 		buf:     make([]byte, size),
 		size:    size,
+		mask:    size - 1,
 		isEmpty: true,
 	}
 }
@@ -103,7 +109,7 @@ func (r *RingBuffer) Advance(len int) {
 	}
 
 	if len < r.Length() {
-		r.r = (r.r + len) % r.size
+		r.r = (r.r + len) & r.mask
 		if r.r == r.w {
 			r.isEmpty = true
 		}
@@ -134,7 +140,7 @@ func (r *RingBuffer) Read(p []byte) (n int, err error) {
 			n = len(p)
 		}
 		copy(p, r.buf[r.r:r.r+n])
-		r.r = (r.r + n) % r.size
+		r.r = (r.r + n) & r.mask
 		if r.r == r.w {
 			r.isEmpty = true
 		}
@@ -154,7 +160,7 @@ func (r *RingBuffer) Read(p []byte) (n int, err error) {
 		c2 := n - c1
 		copy(p[c1:], r.buf[0:c2])
 	}
-	r.r = (r.r + n) % r.size
+	r.r = (r.r + n) & r.mask
 	if r.r == r.w {
 		r.isEmpty = true
 	}
@@ -369,13 +375,14 @@ func (r *RingBuffer) Reset() {
 }
 
 func (r *RingBuffer) malloc(cap int) {
-	newCap := r.size + cap
-	//newBuf := make([]byte, internal.CeilToPowerOfTwo(newCap))
-	newBuf := pbytes.GetLen(newCap)
+	newCap := internal.CeilToPowerOfTwo(r.size + cap)
+	//newBuf := pbytes.GetLen(newCap)
+	newBuf := make([]byte, newCap)
 	oldLen := r.Length()
 	_, _ = r.Read(newBuf)
 	r.r = 0
 	r.w = oldLen
 	r.size = newCap
+	r.mask = newCap - 1
 	r.buf = newBuf
 }
