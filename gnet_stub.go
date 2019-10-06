@@ -33,10 +33,12 @@ func serve(eventHandler EventHandler, listeners []*listener) error {
 	return errors.New("Unsupported platform in gnet")
 }
 
+// ReusePortListenPacket returns a net.PacketConn for UDP.
 func ReusePortListenPacket(proto, addr string) (net.PacketConn, error) {
 	return nil, errors.New("reuseport is not available")
 }
 
+// ReusePortListen returns a net.Listener for TCP.
 func ReusePortListen(proto, addr string) (net.Listener, error) {
 	return nil, errors.New("reuseport is not available")
 }

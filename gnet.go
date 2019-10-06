@@ -54,7 +54,7 @@ type Server struct {
 	NumLoops int
 }
 
-// Conn is an gnet connection.
+// Conn is a interface of gnet connection.
 type Conn interface {
 	// Context returns a user-defined context.
 	Context() interface{}
@@ -71,17 +71,19 @@ type Conn interface {
 	// Wake triggers a React event for this connection.
 	//Wake()
 
-	// Read reads all data from the inbound ring-buffer without moving the "read" pointer.
-	// Use this function
+	// Read reads all data from the inbound ring-buffer without moving the "read" pointer, which means
+	// it is not consuming the data actually and the data will present in the ring-buffer until the ResetBuffer method
+	// was invoked.
 	Read() (buf []byte)
-	// ResetBuffer resets the inbound ring-buffer.
+	// ResetBuffer resets the inbound ring-buffer, which means all data in the inbound ring-buffer has been consumed.
 	ResetBuffer()
 
-	// ReadN reads bytes with the given length from the inbound ring-buffer and it would move the "read" pointer,
-	// it reads data from inbound ring-buffer when the length of the available data is equal to given "n", otherwise,
-	// it will not read any data from the inbound ring-buffer. So you should use this function only if you know exactly
-	// the length of subsequent TCP streams based on your protocol, like the Content-Length attribute in HTTP which
-	// indicates you how many data you should read from inbound ring-buffer.
+	// ReadN reads bytes with the given length from the inbound ring-buffer and the event-loop-buffer, it would move the
+	// "read" pointer, which means it will consume the data from buffer and it can't be revoke (put back to buffer),
+	// it reads data from the inbound ring-buffer and event-loop-buffer when the length of the available data is equal
+	// to the given "n", otherwise, it will not read any data from the inbound ring-buffer. So you should use this
+	// function only if you know exactly the length of subsequent TCP streams based on the protocol, like the
+	// Content-Length attribute in an HTTP request which indicates you how many data you should read from inbound ring-buffer.
 	ReadN(n int) (size int, buf []byte)
 	// ShiftN shifts the "read" pointer in ring buffer with the given length.
 	//ShiftN(n int)

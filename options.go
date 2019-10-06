@@ -25,13 +25,13 @@ type Options struct {
 	// assigned to the value of runtime.NumCPU().
 	Multicore bool
 
-	//ReusePort indicates whether to set up the SO_REUSEPORT option.
+	// ReusePort indicates whether to set up the SO_REUSEPORT option.
 	ReusePort bool
+
 	// Ticker indicates whether the ticker has been set up.
-
 	Ticker bool
-	// TCPKeepAlive (SO_KEEPALIVE) socket option.
 
+	// TCPKeepAlive (SO_KEEPALIVE) socket option.
 	TCPKeepAlive time.Duration
 }
 

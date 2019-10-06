@@ -91,6 +91,8 @@ $ go get -u github.com/panjf2000/gnet
 
 ## Usage
 
+**The detailed documentation is located in here: [docs of gnet](https://gowalker.org/github.com/panjf2000/gnet?lang=en-US), but let's pass through the brief instructions below.**
+
 It is easy to create a network server with `gnet`. All you have to do is just make your implementation of `gnet.EventHandler` interface and register your event-handler functions to it, then pass it to the `gnet.Serve` function along with the binding address(es). Each connection is represented as a `gnet.Conn` interface that is passed to various events to differentiate the clients. At any point you can close a client or shutdown the server by return a `Close` or `Shutdown` action from an event.
 
 The simplest example to get you started playing with `gnet` would be the echo server. So here you are, a simplest echo server upon `gnet` that is listening on port 9000:
@@ -167,6 +169,8 @@ func main() {
 ```
 
 Like I said in the 『Multiple Reactors + Goroutine-Pool Model』section, if there are blocking code in your business logic, then you ought to turn them into non-blocking code in any way, for instance you can wrap them into a goroutine, but it will result in a massive amount of goroutines if massive traffic is passing through your server so I would suggest you utilize a goroutine pool like `ants` to manage those goroutines and reduce the cost of system resources.
+
+**For more examples, check out here: [examples of gnet](https://github.com/panjf2000/gnet/tree/master/examples).**
 
 ### I/O Events
 
