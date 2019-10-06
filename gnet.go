@@ -71,9 +71,9 @@ type Conn interface {
 	// Wake triggers a React event for this connection.
 	//Wake()
 
-	// ReadPair reads all data from the inbound ring-buffer without moving the "read" pointer.
+	// Read reads all data from the inbound ring-buffer without moving the "read" pointer.
 	// Use this function
-	ReadPair() (buf []byte)
+	Read() (buf []byte)
 	// ResetBuffer resets the inbound ring-buffer.
 	ResetBuffer()
 

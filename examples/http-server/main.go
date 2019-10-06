@@ -39,7 +39,7 @@ func (hs *httpServer) OnInitComplete(srv gnet.Server) (action gnet.Action) {
 }
 
 func (hs *httpServer) React(c gnet.Conn) (out []byte, action gnet.Action) {
-	data := c.ReadPair()
+	data := c.Read()
 	if hs.noparse && bytes.Contains(data, []byte("\r\n\r\n")) {
 		// for testing minimal single packet request -> response.
 		out = appendresp(nil, "200 OK", "", res)

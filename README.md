@@ -111,7 +111,7 @@ type echoServer struct {
 }
 
 func (es *echoServer) React(c gnet.Conn) (out []byte, action gnet.Action) {
-	out = c.ReadPair()
+	out = c.Read()
 	c.ResetBuffer()
 	return
 }
@@ -143,7 +143,7 @@ type echoServer struct {
 }
 
 func (es *echoServer) React(c gnet.Conn) (out []byte, action gnet.Action) {
-	data := append([]byte{}, c.ReadPair()...)
+	data := append([]byte{}, c.Read()...)
 	c.ResetBuffer()
 
 	// Use ants pool to unblock the event-loop.

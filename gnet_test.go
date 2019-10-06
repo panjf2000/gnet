@@ -129,7 +129,7 @@ func (s *testServer) OnClosed(c Conn, err error) (action Action) {
 func (s *testServer) React(c Conn) (out []byte, action Action) {
 	_ = c.BufferLength()
 	if s.async {
-		data := c.ReadPair()
+		data := c.Read()
 		c.ResetBuffer()
 		go func() {
 			c.AsyncWrite(append([]byte{}, data...))
@@ -147,7 +147,7 @@ func (s *testServer) React(c Conn) (out []byte, action Action) {
 		}
 		return
 	}
-	out = c.ReadPair()
+	out = c.Read()
 	c.ResetBuffer()
 	return
 }

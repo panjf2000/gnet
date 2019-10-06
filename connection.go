@@ -28,7 +28,7 @@ type conn struct {
 	outboundBuffer *ringbuffer.RingBuffer // buffer for data that is ready to write to client
 }
 
-func (c *conn) ReadPair() []byte {
+func (c *conn) Read() []byte {
 	if c.inboundBuffer.IsEmpty() {
 		return c.oneOffBuffer
 	}
