@@ -57,13 +57,13 @@ func (p *Poller) Trigger(job internal.Job) error {
 }
 
 // Polling ...
-func (p *Poller) Polling(callback func(fd int, filter int16, job internal.Job) error) error {
+func (p *Poller) Polling(callback func(fd int, filter int16, job internal.Job) error) (err error) {
 	el := newEventList(initEvents)
 	var wakenUp bool
 	for {
-		n, err := unix.Kevent(p.fd, nil, el.events, nil)
-		if err != nil && err != unix.EINTR {
-			log.Println(err)
+		n, err0 := unix.Kevent(p.fd, nil, el.events, nil)
+		if err0 != nil && err0 != unix.EINTR {
+			log.Println(err0)
 			continue
 		}
 		var evFilter int16
@@ -73,8 +73,8 @@ func (p *Poller) Polling(callback func(fd int, filter int16, job internal.Job) e
 				if (el.events[i].Flags&unix.EV_EOF != 0) || (el.events[i].Flags&unix.EV_ERROR != 0) {
 					evFilter = EVFilterSock
 				}
-				if err := callback(fd, evFilter, nil); err != nil {
-					return err
+				if err = callback(fd, evFilter, nil); err != nil {
+					return
 				}
 			} else {
 				wakenUp = true
@@ -82,10 +82,8 @@ func (p *Poller) Polling(callback func(fd int, filter int16, job internal.Job) e
 		}
 		if wakenUp {
 			wakenUp = false
-			if err := p.asyncJobQueue.ForEach(func(job internal.Job) error {
-				return callback(0, 0, job)
-			}); err != nil {
-				return err
+			if err = p.asyncJobQueue.ForEach(); err != nil {
+				return
 			}
 		}
 		if n == el.size {

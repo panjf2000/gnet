@@ -31,15 +31,15 @@ func (q *AsyncJobQueue) Push(job Job) {
 }
 
 // ForEach iterates this queue and executes each note with a given func.
-func (q *AsyncJobQueue) ForEach(iter func(job Job) error) error {
+func (q *AsyncJobQueue) ForEach() (err error) {
 	q.mu.Lock()
 	jobs := q.jobs
 	q.jobs = nil
 	q.mu.Unlock()
-	for _, job := range jobs {
-		if err := iter(job); err != nil {
+	for i := range jobs {
+		if err = jobs[i](); err != nil {
 			return err
 		}
 	}
-	return nil
+	return
 }

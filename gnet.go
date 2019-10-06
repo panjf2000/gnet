@@ -18,7 +18,7 @@ import (
 
 var (
 	// ErrClosing indicates this server is closing.
-	ErrClosing = errors.New("closing")
+	ErrClosing = errors.New("closing event-loop")
 )
 
 const socketRingBufferSize = 1024

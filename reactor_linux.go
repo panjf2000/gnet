@@ -27,10 +27,6 @@ func (svr *server) activateSubReactor(lp *loop) {
 	}
 
 	_ = lp.poller.Polling(func(fd int, ev uint32, job internal.Job) error {
-		if fd == 0 {
-			return job()
-		}
-
 		c := lp.connections[fd]
 		switch {
 		case !c.outboundBuffer.IsEmpty():

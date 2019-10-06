@@ -60,34 +60,29 @@ func (p *Poller) Trigger(job internal.Job) error {
 }
 
 // Polling ...
-func (p *Poller) Polling(callback func(fd int, ev uint32, job internal.Job) error) error {
+func (p *Poller) Polling(callback func(fd int, ev uint32, job internal.Job) error) (err error) {
 	el := newEventList(initEvents)
 	var wakenUp bool
 	for {
-		n, err := unix.EpollWait(p.fd, el.events, -1)
-		if err != nil && err != unix.EINTR {
-			log.Println(err)
+		n, err0 := unix.EpollWait(p.fd, el.events, -1)
+		if err0 != nil && err0 != unix.EINTR {
+			log.Println(err0)
 			continue
 		}
 		for i := 0; i < n; i++ {
 			if fd := int(el.events[i].Fd); fd != p.wfd {
-				if err := callback(fd, el.events[i].Events, nil); err != nil {
-					return err
+				if err = callback(fd, el.events[i].Events, nil); err != nil {
+					return
 				}
 			} else {
 				wakenUp = true
-				if _, err := unix.Read(p.wfd, p.wfdBuf); err != nil {
-					log.Println(err)
-					continue
-				}
+				_, _ = unix.Read(p.wfd, p.wfdBuf)
 			}
 		}
 		if wakenUp {
 			wakenUp = false
-			if err := p.asyncJobQueue.ForEach(func(job internal.Job) error {
-				return callback(0, 0, job)
-			}); err != nil {
-				return err
+			if err = p.asyncJobQueue.ForEach(); err != nil {
+				return
 			}
 		}
 		if n == el.size {
