@@ -14,7 +14,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// Poller ...
+// Poller represents a poller which is in charge of monitoring file-descriptors.
 type Poller struct {
 	fd            int    // epoll fd
 	wfd           int    // wake fd
@@ -22,7 +22,7 @@ type Poller struct {
 	asyncJobQueue internal.AsyncJobQueue
 }
 
-// OpenPoller ...
+// OpenPoller instantiates a poller.
 func OpenPoller() (*Poller, error) {
 	poller := new(Poller)
 	epollFD, err := unix.EpollCreate1(0)
@@ -44,7 +44,7 @@ func OpenPoller() (*Poller, error) {
 	return poller, nil
 }
 
-// Close ...
+// Close closes the poller.
 func (p *Poller) Close() error {
 	if err := unix.Close(p.wfd); err != nil {
 		return err
@@ -52,14 +52,14 @@ func (p *Poller) Close() error {
 	return unix.Close(p.fd)
 }
 
-// Trigger ...
+// Trigger wakes up the poller blocked in waiting for network-events and runs jobs in asyncJobQueue.
 func (p *Poller) Trigger(job internal.Job) error {
 	p.asyncJobQueue.Push(job)
 	_, err := unix.Write(p.wfd, []byte{0, 0, 0, 0, 0, 0, 0, 1})
 	return err
 }
 
-// Polling ...
+// Polling blocks the current goroutine, waiting for network-events.
 func (p *Poller) Polling(callback func(fd int, ev uint32, job internal.Job) error) (err error) {
 	el := newEventList(initEvents)
 	var wakenUp bool
@@ -91,34 +91,34 @@ func (p *Poller) Polling(callback func(fd int, ev uint32, job internal.Job) erro
 	}
 }
 
-// AddReadWrite ...
+// AddReadWrite registers the given file-descriptor with readable and writable events to the poller.
 func (p *Poller) AddReadWrite(fd int) error {
 	return unix.EpollCtl(p.fd, unix.EPOLL_CTL_ADD, fd, &unix.EpollEvent{Fd: int32(fd),
 		Events: unix.EPOLLIN | unix.EPOLLOUT})
 }
 
-// AddRead ...
+// AddRead registers the given file-descriptor with readable event to the poller.
 func (p *Poller) AddRead(fd int) error {
 	return unix.EpollCtl(p.fd, unix.EPOLL_CTL_ADD, fd, &unix.EpollEvent{Fd: int32(fd), Events: unix.EPOLLIN})
 }
 
-// AddWrite ...
+// AddWrite registers the given file-descriptor with writable event to the poller.
 func (p *Poller) AddWrite(fd int) error {
 	return unix.EpollCtl(p.fd, unix.EPOLL_CTL_ADD, fd, &unix.EpollEvent{Fd: int32(fd), Events: unix.EPOLLOUT})
 }
 
-// ModRead ...
+// ModRead renews the given file-descriptor with readable event in the poller.
 func (p *Poller) ModRead(fd int) error {
 	return unix.EpollCtl(p.fd, unix.EPOLL_CTL_MOD, fd, &unix.EpollEvent{Fd: int32(fd), Events: unix.EPOLLIN})
 }
 
-// ModReadWrite ...
+// ModReadWrite renews the given file-descriptor with readable and writable events in the poller.
 func (p *Poller) ModReadWrite(fd int) error {
 	return unix.EpollCtl(p.fd, unix.EPOLL_CTL_MOD, fd, &unix.EpollEvent{Fd: int32(fd),
 		Events: unix.EPOLLIN | unix.EPOLLOUT})
 }
 
-// Delete ...
+// Delete removes the given file-descriptor from the poller.
 func (p *Poller) Delete(fd int) error {
 	return unix.EpollCtl(p.fd, unix.EPOLL_CTL_DEL, fd, nil)
 }

@@ -18,7 +18,7 @@ package gnet
 //	LeastConnections
 //)
 
-// IEventLoopGroup ...
+// IEventLoopGroup represents a set of event-loops.
 type IEventLoopGroup interface {
 	register(*loop)
 	next() *loop

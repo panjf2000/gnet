@@ -113,7 +113,7 @@ func (svr *server) activateReactors(numLoops int) error {
 		}
 	}
 	svr.subLoopGroupSize = svr.subLoopGroup.len()
-	// Start sub reactors...
+	// Start sub reactors.
 	svr.startReactors()
 
 	if p, err := netpoll.OpenPoller(); err == nil {
@@ -124,7 +124,7 @@ func (svr *server) activateReactors(numLoops int) error {
 		}
 		_ = lp.poller.AddRead(svr.ln.fd)
 		svr.mainLoop = lp
-		// Start main reactor...
+		// Start main reactor.
 		svr.wg.Add(1)
 		go func() {
 			svr.activateMainReactor()

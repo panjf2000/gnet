@@ -14,13 +14,13 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// Poller ...
+// Poller represents a poller which is in charge of monitoring file-descriptors.
 type Poller struct {
 	fd            int
 	asyncJobQueue internal.AsyncJobQueue
 }
 
-// OpenPoller ...
+// OpenPoller instantiates a poller.
 func OpenPoller() (*Poller, error) {
 	poller := new(Poller)
 	kfd, err := unix.Kqueue()
@@ -40,12 +40,12 @@ func OpenPoller() (*Poller, error) {
 	return poller, nil
 }
 
-// Close ...
+// Close closes the poller.
 func (p *Poller) Close() error {
 	return unix.Close(p.fd)
 }
 
-// Trigger ...
+// Trigger wakes up the poller blocked in waiting for network-events and runs jobs in asyncJobQueue.
 func (p *Poller) Trigger(job internal.Job) error {
 	p.asyncJobQueue.Push(job)
 	_, err := unix.Kevent(p.fd, []unix.Kevent_t{{
@@ -56,7 +56,7 @@ func (p *Poller) Trigger(job internal.Job) error {
 	return err
 }
 
-// Polling ...
+// Polling blocks the current goroutine, waiting for network-events.
 func (p *Poller) Polling(callback func(fd int, filter int16, job internal.Job) error) (err error) {
 	el := newEventList(initEvents)
 	var wakenUp bool
@@ -92,25 +92,7 @@ func (p *Poller) Polling(callback func(fd int, filter int16, job internal.Job) e
 	}
 }
 
-// AddRead ...
-func (p *Poller) AddRead(fd int) error {
-	if _, err := unix.Kevent(p.fd, []unix.Kevent_t{
-		{Ident: uint64(fd), Flags: unix.EV_ADD, Filter: unix.EVFILT_READ}}, nil, nil); err != nil {
-		return err
-	}
-	return nil
-}
-
-// AddWrite ...
-func (p *Poller) AddWrite(fd int) error {
-	if _, err := unix.Kevent(p.fd, []unix.Kevent_t{
-		{Ident: uint64(fd), Flags: unix.EV_ADD, Filter: unix.EVFILT_WRITE}}, nil, nil); err != nil {
-		return err
-	}
-	return nil
-}
-
-// AddReadWrite ...
+// AddReadWrite registers the given file-descriptor with readable and writable events to the poller.
 func (p *Poller) AddReadWrite(fd int) error {
 	if _, err := unix.Kevent(p.fd, []unix.Kevent_t{
 		{Ident: uint64(fd), Flags: unix.EV_ADD, Filter: unix.EVFILT_READ},
@@ -121,7 +103,25 @@ func (p *Poller) AddReadWrite(fd int) error {
 	return nil
 }
 
-// ModRead ...
+// AddRead registers the given file-descriptor with readable event to the poller.
+func (p *Poller) AddRead(fd int) error {
+	if _, err := unix.Kevent(p.fd, []unix.Kevent_t{
+		{Ident: uint64(fd), Flags: unix.EV_ADD, Filter: unix.EVFILT_READ}}, nil, nil); err != nil {
+		return err
+	}
+	return nil
+}
+
+// AddWrite registers the given file-descriptor with writable event to the poller.
+func (p *Poller) AddWrite(fd int) error {
+	if _, err := unix.Kevent(p.fd, []unix.Kevent_t{
+		{Ident: uint64(fd), Flags: unix.EV_ADD, Filter: unix.EVFILT_WRITE}}, nil, nil); err != nil {
+		return err
+	}
+	return nil
+}
+
+// ModRead renews the given file-descriptor with readable event in the poller.
 func (p *Poller) ModRead(fd int) error {
 	if _, err := unix.Kevent(p.fd, []unix.Kevent_t{
 		{Ident: uint64(fd), Flags: unix.EV_DELETE, Filter: unix.EVFILT_WRITE}}, nil, nil); err != nil {
@@ -130,7 +130,7 @@ func (p *Poller) ModRead(fd int) error {
 	return nil
 }
 
-// ModReadWrite ...
+// ModReadWrite renews the given file-descriptor with readable and writable events in the poller.
 func (p *Poller) ModReadWrite(fd int) error {
 	if _, err := unix.Kevent(p.fd, []unix.Kevent_t{
 		{Ident: uint64(fd), Flags: unix.EV_ADD, Filter: unix.EVFILT_WRITE}}, nil, nil); err != nil {
@@ -139,7 +139,7 @@ func (p *Poller) ModReadWrite(fd int) error {
 	return nil
 }
 
-// Delete ...
+// Delete removes the given file-descriptor from the poller.
 func (p *Poller) Delete(fd int) error {
 	return nil
 }

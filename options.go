@@ -6,7 +6,7 @@ package gnet
 
 import "time"
 
-// Option ...
+// Option is a function that will set up option.
 type Option func(opts *Options)
 
 func initOptions(options ...Option) *Options {
@@ -24,15 +24,18 @@ type Options struct {
 	// it will run the server with single thread. The number of threads in the server will be automatically
 	// assigned to the value of runtime.NumCPU().
 	Multicore bool
-	//ReusePort ..
+
+	//ReusePort indicates whether to set up the SO_REUSEPORT option.
 	ReusePort bool
-	// Ticker ...
+	// Ticker indicates whether the ticker has been set up.
+
 	Ticker bool
 	// TCPKeepAlive (SO_KEEPALIVE) socket option.
+
 	TCPKeepAlive time.Duration
 }
 
-// WithOptions ...
+// WithOptions sets up all options.
 func WithOptions(options Options) Option {
 	return func(opts *Options) {
 		*opts = options

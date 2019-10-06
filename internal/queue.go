@@ -9,7 +9,7 @@ import (
 	"sync"
 )
 
-// Job ...
+// Job is a asynchronous function.
 type Job func() error
 
 // NewAsyncJobQueue creates a note-queue.

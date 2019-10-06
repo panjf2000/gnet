@@ -139,7 +139,6 @@ func (s *testServer) React(c Conn) (out []byte, action Action) {
 	top, tail := c.ReadPair()
 	out = top
 	if tail != nil {
-		fmt.Println("appending tail buffer...")
 		out = append(top, tail...)
 	}
 	c.ResetBuffer()
@@ -266,7 +265,8 @@ func (t *testTickServer) Tick() (delay time.Duration, action Action) {
 func testTick(network, addr string) {
 	events := &testTickServer{}
 	start := time.Now()
-	must(Serve(events, network+"://"+addr, WithTicker(true)))
+	opts := Options{Ticker: true}
+	must(Serve(events, network+"://"+addr, WithOptions(opts)))
 	dur := time.Since(start)
 	if dur < 250&time.Millisecond || dur > time.Second {
 		panic("bad ticker timing")

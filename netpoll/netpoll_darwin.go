@@ -7,7 +7,7 @@ package netpoll
 
 import "golang.org/x/sys/unix"
 
-// SetKeepAlive sets the keepalive for the connection
+// SetKeepAlive sets the keepalive for the connection.
 func SetKeepAlive(fd, secs int) error {
 	if err := unix.SetsockoptInt(fd, unix.SOL_SOCKET, 0x8, 1); err != nil {
 		return err
