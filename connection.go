@@ -77,6 +77,7 @@ func (c *conn) ReadN(n int) (size int, buf []byte) {
 	}
 	return
 }
+
 //func (c *conn) ShiftN(n int) {
 //	c.inboundBuffer.Shift(n)
 //}
