@@ -15,9 +15,6 @@ func (svr *server) activateMainReactor() {
 	defer svr.signalShutdown()
 
 	_ = svr.mainLoop.poller.Polling(func(fd int, filter int16, job internal.Job) error {
-		if fd == 0 {
-			return job()
-		}
 		return svr.acceptNewConnection(fd)
 	})
 }
