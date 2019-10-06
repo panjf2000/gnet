@@ -76,7 +76,7 @@ func (lp *loop) loopOpen(c *conn) error {
 		}
 	}
 
-	if len(out) > 0 {
+	if out != nil {
 		c.open(out)
 	}
 	if !c.outboundBuffer.IsEmpty() {
@@ -93,14 +93,16 @@ func (lp *loop) loopIn(c *conn) error {
 		}
 		return lp.loopCloseConn(c, err)
 	}
-	c.extra = lp.packet[:n]
+	c.oneOffBuffer = lp.packet[:n]
 	out, action := lp.svr.eventHandler.React(c)
-	c.action = action
-	if len(out) > 0 {
+	switch out {
+	case nil:
+		_, _ = c.inboundBuffer.Write(c.oneOffBuffer)
+	default:
 		c.write(out)
-	} else if action != DataRead {
-		_, _ = c.inboundBuffer.Write(c.extra)
+		_, _ = c.inboundBuffer.Write(c.oneOffBuffer)
 	}
+	c.action = action
 	return lp.handleAction(c)
 }
 
@@ -245,7 +247,7 @@ func (lp *loop) loopUDPIn(fd int) error {
 	}
 	_, _ = c.inboundBuffer.Write(lp.packet[:n])
 	out, action := lp.svr.eventHandler.React(c)
-	if len(out) > 0 {
+	if out != nil {
 		lp.svr.eventHandler.PreWrite()
 		c.SendTo(out, sa)
 	}

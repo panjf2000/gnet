@@ -19,42 +19,70 @@ type conn struct {
 	sa             unix.Sockaddr          // remote socket address
 	ctx            interface{}            // user-defined context
 	loop           *loop                  // connected loop
-	extra          []byte                 // reuse memory of inbound data
 	opened         bool                   // connection opened event fired
 	action         Action                 // next user action
 	localAddr      net.Addr               // local addre
 	remoteAddr     net.Addr               // remote addr
+	oneOffBuffer   []byte                 // reuse memory of inbound data
 	inboundBuffer  *ringbuffer.RingBuffer // buffer for data from client
 	outboundBuffer *ringbuffer.RingBuffer // buffer for data that is ready to write to client
 }
 
-func (c *conn) ReadPair() (top, tail []byte) {
+func (c *conn) ReadPair() []byte {
 	if c.inboundBuffer.IsEmpty() {
-		top = c.extra
-		return
+		return c.oneOffBuffer
 	}
-	top, _ = c.inboundBuffer.PreReadAll()
-	tail = c.extra
-	return
+	top, _ := c.inboundBuffer.PreReadAll()
+	return append(top, c.oneOffBuffer...)
 }
 func (c *conn) ResetBuffer() {
+	c.oneOffBuffer = c.oneOffBuffer[:0]
 	c.inboundBuffer.Reset()
 }
 
-func (c *conn) ReadN(n int) (num int, top, tail []byte) {
-	if c.inboundBuffer.Length() < n {
+func (c *conn) ReadN(n int) (size int, buf []byte) {
+	oneOffBufferLen := len(c.oneOffBuffer)
+	inBufferLen := c.inboundBuffer.Length()
+	if inBufferLen+oneOffBufferLen < n {
 		return
 	}
-	num = n
-	top, tail = c.inboundBuffer.PreRead(n)
+	if c.inboundBuffer.IsEmpty() {
+		size = n
+		buf = c.oneOffBuffer[:n]
+		if n == oneOffBufferLen {
+			c.oneOffBuffer = c.oneOffBuffer[:0]
+		} else {
+			c.oneOffBuffer = c.oneOffBuffer[n:]
+		}
+		return
+	}
+	size = n
+	buf, tail := c.inboundBuffer.PreRead(n)
+	if tail != nil {
+		buf = append(buf, tail...)
+	}
+	if inBufferLen >= n {
+		//c.ShiftN(n)
+		c.inboundBuffer.Shift(n)
+		return
+	}
+	c.inboundBuffer.Reset()
+
+	restSize := n - inBufferLen
+	buf = append(buf, c.oneOffBuffer[:restSize]...)
+	if restSize == oneOffBufferLen {
+		c.oneOffBuffer = c.oneOffBuffer[:0]
+	} else {
+		c.oneOffBuffer = c.oneOffBuffer[restSize:]
+	}
 	return
 }
-func (c *conn) ShiftN(n int) {
-	c.inboundBuffer.Shift(n)
-}
+//func (c *conn) ShiftN(n int) {
+//	c.inboundBuffer.Shift(n)
+//}
 
-func (c *conn) ReadBytes() []byte {
-	return c.inboundBuffer.WithBytes(c.extra)
+func (c *conn) BufferLength() int {
+	return c.inboundBuffer.Length()
 }
 
 func (c *conn) AsyncWrite(buf []byte) {

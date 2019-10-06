@@ -23,13 +23,15 @@ func (lp *loop) handleEvent(fd int, filter int16, job internal.Job) error {
 			if filter == netpoll.EVFilterWrite {
 				return lp.loopOut(c)
 			}
+			return nil
 		case filter == netpoll.EVFilterRead:
 			return lp.loopIn(c)
 		case filter == netpoll.EVFilterSock:
 			return lp.loopCloseConn(c, nil)
+		default:
+			return nil
 		}
 	} else {
 		return lp.loopAccept(fd)
 	}
-	return nil
 }

@@ -22,11 +22,7 @@ func (es *echoServer) OnInitComplete(srv gnet.Server) (action gnet.Action) {
 	return
 }
 func (es *echoServer) React(c gnet.Conn) (out []byte, action gnet.Action) {
-	top, tail := c.ReadPair()
-	out = top
-	if tail != nil {
-		out = append(top, tail...)
-	}
+	out = c.ReadPair()
 	c.ResetBuffer()
 	return
 }

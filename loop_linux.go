@@ -23,11 +23,13 @@ func (lp *loop) handleEvent(fd int, ev uint32, job internal.Job) error {
 			if ev&netpoll.OutEvents != 0 {
 				return lp.loopOut(c)
 			}
+			return nil
 		case ev&netpoll.InEvents != 0:
 			return lp.loopIn(c)
+		default:
+			return nil
 		}
 	} else {
 		return lp.loopAccept(fd)
 	}
-	return nil
 }

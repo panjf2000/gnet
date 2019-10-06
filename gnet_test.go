@@ -127,23 +127,29 @@ func (s *testServer) OnClosed(c Conn, err error) (action Action) {
 	return
 }
 func (s *testServer) React(c Conn) (out []byte, action Action) {
+	_ = c.BufferLength()
 	if s.async {
-		data := c.ReadBytes()
+		data := c.ReadPair()
 		c.ResetBuffer()
-		action = DataRead
 		go func() {
-			c.AsyncWrite(data)
+			c.AsyncWrite(append([]byte{}, data...))
 		}()
 		return
+	} else if s.multicore {
+		readSize := 1024 * 1024
+		if s.network == "udp" {
+			readSize = 64
+		}
+		n, data := c.ReadN(readSize)
+		if n == readSize {
+			out = data
+			return
+		}
+		return
 	}
-	top, tail := c.ReadPair()
-	out = top
-	if tail != nil {
-		out = append(top, tail...)
-	}
+	out = c.ReadPair()
 	c.ResetBuffer()
 	return
-
 }
 func (s *testServer) Tick() (delay time.Duration, action Action) {
 	if atomic.LoadInt32(&s.started) == 0 {
@@ -203,13 +209,14 @@ func startClient(network, addr string, multicore, async bool) {
 	duration := time.Duration((rand.Float64()*2+1)*float64(time.Second)) / 8
 	start := time.Now()
 	for time.Since(start) < duration {
-		sz := rand.Int() % (1024 * 1024)
+		//sz := rand.Intn(10) * (1024 * 1024)
+		sz := 1024 * 1024
 		data := make([]byte, sz)
 		if network == "udp" {
 			n := 64
-			if sz < 64 {
-				n = sz
-			}
+			//if sz < 64 {
+			//	n = sz
+			//}
 			data = data[:n]
 		}
 		if _, err := rand.Read(data); err != nil {

@@ -30,9 +30,6 @@ const (
 	// None indicates that no action should occur following an event.
 	None Action = iota
 
-	// DataRead indicates data in buffer has been read.
-	DataRead
-
 	// Close closes the connection.
 	Close
 
@@ -74,21 +71,26 @@ type Conn interface {
 	// Wake triggers a React event for this connection.
 	//Wake()
 
-	// ReadPair reads all data from ring buffer.
-	ReadPair() ([]byte, []byte)
-	// ResetBuffer resets the ring buffer.
+	// ReadPair reads all data from the inbound ring-buffer without moving the "read" pointer.
+	// Use this function
+	ReadPair() (buf []byte)
+	// ResetBuffer resets the inbound ring-buffer.
 	ResetBuffer()
 
-	// ReadN reads bytes with the given length from ring buffer.
-	ReadN(int) (int, []byte, []byte)
+	// ReadN reads bytes with the given length from the inbound ring-buffer and it would move the "read" pointer,
+	// it reads data from inbound ring-buffer when the length of the available data is equal to given "n", otherwise,
+	// it will not read any data from the inbound ring-buffer. So you should use this function only if you know exactly
+	// the length of subsequent TCP streams based on your protocol, like the Content-Length attribute in HTTP which
+	// indicates you how many data you should read from inbound ring-buffer.
+	ReadN(n int) (size int, buf []byte)
 	// ShiftN shifts the "read" pointer in ring buffer with the given length.
-	ShiftN(int)
+	//ShiftN(n int)
 
-	// ReadBytes reads all data and return a new slice.
-	ReadBytes() []byte
+	// BufferLength returns the length of available data in the inbound ring-buffer.
+	BufferLength() (size int)
 
 	// AyncWrite writes data asynchronously.
-	AsyncWrite([]byte)
+	AsyncWrite(buf []byte)
 }
 
 // EventHandler represents the server events' callbacks for the Serve call.

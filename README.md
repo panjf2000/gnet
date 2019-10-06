@@ -111,11 +111,7 @@ type echoServer struct {
 }
 
 func (es *echoServer) React(c gnet.Conn) (out []byte, action gnet.Action) {
-	top, tail := c.ReadPair()
-	out = top
-	if tail != nil {
-		out = append(top, tail...)
-	}
+	out = c.ReadPair()
 	c.ResetBuffer()
 	return
 }
@@ -147,7 +143,7 @@ type echoServer struct {
 }
 
 func (es *echoServer) React(c gnet.Conn) (out []byte, action gnet.Action) {
-	data := c.ReadBytes()
+	data := append([]byte{}, c.ReadPair()...)
 	c.ResetBuffer()
 
 	// Use ants pool to unblock the event-loop.
@@ -155,8 +151,7 @@ func (es *echoServer) React(c gnet.Conn) (out []byte, action gnet.Action) {
 		time.Sleep(1 * time.Second)
 		c.AsyncWrite(data)
 	})
-
-	action = gnet.DataRead
+  
 	return
 }
 
@@ -165,6 +160,7 @@ func main() {
 	poolSize := 64 * 1024
 	pool, _ := ants.NewPool(poolSize, ants.WithNonblocking(true))
 	defer pool.Release()
+  
 	echo := &echoServer{pool: pool}
 	log.Fatal(gnet.Serve(echo, "tcp://:9000", gnet.WithMulticore(true)))
 }
