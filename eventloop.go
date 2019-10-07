@@ -244,7 +244,7 @@ func (lp *loop) loopUDPIn(fd int) error {
 		remoteAddr:    netpoll.SockaddrToUDPAddr(&sa6),
 		inboundBuffer: ringbuffer.New(socketRingBufferSize),
 	}
-	_, _ = c.inboundBuffer.Write(lp.packet[:n])
+	c.oneOffBuffer = lp.packet[:n]
 	out, action := lp.svr.eventHandler.React(c)
 	if out != nil {
 		lp.svr.eventHandler.PreWrite()
