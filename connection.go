@@ -89,7 +89,7 @@ func (c *conn) BufferLength() int {
 func (c *conn) AsyncWrite(buf []byte) {
 	_ = c.loop.poller.Trigger(func() error {
 		c.write(buf)
-		ringbuffer.Recycle(buf)
+		//ringbuffer.Recycle(buf)
 		return nil
 	})
 }
