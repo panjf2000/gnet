@@ -25,6 +25,8 @@
 
 - [高性能](#性能测试) 的基于多线程/Go程模型的 Event-Loop 事件驱动
 - 内置 Round-Robin 轮询负载均衡算法
+- 内置 goroutine 池，由开源库 [ants](https://github.com/panjf2000/ants) 提供支持
+- 内置 bytes 内存池，由开源库 [pool](https://github.com/gobwas/pool/) 提供支持
 - 简洁的 APIs
 - 基于 Ring-Buffer 的高效内存利用
 - 支持多种网络协议：TCP、UDP、Unix Sockets
@@ -54,9 +56,9 @@
 
 正如你所知，基于 `gnet` 编写你的网络服务器有一条最重要的原则：永远不能让你业务逻辑（一般写在 `EventHandler.React` 里）阻塞 event-loop 线程，否则的话将会极大地降低服务器的吞吐量，这也是 `netty` 的一条最重要的原则。
 
-我的回答是，现在我正在为 `gnet` 开发一个新的多线程/Go程模型：『带线程/Go程池的主从多 Reactors』，这个新网络模型将通过引入一个 worker pool 来解决业务逻辑阻塞的问题：它会在启动的时候初始化一个 worker pool，然后在把 `EventHandler.React`里面的阻塞代码放到 worker pool 里执行，从而避免阻塞 event-loop 线程，
+我的回答是，基于`gnet` 的另一种多线程/Go程模型：『带线程/Go程池的主从多 Reactors』可以解决阻塞问题，这个新网络模型通过引入一个 worker pool 来解决业务逻辑阻塞的问题：它会在启动的时候初始化一个 worker pool，然后在把 `EventHandler.React`里面的阻塞代码放到 worker pool 里执行，从而避免阻塞 event-loop 线程，
 
-这个模型还在持续开发中并且很快就能完成，模型的架构图如下所示：
+模型的架构图如下所示：
 
 <p align="center">
 <img width="854" alt="multi_reactor_thread_pool" src="https://user-images.githubusercontent.com/7496278/64918783-90de3b80-d7d5-11e9-9190-ff8277c95db1.png">
@@ -67,9 +69,11 @@
 <img width="916" alt="multi-reactors" src="https://user-images.githubusercontent.com/7496278/64918646-a7839300-d7d3-11e9-804a-d021ddd23ca3.png">
 </p>
 
-不过，在这个新的网络模型开发完成之前，你依然可以通过一些其他的外部开源 goroutine pool 来处理你的阻塞业务逻辑，在这里我推荐个人开发的一个开源 goroutine pool：[ants](https://github.com/panjf2000/ants)，它是一个基于 Go 开发的高性能的 goroutine pool ，实现了对大规模 goroutine 的调度管理、goroutine 复用。
+`gnet` 通过利用 [ants](https://github.com/panjf2000/ants) goroutine 池（一个基于 Go 开发的高性能的 goroutine 池 ，实现了对大规模 goroutines 的调度管理、goroutines 复用）来实现『主从多 Reactors + 线程/Go程池』网络模型。关于 `ants` 的全部功能和使用，可以在 [ants 文档](https://gowalker.org/github.com/panjf2000/ants?lang=zh-CN) 里找到。
 
-你可以在开发 `gnet` 网络应用的时候集成 `ants` 库，然后把那些阻塞业务逻辑提交到 `ants` 池里去执行，从而避免阻塞 event-loop 线程。
+`gnet` 内部集成了 `ants` 以及提供了 `pool.NewWorkerPool` 方法来初始化一个 `ants` goroutine 池，然后你可以把 `EventHandler.React` 中阻塞的业务逻辑提交到 goroutine 池里执行，最后在 goroutine 池里的代码调用 `gnet.Conn.AsyncWrite` 方法把处理完阻塞逻辑之后得到的输出数据异步写回客户端，这样就可以避免阻塞 event-loop 线程。
+
+有关在 `gnet` 里使用 `ants` goroutine 池的细节可以到[这里](#echo-server-with-blocking-logic)进一步了解。
 
 ## 自动扩容的 Ring-Buffer
 
@@ -131,13 +135,13 @@ import (
 	"log"
 	"time"
 
-	"github.com/panjf2000/ants/v2"
 	"github.com/panjf2000/gnet"
+	"github.com/panjf2000/gnet/pool"
 )
 
 type echoServer struct {
 	*gnet.EventServer
-	pool *ants.Pool
+	pool *pool.WorkerPool
 }
 
 func (es *echoServer) React(c gnet.Conn) (out []byte, action gnet.Action) {
@@ -149,23 +153,21 @@ func (es *echoServer) React(c gnet.Conn) (out []byte, action gnet.Action) {
 		time.Sleep(1 * time.Second)
 		c.AsyncWrite(data)
 	})
-  
+
 	return
 }
 
 func main() {
-	// Create a goroutine pool.
-	poolSize := 64 * 1024
-	pool, _ := ants.NewPool(poolSize, ants.WithNonblocking(true))
-	defer pool.Release()
-  
-	echo := &echoServer{pool: pool}
+	p := pool.NewWorkerPool()
+	defer p.Release()
+	
+	echo := &echoServer{pool: p}
 	log.Fatal(gnet.Serve(echo, "tcp://:9000", gnet.WithMulticore(true)))
 }
 ```
 正如我在『主从多 Reactors + 线程/Go程池』那一节所说的那样，如果你的业务逻辑里包含阻塞代码，那么你应该把这些阻塞代码变成非阻塞的，比如通过把这部分代码通过 goroutine 去运行，但是要注意一点，如果你的服务器处理的流量足够的大，那么这种做法将会导致创建大量的 goroutines 极大地消耗系统资源，所以我一般建议你用 goroutine pool 来做 goroutines 的复用和管理，以及节省系统资源。
 
-**更多的例子可以在这里查看: [gnet 例子](https://github.com/panjf2000/gnet/tree/master/examples)。**
+**更多的例子可以在这里查看: [gnet 示例](https://github.com/panjf2000/gnet/tree/master/examples)。**
 
 ### I/O 事件
 
@@ -277,6 +279,7 @@ GOMAXPROCS=4
 - [evio](https://github.com/tidwall/evio)
 - [netty](https://github.com/netty/netty)
 - [ants](https://github.com/panjf2000/ants)
+- [pool](https://github.com/gobwas/pool)
 
 # 相关文章
 

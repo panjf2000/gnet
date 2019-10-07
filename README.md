@@ -23,8 +23,10 @@ The goal of this project is to create a server framework for Go that performs on
 
 # Features
 
-- [High-performance](#Performance) Event-Loop under multi-threads/goroutines model
+- [High-performance](#performance) Event-Loop under multi-threads/goroutines model
 - Built-in load balancing algorithm: Round-Robin
+- Built-in goroutine pool powered by the library [ants](https://github.com/panjf2000/ants)
+- Built-in memory pool with bytes powered by the library [pool](https://github.com/gobwas/pool/)
 - Concise APIs
 - Efficient memory usage: Ring-Buffer
 - Supporting multiple protocols: TCP, UDP, and Unix Sockets
@@ -55,9 +57,9 @@ You may ask me a question: what if my business logic in `EventHandler.React`  co
 
 As you know, there is a most important tenet when writing code under `gnet`: you should never block the event-loop in the `EventHandler.React`, otherwise, it will lead to a low throughput in your `gnet` server, which is also the most important tenet in `netty`. 
 
-And the solution for that would be found in the subsequent multiple-threads/goroutines model of `gnet`: 『Multiple Reactors with thread/goroutine pool』which pulls you out from the blocking mire, it will construct a worker-pool with fixed capacity and put those blocking jobs in `EventHandler.React` into the worker-pool to unblock the event-loop goroutines.
+And the solution for that could be found in the subsequent multiple-threads/goroutines model of `gnet`: 『Multiple Reactors with thread/goroutine pool』which pulls you out from the blocking mire, it will construct a worker-pool with fixed capacity and put those blocking jobs in `EventHandler.React` into the worker-pool to make the event-loop goroutines non-blocking.
 
-This new networking model is under development and about to be delivered soon and its architecture diagram of the new model is in here:
+The architecture diagram of『Multiple Reactors with thread/goroutine pool』networking model architecture is in here:
 
 <p align="center">
 <img width="854" alt="multi_reactor_thread_pool" src="https://user-images.githubusercontent.com/7496278/64918783-90de3b80-d7d5-11e9-9190-ff8277c95db1.png">
@@ -68,9 +70,11 @@ and it works as the following sequence diagram:
 <img width="916" alt="multi-reactors" src="https://user-images.githubusercontent.com/7496278/64918646-a7839300-d7d3-11e9-804a-d021ddd23ca3.png">
 </p>
 
-Before you can benefit from this new networking model in handling blocking business logic, there is still a way for you to handle your business logic in networking: you can utilize the open-source goroutine-pool to unblock your blocking code, and I now present you [ants](https://github.com/panjf2000/ants): a high-performance goroutine pool in Go that allows you to manage and recycle a massive number of goroutines in your concurrent programs.
+`gnet` implements the networking model of 『Multiple Reactors with thread/goroutine pool』by the aid of a high-performance goroutine pool called [ants](https://github.com/panjf2000/ants) that allows you to manage and recycle a massive number of goroutines in your concurrent programs, the full features and usages in `ants` are documented [here](https://gowalker.org/github.com/panjf2000/ants?lang=en-US).
 
-You can import `ants` to your `gnet` server and put your blocking code to the `ants` pool in `EventHandler.React`, which makes your business code non-blocking.
+`gnet` integrates `ants` and provides the `pool.NewWorkerPool` method that you can invoke to instantiate a `ants` pool where you are able to put your blocking code logic in `EventHandler.React` and invoke the function of `gnet.Conn.AsyncWrite` to send out data asynchronously in worker pool after you finish the blocking process and get the output data, which makes the goroutine of event-loop non-blocking.
+
+The details about integrating `gnet`  with `ants` are shown [here](#echo-server-with-blocking-logic).
 
 ## Auto-scaling Ring Buffer
 
@@ -135,13 +139,13 @@ import (
 	"log"
 	"time"
 
-	"github.com/panjf2000/ants/v2"
 	"github.com/panjf2000/gnet"
+	"github.com/panjf2000/gnet/pool"
 )
 
 type echoServer struct {
 	*gnet.EventServer
-	pool *ants.Pool
+	pool *pool.WorkerPool
 }
 
 func (es *echoServer) React(c gnet.Conn) (out []byte, action gnet.Action) {
@@ -153,17 +157,15 @@ func (es *echoServer) React(c gnet.Conn) (out []byte, action gnet.Action) {
 		time.Sleep(1 * time.Second)
 		c.AsyncWrite(data)
 	})
-  
+
 	return
 }
 
 func main() {
-	// Create a goroutine pool.
-	poolSize := 64 * 1024
-	pool, _ := ants.NewPool(poolSize, ants.WithNonblocking(true))
-	defer pool.Release()
-  
-	echo := &echoServer{pool: pool}
+	p := pool.NewWorkerPool()
+	defer p.Release()
+	
+	echo := &echoServer{pool: p}
 	log.Fatal(gnet.Serve(echo, "tcp://:9000", gnet.WithMulticore(true)))
 }
 ```
@@ -283,6 +285,7 @@ Source code in `gnet` is available under the MIT [License](/LICENSE).
 - [evio](https://github.com/tidwall/evio)
 - [netty](https://github.com/netty/netty)
 - [ants](https://github.com/panjf2000/ants)
+- [pool](https://github.com/gobwas/pool)
 
 # Relevant Articles
 

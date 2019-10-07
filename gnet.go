@@ -75,6 +75,7 @@ type Conn interface {
 	// it is not consuming the data actually and the data will present in the ring-buffer until the ResetBuffer method
 	// was invoked.
 	Read() (buf []byte)
+
 	// ResetBuffer resets the inbound ring-buffer, which means all data in the inbound ring-buffer has been consumed.
 	ResetBuffer()
 
@@ -85,6 +86,7 @@ type Conn interface {
 	// function only if you know exactly the length of subsequent TCP streams based on the protocol, like the
 	// Content-Length attribute in an HTTP request which indicates you how many data you should read from inbound ring-buffer.
 	ReadN(n int) (size int, buf []byte)
+
 	// ShiftN shifts the "read" pointer in ring buffer with the given length.
 	//ShiftN(n int)
 

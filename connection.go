@@ -35,6 +35,7 @@ func (c *conn) Read() []byte {
 	top, _ := c.inboundBuffer.PreReadAll()
 	return append(top, c.oneOffBuffer...)
 }
+
 func (c *conn) ResetBuffer() {
 	c.oneOffBuffer = c.oneOffBuffer[:0]
 	c.inboundBuffer.Reset()
@@ -83,7 +84,7 @@ func (c *conn) ReadN(n int) (size int, buf []byte) {
 //}
 
 func (c *conn) BufferLength() int {
-	return c.inboundBuffer.Length()
+	return c.inboundBuffer.Length() + len(c.oneOffBuffer)
 }
 
 func (c *conn) AsyncWrite(buf []byte) {
@@ -127,13 +128,14 @@ func (c *conn) write(buf []byte) {
 	}
 }
 
+func (c *conn) SendTo(buf []byte, sa unix.Sockaddr) {
+	_ = unix.Sendto(c.fd, buf, 0, sa)
+}
+
 func (c *conn) Context() interface{}       { return c.ctx }
 func (c *conn) SetContext(ctx interface{}) { c.ctx = ctx }
 func (c *conn) LocalAddr() net.Addr        { return c.localAddr }
 func (c *conn) RemoteAddr() net.Addr       { return c.remoteAddr }
-func (c *conn) SendTo(buf []byte, sa unix.Sockaddr) {
-	_ = unix.Sendto(c.fd, buf, 0, sa)
-}
 
 //func (c *conn) Wake() {
 //	if c.loop != nil {

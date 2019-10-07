@@ -95,13 +95,12 @@ func (lp *loop) loopIn(c *conn) error {
 	}
 	c.oneOffBuffer = lp.packet[:n]
 	out, action := lp.svr.eventHandler.React(c)
-	switch out {
-	case nil:
-		_, _ = c.inboundBuffer.Write(c.oneOffBuffer)
-	default:
+
+	if out != nil {
 		c.write(out)
-		_, _ = c.inboundBuffer.Write(c.oneOffBuffer)
 	}
+	_, _ = c.inboundBuffer.Write(c.oneOffBuffer)
+
 	c.action = action
 	return lp.handleAction(c)
 }

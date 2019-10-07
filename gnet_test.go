@@ -16,6 +16,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/panjf2000/gnet/pool"
 )
 
 func TestServe(t *testing.T) {
@@ -99,6 +101,9 @@ type testServer struct {
 	connected    int32
 	clientActive int32
 	disconnected int32
+	bytesPool    *pool.BytesPool
+	workerPool   *pool.WorkerPool
+	bytesList    [][]byte
 }
 
 func (s *testServer) OnOpened(c Conn) (out []byte, action Action) {
@@ -122,18 +127,26 @@ func (s *testServer) OnClosed(c Conn, err error) (action Action) {
 	if atomic.LoadInt32(&s.connected) == atomic.LoadInt32(&s.disconnected) &&
 		atomic.LoadInt32(&s.disconnected) == int32(s.nclients) {
 		action = Shutdown
+		for i := range s.bytesList {
+			s.bytesPool.Put(s.bytesList[i])
+		}
+		s.workerPool.Release()
 	}
 
 	return
 }
 func (s *testServer) React(c Conn) (out []byte, action Action) {
-	_ = c.BufferLength()
 	if s.async {
+		bufLen := c.BufferLength()
+		buf := s.bytesPool.GetLen(bufLen)
 		data := c.Read()
+		copy(buf, data)
+		s.bytesList = append(s.bytesList, buf)
 		c.ResetBuffer()
-		go func() {
-			c.AsyncWrite(append([]byte{}, data...))
-		}()
+		_ = s.workerPool.Submit(
+			func() {
+				c.AsyncWrite(buf)
+			})
 		return
 	} else if s.multicore {
 		readSize := 1024 * 1024
@@ -172,7 +185,8 @@ func (s *testServer) Tick() (delay time.Duration, action Action) {
 
 func testServe(network, addr string, reuseport, multicore, async bool, nclients int) {
 	var err error
-	ts := &testServer{network: network, addr: addr, multicore: multicore, async: async, nclients: nclients}
+	ts := &testServer{network: network, addr: addr, multicore: multicore, async: async, nclients: nclients,
+		bytesPool: pool.NewBytesPool(), workerPool: pool.NewWorkerPool()}
 	if network == "unix" {
 		_ = os.RemoveAll(addr)
 		defer os.RemoveAll(addr)
