@@ -87,15 +87,21 @@ The details about integrating `gnet`  with `ants` are shown [here](#echo-server-
 
 # Getting Started
 
+## Prerequisites
+
+`gnet` requires Go 1.9 or later.
+
 ## Installation
 
-```sh
-$ go get -u github.com/panjf2000/gnet
+```powershell
+go get -u github.com/panjf2000/gnet
 ```
 
-## Usage
+`gnet` is available as a Go module, with [Go 1.11 Modules](https://github.com/golang/go/wiki/Modules) support (Go 1.11+), just simply `import "github.com/panjf2000/gnet"` in your source code and `go [build|run|test]` will download the necessary dependencies automatically.
 
-**The detailed documentation is located in here: [docs of gnet](https://gowalker.org/github.com/panjf2000/gnet?lang=en-US), but let's pass through the brief instructions below.**
+## Usage Examples
+
+**The detailed documentation is located in here: [docs of gnet](https://gowalker.org/github.com/panjf2000/gnet?lang=en-US), but let's pass through the brief instructions first.**
 
 It is easy to create a network server with `gnet`. All you have to do is just make your implementation of `gnet.EventHandler` interface and register your event-handler functions to it, then pass it to the `gnet.Serve` function along with the binding address(es). Each connection is represented as a `gnet.Conn` interface that is passed to various events to differentiate the clients. At any point you can close a client or shutdown the server by return a `Close` or `Shutdown` action from an event.
 
@@ -181,7 +187,7 @@ Current supported I/O events in `gnet`:
 - `EventHandler.OnInitComplete` is activated when the server is ready to accept new connections.
 - `EventHandler.OnOpened` is activated when a connection has opened.
 - `EventHandler.OnClosed` is activated when a connection has closed.
-- `EventHandler.React` is activated when the server receives new data from a connection.
+- `EventHandler.React` is activated when the server receives new data from a connection. (usually it is where you write the code of business logic)
 - `EventHandler.Tick` is activated immediately after the server starts and will fire again after a specified interval.
 - `EventHandler.PreWrite` is activated just before any data is written to any client socket.
 

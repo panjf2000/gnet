@@ -86,11 +86,17 @@
 
 # 开始使用
 
+## 前提
+
+`gnet` 需要 Go 版本 >= 1.9。
+
 ## 安装
 
-```sh
-$ go get -u github.com/panjf2000/gnet
+```powershell
+go get -u github.com/panjf2000/gnet
 ```
+
+`gnet` 支持作为一个 Go module 被导入，基于 [Go 1.11 Modules](https://github.com/golang/go/wiki/Modules) (Go 1.11+)，只需要在你的项目里直接 `import "github.com/panjf2000/gnet"`，然后运行 `go [build|run|test]` 自动下载和构建需要的依赖包。
 
 ## 使用示例
 
