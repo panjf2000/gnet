@@ -6,25 +6,9 @@ const (
 	maxintHeadBit = 1 << (bitsize - 2)
 )
 
-// LogarithmicRange iterates from ceiled to power of two min to max,
-// calling cb on each iteration.
-func LogarithmicRange(min, max int, cb func(int)) {
-	if min == 0 {
-		min = 1
-	}
-	for n := CeilToPowerOfTwo(min); n <= max; n <<= 1 {
-		cb(n)
-	}
-}
-
 // IsPowerOfTwo reports whether given integer is a power of two.
 func IsPowerOfTwo(n int) bool {
 	return n&(n-1) == 0
-}
-
-// Identity is identity.
-func Identity(n int) int {
-	return n
 }
 
 // CeilToPowerOfTwo returns the least power of two integer value greater than
