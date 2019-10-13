@@ -21,6 +21,7 @@ var (
 	ErrClosing = errors.New("closing event-loop")
 )
 
+// socketRingBufferSize represents the initial size of connection ring-buffer.
 const socketRingBufferSize = 1024
 
 // Action is an action that occurs after the completion of an event.
@@ -41,7 +42,7 @@ const (
 // running server and has control functions for managing state.
 type Server struct {
 	// Multicore indicates whether the server will be effectively created with multi-cores, if so,
-	// then you must take care with synchonizing memory between all event callbacks, otherwise,
+	// then you must take care of synchronizing the shared data between all event callbacks, otherwise,
 	// it will run the server with single thread. The number of threads in the server will be automatically
 	// assigned to the value of runtime.NumCPU().
 	Multicore bool
@@ -71,29 +72,29 @@ type Conn interface {
 	// Wake triggers a React event for this connection.
 	//Wake()
 
-	// Read reads all data from the inbound ring-buffer without moving the "read" pointer, which means
-	// it is not consuming the data actually and the data will present in the ring-buffer until the ResetBuffer method
-	// was invoked.
+	// Read reads all data from inbound ring-buffer without moving "read" pointer, which means
+	// it does not evict the data from ring-buffer actually and those data will present in ring-buffer until the
+	// ResetBuffer method is invoked.
 	Read() (buf []byte)
 
-	// ResetBuffer resets the inbound ring-buffer, which means all data in the inbound ring-buffer has been consumed.
+	// ResetBuffer resets the inbound ring-buffer, which means all data in the inbound ring-buffer has been evicted.
 	ResetBuffer()
 
-	// ReadN reads bytes with the given length from the inbound ring-buffer and the event-loop-buffer, it would move the
-	// "read" pointer, which means it will consume the data from buffer and it can't be revoke (put back to buffer),
+	// ReadN reads bytes with the given length from inbound ring-buffer and event-loop-buffer, it would move
+	// "read" pointer, which means it will evict the data from buffer and it can't be revoked (put back to buffer),
 	// it reads data from the inbound ring-buffer and event-loop-buffer when the length of the available data is equal
 	// to the given "n", otherwise, it will not read any data from the inbound ring-buffer. So you should use this
 	// function only if you know exactly the length of subsequent TCP streams based on the protocol, like the
-	// Content-Length attribute in an HTTP request which indicates you how many data you should read from inbound ring-buffer.
+	// Content-Length attribute in an HTTP request which indicates you how much data you should read from inbound ring-buffer.
 	ReadN(n int) (size int, buf []byte)
 
-	// ShiftN shifts the "read" pointer in ring buffer with the given length.
+	// ShiftN shifts "read" pointer in ring buffer with the given length.
 	//ShiftN(n int)
 
 	// BufferLength returns the length of available data in the inbound ring-buffer.
 	BufferLength() (size int)
 
-	// AyncWrite writes data asynchronously.
+	// AyncWrite writes data to client/connection asynchronously.
 	AsyncWrite(buf []byte)
 }
 
@@ -101,18 +102,17 @@ type Conn interface {
 // Each event has an Action return value that is used manage the state
 // of the connection and server.
 type EventHandler interface {
-	// OnInitComplete fires when the server can accept connections. The server
-	// parameter has information and various utilities.
+	// OnInitComplete fires when the server is ready for accepting connections.
+	// The server parameter has information and various utilities.
 	OnInitComplete(server Server) (action Action)
 
-	// OnOpened fires when a new connection has opened.
+	// OnOpened fires when a new connection has been opened.
 	// The info parameter has information about the connection such as
 	// it's local and remote address.
 	// Use the out return value to write data to the connection.
-	// The opts return value is used to set connection options.
 	OnOpened(c Conn) (out []byte, action Action)
 
-	// OnClosed fires when a connection has closed.
+	// OnClosed fires when a connection has been closed.
 	// The err parameter is the last known connection error.
 	OnClosed(c Conn, err error) (action Action)
 
@@ -120,8 +120,8 @@ type EventHandler interface {
 	PreWrite()
 
 	// React fires when a connection sends the server data.
-	// The in parameter is the incoming data.
-	// Use the out return value to write data to the connection.
+	// Invoke c.Read() or c.ReadN(n) within the parameter c to read incoming data from client/connection.
+	// Use the out return value to write data to the client/connection.
 	React(c Conn) (out []byte, action Action)
 
 	// Tick fires immediately after the server starts and will fire again
@@ -134,22 +134,21 @@ type EventHandler interface {
 type EventServer struct {
 }
 
-// OnInitComplete fires when the server can accept connections. The server
-// parameter has information and various utilities.
+// OnInitComplete fires when the server is ready for accepting connections.
+// The server parameter has information and various utilities.
 func (es *EventServer) OnInitComplete(svr Server) (action Action) {
 	return
 }
 
-// OnOpened fires when a new connection has opened.
+// OnOpened fires when a new connection has been opened.
 // The info parameter has information about the connection such as
 // it's local and remote address.
 // Use the out return value to write data to the connection.
-// The opts return value is used to set connection options.
 func (es *EventServer) OnOpened(c Conn) (out []byte, action Action) {
 	return
 }
 
-// OnClosed fires when a connection has closed.
+// OnClosed fires when a connection has been closed.
 // The err parameter is the last known connection error.
 func (es *EventServer) OnClosed(c Conn, err error) (action Action) {
 	return
@@ -160,8 +159,8 @@ func (es *EventServer) PreWrite() {
 }
 
 // React fires when a connection sends the server data.
-// The in parameter is the incoming data.
-// Use the out return value to write data to the connection.
+// Invoke c.Read() or c.ReadN(n) within the parameter c to read incoming data from client/connection.
+// Use the out return value to write data to the client/connection.
 func (es *EventServer) React(c Conn) (out []byte, action Action) {
 	return
 }
