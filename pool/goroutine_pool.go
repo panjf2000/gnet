@@ -15,12 +15,17 @@ const (
 	DefaultAntsPoolSize = 256 * 1024
 
 	// ExpiryDuration is the interval time to clean up those expired workers.
-	ExpiryDuration      = 10 * time.Second
+	ExpiryDuration = 10 * time.Second
 
 	// Nonblocking decides what to do when submitting a new job to a full worker pool: waiting for a available worker
 	// or returning nil directly.
 	Nonblocking = true
 )
+
+func init() {
+	// It releases the default pool from ants.
+	ants.Release()
+}
 
 // WorkerPool is the alias of ants.Pool.
 type WorkerPool = ants.Pool

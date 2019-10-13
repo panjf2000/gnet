@@ -12,7 +12,9 @@
 <a title="Mentioned in Awesome Go" target="_blank" href="https://github.com/avelino/awesome-go"><img src="https://awesome.re/mentioned-badge-flat.svg"></a>
 </p>
 
-# [[中文](README_ZH.md)]
+English | [🇨🇳中文](README_ZH.md)
+
+# 📖 Introduction
 
 `gnet` is an event-driven networking framework that is fast and small. It makes direct [epoll](https://en.wikipedia.org/wiki/Epoll) and [kqueue](https://en.wikipedia.org/wiki/Kqueue) syscalls rather than using the standard Go [net](https://golang.org/pkg/net/) package, and works in a similar manner as [netty](https://github.com/netty/netty) and [libuv](https://github.com/libuv/libuv).
 
@@ -22,7 +24,7 @@ The goal of this project is to create a server framework for Go that performs on
 
 **`gnet` derives from the project: `evio` while having a much higher performance.**
 
-# Features
+# 🚀 Features
 
 - [High-performance](#performance) event-loop under multi-threads/goroutines model
 - Built-in load balancing algorithm: Round-Robin
@@ -36,7 +38,7 @@ The goal of this project is to create a server framework for Go that performs on
 - Flexible ticker event
 - SO_REUSEPORT socket option
 
-# Key Designs
+# 💡 Key Designs
 
 ## Multiple-Threads/Goroutines Model
 ### Multiple Reactors Model
@@ -86,7 +88,7 @@ The details about integrating `gnet`  with `ants` are shown [here](#echo-server-
 </p>
 
 
-# Getting Started
+# 🎉 Getting Started
 
 ## Prerequisites
 
@@ -181,7 +183,7 @@ Like I said in the 『Multiple Reactors + Goroutine-Pool Model』section, if the
 
 **For more examples, check out here: [examples of gnet](https://github.com/panjf2000/gnet/tree/master/examples).**
 
-### I/O Events
+## I/O Events
 
 Current supported I/O events in `gnet`:
 
@@ -193,7 +195,7 @@ Current supported I/O events in `gnet`:
 - `EventHandler.PreWrite` is activated just before any data is written to any client socket.
 
 
-### Ticker
+## Ticker
 
 The `EventHandler.Tick` event fires ticks at a specified interval. 
 The first tick fires immediately after the `Serving` events and if you intend to set up a ticker event, remember to pass an option: `gnet.WithTicker(true)` to `gnet.Serve`.
@@ -231,7 +233,7 @@ Just use functional options to set up `SO_REUSEPORT` and you can enjoy this feat
 gnet.Serve(events, "tcp://:9000", gnet.WithMulticore(true), gnet.WithReusePort(true)))
 ```
 
-# Performance
+# 📊 Performance
 
 ## Contrasts to the similar networking libraries
 
@@ -283,18 +285,18 @@ GOMAXPROCS=4
 
 ![](https://github.com/panjf2000/gnet_benchmarks/raw/master/results/http_mac.png)
 
-# License
+# 📄 License
 
 Source code in `gnet` is available under the MIT [License](/LICENSE).
 
-# Thanks
+# 🙏 Thanks
 
 - [evio](https://github.com/tidwall/evio)
 - [netty](https://github.com/netty/netty)
 - [ants](https://github.com/panjf2000/ants)
 - [pool](https://github.com/gobwas/pool)
 
-# Relevant Articles
+# 📚 Relevant Articles
 
 - [A Million WebSockets and Go](https://www.freecodecamp.org/news/million-websockets-and-go-cc58418460bb/)
 - [Going Infinite, handling 1M websockets connections in Go](https://speakerdeck.com/eranyanay/going-infinite-handling-1m-websockets-connections-in-go)

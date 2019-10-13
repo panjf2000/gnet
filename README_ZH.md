@@ -12,7 +12,9 @@
 <a title="Mentioned in Awesome Go" target="_blank" href="https://github.com/avelino/awesome-go"><img src="https://awesome.re/mentioned-badge-flat.svg"></a>
 </p>
 
-# [[英文](README.md)]
+[英文](README.md) | 🇨🇳中文
+
+# 📖 简介
 
 `gnet` 是一个基于事件驱动的高性能和轻量级网络框架。它直接使用 [epoll](https://en.wikipedia.org/wiki/Epoll) 和 [kqueue](https://en.wikipedia.org/wiki/Kqueue) 系统调用而非标准 Golang 网络包：[net](https://golang.org/pkg/net/) 来构建网络应用，它的工作原理类似两个开源的网络库：[netty](https://github.com/netty/netty) 和 [libuv](https://github.com/libuv/libuv)。
 
@@ -22,7 +24,7 @@
 
 **`gnet` 衍生自另一个项目：`evio`，但性能远胜之。**
 
-# 功能
+# 🚀 功能
 
 - [高性能](#性能测试) 的基于多线程/Go程模型的 event-loop 事件驱动
 - 内置 Round-Robin 轮询负载均衡算法
@@ -36,7 +38,7 @@
 - 灵活的事件定时器
 - SO_REUSEPORT 端口重用
 
-# 核心设计
+# 💡 核心设计
 ## 多线程/Go程模型
 ### 主从多 Reactors 模型
 
@@ -85,7 +87,7 @@
 </p>
 
 
-# 开始使用
+# 🎉 开始使用
 
 ## 前提
 
@@ -176,7 +178,7 @@ func main() {
 
 **更多的例子可以在这里查看: [gnet 示例](https://github.com/panjf2000/gnet/tree/master/examples)。**
 
-### I/O 事件
+## I/O 事件
 
  `gnet` 目前支持的 I/O 事件如下：
 
@@ -188,7 +190,7 @@ func main() {
 - `EventHandler.PreWrite` 预先写数据方法，在 server 端写数据回 client 端之前调用。
 
 
-### 定时器
+## 定时器
 
 `EventHandler.Tick` 会每隔一段时间触发一次，间隔时间你可以自己控制，设定返回的 `delay` 变量就行。
 
@@ -227,7 +229,7 @@ events.Tick = func() (delay time.Duration, action Action){
 gnet.Serve(events, "tcp://:9000", gnet.WithMulticore(true), gnet.WithReusePort(true)))
 ```
 
-# 性能测试
+# 📊 性能测试
 
 ## 同类型的网络库性能对比
 
@@ -277,18 +279,18 @@ GOMAXPROCS=4
 
 ![](https://github.com/panjf2000/gnet_benchmarks/raw/master/results/http_mac.png)
 
-# 证书
+# 📄 证书
 
 `gnet` 的源码允许用户在遵循 MIT [开源证书](/LICENSE) 规则的前提下使用。
 
-# 致谢
+# 🙏 致谢
 
 - [evio](https://github.com/tidwall/evio)
 - [netty](https://github.com/netty/netty)
 - [ants](https://github.com/panjf2000/ants)
 - [pool](https://github.com/gobwas/pool)
 
-# 相关文章
+# 📚 相关文章
 
 - [A Million WebSockets and Go](https://www.freecodecamp.org/news/million-websockets-and-go-cc58418460bb/)
 - [Going Infinite, handling 1M websockets connections in Go](https://speakerdeck.com/eranyanay/going-infinite-handling-1m-websockets-connections-in-go)
