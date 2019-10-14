@@ -1,5 +1,5 @@
 <p align="center">
-<img src="https://raw.githubusercontent.com/panjf2000/logos/master/gnet/logo.png" alt="gnet">
+<img src="https://raw.githubusercontent.com/panjf2000/logos/master/gnet/logo.png" width="300" alt="gnet">
 <br />
 <a title="Build Status" target="_blank" href="https://travis-ci.com/panjf2000/gnet"><img src="https://img.shields.io/travis/com/panjf2000/gnet?style=flat-square"></a>
 <a title="Codecov" target="_blank" href="https://codecov.io/gh/panjf2000/gnet"><img src="https://img.shields.io/codecov/c/github/panjf2000/gnet?style=flat-square"></a>
@@ -283,6 +283,12 @@ GOMAXPROCS=4
 
 `gnet` 的源码允许用户在遵循 MIT [开源证书](/LICENSE) 规则的前提下使用。
 
+# 👏 贡献者
+
+请在提 PR 之前仔细阅读 [Contributing Guidelines](CONTRIBUTING.md)，感谢那些为 `ants` 贡献过代码的开发者！
+
+[![](https://opencollective.com/gnet/contributors.svg?width=890&button=false)](https://github.com/panjf2000/gnet/graphs/contributors)
+
 # 🙏 致谢
 
 - [evio](https://github.com/tidwall/evio)
@@ -295,3 +301,20 @@ GOMAXPROCS=4
 - [A Million WebSockets and Go](https://www.freecodecamp.org/news/million-websockets-and-go-cc58418460bb/)
 - [Going Infinite, handling 1M websockets connections in Go](https://speakerdeck.com/eranyanay/going-infinite-handling-1m-websockets-connections-in-go)
 - [gnet: 一个轻量级且高性能的 Golang 网络库](https://taohuawu.club/go-event-loop-networking-library-gnet)
+
+# 💰 支持
+
+如果有意向，可以通过每个月定量的少许捐赠来支持这个项目。
+
+<a href="https://opencollective.com/gnet#backers" target="_blank"><img src="https://opencollective.com/gnet/backers.svg"></a>
+
+# 💎 赞助
+
+每月定量捐赠 10 刀即可成为本项目的赞助者，届时您的 logo 或者 link 可以展示在本项目的 README 上。
+
+<a href="https://opencollective.com/gnet#sponsors" target="_blank"><img src="https://opencollective.com/gnet/sponsors.svg"></a>
+
+# ☕️ 打赏
+
+<img src="https://raw.githubusercontent.com/panjf2000/illustrations/master/payments/WeChatPay.JPG" width="300" align="middle"/>&nbsp;&nbsp;
+<img src="https://raw.githubusercontent.com/panjf2000/illustrations/master/payments/AliPay.JPG" width="300" align="middle"/>&nbsp;&nbsp;

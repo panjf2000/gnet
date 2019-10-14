@@ -1,5 +1,5 @@
 <p align="center">
-<img src="https://raw.githubusercontent.com/panjf2000/logos/master/gnet/logo.png" alt="gnet">
+<img src="https://raw.githubusercontent.com/panjf2000/logos/master/gnet/logo.png" width="300" alt="gnet">
 <br />
 <a title="Build Status" target="_blank" href="https://travis-ci.com/panjf2000/gnet"><img src="https://img.shields.io/travis/com/panjf2000/gnet?style=flat-square"></a>
 <a title="Codecov" target="_blank" href="https://codecov.io/gh/panjf2000/gnet"><img src="https://img.shields.io/codecov/c/github/panjf2000/gnet?style=flat-square"></a>
@@ -289,6 +289,12 @@ GOMAXPROCS=4
 
 Source code in `gnet` is available under the MIT [License](/LICENSE).
 
+# 👏 Contributors
+
+Please read our [Contributing Guidelines](CONTRIBUTING.md) before opening a PR and thank you to all the developers who already made contributions to `gnet`!
+
+[![](https://opencollective.com/gnet/contributors.svg?width=890&button=false)](https://github.com/panjf2000/gnet/graphs/contributors)
+
 # 🙏 Thanks
 
 - [evio](https://github.com/tidwall/evio)
@@ -301,3 +307,20 @@ Source code in `gnet` is available under the MIT [License](/LICENSE).
 - [A Million WebSockets and Go](https://www.freecodecamp.org/news/million-websockets-and-go-cc58418460bb/)
 - [Going Infinite, handling 1M websockets connections in Go](https://speakerdeck.com/eranyanay/going-infinite-handling-1m-websockets-connections-in-go)
 - [gnet: 一个轻量级且高性能的 Golang 网络库](https://taohuawu.club/go-event-loop-networking-library-gnet)
+
+# 💰 Backers
+
+Support us with a monthly donation and help us continue our activities.
+
+<a href="https://opencollective.com/gnet#backers" target="_blank"><img src="https://opencollective.com/gnet/backers.svg"></a>
+
+# 💎 Sponsors
+
+Become a bronze sponsor with a monthly donation of $10 and get your logo on our README on Github.
+
+<a href="https://opencollective.com/gnet#sponsors" target="_blank"><img src="https://opencollective.com/gnet/sponsors.svg"></a>
+
+# ☕️ Buy me a coffee
+
+<img src="https://raw.githubusercontent.com/panjf2000/illustrations/master/payments/WeChatPay.JPG" width="300" align="middle"/>&nbsp;&nbsp;
+<img src="https://raw.githubusercontent.com/panjf2000/illustrations/master/payments/AliPay.JPG" width="300" align="middle"/>&nbsp;&nbsp;
