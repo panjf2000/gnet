@@ -18,7 +18,8 @@ type echoServer struct {
 }
 
 func (es *echoServer) OnInitComplete(srv gnet.Server) (action gnet.Action) {
-	log.Printf("Server is running under multi-core: %t, loops: %d\n", srv.Multicore, srv.NumLoops)
+	log.Printf("Echo server is listening on %s (multi-cores: %t, loops: %d)\n",
+		srv.Addr.String(), srv.Multicore, srv.NumLoops)
 	return
 }
 func (es *echoServer) React(c gnet.Conn) (out []byte, action gnet.Action) {
@@ -31,6 +32,7 @@ func main() {
 	var port int
 	var multicore bool
 
+	// Example command: go run main.go --port 2333 --multicore true
 	flag.IntVar(&port, "port", 5000, "server port")
 	flag.BoolVar(&multicore, "multicore", true, "multicore")
 	flag.Parse()

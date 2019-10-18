@@ -29,12 +29,12 @@ type request struct {
 
 type httpServer struct {
 	*gnet.EventServer
-	port    int
 	noparse bool
 }
 
 func (hs *httpServer) OnInitComplete(srv gnet.Server) (action gnet.Action) {
-	log.Printf("http server started on port %d (loops: %d)", hs.port, srv.NumLoops)
+	log.Printf("HTTP server is listening on %s (multi-cores: %t, loops: %d)\n",
+		srv.Addr.String(), srv.Multicore, srv.NumLoops)
 	return
 }
 
@@ -71,6 +71,7 @@ func main() {
 	var aaaa bool
 	var noparse bool
 
+	// Example command: go run main.go --port 2333 --multicore true
 	flag.IntVar(&port, "port", 8080, "server port")
 	flag.BoolVar(&aaaa, "aaaa", false, "aaaaa....")
 	flag.BoolVar(&noparse, "noparse", true, "do not parse requests")
@@ -87,7 +88,7 @@ func main() {
 		res = "Hello World!\r\n"
 	}
 
-	http := &httpServer{port: port, noparse: noparse}
+	http := &httpServer{noparse: noparse}
 	// We at least want the single http address.
 	addr := fmt.Sprintf("tcp"+"://:%d", port)
 	// Start serving!
