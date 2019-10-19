@@ -28,16 +28,18 @@ func (svr *server) activateSubReactor(lp *loop) {
 
 	_ = lp.poller.Polling(func(fd int, ev uint32, job internal.Job) error {
 		c := lp.connections[fd]
-		switch {
-		case !c.outboundBuffer.IsEmpty():
+		switch c.outboundBuffer.IsEmpty() {
+		case true:
+			if ev&netpoll.InEvents != 0 {
+				return lp.loopIn(c)
+			}
+			return nil
+		case false:
 			if ev&netpoll.OutEvents != 0 {
 				return lp.loopOut(c)
 			}
 			return nil
-		case ev&netpoll.InEvents != 0:
-			return lp.loopIn(c)
-		default:
-			return nil
 		}
+		return nil
 	})
 }

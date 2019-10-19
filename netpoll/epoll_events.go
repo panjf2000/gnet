@@ -10,11 +10,11 @@ import "golang.org/x/sys/unix"
 
 const (
 	// ErrEvents ...
-	ErrEvents = unix.EPOLLERR | unix.EPOLLHUP
+	ErrEvents = unix.EPOLLERR | unix.EPOLLHUP | unix.EPOLLRDHUP
 	// OutEvents ...
 	OutEvents = unix.EPOLLOUT
 	// InEvents ...
-	InEvents = ErrEvents | unix.EPOLLRDHUP | unix.EPOLLIN
+	InEvents = ErrEvents | unix.EPOLLPRI | unix.EPOLLIN
 )
 
 type eventList struct {
