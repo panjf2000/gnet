@@ -150,14 +150,14 @@ func (svr *server) stop() {
 	// Notify all loops to close by closing all listeners
 	svr.subLoopGroup.iterate(func(i int, lp *loop) bool {
 		sniffError(lp.poller.Trigger(func() error {
-			return ErrClosing
+			return errShutdown
 		}))
 		return true
 	})
 
 	if svr.mainLoop != nil {
 		sniffError(svr.mainLoop.poller.Trigger(func() error {
-			return ErrClosing
+			return errShutdown
 		}))
 	}
 

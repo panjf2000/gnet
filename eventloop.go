@@ -93,13 +93,13 @@ func (lp *loop) loopIn(c *conn) error {
 		}
 		return lp.loopCloseConn(c, err)
 	}
-	c.oneOffBuffer = lp.packet[:n]
+	c.cache = lp.packet[:n]
 	out, action := lp.svr.eventHandler.React(c)
 
 	if out != nil {
 		c.write(out)
 	}
-	_, _ = c.inboundBuffer.Write(c.oneOffBuffer)
+	_, _ = c.inboundBuffer.Write(c.cache)
 
 	c.action = action
 	return lp.handleAction(c)
@@ -117,6 +117,7 @@ func (lp *loop) loopOut(c *conn) error {
 		return lp.loopCloseConn(c, err)
 	}
 	c.outboundBuffer.Shift(n)
+
 	if len(top) == n && tail != nil {
 		n, err = unix.Write(c.fd, tail)
 		if err != nil {
@@ -143,7 +144,7 @@ func (lp *loop) loopCloseConn(c *conn, err error) error {
 	switch lp.svr.eventHandler.OnClosed(c, err) {
 	case None:
 	case Shutdown:
-		return ErrClosing
+		return errShutdown
 	}
 	return nil
 }
@@ -172,7 +173,7 @@ func (lp *loop) loopCloseConn(c *conn, err error) error {
 //		switch action {
 //		case None:
 //		case Shutdown:
-//			err = ErrClosing
+//			err = errShutdown
 //		}
 //		l.svr.tch <- delay
 //	case error: // shutdown
@@ -195,7 +196,7 @@ func (lp *loop) loopTicker() {
 			switch action {
 			case None:
 			case Shutdown:
-				err = ErrClosing
+				err = errShutdown
 			}
 			return
 		}); err != nil {
@@ -212,7 +213,7 @@ func (lp *loop) handleAction(c *conn) error {
 	case Close:
 		return lp.loopCloseConn(c, nil)
 	case Shutdown:
-		return ErrClosing
+		return errShutdown
 	default:
 		return nil
 	}
@@ -244,7 +245,7 @@ func (lp *loop) loopUDPIn(fd int) error {
 		remoteAddr:    netpoll.SockaddrToUDPAddr(&sa6),
 		inboundBuffer: ringbuffer.New(socketRingBufferSize),
 	}
-	c.oneOffBuffer = lp.packet[:n]
+	c.cache = lp.packet[:n]
 	out, action := lp.svr.eventHandler.React(c)
 	if out != nil {
 		lp.svr.eventHandler.PreWrite()
@@ -252,7 +253,7 @@ func (lp *loop) loopUDPIn(fd int) error {
 	}
 	switch action {
 	case Shutdown:
-		return ErrClosing
+		return errShutdown
 	}
 	return nil
 }

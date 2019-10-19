@@ -17,8 +17,8 @@ import (
 )
 
 var (
-	// ErrClosing indicates this server is closing.
-	ErrClosing = errors.New("closing event-loop")
+	// errShutdown indicates this server is closing.
+	errShutdown = errors.New("server is going to be shutdown")
 )
 
 // socketRingBufferSize represents the initial size of connection ring-buffer.

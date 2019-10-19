@@ -19,41 +19,41 @@ type conn struct {
 	sa             unix.Sockaddr          // remote socket address
 	ctx            interface{}            // user-defined context
 	loop           *loop                  // connected loop
+	cache          []byte                 // reuse memory of inbound data
 	opened         bool                   // connection opened event fired
 	action         Action                 // next user action
 	localAddr      net.Addr               // local addre
 	remoteAddr     net.Addr               // remote addr
-	oneOffBuffer   []byte                 // reuse memory of inbound data
 	inboundBuffer  *ringbuffer.RingBuffer // buffer for data from client
 	outboundBuffer *ringbuffer.RingBuffer // buffer for data that is ready to write to client
 }
 
 func (c *conn) Read() []byte {
 	if c.inboundBuffer.IsEmpty() {
-		return c.oneOffBuffer
+		return c.cache
 	}
 	top, _ := c.inboundBuffer.PreReadAll()
-	return append(top, c.oneOffBuffer...)
+	return append(top, c.cache...)
 }
 
 func (c *conn) ResetBuffer() {
-	c.oneOffBuffer = c.oneOffBuffer[:0]
+	c.cache = c.cache[:0]
 	c.inboundBuffer.Reset()
 }
 
 func (c *conn) ReadN(n int) (size int, buf []byte) {
-	oneOffBufferLen := len(c.oneOffBuffer)
+	oneOffBufferLen := len(c.cache)
 	inBufferLen := c.inboundBuffer.Length()
 	if inBufferLen+oneOffBufferLen < n {
 		return
 	}
 	if c.inboundBuffer.IsEmpty() {
 		size = n
-		buf = c.oneOffBuffer[:n]
+		buf = c.cache[:n]
 		if n == oneOffBufferLen {
-			c.oneOffBuffer = c.oneOffBuffer[:0]
+			c.cache = c.cache[:0]
 		} else {
-			c.oneOffBuffer = c.oneOffBuffer[n:]
+			c.cache = c.cache[n:]
 		}
 		return
 	}
@@ -70,11 +70,11 @@ func (c *conn) ReadN(n int) (size int, buf []byte) {
 	c.inboundBuffer.Reset()
 
 	restSize := n - inBufferLen
-	buf = append(buf, c.oneOffBuffer[:restSize]...)
+	buf = append(buf, c.cache[:restSize]...)
 	if restSize == oneOffBufferLen {
-		c.oneOffBuffer = c.oneOffBuffer[:0]
+		c.cache = c.cache[:0]
 	} else {
-		c.oneOffBuffer = c.oneOffBuffer[restSize:]
+		c.cache = c.cache[restSize:]
 	}
 	return
 }
@@ -84,7 +84,7 @@ func (c *conn) ReadN(n int) (size int, buf []byte) {
 //}
 
 func (c *conn) BufferLength() int {
-	return c.inboundBuffer.Length() + len(c.oneOffBuffer)
+	return c.inboundBuffer.Length() + len(c.cache)
 }
 
 func (c *conn) AsyncWrite(buf []byte) {
