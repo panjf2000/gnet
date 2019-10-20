@@ -29,15 +29,18 @@ func (svr *server) activateSubReactor(lp *loop) {
 	_ = lp.poller.Polling(func(fd int, filter int16, job internal.Job) error {
 		c := lp.connections[fd]
 		switch filter {
-		case netpoll.EVFilterSock:
-			return lp.loopCloseConn(c, nil)
-		case netpoll.EVFilterRead:
-			return lp.loopIn(c)
+		// Don't change the ordering of processing EVFILT_WRITE | EVFILT_READ | EV_ERROR/EV_EOF unless you're 100%
+		// sure what you're doing!
+		// Re-ordering can easily introduce bugs and bad side-effects, as I found out painfully in the past.
 		case netpoll.EVFilterWrite:
 			if !c.outboundBuffer.IsEmpty() {
 				return lp.loopOut(c)
 			}
 			return nil
+		case netpoll.EVFilterRead:
+			return lp.loopIn(c)
+		case netpoll.EVFilterSock:
+			return lp.loopCloseConn(c, nil)
 		default:
 			return nil
 		}

@@ -17,6 +17,9 @@ func (lp *loop) handleEvent(fd int, ev uint32, job internal.Job) error {
 	}
 	if c, ok := lp.connections[fd]; ok {
 		switch {
+		// Don't change the ordering of processing EPOLLOUT | EPOLLRDHUP / EPOLLIN unless you're 100%
+		// sure what you're doing!
+		// Re-ordering can easily introduce bugs and bad side-effects, as I found out painfully in the past.
 		case !c.opened:
 			return lp.loopOpen(c)
 		case !c.outboundBuffer.IsEmpty():

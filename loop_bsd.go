@@ -16,22 +16,27 @@ func (lp *loop) handleEvent(fd int, filter int16, job internal.Job) error {
 		return job()
 	}
 	if c, ok := lp.connections[fd]; ok {
-		switch {
-		case !c.opened:
+		switch c.opened {
+		case false:
 			return lp.loopOpen(c)
-		case !c.outboundBuffer.IsEmpty():
-			if filter == netpoll.EVFilterWrite {
-				return lp.loopOut(c)
+		case true:
+			switch filter {
+			// Don't change the ordering of processing EVFILT_WRITE | EVFILT_READ | EV_ERROR/EV_EOF unless you're 100%
+			// sure what you're doing!
+			// Re-ordering can easily introduce bugs and bad side-effects, as I found out painfully in the past.
+			case netpoll.EVFilterWrite:
+				if !c.outboundBuffer.IsEmpty() {
+					return lp.loopOut(c)
+				}
+				return nil
+			case netpoll.EVFilterRead:
+				return lp.loopIn(c)
+			case netpoll.EVFilterSock:
+				return lp.loopCloseConn(c, nil)
+			default:
+				return nil
 			}
-			return nil
-		case filter == netpoll.EVFilterRead:
-			return lp.loopIn(c)
-		case filter == netpoll.EVFilterSock:
-			return lp.loopCloseConn(c, nil)
-		default:
-			return nil
 		}
-	} else {
-		return lp.loopAccept(fd)
 	}
+	return lp.loopAccept(fd)
 }
