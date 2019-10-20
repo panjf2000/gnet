@@ -26,17 +26,21 @@ The goal of this project is to create a server framework for Go that performs on
 
 # 🚀 Features
 
-- [High-performance](#performance) event-loop under multi-threads/goroutines model
-- Built-in load balancing algorithm: Round-Robin
-- Built-in goroutine pool powered by the library [ants](https://github.com/panjf2000/ants)
-- Built-in memory pool with bytes powered by the library [pool](https://github.com/gobwas/pool/)
-- Concise APIs
-- Efficient memory usage: Ring-Buffer
-- Supporting multiple protocols: TCP, UDP, and Unix Sockets
-- Supporting two event-notification mechanisms: epoll on Linux and kqueue on FreeBSD
-- Supporting asynchronous write operation
-- Flexible ticker event
-- SO_REUSEPORT socket option
+- [x] [High-performance](#performance) event-loop under multi-threads/goroutines model
+- [x] Built-in load balancing algorithm: Round-Robin
+- [x] Built-in goroutine pool powered by the library [ants](https://github.com/panjf2000/ants)
+- [x] Built-in memory pool with bytes powered by the library [pool](https://github.com/gobwas/pool/)
+- [x] Concise APIs
+- [x] Efficient memory usage: Ring-Buffer
+- [x] Supporting multiple protocols: TCP, UDP, and Unix Sockets
+- [x] Supporting two event-notification mechanisms: epoll on Linux and kqueue on FreeBSD
+- [x] Supporting asynchronous write operation
+- [x] Flexible ticker event
+- [x] SO_REUSEPORT socket option
+- [ ] Additional load-balancing algorithms: Random, Least-Connections, Consistent-hashing and so on
+- [ ] New event-notification mechanism: IOCP on Windows platform 
+- [ ] TLS support
+- [ ] Implementation of `gnet` Client
 
 # 💡 Key Designs
 

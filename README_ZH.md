@@ -26,17 +26,21 @@
 
 # 🚀 功能
 
-- [高性能](#性能测试) 的基于多线程/Go程模型的 event-loop 事件驱动
-- 内置 Round-Robin 轮询负载均衡算法
-- 内置 goroutine 池，由开源库 [ants](https://github.com/panjf2000/ants) 提供支持
-- 内置 bytes 内存池，由开源库 [pool](https://github.com/gobwas/pool/) 提供支持
-- 简洁的 APIs
-- 基于 Ring-Buffer 的高效内存利用
-- 支持多种网络协议：TCP、UDP、Unix Sockets
-- 支持两种事件驱动机制：Linux 里的 epoll 以及 FreeBSD 里的 kqueue
-- 支持异步写操作
-- 灵活的事件定时器
-- SO_REUSEPORT 端口重用
+- [x] [高性能](#性能测试) 的基于多线程/Go程模型的 event-loop 事件驱动
+- [x] 内置 Round-Robin 轮询负载均衡算法
+- [x] 内置 goroutine 池，由开源库 [ants](https://github.com/panjf2000/ants) 提供支持
+- [x] 内置 bytes 内存池，由开源库 [pool](https://github.com/gobwas/pool/) 提供支持
+- [x] 简洁的 APIs
+- [x] 基于 Ring-Buffer 的高效内存利用
+- [x] 支持多种网络协议：TCP、UDP、Unix Sockets
+- [x] 支持两种事件驱动机制：Linux 里的 epoll 以及 FreeBSD 里的 kqueue
+- [x] 支持异步写操作
+- [x] 灵活的事件定时器
+- [x] SO_REUSEPORT 端口重用
+- [ ] 加入更多的负载均衡算法：随机、最少连接、一致性哈希等等
+- [ ] 支持 Windows 平台的 IOCP 事件驱动机制
+- [ ] 支持 TLS
+- [ ] 实现 `gnet` 客户端
 
 # 💡 核心设计
 ## 多线程/Go程模型
