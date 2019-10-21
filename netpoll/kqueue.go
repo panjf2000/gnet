@@ -45,14 +45,16 @@ func (p *Poller) Close() error {
 	return unix.Close(p.fd)
 }
 
+var wakeChanges = []unix.Kevent_t{{
+	Ident:  0,
+	Filter: unix.EVFILT_USER,
+	Fflags: unix.NOTE_TRIGGER,
+}}
+
 // Trigger wakes up the poller blocked in waiting for network-events and runs jobs in asyncJobQueue.
 func (p *Poller) Trigger(job internal.Job) error {
 	p.asyncJobQueue.Push(job)
-	_, err := unix.Kevent(p.fd, []unix.Kevent_t{{
-		Ident:  0,
-		Filter: unix.EVFILT_USER,
-		Fflags: unix.NOTE_TRIGGER,
-	}}, nil, nil)
+	_, err := unix.Kevent(p.fd, wakeChanges, nil, nil)
 	return err
 }
 
