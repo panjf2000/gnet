@@ -52,7 +52,7 @@ func (p *Poller) Close() error {
 	return unix.Close(p.fd)
 }
 
-var wakeSignal = []byte{0, 0, 0, 0, 0, 0, 0, 1}
+var wakeSignal = []byte{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
 
 // Trigger wakes up the poller blocked in waiting for network-events and runs jobs in asyncJobQueue.
 func (p *Poller) Trigger(job internal.Job) error {
