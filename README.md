@@ -26,7 +26,7 @@ The goal of this project is to create a server framework for Go that performs on
 
 # 🚀 Features
 
-- [x] [High-performance](#performance) event-loop under multi-threads/goroutines model
+- [x] [High-performance](#-performance) event-loop under multi-threads/goroutines model
 - [x] Built-in load balancing algorithm: Round-Robin
 - [x] Built-in goroutine pool powered by the library [ants](https://github.com/panjf2000/ants)
 - [x] Built-in memory pool with bytes powered by the library [pool](https://github.com/gobwas/pool/)
