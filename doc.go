@@ -1,7 +1,3 @@
-// Copyright 2019 Andy Pan. All rights reserved.
-// Use of this source code is governed by an MIT-style
-// license that can be found in the LICENSE file.
-
 /*
 gnet is an event-driven networking framework that is fast and small. It makes direct epoll and kqueue syscalls rather
 than using the standard Go net package, and works in a similar manner as netty and libuv.
@@ -40,5 +36,4 @@ Echo server built upon gnet is shown below:
 		log.Fatal(gnet.Serve(echo, "tcp://:9000", gnet.WithMulticore(true)))
 	}
 */
-
 package gnet
