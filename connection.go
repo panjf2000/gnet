@@ -128,6 +128,14 @@ func (c *conn) write(buf []byte) {
 	}
 }
 
+func (c *conn) reset()  {
+	c.opened = false
+	c.ctx = nil
+	c.cache = nil
+	c.inboundBuffer.Reset()
+	c.outboundBuffer.Reset()
+}
+
 func (c *conn) SendTo(buf []byte, sa unix.Sockaddr) {
 	_ = unix.Sendto(c.fd, buf, 0, sa)
 }

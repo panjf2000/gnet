@@ -49,12 +49,16 @@ func (lp *loop) loopAccept(fd int) error {
 		if err := unix.SetNonblock(nfd, true); err != nil {
 			return err
 		}
-		c := &conn{fd: nfd,
-			sa:             sa,
-			inboundBuffer:  ringbuffer.New(socketRingBufferSize),
-			outboundBuffer: ringbuffer.New(socketRingBufferSize),
-			loop:           lp,
-		}
+		c := lp.svr.connPool.Get().(*conn)
+		c.fd = nfd
+		c.loop = lp
+		c.sa = sa
+		//c := &conn{fd: nfd,
+		//	sa:             sa,
+		//	inboundBuffer:  ringbuffer.New(socketRingBufferSize),
+		//	outboundBuffer: ringbuffer.New(socketRingBufferSize),
+		//	loop:           lp,
+		//}
 		if err = lp.poller.AddReadWrite(c.fd); err == nil {
 			lp.connections[c.fd] = c
 		} else {
@@ -140,8 +144,10 @@ func (lp *loop) loopCloseConn(c *conn, err error) error {
 		delete(lp.connections, c.fd)
 		_ = unix.Close(c.fd)
 	}
-
-	switch lp.svr.eventHandler.OnClosed(c, err) {
+	action := lp.svr.eventHandler.OnClosed(c, err)
+	c.reset()
+	lp.svr.connPool.Put(c)
+	switch action {
 	case None:
 	case Shutdown:
 		return errShutdown
