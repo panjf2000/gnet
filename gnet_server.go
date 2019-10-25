@@ -24,7 +24,7 @@ type server struct {
 	opts             *Options           // options with server
 	once             sync.Once          // make sure only signalShutdown once
 	cond             *sync.Cond         // shutdown signaler
-	connPool 		 sync.Pool          // pool for caching connections
+	connPool         sync.Pool          // pool for caching connections
 	mainLoop         *loop              // main loop for accepting connections
 	eventHandler     EventHandler       // user eventHandler
 	subLoopGroup     IEventLoopGroup    // loops for handling events
@@ -197,9 +197,14 @@ func serve(eventHandler EventHandler, listener *listener, options *Options) erro
 	svr.tch = make(chan time.Duration)
 	svr.opts = options
 
-	server := Server{options.Multicore, listener.lnaddr, numCPU}
-	action := svr.eventHandler.OnInitComplete(server)
-	switch action {
+	server := Server{
+		Multicore:    options.Multicore,
+		Addr:         listener.lnaddr,
+		NumLoops:     numCPU,
+		ReUsePort:    options.ReusePort,
+		TCPKeepAlive: options.TCPKeepAlive,
+	}
+	switch svr.eventHandler.OnInitComplete(server) {
 	case None:
 	case Shutdown:
 		return nil

@@ -53,21 +53,27 @@ type Server struct {
 
 	// NumLoops is the number of loops that the server is using.
 	NumLoops int
+
+	// ReUsePort indicates whether SO_REUSEPORT is enable.
+	ReUsePort bool
+
+	// TCPKeepAlive (SO_KEEPALIVE) socket option.
+	TCPKeepAlive time.Duration
 }
 
 // Conn is a interface of gnet connection.
 type Conn interface {
 	// Context returns a user-defined context.
-	Context() interface{}
+	Context() (ctx interface{})
 
 	// SetContext sets a user-defined context.
-	SetContext(interface{})
+	SetContext(ctx interface{})
 
 	// LocalAddr is the connection's local socket address.
-	LocalAddr() net.Addr
+	LocalAddr() (addr net.Addr)
 
 	// RemoteAddr is the connection's remote peer address.
-	RemoteAddr() net.Addr
+	RemoteAddr() (addr net.Addr)
 
 	// Wake triggers a React event for this connection.
 	//Wake()
@@ -96,6 +102,9 @@ type Conn interface {
 
 	// AyncWrite writes data to client/connection asynchronously.
 	AsyncWrite(buf []byte)
+
+	// Wake triggers a React event for this connection.
+	Wake()
 }
 
 // EventHandler represents the server events' callbacks for the Serve call.

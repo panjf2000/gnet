@@ -294,6 +294,59 @@ func testTick(network, addr string) {
 	}
 }
 
+func TestWakeConn(t *testing.T) {
+	testWakeConn("tcp", ":9000")
+}
+
+type testWakeConnServer struct {
+	*EventServer
+	network string
+	addr    string
+	conn    Conn
+	wake    bool
+}
+
+func (t *testWakeConnServer) OnOpened(c Conn) (out []byte, action Action) {
+	t.conn = c
+	return
+}
+
+func (t *testWakeConnServer) OnClosed(c Conn, err error) (action Action) {
+	action = Shutdown
+	return
+}
+
+func (t *testWakeConnServer) React(c Conn) (out []byte, action Action) {
+	out = []byte("Waking up.")
+	return
+}
+func (t *testWakeConnServer) Tick() (delay time.Duration, action Action) {
+	if !t.wake {
+		t.wake = true
+		delay = time.Millisecond * 100
+		go func() {
+			conn, err := net.Dial(t.network, t.addr)
+			must(err)
+			defer conn.Close()
+			r := make([]byte, 10)
+			_, err = conn.Read(r)
+			if err != nil {
+				panic(err)
+			}
+			fmt.Println(string(r))
+		}()
+		return
+	}
+	t.conn.Wake()
+	delay = time.Millisecond * 100
+	return
+}
+
+func testWakeConn(network, addr string) {
+	svr := &testWakeConnServer{network: network, addr: addr}
+	must(Serve(svr, network+"://"+addr, WithTicker(true)))
+}
+
 func TestShutdown(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)

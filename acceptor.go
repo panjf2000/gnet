@@ -29,13 +29,6 @@ func (svr *server) acceptNewConnection(fd int) error {
 	c.fd = nfd
 	c.loop = lp
 	c.sa = sa
-	//c := &conn{
-	//	fd:             nfd,
-	//	sa:             sa,
-	//	loop:           lp,
-	//	inboundBuffer:  ringbuffer.New(socketRingBufferSize),
-	//	outboundBuffer: ringbuffer.New(socketRingBufferSize),
-	//}
 	_ = lp.loopOpen(c)
 	_ = lp.poller.Trigger(func() (err error) {
 		if err = lp.poller.AddRead(nfd); err == nil {

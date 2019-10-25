@@ -79,10 +79,6 @@ func (c *conn) ReadN(n int) (size int, buf []byte) {
 	return
 }
 
-//func (c *conn) ShiftN(n int) {
-//	c.inboundBuffer.Shift(n)
-//}
-
 func (c *conn) BufferLength() int {
 	return c.inboundBuffer.Length() + len(c.cache)
 }
@@ -90,10 +86,26 @@ func (c *conn) BufferLength() int {
 func (c *conn) AsyncWrite(buf []byte) {
 	_ = c.loop.poller.Trigger(func() error {
 		c.write(buf)
-		//ringbuffer.Recycle(buf)
 		return nil
 	})
 }
+
+func (c *conn) Wake() {
+	if c.loop != nil {
+		sniffError(c.loop.poller.Trigger(func() error {
+			return c.loop.loopWake(c)
+		}))
+	}
+}
+
+//func (c *conn) ShiftN(n int) {
+//	c.inboundBuffer.Shift(n)
+//}
+
+func (c *conn) Context() interface{}       { return c.ctx }
+func (c *conn) SetContext(ctx interface{}) { c.ctx = ctx }
+func (c *conn) LocalAddr() net.Addr        { return c.localAddr }
+func (c *conn) RemoteAddr() net.Addr       { return c.remoteAddr }
 
 func (c *conn) open(buf []byte) {
 	n, err := unix.Write(c.fd, buf)
@@ -128,25 +140,14 @@ func (c *conn) write(buf []byte) {
 	}
 }
 
-func (c *conn) reset()  {
+func (c *conn) sendTo(buf []byte, sa unix.Sockaddr) {
+	_ = unix.Sendto(c.fd, buf, 0, sa)
+}
+
+func (c *conn) reset() {
 	c.opened = false
 	c.ctx = nil
 	c.cache = nil
 	c.inboundBuffer.Reset()
 	c.outboundBuffer.Reset()
 }
-
-func (c *conn) SendTo(buf []byte, sa unix.Sockaddr) {
-	_ = unix.Sendto(c.fd, buf, 0, sa)
-}
-
-func (c *conn) Context() interface{}       { return c.ctx }
-func (c *conn) SetContext(ctx interface{}) { c.ctx = ctx }
-func (c *conn) LocalAddr() net.Addr        { return c.localAddr }
-func (c *conn) RemoteAddr() net.Addr       { return c.remoteAddr }
-
-//func (c *conn) Wake() {
-//	if c.loop != nil {
-//		sniffError(c.loop.poller.Trigger(c))
-//	}
-//}

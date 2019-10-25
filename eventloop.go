@@ -53,12 +53,6 @@ func (lp *loop) loopAccept(fd int) error {
 		c.fd = nfd
 		c.loop = lp
 		c.sa = sa
-		//c := &conn{fd: nfd,
-		//	sa:             sa,
-		//	inboundBuffer:  ringbuffer.New(socketRingBufferSize),
-		//	outboundBuffer: ringbuffer.New(socketRingBufferSize),
-		//	loop:           lp,
-		//}
 		if err = lp.poller.AddReadWrite(c.fd); err == nil {
 			lp.connections[c.fd] = c
 		} else {
@@ -155,44 +149,17 @@ func (lp *loop) loopCloseConn(c *conn, err error) error {
 	return nil
 }
 
-//func (l *loop) loopWake(conn *conn) error {
-//	out, action := l.svr.eventHandler.React(conn)
-//	conn.action = action
-//	if len(out) > 0 {
-//		conn.write(out)
-//	}
-//	return l.handleAction(conn)
-//}
-
-//func (l *loop) loopNote(job internal.Job) error {
-//
-//	var err error
-//	switch v := job.(type) {
-//	case *conn:
-//		l.connections[v.fd] = v
-//		l.poller.AddRead(v.fd)
-//		return nil
-//	case func() error:
-//		return v()
-//	case time.Duration:
-//		delay, action := l.svr.eventHandler.Tick()
-//		switch action {
-//		case None:
-//		case Shutdown:
-//			err = errShutdown
-//		}
-//		l.svr.tch <- delay
-//	case error: // shutdown
-//		err = v
-//		//case *conn:
-//		//	// Wake called for connection
-//		//	if val, ok := l.connections[v.fd]; !ok || val != v {
-//		//		return nil // ignore stale wakes
-//		//	}
-//		//	return l.loopWake(v)
-//	}
-//	return err
-//}
+func (lp *loop) loopWake(c *conn) error {
+	if co, ok := lp.connections[c.fd]; !ok || co != c {
+		return nil // ignore stale wakes
+	}
+	out, action := lp.svr.eventHandler.React(c)
+	c.action = action
+	if out != nil {
+		c.write(out)
+	}
+	return lp.handleAction(c)
+}
 
 func (lp *loop) loopTicker() {
 	for {
@@ -255,7 +222,7 @@ func (lp *loop) loopUDPIn(fd int) error {
 	out, action := lp.svr.eventHandler.React(c)
 	if out != nil {
 		lp.svr.eventHandler.PreWrite()
-		c.SendTo(out, sa)
+		c.sendTo(out, sa)
 	}
 	switch action {
 	case Shutdown:
