@@ -63,7 +63,6 @@ func (c *conn) ReadN(n int) (size int, buf []byte) {
 		buf = append(buf, tail...)
 	}
 	if inBufferLen >= n {
-		//c.ShiftN(n)
 		c.inboundBuffer.Shift(n)
 		return
 	}
