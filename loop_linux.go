@@ -12,9 +12,6 @@ import (
 )
 
 func (lp *loop) handleEvent(fd int, ev uint32, job internal.Job) error {
-	if fd == 0 {
-		return job()
-	}
 	if c, ok := lp.connections[fd]; ok {
 		switch {
 		// Don't change the ordering of processing EPOLLOUT | EPOLLRDHUP / EPOLLIN unless you're 100%
@@ -32,7 +29,6 @@ func (lp *loop) handleEvent(fd int, ev uint32, job internal.Job) error {
 		default:
 			return nil
 		}
-	} else {
-		return lp.loopAccept(fd)
 	}
+	return lp.loopAccept(fd)
 }

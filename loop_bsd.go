@@ -12,9 +12,6 @@ import (
 )
 
 func (lp *loop) handleEvent(fd int, filter int16, job internal.Job) error {
-	if fd == 0 {
-		return job()
-	}
 	if c, ok := lp.connections[fd]; ok {
 		switch c.opened {
 		case false:
