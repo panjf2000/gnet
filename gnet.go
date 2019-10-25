@@ -47,7 +47,7 @@ type Server struct {
 	// assigned to the value of runtime.NumCPU().
 	Multicore bool
 
-	// The addrs parameter is an array of listening addresses that align
+	// The Addr parameter is an array of listening addresses that align
 	// with the addr strings passed to the Serve function.
 	Addr net.Addr
 
@@ -100,7 +100,7 @@ type Conn interface {
 	// BufferLength returns the length of available data in the inbound ring-buffer.
 	BufferLength() (size int)
 
-	// AyncWrite writes data to client/connection asynchronously.
+	// AsyncWrite writes data to client/connection asynchronously.
 	AsyncWrite(buf []byte)
 
 	// Wake triggers a React event for this connection.

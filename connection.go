@@ -22,7 +22,7 @@ type conn struct {
 	cache          []byte                 // reuse memory of inbound data
 	opened         bool                   // connection opened event fired
 	action         Action                 // next user action
-	localAddr      net.Addr               // local addre
+	localAddr      net.Addr               // local addr
 	remoteAddr     net.Addr               // remote addr
 	inboundBuffer  *ringbuffer.RingBuffer // buffer for data from client
 	outboundBuffer *ringbuffer.RingBuffer // buffer for data that is ready to write to client

@@ -20,12 +20,12 @@ func initOptions(options ...Option) *Options {
 // Options are set when the client opens.
 type Options struct {
 	// Multicore indicates whether the server will be effectively created with multi-cores, if so,
-	// then you must take care with synchonizing memory between all event callbacks, otherwise,
+	// then you must take care with synchronizing memory between all event callbacks, otherwise,
 	// it will run the server with single thread. The number of threads in the server will be automatically
 	// assigned to the value of runtime.NumCPU().
 	Multicore bool
 
-	// ReusePort indicates whether to set up the SO_REUSEPORT option.
+	// ReusePort indicates whether to set up the SO_REUSEPORT socket option.
 	ReusePort bool
 
 	// Ticker indicates whether the ticker has been set up.
@@ -42,28 +42,28 @@ func WithOptions(options Options) Option {
 	}
 }
 
-// WithMulticore ...
+// WithMulticore sets up multi-cores with gnet.
 func WithMulticore(multicore bool) Option {
 	return func(opts *Options) {
 		opts.Multicore = multicore
 	}
 }
 
-// WithReusePort ...
+// WithReusePort sets up SO_REUSEPORT socket option.
 func WithReusePort(reusePort bool) Option {
 	return func(opts *Options) {
 		opts.ReusePort = reusePort
 	}
 }
 
-// WithTCPKeepAlive ...
+// WithTCPKeepAlive sets up SO_KEEPALIVE socket option.
 func WithTCPKeepAlive(tcpKeepAlive time.Duration) Option {
 	return func(opts *Options) {
 		opts.TCPKeepAlive = tcpKeepAlive
 	}
 }
 
-// WithTicker ...
+// WithTicker indicates that a ticker is set.
 func WithTicker(ticker bool) Option {
 	return func(opts *Options) {
 		opts.Ticker = ticker

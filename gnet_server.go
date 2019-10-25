@@ -19,7 +19,7 @@ import (
 
 type server struct {
 	ln               *listener          // all the listeners
-	wg               sync.WaitGroup     // loop close waitgroup
+	wg               sync.WaitGroup     // loop close WaitGroup
 	tch              chan time.Duration // ticker channel
 	opts             *Options           // options with server
 	once             sync.Once          // make sure only signalShutdown once
