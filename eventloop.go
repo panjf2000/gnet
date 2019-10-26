@@ -137,14 +137,15 @@ func (lp *loop) loopCloseConn(c *conn, err error) error {
 	if err := lp.poller.Delete(c.fd); err == nil {
 		delete(lp.connections, c.fd)
 		_ = unix.Close(c.fd)
-	}
-	action := lp.svr.eventHandler.OnClosed(c, err)
-	c.reset()
-	lp.svr.connPool.Put(c)
-	switch action {
-	case None:
-	case Shutdown:
-		return errShutdown
+		action := lp.svr.eventHandler.OnClosed(c, err)
+		c.reset()
+		lp.svr.connPool.Put(c)
+		switch action {
+		case None:
+			return nil
+		case Shutdown:
+			return errShutdown
+		}
 	}
 	return nil
 }
