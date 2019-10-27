@@ -134,15 +134,12 @@ func (lp *loop) loopOut(c *conn) error {
 }
 
 func (lp *loop) loopCloseConn(c *conn, err error) error {
-	if err := lp.poller.Delete(c.fd); err == nil {
+	if _, ok := lp.connections[c.fd]; ok && lp.poller.Delete(c.fd) == nil && unix.Close(c.fd) == nil {
 		delete(lp.connections, c.fd)
-		_ = unix.Close(c.fd)
 		action := lp.svr.eventHandler.OnClosed(c, err)
 		c.reset()
 		lp.svr.connPool.Put(c)
 		switch action {
-		case None:
-			return nil
 		case Shutdown:
 			return errShutdown
 		}
