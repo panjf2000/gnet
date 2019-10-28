@@ -49,7 +49,7 @@ func (lp *loop) loopAccept(fd int) error {
 		if err := unix.SetNonblock(nfd, true); err != nil {
 			return err
 		}
-		c := initConn(nfd, lp, sa)
+		c := newConn(nfd, lp, sa)
 		if err = lp.poller.AddReadWrite(c.fd); err == nil {
 			lp.connections[c.fd] = c
 		} else {
@@ -137,7 +137,7 @@ func (lp *loop) loopCloseConn(c *conn, err error) error {
 		case Shutdown:
 			return errShutdown
 		}
-		c.opened = false
+		c.reset()
 	}
 	return nil
 }

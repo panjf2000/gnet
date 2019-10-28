@@ -28,15 +28,62 @@ type conn struct {
 	outboundBuffer *ringbuffer.RingBuffer // buffer for data that is ready to write to client
 }
 
-func initConn(fd int, lp *loop, sa unix.Sockaddr) *conn {
+func newConn(fd int, lp *loop, sa unix.Sockaddr) *conn {
 	return &conn{
 		fd:             fd,
 		loop:           lp,
 		sa:             sa,
-		inboundBuffer:  ringbuffer.New(socketRingBufferSize),
-		outboundBuffer: ringbuffer.New(socketRingBufferSize),
+		inboundBuffer:  lp.svr.bytesPool.Get().(*ringbuffer.RingBuffer),
+		outboundBuffer: lp.svr.bytesPool.Get().(*ringbuffer.RingBuffer),
 	}
 }
+
+func (c *conn) reset() {
+	c.opened = false
+	c.inboundBuffer.Reset()
+	c.outboundBuffer.Reset()
+	c.loop.svr.bytesPool.Put(c.inboundBuffer)
+	c.loop.svr.bytesPool.Put(c.outboundBuffer)
+}
+
+func (c *conn) open(buf []byte) {
+	n, err := unix.Write(c.fd, buf)
+	if err != nil {
+		_, _ = c.outboundBuffer.Write(buf)
+		return
+	}
+
+	if n < len(buf) {
+		_, _ = c.outboundBuffer.Write(buf[n:])
+	}
+}
+
+func (c *conn) write(buf []byte) {
+	if !c.outboundBuffer.IsEmpty() {
+		_, _ = c.outboundBuffer.Write(buf)
+		return
+	}
+	n, err := unix.Write(c.fd, buf)
+	if err != nil {
+		if err == unix.EAGAIN {
+			_, _ = c.outboundBuffer.Write(buf)
+			_ = c.loop.poller.ModReadWrite(c.fd)
+			return
+		}
+		_ = c.loop.loopCloseConn(c, err)
+		return
+	}
+	if n < len(buf) {
+		_, _ = c.outboundBuffer.Write(buf[n:])
+		_ = c.loop.poller.ModReadWrite(c.fd)
+	}
+}
+
+func (c *conn) sendTo(buf []byte, sa unix.Sockaddr) {
+	_ = unix.Sendto(c.fd, buf, 0, sa)
+}
+
+// ================================= Public APIs of gnet.Conn =================================
 
 func (c *conn) Read() []byte {
 	if c.inboundBuffer.IsEmpty() {
@@ -117,40 +164,3 @@ func (c *conn) Context() interface{}       { return c.ctx }
 func (c *conn) SetContext(ctx interface{}) { c.ctx = ctx }
 func (c *conn) LocalAddr() net.Addr        { return c.localAddr }
 func (c *conn) RemoteAddr() net.Addr       { return c.remoteAddr }
-
-func (c *conn) open(buf []byte) {
-	n, err := unix.Write(c.fd, buf)
-	if err != nil {
-		_, _ = c.outboundBuffer.Write(buf)
-		return
-	}
-
-	if n < len(buf) {
-		_, _ = c.outboundBuffer.Write(buf[n:])
-	}
-}
-
-func (c *conn) write(buf []byte) {
-	if !c.outboundBuffer.IsEmpty() {
-		_, _ = c.outboundBuffer.Write(buf)
-		return
-	}
-	n, err := unix.Write(c.fd, buf)
-	if err != nil {
-		if err == unix.EAGAIN {
-			_, _ = c.outboundBuffer.Write(buf)
-			_ = c.loop.poller.ModReadWrite(c.fd)
-			return
-		}
-		_ = c.loop.loopCloseConn(c, err)
-		return
-	}
-	if n < len(buf) {
-		_, _ = c.outboundBuffer.Write(buf[n:])
-		_ = c.loop.poller.ModReadWrite(c.fd)
-	}
-}
-
-func (c *conn) sendTo(buf []byte, sa unix.Sockaddr) {
-	_ = unix.Sendto(c.fd, buf, 0, sa)
-}
