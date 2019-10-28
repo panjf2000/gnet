@@ -82,15 +82,22 @@ func (c *conn) BufferLength() int {
 	return c.inboundBuffer.Length() + len(c.cache)
 }
 
-func (c *conn) AsyncWrite(buf []byte) {
+func (c *conn) ConnCAS() int {
+	return c.fd
+}
+
+func (c *conn) AsyncWrite(buf []byte, cas int) {
 	_ = c.loop.poller.Trigger(func() error {
-		c.write(buf)
+		if c.opened && c.fd == cas {
+			c.write(buf)
+		}
 		return nil
 	})
 }
 
 func (c *conn) Wake() {
-	if c.loop != nil {
+	// check whether it is stale wakes
+	if c.inLoop() {
 		sniffError(c.loop.poller.Trigger(func() error {
 			return c.loop.loopWake(c)
 		}))
@@ -143,10 +150,30 @@ func (c *conn) sendTo(buf []byte, sa unix.Sockaddr) {
 	_ = unix.Sendto(c.fd, buf, 0, sa)
 }
 
+func (c *conn) inLoop() bool {
+	if c.loop != nil {
+		co, ok := c.loop.connections[c.fd]
+		return ok && co == c
+	}
+	return false
+}
+
+func (c *conn) init(fd int, lp *loop, sa unix.Sockaddr) {
+	c.fd = fd
+	c.loop = lp
+	c.sa = sa
+}
+
 func (c *conn) reset() {
+	c.fd = 0
 	c.opened = false
+	c.loop = nil
+	c.sa = nil
 	c.ctx = nil
 	c.cache = nil
+	c.action = None
+	c.localAddr = nil
+	c.remoteAddr = nil
 	c.inboundBuffer.Reset()
 	c.outboundBuffer.Reset()
 }

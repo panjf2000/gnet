@@ -26,15 +26,13 @@ func (svr *server) acceptNewConnection(fd int) error {
 	}
 	lp := svr.subLoopGroup.next()
 	c := svr.connPool.Get().(*conn)
-	c.fd = nfd
-	c.loop = lp
-	c.sa = sa
-	_ = lp.loopOpen(c)
 	_ = lp.poller.Trigger(func() (err error) {
-		if err = lp.poller.AddRead(nfd); err == nil {
-			lp.connections[nfd] = c
+		if err = lp.poller.AddRead(nfd); err != nil {
 			return
 		}
+		c.init(nfd, lp, sa)
+		lp.connections[nfd] = c
+		err = lp.loopOpen(c)
 		return
 	})
 	return nil

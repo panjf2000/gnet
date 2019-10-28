@@ -148,9 +148,6 @@ func (lp *loop) loopCloseConn(c *conn, err error) error {
 }
 
 func (lp *loop) loopWake(c *conn) error {
-	if co, ok := lp.connections[c.fd]; !ok || co != c {
-		return nil // ignore stale wakes
-	}
 	out, action := lp.svr.eventHandler.React(c)
 	c.action = action
 	if out != nil {

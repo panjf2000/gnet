@@ -100,8 +100,11 @@ type Conn interface {
 	// BufferLength returns the length of available data in the inbound ring-buffer.
 	BufferLength() (size int)
 
+	// ConnCAS
+	ConnCAS() int
+
 	// AsyncWrite writes data to client/connection asynchronously.
-	AsyncWrite(buf []byte)
+	AsyncWrite(buf []byte, cas int)
 
 	// Wake triggers a React event for this connection.
 	Wake()
