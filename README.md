@@ -162,14 +162,13 @@ type echoServer struct {
 }
 
 func (es *echoServer) React(c gnet.Conn) (out []byte, action gnet.Action) {
-	cas := c.ConnCAS()
 	data := append([]byte{}, c.Read()...)
 	c.ResetBuffer()
 
 	// Use ants pool to unblock the event-loop.
 	_ = es.pool.Submit(func() {
 		time.Sleep(1 * time.Second)
-		c.AsyncWrite(data, cas)
+		c.AsyncWrite(data)
 	})
 
 	return

@@ -28,6 +28,16 @@ type conn struct {
 	outboundBuffer *ringbuffer.RingBuffer // buffer for data that is ready to write to client
 }
 
+func initConn(fd int, lp *loop, sa unix.Sockaddr) *conn {
+	return &conn{
+		fd:             fd,
+		loop:           lp,
+		sa:             sa,
+		inboundBuffer:  ringbuffer.New(socketRingBufferSize),
+		outboundBuffer: ringbuffer.New(socketRingBufferSize),
+	}
+}
+
 func (c *conn) Read() []byte {
 	if c.inboundBuffer.IsEmpty() {
 		return c.cache
@@ -82,13 +92,9 @@ func (c *conn) BufferLength() int {
 	return c.inboundBuffer.Length() + len(c.cache)
 }
 
-func (c *conn) ConnCAS() int {
-	return c.fd
-}
-
-func (c *conn) AsyncWrite(buf []byte, cas int) {
+func (c *conn) AsyncWrite(buf []byte) {
 	_ = c.loop.poller.Trigger(func() error {
-		if c.opened && c.fd == cas {
+		if c.opened {
 			c.write(buf)
 		}
 		return nil
@@ -96,8 +102,7 @@ func (c *conn) AsyncWrite(buf []byte, cas int) {
 }
 
 func (c *conn) Wake() {
-	// check whether it is stale wakes
-	if c.inLoop() {
+	if c.loop != nil {
 		sniffError(c.loop.poller.Trigger(func() error {
 			return c.loop.loopWake(c)
 		}))
@@ -148,32 +153,4 @@ func (c *conn) write(buf []byte) {
 
 func (c *conn) sendTo(buf []byte, sa unix.Sockaddr) {
 	_ = unix.Sendto(c.fd, buf, 0, sa)
-}
-
-func (c *conn) inLoop() bool {
-	if c.loop != nil {
-		co, ok := c.loop.connections[c.fd]
-		return ok && co == c
-	}
-	return false
-}
-
-func (c *conn) init(fd int, lp *loop, sa unix.Sockaddr) {
-	c.fd = fd
-	c.loop = lp
-	c.sa = sa
-}
-
-func (c *conn) reset() {
-	c.fd = 0
-	c.opened = false
-	c.loop = nil
-	c.sa = nil
-	c.ctx = nil
-	c.cache = nil
-	c.action = None
-	c.localAddr = nil
-	c.remoteAddr = nil
-	c.inboundBuffer.Reset()
-	c.outboundBuffer.Reset()
 }

@@ -137,7 +137,6 @@ func (s *testServer) OnClosed(c Conn, err error) (action Action) {
 }
 func (s *testServer) React(c Conn) (out []byte, action Action) {
 	if s.async {
-		cas := c.ConnCAS()
 		bufLen := c.BufferLength()
 		buf := s.bytesPool.GetLen(bufLen)
 		data := c.Read()
@@ -146,7 +145,7 @@ func (s *testServer) React(c Conn) (out []byte, action Action) {
 		c.ResetBuffer()
 		_ = s.workerPool.Submit(
 			func() {
-				c.AsyncWrite(buf, cas)
+				c.AsyncWrite(buf)
 			})
 		return
 	} else if s.multicore {

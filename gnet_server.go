@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/panjf2000/gnet/netpoll"
-	"github.com/panjf2000/gnet/ringbuffer"
 )
 
 type server struct {
@@ -24,7 +23,6 @@ type server struct {
 	opts             *Options           // options with server
 	once             sync.Once          // make sure only signalShutdown once
 	cond             *sync.Cond         // shutdown signaler
-	connPool         sync.Pool          // pool for caching connections
 	mainLoop         *loop              // main loop for accepting connections
 	eventHandler     EventHandler       // user eventHandler
 	subLoopGroup     IEventLoopGroup    // loops for handling events
@@ -208,13 +206,6 @@ func serve(eventHandler EventHandler, listener *listener, options *Options) erro
 	case None:
 	case Shutdown:
 		return nil
-	}
-
-	svr.connPool.New = func() interface{} {
-		return &conn{
-			inboundBuffer:  ringbuffer.New(socketRingBufferSize),
-			outboundBuffer: ringbuffer.New(socketRingBufferSize),
-		}
 	}
 
 	if err := svr.start(numCPU); err != nil {

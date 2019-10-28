@@ -49,10 +49,7 @@ func (lp *loop) loopAccept(fd int) error {
 		if err := unix.SetNonblock(nfd, true); err != nil {
 			return err
 		}
-		c := lp.svr.connPool.Get().(*conn)
-		c.fd = nfd
-		c.loop = lp
-		c.sa = sa
+		c := initConn(nfd, lp, sa)
 		if err = lp.poller.AddReadWrite(c.fd); err == nil {
 			lp.connections[c.fd] = c
 		} else {
@@ -134,20 +131,21 @@ func (lp *loop) loopOut(c *conn) error {
 }
 
 func (lp *loop) loopCloseConn(c *conn, err error) error {
-	if _, ok := lp.connections[c.fd]; ok && lp.poller.Delete(c.fd) == nil && unix.Close(c.fd) == nil {
+	if lp.poller.Delete(c.fd) == nil && unix.Close(c.fd) == nil {
 		delete(lp.connections, c.fd)
-		action := lp.svr.eventHandler.OnClosed(c, err)
-		c.reset()
-		lp.svr.connPool.Put(c)
-		switch action {
+		switch lp.svr.eventHandler.OnClosed(c, err) {
 		case Shutdown:
 			return errShutdown
 		}
+		c.opened = false
 	}
 	return nil
 }
 
 func (lp *loop) loopWake(c *conn) error {
+	if co, ok := lp.connections[c.fd]; !ok || co != c {
+		return nil // ignore stale wakes.
+	}
 	out, action := lp.svr.eventHandler.React(c)
 	c.action = action
 	if out != nil {
