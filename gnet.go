@@ -100,10 +100,12 @@ type Conn interface {
 	// BufferLength returns the length of available data in the inbound ring-buffer.
 	BufferLength() (size int)
 
-	// ConnCAS
+	// ConnCAS returns a cas that represents a current fd for the subsequent AsyncWrite, this method must be invoked
+	// right before AsyncWrite and in event-loop goroutine, otherwise, it may cause race issues.
 	ConnCAS() int
 
-	// AsyncWrite writes data to client/connection asynchronously.
+	// AsyncWrite writes data to client/connection asynchronously, usually you would invoke it in a biz goroutine instead of
+	// the event-loop goroutine.
 	AsyncWrite(buf []byte, cas int)
 
 	// Wake triggers a React event for this connection.
