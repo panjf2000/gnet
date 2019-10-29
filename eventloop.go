@@ -209,7 +209,7 @@ func (lp *loop) loopUDPIn(fd int) error {
 		fd:            fd,
 		localAddr:     lp.svr.ln.lnaddr,
 		remoteAddr:    netpoll.SockaddrToUDPAddr(&sa6),
-		inboundBuffer: ringbuffer.New(socketRingBufferSize),
+		inboundBuffer: lp.svr.bytesPool.Get().(*ringbuffer.RingBuffer),
 	}
 	c.cache = lp.packet[:n]
 	out, action := lp.svr.eventHandler.React(c)
@@ -221,5 +221,6 @@ func (lp *loop) loopUDPIn(fd int) error {
 	case Shutdown:
 		return errShutdown
 	}
+	lp.svr.bytesPool.Put(c.inboundBuffer)
 	return nil
 }
