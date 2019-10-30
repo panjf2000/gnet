@@ -224,7 +224,7 @@ func (lp *loop) loopUDPIn(fd int) error {
 
 	c.inboundBuffer.Reset()
 	lp.svr.bytesPool.Put(c.inboundBuffer)
-	c.inboundBuffer = nil
+	c = nil
 
 	return nil
 }
