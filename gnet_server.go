@@ -196,6 +196,9 @@ func serve(eventHandler EventHandler, listener *listener, options *Options) erro
 	svr.cond = sync.NewCond(&sync.Mutex{})
 	svr.tch = make(chan time.Duration)
 	svr.opts = options
+	svr.bytesPool.New = func() interface{} {
+		return ringbuffer.New(socketRingBufferSize)
+	}
 
 	server := Server{
 		Multicore:    options.Multicore,
@@ -208,10 +211,6 @@ func serve(eventHandler EventHandler, listener *listener, options *Options) erro
 	case None:
 	case Shutdown:
 		return nil
-	}
-
-	svr.bytesPool.New = func() interface{} {
-		return ringbuffer.New(socketRingBufferSize)
 	}
 
 	if err := svr.start(numCPU); err != nil {

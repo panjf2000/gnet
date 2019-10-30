@@ -221,6 +221,9 @@ func (lp *loop) loopUDPIn(fd int) error {
 	case Shutdown:
 		return errShutdown
 	}
+
+	c.inboundBuffer.Reset()
 	lp.svr.bytesPool.Put(c.inboundBuffer)
+
 	return nil
 }
