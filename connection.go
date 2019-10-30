@@ -38,12 +38,19 @@ func newConn(fd int, lp *loop, sa unix.Sockaddr) *conn {
 	}
 }
 
-func (c *conn) reset() {
+func (c *conn) release() {
 	c.opened = false
+	c.sa = nil
+	c.ctx = nil
+	c.cache = nil
+	c.localAddr = nil
+	c.remoteAddr = nil
 	c.inboundBuffer.Reset()
 	c.outboundBuffer.Reset()
 	c.loop.svr.bytesPool.Put(c.inboundBuffer)
 	c.loop.svr.bytesPool.Put(c.outboundBuffer)
+	c.inboundBuffer = nil
+	c.outboundBuffer = nil
 }
 
 func (c *conn) open(buf []byte) {

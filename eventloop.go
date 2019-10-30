@@ -137,7 +137,7 @@ func (lp *loop) loopCloseConn(c *conn, err error) error {
 		case Shutdown:
 			return errShutdown
 		}
-		c.reset()
+		c.release()
 	}
 	return nil
 }
@@ -224,6 +224,7 @@ func (lp *loop) loopUDPIn(fd int) error {
 
 	c.inboundBuffer.Reset()
 	lp.svr.bytesPool.Put(c.inboundBuffer)
+	c.inboundBuffer = nil
 
 	return nil
 }
