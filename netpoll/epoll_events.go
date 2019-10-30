@@ -9,12 +9,13 @@ package netpoll
 import "golang.org/x/sys/unix"
 
 const (
-	// ErrEvents ...
-	ErrEvents = unix.EPOLLERR | unix.EPOLLHUP
-	// OutEvents ...
+	// ErrEvents represents exceptional events that are not read/write, like socket being closed,
+	// reading/writing from/to a closed socket, etc.
+	ErrEvents = unix.EPOLLERR | unix.EPOLLHUP | unix.EPOLLRDHUP
+	// OutEvents combines EPOLLOUT event and some exceptional events.
 	OutEvents = ErrEvents | unix.EPOLLOUT
-	// InEvents ...
-	InEvents = ErrEvents | unix.EPOLLIN | unix.EPOLLPRI | unix.EPOLLRDHUP
+	// InEvents combines EPOLLIN/EPOLLPRI events and some exceptional events.
+	InEvents = ErrEvents | unix.EPOLLIN | unix.EPOLLPRI
 )
 
 type eventList struct {
