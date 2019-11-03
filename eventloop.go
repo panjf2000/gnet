@@ -70,13 +70,14 @@ func (lp *loop) loopOpen(c *conn) error {
 			sniffError(netpoll.SetKeepAlive(c.fd, int(lp.svr.opts.TCPKeepAlive/time.Second)))
 		}
 	}
-
 	if out != nil {
 		c.open(out)
 	}
+
 	if !c.outboundBuffer.IsEmpty() {
 		_ = lp.poller.AddWrite(c.fd)
 	}
+
 	return lp.handleAction(c)
 }
 
@@ -89,10 +90,11 @@ func (lp *loop) loopIn(c *conn) error {
 		return lp.loopCloseConn(c, err)
 	}
 	c.cache = lp.packet[:n]
-	out, action := lp.svr.eventHandler.React(c)
 
+	out, action := lp.svr.eventHandler.React(c)
+	frame, err := lp.svr.codec.Encode(out)
 	if out != nil {
-		c.write(out)
+		c.write(frame)
 	}
 	_, _ = c.inboundBuffer.Write(c.cache)
 
@@ -103,8 +105,8 @@ func (lp *loop) loopIn(c *conn) error {
 func (lp *loop) loopOut(c *conn) error {
 	lp.svr.eventHandler.PreWrite()
 
-	top, tail := c.outboundBuffer.PreReadAll()
-	n, err := unix.Write(c.fd, top)
+	head, tail := c.outboundBuffer.LazyReadAll()
+	n, err := unix.Write(c.fd, head)
 	if err != nil {
 		if err == unix.EAGAIN {
 			return nil
@@ -113,7 +115,7 @@ func (lp *loop) loopOut(c *conn) error {
 	}
 	c.outboundBuffer.Shift(n)
 
-	if len(top) == n && tail != nil {
+	if len(head) == n && tail != nil {
 		n, err = unix.Write(c.fd, tail)
 		if err != nil {
 			if err == unix.EAGAIN {

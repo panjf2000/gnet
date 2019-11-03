@@ -92,12 +92,17 @@ func (c *conn) sendTo(buf []byte, sa unix.Sockaddr) {
 
 // ================================= Public APIs of gnet.Conn =================================
 
+func (c *conn) ReadFrame() []byte {
+	buf, _ := c.loop.svr.codec.Decode(c)
+	return buf
+}
+
 func (c *conn) Read() []byte {
 	if c.inboundBuffer.IsEmpty() {
 		return c.cache
 	}
-	top, _ := c.inboundBuffer.PreReadAll()
-	return append(top, c.cache...)
+	head, _ := c.inboundBuffer.LazyReadAll()
+	return append(head, c.cache...)
 }
 
 func (c *conn) ResetBuffer() {
@@ -122,7 +127,7 @@ func (c *conn) ReadN(n int) (size int, buf []byte) {
 		return
 	}
 	size = n
-	buf, tail := c.inboundBuffer.PreRead(n)
+	buf, tail := c.inboundBuffer.LazyRead(n)
 	if tail != nil {
 		buf = append(buf, tail...)
 	}

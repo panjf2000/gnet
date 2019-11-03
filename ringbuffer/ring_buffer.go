@@ -40,8 +40,8 @@ func New(size int) *RingBuffer {
 	}
 }
 
-// PreRead reads the bytes with given length but will not move the pointer of "read".
-func (r *RingBuffer) PreRead(len int) (top []byte, tail []byte) {
+// LazyRead reads the bytes with given length but will not move the pointer of "read".
+func (r *RingBuffer) LazyRead(len int) (head []byte, tail []byte) {
 	if r.isEmpty {
 		return
 	}
@@ -56,7 +56,7 @@ func (r *RingBuffer) PreRead(len int) (top []byte, tail []byte) {
 			n = len
 		}
 
-		top = r.buf[r.r : r.r+n]
+		head = r.buf[r.r : r.r+n]
 		return
 	}
 
@@ -66,10 +66,10 @@ func (r *RingBuffer) PreRead(len int) (top []byte, tail []byte) {
 	}
 
 	if r.r+n <= r.size {
-		top = r.buf[r.r : r.r+n]
+		head = r.buf[r.r : r.r+n]
 	} else {
 		c1 := r.size - r.r
-		top = r.buf[r.r:r.size]
+		head = r.buf[r.r:r.size]
 		c2 := n - c1
 		tail = r.buf[0:c2]
 	}
@@ -77,24 +77,24 @@ func (r *RingBuffer) PreRead(len int) (top []byte, tail []byte) {
 	return
 }
 
-// PreReadAll reads the all bytes in this ring-buffer but will not move the pointer of "read".
-func (r *RingBuffer) PreReadAll() (top []byte, tail []byte) {
+// LazyReadAll reads the all bytes in this ring-buffer but will not move the pointer of "read".
+func (r *RingBuffer) LazyReadAll() (head []byte, tail []byte) {
 	if r.isEmpty {
 		return
 	}
 
 	if r.w > r.r {
 		n := r.w - r.r // Length
-		top = r.buf[r.r : r.r+n]
+		head = r.buf[r.r : r.r+n]
 		return
 	}
 
 	n := r.size - r.r + r.w // Length
 	if r.r+n <= r.size {
-		top = r.buf[r.r : r.r+n]
+		head = r.buf[r.r : r.r+n]
 	} else {
 		c1 := r.size - r.r
-		top = r.buf[r.r:r.size]
+		head = r.buf[r.r:r.size]
 		c2 := n - c1
 		tail = r.buf[0:c2]
 	}
@@ -241,7 +241,7 @@ func (r *RingBuffer) WriteByte(c byte) error {
 	return nil
 }
 
-// Length return the length of available read bytes.
+// Length returns the length of available read bytes.
 func (r *RingBuffer) Length() int {
 	if r.r == r.w {
 		if r.isEmpty {

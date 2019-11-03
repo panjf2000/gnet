@@ -24,6 +24,7 @@ type server struct {
 	opts             *Options           // options with server
 	once             sync.Once          // make sure only signalShutdown once
 	cond             *sync.Cond         // shutdown signaler
+	codec            ICodec             // codec for TCP streams
 	mainLoop         *loop              // main loop for accepting connections
 	bytesPool        sync.Pool          // pool for storing bytes
 	eventHandler     EventHandler       // user eventHandler
@@ -199,6 +200,7 @@ func serve(eventHandler EventHandler, listener *listener, options *Options) erro
 	svr.bytesPool.New = func() interface{} {
 		return ringbuffer.New(socketRingBufferSize)
 	}
+	svr.codec = new(BuiltInFrameCodec)
 
 	server := Server{
 		Multicore:    options.Multicore,

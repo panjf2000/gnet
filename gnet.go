@@ -73,6 +73,9 @@ type Conn interface {
 	// Wake triggers a React event for this connection.
 	//Wake()
 
+	// ReadFrame ...
+	ReadFrame() (buf []byte)
+
 	// Read reads all data from inbound ring-buffer without moving "read" pointer, which means
 	// it does not evict the data from ring-buffer actually and those data will present in ring-buffer until the
 	// ResetBuffer method is invoked.

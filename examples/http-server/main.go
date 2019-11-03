@@ -132,7 +132,7 @@ func appendresp(b []byte, status, head, body string) []byte {
 func parsereq(data []byte, req *request) (leftover []byte, err error) {
 	sdata := string(data)
 	var i, s int
-	var top string
+	var head string
 	var clen int
 	var q = -1
 	// method, path, proto line
@@ -165,13 +165,13 @@ func parsereq(data []byte, req *request) (leftover []byte, err error) {
 	if req.proto == "" {
 		return data, fmt.Errorf("malformed request")
 	}
-	top = sdata[:s]
+	head = sdata[:s]
 	for ; i < len(sdata); i++ {
 		if i > 1 && sdata[i] == '\n' && sdata[i-1] == '\r' {
 			line := sdata[s : i-1]
 			s = i + 1
 			if line == "" {
-				req.head = sdata[len(top)+2 : i+1]
+				req.head = sdata[len(head)+2 : i+1]
 				i++
 				if clen > 0 {
 					if len(sdata[i:]) < clen {
