@@ -4,7 +4,9 @@
 
 package gnet
 
-import "time"
+import (
+	"time"
+)
 
 // Option is a function that will set up option.
 type Option func(opts *Options)
@@ -33,6 +35,9 @@ type Options struct {
 
 	// TCPKeepAlive (SO_KEEPALIVE) socket option.
 	TCPKeepAlive time.Duration
+
+	// ICodec encodes and decodes TCP streams.
+	Codec ICodec
 }
 
 // WithOptions sets up all options.
@@ -67,5 +72,12 @@ func WithTCPKeepAlive(tcpKeepAlive time.Duration) Option {
 func WithTicker(ticker bool) Option {
 	return func(opts *Options) {
 		opts.Ticker = ticker
+	}
+}
+
+// WithCodec sets up a codec to handle TCP streams.
+func WithCodec(codec ICodec) Option {
+	return func(opts *Options) {
+		opts.Codec = codec
 	}
 }

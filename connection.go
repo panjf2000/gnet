@@ -142,6 +142,14 @@ func (c *conn) ReadN(n int) (size int, buf []byte) {
 	return
 }
 
+func (c *conn) InboundBuffer() *ringbuffer.RingBuffer {
+	return c.inboundBuffer
+}
+
+func (c *conn) OutboundBuffer() *ringbuffer.RingBuffer {
+	return c.outboundBuffer
+}
+
 func (c *conn) BufferLength() int {
 	return c.inboundBuffer.Length() + len(c.cache)
 }

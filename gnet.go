@@ -6,7 +6,6 @@
 package gnet
 
 import (
-	"errors"
 	"log"
 	"net"
 	"os"
@@ -14,11 +13,7 @@ import (
 	"time"
 
 	"github.com/panjf2000/gnet/netpoll"
-)
-
-var (
-	// errShutdown indicates this server is closing.
-	errShutdown = errors.New("server is going to be shutdown")
+	"github.com/panjf2000/gnet/ringbuffer"
 )
 
 // socketRingBufferSize represents the initial size of connection ring-buffer.
@@ -99,6 +94,12 @@ type Conn interface {
 
 	// BufferLength returns the length of available data in the inbound ring-buffer.
 	BufferLength() (size int)
+
+	// OutboundBuffer ...
+	OutboundBuffer() *ringbuffer.RingBuffer
+
+	// InboundBuffer ...
+	InboundBuffer() *ringbuffer.RingBuffer
 
 	// AsyncWrite writes data to client/connection asynchronously, usually you would invoke it in a biz goroutine instead of
 	// the event-loop goroutine.
