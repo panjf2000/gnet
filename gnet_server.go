@@ -200,7 +200,12 @@ func serve(eventHandler EventHandler, listener *listener, options *Options) erro
 	svr.bytesPool.New = func() interface{} {
 		return ringbuffer.New(socketRingBufferSize)
 	}
-	svr.codec = new(BuiltInFrameCodec)
+	svr.codec = func() ICodec {
+		if options.Codec == nil {
+			return new(BuiltInFrameCodec)
+		}
+		return options.Codec
+	}()
 
 	server := Server{
 		Multicore:    options.Multicore,
