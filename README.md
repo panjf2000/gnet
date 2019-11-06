@@ -37,6 +37,7 @@ The goal of this project is to create a server framework for Go that performs on
 - [x] Supporting asynchronous write operation
 - [x] Flexible ticker event
 - [x] SO_REUSEPORT socket option
+- [ ] Codec implementations to encode/decode TCP frames, referencing [netty codec](https://github.com/netty/netty/tree/4.1/codec/src/main/java/io/netty/handler/codec)
 - [ ] Additional load-balancing algorithms: Random, Least-Connections, Consistent-hashing and so on
 - [ ] New event-notification mechanism: IOCP on Windows platform 
 - [ ] TLS support
@@ -305,6 +306,7 @@ Please read our [Contributing Guidelines](CONTRIBUTING.md) before opening a PR a
 - [netty](https://github.com/netty/netty)
 - [ants](https://github.com/panjf2000/ants)
 - [pool](https://github.com/gobwas/pool)
+- [goframe](https://github.com/smallnest/goframe)
 
 # 📚 Relevant Articles
 

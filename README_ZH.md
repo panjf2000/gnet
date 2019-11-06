@@ -37,6 +37,7 @@
 - [x] 支持异步写操作
 - [x] 灵活的事件定时器
 - [x] SO_REUSEPORT 端口重用
+- [ ] 新增多种编解码器，支持 TCP 数据流分包，参考自 [netty codec](https://github.com/netty/netty/tree/4.1/codec/src/main/java/io/netty/handler/codec)
 - [ ] 加入更多的负载均衡算法：随机、最少连接、一致性哈希等等
 - [ ] 支持 Windows 平台的 IOCP 事件驱动机制
 - [ ] 支持 TLS
@@ -299,6 +300,7 @@ GOMAXPROCS=4
 - [netty](https://github.com/netty/netty)
 - [ants](https://github.com/panjf2000/ants)
 - [pool](https://github.com/gobwas/pool)
+- [goframe](https://github.com/smallnest/goframe)
 
 # 📚 相关文章
 
