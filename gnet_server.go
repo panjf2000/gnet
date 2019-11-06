@@ -24,7 +24,7 @@ type server struct {
 	opts             *Options           // options with server
 	once             sync.Once          // make sure only signalShutdown once
 	cond             *sync.Cond         // shutdown signaler
-	codec            ICodec             // codec for TCP streams
+	codec            ICodec             // codec for TCP stream
 	mainLoop         *loop              // main loop for accepting connections
 	bytesPool        sync.Pool          // pool for storing bytes
 	eventHandler     EventHandler       // user eventHandler

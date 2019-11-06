@@ -36,7 +36,7 @@ type Options struct {
 	// TCPKeepAlive (SO_KEEPALIVE) socket option.
 	TCPKeepAlive time.Duration
 
-	// ICodec encodes and decodes TCP streams.
+	// ICodec encodes and decodes TCP stream.
 	Codec ICodec
 }
 
@@ -75,7 +75,7 @@ func WithTicker(ticker bool) Option {
 	}
 }
 
-// WithCodec sets up a codec to handle TCP streams.
+// WithCodec sets up a codec to handle TCP stream.
 func WithCodec(codec ICodec) Option {
 	return func(opts *Options) {
 		opts.Codec = codec

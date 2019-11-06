@@ -88,7 +88,7 @@ type Conn interface {
 	// "read" pointer, which means it will evict the data from buffer and it can't be revoked (put back to buffer),
 	// it reads data from the inbound ring-buffer and event-loop-buffer when the length of the available data is equal
 	// to the given "n", otherwise, it will not read any data from the inbound ring-buffer. So you should use this
-	// function only if you know exactly the length of subsequent TCP streams based on the protocol, like the
+	// function only if you know exactly the length of subsequent TCP stream based on the protocol, like the
 	// Content-Length attribute in an HTTP request which indicates you how much data you should read from inbound ring-buffer.
 	ReadN(n int) (size int, buf []byte)
 
