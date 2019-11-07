@@ -35,7 +35,6 @@ func (cs *codecServer) React(c gnet.Conn) (out []byte, action gnet.Action) {
 		return
 	}
 	out = c.ReadFrame()
-	fmt.Printf("write frame: %s\n", string(out))
 	return
 }
 

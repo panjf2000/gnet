@@ -91,11 +91,13 @@ func (lp *loop) loopIn(c *conn) error {
 	}
 	c.cache = lp.packet[:n]
 
+loopReact:
 	out, action := lp.svr.eventHandler.React(c)
-	if out != nil {
+	if len(out) != 0 {
 		if frame, err := lp.svr.codec.Encode(out); err == nil {
 			c.write(frame)
 		}
+		goto loopReact
 	}
 	_, _ = c.inboundBuffer.Write(c.cache)
 
