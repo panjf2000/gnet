@@ -54,8 +54,8 @@ func main() {
 	var interval time.Duration
 	var ticker bool
 
-	// Example command: go run main.go --port 2333 --tick 1s
-	flag.IntVar(&port, "port", 5000, "server port")
+	// Example command: go run push.go --port 9000 --tick 1s
+	flag.IntVar(&port, "port", 9000, "server port")
 	flag.BoolVar(&multicore, "multicore", true, "multicore")
 	flag.DurationVar(&interval, "tick", 0, "pushing tick")
 	flag.Parse()

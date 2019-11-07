@@ -32,8 +32,8 @@ func main() {
 	var port int
 	var multicore bool
 
-	// Example command: go run main.go --port 2333 --multicore true
-	flag.IntVar(&port, "port", 5000, "server port")
+	// Example command: go run echo.go --port 9000 --multicore true
+	flag.IntVar(&port, "port", 9000, "server port")
 	flag.BoolVar(&multicore, "multicore", true, "multicore")
 	flag.Parse()
 	echo := new(echoServer)

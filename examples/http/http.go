@@ -71,7 +71,7 @@ func main() {
 	var aaaa bool
 	var noparse bool
 
-	// Example command: go run main.go --port 2333 --multicore true
+	// Example command: go run http.go --port 8080 --multicore true
 	flag.IntVar(&port, "port", 8080, "server port")
 	flag.BoolVar(&aaaa, "aaaa", false, "aaaaa....")
 	flag.BoolVar(&noparse, "noparse", true, "do not parse requests")
