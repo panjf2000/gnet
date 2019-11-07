@@ -28,7 +28,20 @@ func TestLengthFieldBasedFrameCodec(t *testing.T) {
 	}
 	out, _ := codec.Encode(data)
 	if string(out[3:]) != string(data) {
-		t.Fatalf("data don't match, raw data: %s, encoded data: %s\n", string(data), string(out))
+		t.Fatalf("data don't match with big endian, raw data: %s, encoded data: %s\n", string(data), string(out))
+	}
+
+	encoderConfig.ByteOrder = binary.LittleEndian
+	decoderConfig.ByteOrder = binary.LittleEndian
+	codec = NewLengthFieldBasedFrameCodec(encoderConfig, decoderConfig)
+	sz = rand.Intn(10) * 64
+	data = make([]byte, sz)
+	if _, err := rand.Read(data); err != nil {
+		panic(err)
+	}
+	out, _ = codec.Encode(data)
+	if string(out[3:]) != string(data) {
+		t.Fatalf("data don't match with little endian, raw data: %s, encoded data: %s\n", string(data), string(out))
 	}
 
 	buf := make([]byte, 3)

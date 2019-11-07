@@ -200,20 +200,6 @@ func (cc *LengthFieldBasedFrameCodec) Encode(buf []byte) (out []byte, err error)
 	return
 }
 
-func writeUint24(byteOrder binary.ByteOrder, v int) []byte {
-	b := make([]byte, 3)
-	if byteOrder == binary.LittleEndian {
-		b[0] = byte(v)
-		b[1] = byte(v >> 8)
-		b[2] = byte(v >> 16)
-	} else {
-		b[2] = byte(v)
-		b[1] = byte(v >> 8)
-		b[0] = byte(v >> 16)
-	}
-	return b
-}
-
 // Decode ...
 func (cc *LengthFieldBasedFrameCodec) Decode(c Conn) ([]byte, error) {
 	var size int
@@ -294,4 +280,18 @@ func readUint24(byteOrder binary.ByteOrder, b []byte) uint64 {
 		return uint64(b[0]) | uint64(b[1])<<8 | uint64(b[2])<<16
 	}
 	return uint64(b[2]) | uint64(b[1])<<8 | uint64(b[0])<<16
+}
+
+func writeUint24(byteOrder binary.ByteOrder, v int) []byte {
+	b := make([]byte, 3)
+	if byteOrder == binary.LittleEndian {
+		b[0] = byte(v)
+		b[1] = byte(v >> 8)
+		b[2] = byte(v >> 16)
+	} else {
+		b[2] = byte(v)
+		b[1] = byte(v >> 8)
+		b[0] = byte(v >> 16)
+	}
+	return b
 }
