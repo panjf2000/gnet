@@ -17,7 +17,7 @@ var CRLFByte = byte('\n')
 type ICodec interface {
 	// Encode encodes frames upon server responses into TCP stream.
 	Encode(buf []byte) ([]byte, error)
-	// Encode decodes frames from TCP stream via specific implementation.
+	// Decode decodes frames from TCP stream via specific implementation.
 	Decode(c Conn) ([]byte, error)
 }
 
@@ -28,7 +28,7 @@ type ICodec interface {
 //	Encode(buf []byte) ([]byte, error)
 //}
 
-// BuiltInFrameCodec is the built-in codec which will be assign to gnet server when customized codec is not set up.
+// BuiltInFrameCodec is the built-in codec which will be assigned to gnet server when customized codec is not set up.
 type BuiltInFrameCodec struct {
 }
 

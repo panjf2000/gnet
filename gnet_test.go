@@ -404,9 +404,12 @@ func (s *testServer) React(c Conn) (out []byte, action Action) {
 			return
 		}
 		return
+	} else if s.network == "udp" {
+		out = c.Read()
+		c.ResetBuffer()
+		return
 	}
-	out = c.Read()
-	c.ResetBuffer()
+	out = c.ReadFrame()
 	return
 }
 func (s *testServer) Tick() (delay time.Duration, action Action) {

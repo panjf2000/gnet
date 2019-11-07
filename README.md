@@ -37,7 +37,7 @@ The goal of this project is to create a server framework for Go that performs on
 - [x] Supporting asynchronous write operation
 - [x] Flexible ticker event
 - [x] SO_REUSEPORT socket option
-- [x] Codec implementations to encode/decode TCP stream to frame: LineBasedFrameCodec, DelimiterBasedFrameCodec, FixedLengthFrameCodec and LengthFieldBasedFrameCodec, referencing [netty codec](https://github.com/netty/netty/tree/4.1/codec/src/main/java/io/netty/handler/codec)
+- [x] Codec implementations to encode/decode frames into/from TCP stream: LineBasedFrameCodec, DelimiterBasedFrameCodec, FixedLengthFrameCodec and LengthFieldBasedFrameCodec, referencing [netty codec](https://github.com/netty/netty/tree/4.1/codec/src/main/java/io/netty/handler/codec)
 - [ ] Additional load-balancing algorithms: Random, Least-Connections, Consistent-hashing and so on
 - [ ] New event-notification mechanism: IOCP on Windows platform 
 - [ ] TLS support
@@ -186,7 +186,467 @@ func main() {
 
 Like I said in the 『Multiple Reactors + Goroutine-Pool Model』section, if there are blocking code in your business logic, then you ought to turn them into non-blocking code in any way, for instance you can wrap them into a goroutine, but it will result in a massive amount of goroutines if massive traffic is passing through your server so I would suggest you utilize a goroutine pool like `ants` to manage those goroutines and reduce the cost of system resources.
 
-**For more examples, check out here: [examples of gnet](https://github.com/panjf2000/gnet/tree/master/examples).**
+**All gnet examples:**
+
+<details>
+	<summary> Echo Server </summary>
+
+```go
+package main
+import (
+	"flag"
+	"fmt"
+	"log"
+
+	"github.com/panjf2000/gnet"
+)
+
+type echoServer struct {
+	*gnet.EventServer
+}
+
+func (es *echoServer) OnInitComplete(srv gnet.Server) (action gnet.Action) {
+	log.Printf("Echo server is listening on %s (multi-cores: %t, loops: %d)\n",
+		srv.Addr.String(), srv.Multicore, srv.NumLoops)
+	return
+}
+func (es *echoServer) React(c gnet.Conn) (out []byte, action gnet.Action) {
+	out = c.Read()
+	c.ResetBuffer()
+	return
+}
+
+func main() {
+	var port int
+	var multicore bool
+
+	// Example command: go run echo.go --port 9000 --multicore true
+	flag.IntVar(&port, "port", 9000, "server port")
+	flag.BoolVar(&multicore, "multicore", true, "multicore")
+	flag.Parse()
+	echo := new(echoServer)
+	log.Fatal(gnet.Serve(echo, fmt.Sprintf("tcp://:%d", port), gnet.WithMulticore(multicore)))
+}
+```
+</details>
+
+<details>
+	<summary> HTTP Server </summary>
+
+```go
+package main
+
+import (
+	"bytes"
+	"flag"
+	"fmt"
+	"log"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/panjf2000/gnet"
+)
+
+var res string
+
+type request struct {
+	proto, method string
+	path, query   string
+	head, body    string
+	remoteAddr    string
+}
+
+type httpServer struct {
+	*gnet.EventServer
+	noparse bool
+}
+
+func (hs *httpServer) OnInitComplete(srv gnet.Server) (action gnet.Action) {
+	log.Printf("HTTP server is listening on %s (multi-cores: %t, loops: %d)\n",
+		srv.Addr.String(), srv.Multicore, srv.NumLoops)
+	return
+}
+
+func (hs *httpServer) React(c gnet.Conn) (out []byte, action gnet.Action) {
+	data := c.Read()
+	if hs.noparse && bytes.Contains(data, []byte("\r\n\r\n")) {
+		// for testing minimal single packet request -> response.
+		out = appendresp(nil, "200 OK", "", res)
+		c.ResetBuffer()
+		return
+	}
+	// process the pipeline
+	var req request
+	leftover, err := parsereq(data, &req)
+	if err != nil {
+		// bad thing happened
+		out = appendresp(out, "500 Error", "", err.Error()+"\n")
+		action = gnet.Close
+		return
+	} else if len(leftover) == len(data) {
+		// request not ready, yet
+		return
+	}
+	// handle the request
+	req.remoteAddr = c.RemoteAddr().String()
+	out = appendhandle(out, &req)
+	c.ResetBuffer()
+	return
+}
+
+func main() {
+	var port int
+	var multicore bool
+	var aaaa bool
+	var noparse bool
+
+	// Example command: go run http.go --port 8080 --multicore true
+	flag.IntVar(&port, "port", 8080, "server port")
+	flag.BoolVar(&aaaa, "aaaa", false, "aaaaa....")
+	flag.BoolVar(&noparse, "noparse", true, "do not parse requests")
+	flag.BoolVar(&multicore, "multicore", true, "multicore")
+	flag.Parse()
+
+	if os.Getenv("NOPARSE") == "1" {
+		noparse = true
+	}
+
+	if aaaa {
+		res = strings.Repeat("a", 1024)
+	} else {
+		res = "Hello World!\r\n"
+	}
+
+	http := &httpServer{noparse: noparse}
+	// We at least want the single http address.
+	addr := fmt.Sprintf("tcp"+"://:%d", port)
+	// Start serving!
+	log.Fatal(gnet.Serve(http, addr, gnet.WithMulticore(multicore)))
+}
+
+// appendhandle handles the incoming request and appends the response to
+// the provided bytes, which is then returned to the caller.
+func appendhandle(b []byte, req *request) []byte {
+	return appendresp(b, "200 OK", "", res)
+}
+
+// appendresp will append a valid http response to the provide bytes.
+// The status param should be the code plus text such as "200 OK".
+// The head parameter should be a series of lines ending with "\r\n" or empty.
+func appendresp(b []byte, status, head, body string) []byte {
+	b = append(b, "HTTP/1.1"...)
+	b = append(b, ' ')
+	b = append(b, status...)
+	b = append(b, '\r', '\n')
+	b = append(b, "Server: gnet\r\n"...)
+	b = append(b, "Date: "...)
+	b = time.Now().AppendFormat(b, "Mon, 02 Jan 2006 15:04:05 GMT")
+	b = append(b, '\r', '\n')
+	if len(body) > 0 {
+		b = append(b, "Content-Length: "...)
+		b = strconv.AppendInt(b, int64(len(body)), 10)
+		b = append(b, '\r', '\n')
+	}
+	b = append(b, head...)
+	b = append(b, '\r', '\n')
+	if len(body) > 0 {
+		b = append(b, body...)
+	}
+	return b
+}
+
+// parsereq is a very simple http request parser. This operation
+// waits for the entire payload to be buffered before returning a
+// valid request.
+func parsereq(data []byte, req *request) (leftover []byte, err error) {
+	sdata := string(data)
+	var i, s int
+	var head string
+	var clen int
+	var q = -1
+	// method, path, proto line
+	for ; i < len(sdata); i++ {
+		if sdata[i] == ' ' {
+			req.method = sdata[s:i]
+			for i, s = i+1, i+1; i < len(sdata); i++ {
+				if sdata[i] == '?' && q == -1 {
+					q = i - s
+				} else if sdata[i] == ' ' {
+					if q != -1 {
+						req.path = sdata[s:q]
+						req.query = req.path[q+1 : i]
+					} else {
+						req.path = sdata[s:i]
+					}
+					for i, s = i+1, i+1; i < len(sdata); i++ {
+						if sdata[i] == '\n' && sdata[i-1] == '\r' {
+							req.proto = sdata[s:i]
+							i, s = i+1, i+1
+							break
+						}
+					}
+					break
+				}
+			}
+			break
+		}
+	}
+	if req.proto == "" {
+		return data, fmt.Errorf("malformed request")
+	}
+	head = sdata[:s]
+	for ; i < len(sdata); i++ {
+		if i > 1 && sdata[i] == '\n' && sdata[i-1] == '\r' {
+			line := sdata[s : i-1]
+			s = i + 1
+			if line == "" {
+				req.head = sdata[len(head)+2 : i+1]
+				i++
+				if clen > 0 {
+					if len(sdata[i:]) < clen {
+						break
+					}
+					req.body = sdata[i : i+clen]
+					i += clen
+				}
+				return data[i:], nil
+			}
+			if strings.HasPrefix(line, "Content-Length:") {
+				n, err := strconv.ParseInt(strings.TrimSpace(line[len("Content-Length:"):]), 10, 64)
+				if err == nil {
+					clen = int(n)
+				}
+			}
+		}
+	}
+	// not enough data
+	return data, nil
+}
+```
+</details>
+
+<details>
+	<summary> Push Server </summary>
+
+```go
+package main
+
+import (
+	"flag"
+	"fmt"
+	"log"
+	"sync"
+	"time"
+
+	"github.com/panjf2000/gnet"
+)
+
+type pushServer struct {
+	*gnet.EventServer
+	tick             time.Duration
+	connectedSockets sync.Map
+}
+
+func (ps *pushServer) OnInitComplete(srv gnet.Server) (action gnet.Action) {
+	log.Printf("Push server is listening on %s (multi-cores: %t, loops: %d), "+
+		"pushing data every %s ...\n", srv.Addr.String(), srv.Multicore, srv.NumLoops, ps.tick.String())
+	return
+}
+func (ps *pushServer) OnOpened(c gnet.Conn) (out []byte, action gnet.Action) {
+	log.Printf("Socket with addr: %s has been opened...\n", c.RemoteAddr().String())
+	ps.connectedSockets.Store(c.RemoteAddr().String(), c)
+	return
+}
+func (ps *pushServer) OnClosed(c gnet.Conn, err error) (action gnet.Action) {
+	log.Printf("Socket with addr: %s is closing...\n", c.RemoteAddr().String())
+	ps.connectedSockets.Delete(c.RemoteAddr().String())
+	return
+}
+func (ps *pushServer) Tick() (delay time.Duration, action gnet.Action) {
+	log.Println("It's time to push data to clients!!!")
+	ps.connectedSockets.Range(func(key, value interface{}) bool {
+		addr := key.(string)
+		c := value.(gnet.Conn)
+		c.AsyncWrite([]byte(fmt.Sprintf("heart beating to %s\n", addr)))
+		return true
+	})
+	delay = ps.tick
+	return
+}
+func (ps *pushServer) React(c gnet.Conn) (out []byte, action gnet.Action) {
+	out = c.Read()
+	c.ResetBuffer()
+	return
+}
+
+func main() {
+	var port int
+	var multicore bool
+	var interval time.Duration
+	var ticker bool
+
+	// Example command: go run push.go --port 9000 --tick 1s
+	flag.IntVar(&port, "port", 9000, "server port")
+	flag.BoolVar(&multicore, "multicore", true, "multicore")
+	flag.DurationVar(&interval, "tick", 0, "pushing tick")
+	flag.Parse()
+	if interval > 0 {
+		ticker = true
+	}
+	push := &pushServer{tick: interval}
+	log.Fatal(gnet.Serve(push, fmt.Sprintf("tcp://:%d", port), gnet.WithMulticore(multicore), gnet.WithTicker(ticker)))
+}
+```
+</details>
+
+<details>
+	<summary> Codec Client/Server </summary>
+
+**Client:**
+
+```go
+// Reference https://github.com/smallnest/goframe/blob/master/_examples/goclient/client.go
+
+package main
+
+import (
+	"encoding/binary"
+	"fmt"
+	"net"
+
+	"github.com/smallnest/goframe"
+)
+
+func main() {
+	conn, err := net.Dial("tcp", "127.0.0.1:9000")
+	if err != nil {
+		panic(err)
+	}
+	defer conn.Close()
+
+	encoderConfig := goframe.EncoderConfig{
+		ByteOrder:                       binary.BigEndian,
+		LengthFieldLength:               4,
+		LengthAdjustment:                0,
+		LengthIncludesLengthFieldLength: false,
+	}
+
+	decoderConfig := goframe.DecoderConfig{
+		ByteOrder:           binary.BigEndian,
+		LengthFieldOffset:   0,
+		LengthFieldLength:   4,
+		LengthAdjustment:    0,
+		InitialBytesToStrip: 4,
+	}
+
+	fc := goframe.NewLengthFieldBasedFrameConn(encoderConfig, decoderConfig, conn)
+	err = fc.WriteFrame([]byte("hello"))
+	if err != nil {
+		panic(err)
+	}
+	err = fc.WriteFrame([]byte("world"))
+	if err != nil {
+		panic(err)
+	}
+
+	buf, err := fc.ReadFrame()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("received: ", string(buf))
+	buf, err = fc.ReadFrame()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("received: ", string(buf))
+}
+```
+
+**Server:**
+
+```go
+package main
+
+import (
+	"encoding/binary"
+	"flag"
+	"fmt"
+	"log"
+	"time"
+
+	"github.com/panjf2000/gnet"
+	"github.com/panjf2000/gnet/pool"
+)
+
+type codecServer struct {
+	*gnet.EventServer
+	addr       string
+	multicore  bool
+	async      bool
+	codec      gnet.ICodec
+	workerPool *pool.WorkerPool
+}
+
+func (cs *codecServer) OnInitComplete(srv gnet.Server) (action gnet.Action) {
+	log.Printf("Test codec server is listening on %s (multi-cores: %t, loops: %d)\n",
+		srv.Addr.String(), srv.Multicore, srv.NumLoops)
+	return
+}
+
+func (cs *codecServer) React(c gnet.Conn) (out []byte, action gnet.Action) {
+	if cs.async {
+		data := append([]byte{}, c.ReadFrame()...)
+		_ = cs.workerPool.Submit(func() {
+			c.AsyncWrite(data)
+		})
+		return
+	}
+	out = c.ReadFrame()
+	return
+}
+
+func testCodecServe(addr string, multicore, async bool, codec gnet.ICodec) {
+	var err error
+	if codec == nil {
+		encoderConfig := gnet.EncoderConfig{
+			ByteOrder:                       binary.BigEndian,
+			LengthFieldLength:               4,
+			LengthAdjustment:                0,
+			LengthIncludesLengthFieldLength: false,
+		}
+		decoderConfig := gnet.DecoderConfig{
+			ByteOrder:           binary.BigEndian,
+			LengthFieldOffset:   0,
+			LengthFieldLength:   4,
+			LengthAdjustment:    0,
+			InitialBytesToStrip: 4,
+		}
+		codec = gnet.NewLengthFieldBasedFrameCodec(encoderConfig, decoderConfig)
+	}
+	cs := &codecServer{addr: addr, multicore: multicore, async: async, codec: codec, workerPool: pool.NewWorkerPool()}
+	err = gnet.Serve(cs, addr, gnet.WithMulticore(multicore), gnet.WithTCPKeepAlive(time.Minute*5), gnet.WithCodec(codec))
+	if err != nil {
+		panic(err)
+	}
+}
+
+func main() {
+	var port int
+	var multicore bool
+
+	// Example command: go run server.go --port 9000 --multicore true
+	flag.IntVar(&port, "port", 9000, "server port")
+	flag.BoolVar(&multicore, "multicore", true, "multicore")
+	flag.Parse()
+	addr := fmt.Sprintf("tcp://:%d", port)
+	testCodecServe(addr, true, false, nil)
+}
+```
+</details>
+
+**For more details, check out here: [examples of gnet](https://github.com/panjf2000/gnet/tree/master/examples).**
 
 ## I/O Events
 
