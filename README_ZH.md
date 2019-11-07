@@ -37,7 +37,7 @@
 - [x] 支持异步写操作
 - [x] 灵活的事件定时器
 - [x] SO_REUSEPORT 端口重用
-- [x] 新增多种编解码器，以此支持对 TCP 数据流分包：LineBasedFrameCodec, DelimiterBasedFrameCodec, FixedLengthFrameCodec 和 LengthFieldBasedFrameCodec，参考自 [netty codec](https://github.com/netty/netty/tree/4.1/codec/src/main/java/io/netty/handler/codec)
+- [x] 内置多种编解码器，支持对 TCP 数据流分包：LineBasedFrameCodec, DelimiterBasedFrameCodec, FixedLengthFrameCodec 和 LengthFieldBasedFrameCodec，参考自 [netty codec](https://github.com/netty/netty/tree/4.1/codec/src/main/java/io/netty/handler/codec)，而且支持自定制编解码器
 - [ ] 加入更多的负载均衡算法：随机、最少连接、一致性哈希等等
 - [ ] 支持 Windows 平台的 IOCP 事件驱动机制
 - [ ] 支持 TLS
@@ -693,6 +693,14 @@ events.Tick = func() (delay time.Duration, action Action){
 ```go
 gnet.Serve(events, "tcp://:9000", gnet.WithMulticore(true), gnet.WithReusePort(true)))
 ```
+
+## 多种内置的 TCP 流编解码器
+
+`gnet` 内置了多种用于 TCP 流分包的编解码器。
+
+目前一共实现了 4 种常见的编解码器：LineBasedFrameCodec, DelimiterBasedFrameCodec, FixedLengthFrameCodec 和 LengthFieldBasedFrameCodec，基本上能满足大多数应用场景的需求了；而且 `gnet` 还允许用户实现自己的编解码器：只需要实现 [gnet.ICodec](https://github.com/panjf2000/gnet/blob/master/codec.go#L17) 接口，并通过 functional options 替换掉内部默认的编解码器即可。
+
+这里有一个使用编解码器对 TCP 流分包的[例子](https://github.com/panjf2000/gnet/blob/master/examples/codec/server/server.go)。
 
 # 📊 性能测试
 

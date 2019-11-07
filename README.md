@@ -37,7 +37,7 @@ The goal of this project is to create a server framework for Go that performs on
 - [x] Supporting asynchronous write operation
 - [x] Flexible ticker event
 - [x] SO_REUSEPORT socket option
-- [x] Codec implementations to encode/decode frames into/from TCP stream: LineBasedFrameCodec, DelimiterBasedFrameCodec, FixedLengthFrameCodec and LengthFieldBasedFrameCodec, referencing [netty codec](https://github.com/netty/netty/tree/4.1/codec/src/main/java/io/netty/handler/codec)
+- [x] Built-in multiple codecs to encode/decode network frames into/from TCP stream: LineBasedFrameCodec, DelimiterBasedFrameCodec, FixedLengthFrameCodec and LengthFieldBasedFrameCodec, referencing [netty codec](https://github.com/netty/netty/tree/4.1/codec/src/main/java/io/netty/handler/codec), also supporting customized codecs
 - [ ] Additional load-balancing algorithms: Random, Least-Connections, Consistent-hashing and so on
 - [ ] New event-notification mechanism: IOCP on Windows platform 
 - [ ] TLS support
@@ -684,7 +684,7 @@ The `gnet.Serve` function can bind to UDP addresses.
 
 The `gnet.WithMulticore(true)` indicates whether the server will be effectively created with multi-cores, if so, then you must take care of synchronizing memory between all event callbacks, otherwise, it will run the server with a single thread. The number of threads in the server will be automatically assigned to the value of `runtime.NumCPU()`.
 
-## Load balancing
+## Load Balancing
 
 The current built-in load balancing algorithm in `gnet` is Round-Robin.
 
@@ -697,6 +697,14 @@ Just use functional options to set up `SO_REUSEPORT` and you can enjoy this feat
 ```go
 gnet.Serve(events, "tcp://:9000", gnet.WithMulticore(true), gnet.WithReusePort(true)))
 ```
+
+## Multiple built-in codecs for TCP stream
+
+There are multiple built-in codecs in `gnet` which allow you to encode/decode frames into/from TCP stream.
+
+So far `gnet` has four kinds of built-in codecs: LineBasedFrameCodec, DelimiterBasedFrameCodec, FixedLengthFrameCodec and LengthFieldBasedFrameCodec, which generally meets most scenarios, but still `gnet` allows users to customize their own codecs in their `gnet` servers by implementing the interface [gnet.ICodec](https://github.com/panjf2000/gnet/blob/master/codec.go#L17) and replacing the default codec in `gnet` with customized codec via functional options.
+
+Here is an [example](https://github.com/panjf2000/gnet/blob/master/examples/codec/server/server.go) with codec, showing you how to leverage codec to encode/decode network frames into/from TCP stream.
 
 # 📊 Performance
 
