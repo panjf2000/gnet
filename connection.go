@@ -160,12 +160,14 @@ func (c *conn) BufferLength() int {
 }
 
 func (c *conn) AsyncWrite(buf []byte) {
-	_ = c.loop.poller.Trigger(func() error {
-		if c.opened {
-			c.write(buf)
-		}
-		return nil
-	})
+	if encodedBuf, err := c.loop.svr.codec.Encode(buf); err == nil {
+		_ = c.loop.poller.Trigger(func() error {
+			if c.opened {
+				c.write(encodedBuf)
+			}
+			return nil
+		})
+	}
 }
 
 func (c *conn) Wake() {

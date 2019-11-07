@@ -92,9 +92,10 @@ func (lp *loop) loopIn(c *conn) error {
 	c.cache = lp.packet[:n]
 
 	out, action := lp.svr.eventHandler.React(c)
-	frame, err := lp.svr.codec.Encode(out)
 	if out != nil {
-		c.write(frame)
+		if frame, err := lp.svr.codec.Encode(out); err == nil {
+			c.write(frame)
+		}
 	}
 	_, _ = c.inboundBuffer.Write(c.cache)
 

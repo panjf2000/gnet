@@ -7,6 +7,7 @@ package gnet
 
 import (
 	"bufio"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"math/rand"
@@ -19,6 +20,250 @@ import (
 
 	"github.com/panjf2000/gnet/pool"
 )
+
+func TestCodecServe(t *testing.T) {
+	// start a server
+	// connect 10 clients
+	// each client will pipe random data for 1-3 seconds.
+	// the writes to the server will be random sizes. 0KB - 1MB.
+	// the server will echo back the data.
+	// waits for graceful connection closing.
+	t.Run("poll", func(t *testing.T) {
+		t.Run("tcp", func(t *testing.T) {
+			t.Run("1-loop-LineBasedFrameCodec", func(t *testing.T) {
+				testCodecServe("tcp", ":9991", false, false, 10, false, new(LineBasedFrameCodec))
+			})
+			t.Run("1-loop-DelimiterBasedFrameCodec", func(t *testing.T) {
+				testCodecServe("tcp", ":9992", false, false, 10, false, NewDelimiterBasedFrameCodec('|'))
+			})
+			t.Run("1-loop-FixedLengthFrameCodec", func(t *testing.T) {
+				testCodecServe("tcp", ":9993", false, false, 10, false, NewFixedLengthFrameCodec(12))
+			})
+			t.Run("1-loop-LengthFieldBasedFrameCodec", func(t *testing.T) {
+				testCodecServe("tcp", ":9994", false, false, 10, false, nil)
+			})
+			t.Run("N-loop-LineBasedFrameCodec", func(t *testing.T) {
+				testCodecServe("tcp", ":9995", true, false, 10, false, new(LineBasedFrameCodec))
+			})
+			t.Run("N-loop-DelimiterBasedFrameCodec", func(t *testing.T) {
+				testCodecServe("tcp", ":9996", true, false, 10, false, NewDelimiterBasedFrameCodec('|'))
+			})
+			t.Run("N-loop-FixedLengthFrameCodec", func(t *testing.T) {
+				testCodecServe("tcp", ":9997", true, false, 10, false, NewFixedLengthFrameCodec(12))
+			})
+			t.Run("N-loop-LengthFieldBasedFrameCodec", func(t *testing.T) {
+				testCodecServe("tcp", ":9998", true, false, 10, false, nil)
+			})
+		})
+		t.Run("tcp-async", func(t *testing.T) {
+			t.Run("1-loop-LineBasedFrameCodec", func(t *testing.T) {
+				testCodecServe("tcp", ":9991", false, true, 10, false, new(LineBasedFrameCodec))
+			})
+			t.Run("1-loop-DelimiterBasedFrameCodec", func(t *testing.T) {
+				testCodecServe("tcp", ":9992", false, true, 10, false, NewDelimiterBasedFrameCodec('|'))
+			})
+			t.Run("1-loop-FixedLengthFrameCodec", func(t *testing.T) {
+				testCodecServe("tcp", ":9993", false, true, 10, false, NewFixedLengthFrameCodec(12))
+			})
+			t.Run("1-loop-LengthFieldBasedFrameCodec", func(t *testing.T) {
+				testCodecServe("tcp", ":9994", false, true, 10, false, nil)
+			})
+			t.Run("N-loop-LineBasedFrameCodec", func(t *testing.T) {
+				testCodecServe("tcp", ":9995", true, true, 10, false, new(LineBasedFrameCodec))
+			})
+			t.Run("N-loop-DelimiterBasedFrameCodec", func(t *testing.T) {
+				testCodecServe("tcp", ":9996", true, true, 10, false, NewDelimiterBasedFrameCodec('|'))
+			})
+			t.Run("N-loop-FixedLengthFrameCodec", func(t *testing.T) {
+				testCodecServe("tcp", ":9997", true, true, 10, false, NewFixedLengthFrameCodec(12))
+			})
+			t.Run("N-loop-LengthFieldBasedFrameCodec", func(t *testing.T) {
+				testCodecServe("tcp", ":9998", true, true, 10, false, nil)
+			})
+		})
+	})
+	t.Run("poll-reuseport", func(t *testing.T) {
+		t.Run("tcp", func(t *testing.T) {
+			t.Run("1-loop-LineBasedFrameCodec", func(t *testing.T) {
+				testCodecServe("tcp", ":9991", false, false, 10, true, new(LineBasedFrameCodec))
+			})
+			t.Run("1-loop-DelimiterBasedFrameCodec", func(t *testing.T) {
+				testCodecServe("tcp", ":9992", false, false, 10, true, NewDelimiterBasedFrameCodec('|'))
+			})
+			t.Run("1-loop-FixedLengthFrameCodec", func(t *testing.T) {
+				testCodecServe("tcp", ":9993", false, false, 10, true, NewFixedLengthFrameCodec(12))
+			})
+			t.Run("1-loop-LengthFieldBasedFrameCodec", func(t *testing.T) {
+				testCodecServe("tcp", ":9994", false, false, 10, true, nil)
+			})
+			t.Run("N-loop-LineBasedFrameCodec", func(t *testing.T) {
+				testCodecServe("tcp", ":9995", true, false, 10, true, new(LineBasedFrameCodec))
+			})
+			t.Run("N-loop-DelimiterBasedFrameCodec", func(t *testing.T) {
+				testCodecServe("tcp", ":9996", true, false, 10, true, NewDelimiterBasedFrameCodec('|'))
+			})
+			t.Run("N-loop-FixedLengthFrameCodec", func(t *testing.T) {
+				testCodecServe("tcp", ":9997", true, false, 10, true, NewFixedLengthFrameCodec(12))
+			})
+			t.Run("N-loop-LengthFieldBasedFrameCodec", func(t *testing.T) {
+				testCodecServe("tcp", ":9998", true, false, 10, true, nil)
+			})
+		})
+		t.Run("tcp-async", func(t *testing.T) {
+			t.Run("1-loop-LineBasedFrameCodec", func(t *testing.T) {
+				testCodecServe("tcp", ":9991", false, true, 10, true, new(LineBasedFrameCodec))
+			})
+			t.Run("1-loop-DelimiterBasedFrameCodec", func(t *testing.T) {
+				testCodecServe("tcp", ":9992", false, true, 10, true, NewDelimiterBasedFrameCodec('|'))
+			})
+			t.Run("1-loop-FixedLengthFrameCodec", func(t *testing.T) {
+				testCodecServe("tcp", ":9993", false, true, 10, true, NewFixedLengthFrameCodec(12))
+			})
+			t.Run("1-loop-LengthFieldBasedFrameCodec", func(t *testing.T) {
+				testCodecServe("tcp", ":9994", false, true, 10, true, nil)
+			})
+			t.Run("N-loop-LineBasedFrameCodec", func(t *testing.T) {
+				testCodecServe("tcp", ":9995", true, true, 10, true, new(LineBasedFrameCodec))
+			})
+			t.Run("N-loop-DelimiterBasedFrameCodec", func(t *testing.T) {
+				testCodecServe("tcp", ":9996", true, true, 10, true, NewDelimiterBasedFrameCodec('|'))
+			})
+			t.Run("N-loop-FixedLengthFrameCodec", func(t *testing.T) {
+				testCodecServe("tcp", ":9997", true, true, 10, true, NewFixedLengthFrameCodec(12))
+			})
+			t.Run("N-loop-LengthFieldBasedFrameCodec", func(t *testing.T) {
+				testCodecServe("tcp", ":9998", true, true, 10, true, nil)
+			})
+		})
+	})
+}
+
+type testCodecServer struct {
+	*EventServer
+	network      string
+	addr         string
+	multicore    bool
+	async        bool
+	nclients     int
+	started      int32
+	connected    int32
+	disconnected int32
+	codec        ICodec
+	workerPool   *pool.WorkerPool
+}
+
+func (s *testCodecServer) OnOpened(c Conn) (out []byte, action Action) {
+	c.SetContext(c)
+	atomic.AddInt32(&s.connected, 1)
+	out = []byte("sweetness\r\n")
+	if c.LocalAddr() == nil {
+		panic("nil local addr")
+	}
+	if c.RemoteAddr() == nil {
+		panic("nil local addr")
+	}
+	return
+}
+func (s *testCodecServer) OnClosed(c Conn, err error) (action Action) {
+	if c.Context() != c {
+		panic("invalid context")
+	}
+
+	atomic.AddInt32(&s.disconnected, 1)
+	if atomic.LoadInt32(&s.connected) == atomic.LoadInt32(&s.disconnected) &&
+		atomic.LoadInt32(&s.disconnected) == int32(s.nclients) {
+		action = Shutdown
+	}
+
+	return
+}
+func (s *testCodecServer) React(c Conn) (out []byte, action Action) {
+	if s.async {
+		data := append([]byte{}, c.ReadFrame()...)
+		_ = s.workerPool.Submit(func() {
+			c.AsyncWrite(data)
+		})
+		return
+	}
+	out = c.ReadFrame()
+	return
+}
+func (s *testCodecServer) Tick() (delay time.Duration, action Action) {
+	if atomic.LoadInt32(&s.started) == 0 {
+		for i := 0; i < s.nclients; i++ {
+			go func() {
+				startCodecClient(s.network, s.addr, s.multicore, s.async, s.codec)
+			}()
+		}
+		atomic.StoreInt32(&s.started, 1)
+	}
+	delay = time.Second / 5
+	return
+}
+
+func testCodecServe(network, addr string, multicore, async bool, nclients int, reuseport bool, codec ICodec) {
+	var err error
+	if codec == nil {
+		encoderConfig := EncoderConfig{
+			ByteOrder:                       binary.BigEndian,
+			LengthFieldLength:               4,
+			LengthAdjustment:                0,
+			LengthIncludesLengthFieldLength: false,
+		}
+		decoderConfig := DecoderConfig{
+			ByteOrder:           binary.BigEndian,
+			LengthFieldOffset:   0,
+			LengthFieldLength:   4,
+			LengthAdjustment:    0,
+			InitialBytesToStrip: 4,
+		}
+		codec = NewLengthFieldBasedFrameCodec(encoderConfig, decoderConfig)
+	}
+	ts := &testCodecServer{network: network, addr: addr, multicore: multicore, async: async, nclients: nclients, codec: codec, workerPool: pool.NewWorkerPool()}
+	if reuseport {
+		err = Serve(ts, network+"://"+addr, WithMulticore(multicore), WithTicker(true),
+			WithTCPKeepAlive(time.Minute*5), WithCodec(codec), WithReusePort(true))
+	} else {
+		err = Serve(ts, network+"://"+addr, WithMulticore(multicore), WithTicker(true),
+			WithTCPKeepAlive(time.Minute*5), WithCodec(codec))
+	}
+	if err != nil {
+		panic(err)
+	}
+}
+
+func startCodecClient(network, addr string, multicore, async bool, codec ICodec) {
+	rand.Seed(time.Now().UnixNano())
+	c, err := net.Dial(network, addr)
+	if err != nil {
+		panic(err)
+	}
+	defer c.Close()
+	rd := bufio.NewReader(c)
+	msg, err := rd.ReadBytes('\n')
+	if err != nil {
+		panic(err)
+	}
+	if string(msg) != "sweetness\r\n" {
+		panic("bad header")
+	}
+	duration := time.Duration((rand.Float64()*2+1)*float64(time.Second)) / 8
+	start := time.Now()
+	for time.Since(start) < duration {
+		data := []byte("Hello, World")
+		encodedData, _ := codec.Encode(data)
+		if _, err := c.Write(encodedData); err != nil {
+			panic(err)
+		}
+		data2 := make([]byte, len(encodedData))
+		if _, err := io.ReadFull(rd, data2); err != nil {
+			panic(err)
+		}
+		if string(encodedData) != string(data2) && !async {
+			panic(fmt.Sprintf("mismatch %s/multi-core:%t: %d vs %d bytes\n", network, multicore, len(encodedData), len(data2)))
+		}
+	}
+}
 
 func TestServe(t *testing.T) {
 	// start a server

@@ -66,18 +66,23 @@ func (cc *LineBasedFrameCodec) Decode(c Conn) ([]byte, error) {
 
 // DelimiterBasedFrameCodec encodes/decodes specific-delimiter-separated frames into/from TCP stream.
 type DelimiterBasedFrameCodec struct {
-	Delimiter byte
+	delimiter byte
+}
+
+// NewDelimiterBasedFrameCodec instantiates and returns a codec with a specific delimiter.
+func NewDelimiterBasedFrameCodec(delimiter byte) *DelimiterBasedFrameCodec {
+	return &DelimiterBasedFrameCodec{delimiter}
 }
 
 // Encode ...
 func (cc *DelimiterBasedFrameCodec) Encode(buf []byte) ([]byte, error) {
-	return append(buf, cc.Delimiter), nil
+	return append(buf, cc.delimiter), nil
 }
 
 // Decode ...
 func (cc *DelimiterBasedFrameCodec) Decode(c Conn) ([]byte, error) {
 	buf := c.Read()
-	idx := bytes.IndexByte(buf, cc.Delimiter)
+	idx := bytes.IndexByte(buf, cc.delimiter)
 	if idx == -1 {
 		return nil, ErrDelimiterNotFound
 	}
@@ -87,12 +92,17 @@ func (cc *DelimiterBasedFrameCodec) Decode(c Conn) ([]byte, error) {
 
 // FixedLengthFrameCodec encodes/decodes fixed-length-separated frames into/from TCP stream.
 type FixedLengthFrameCodec struct {
-	FrameLength int
+	frameLength int
+}
+
+// NewFixedLengthFrameCodec instantiates and returns a codec with fixed length.
+func NewFixedLengthFrameCodec(frameLength int) *FixedLengthFrameCodec {
+	return &FixedLengthFrameCodec{frameLength}
 }
 
 // Encode ...
 func (cc *FixedLengthFrameCodec) Encode(buf []byte) ([]byte, error) {
-	if len(buf)%cc.FrameLength != 0 {
+	if len(buf)%cc.frameLength != 0 {
 		return nil, ErrInvalidFixedLength
 	}
 	return buf, nil
@@ -100,7 +110,7 @@ func (cc *FixedLengthFrameCodec) Encode(buf []byte) ([]byte, error) {
 
 // Decode ...
 func (cc *FixedLengthFrameCodec) Decode(c Conn) ([]byte, error) {
-	size, buf := c.ReadN(cc.FrameLength)
+	size, buf := c.ReadN(cc.frameLength)
 	if size == 0 {
 		return nil, ErrUnexpectedEOF
 	}
@@ -113,6 +123,13 @@ func (cc *FixedLengthFrameCodec) Decode(c Conn) ([]byte, error) {
 type LengthFieldBasedFrameCodec struct {
 	encoderConfig EncoderConfig
 	decoderConfig DecoderConfig
+}
+
+// NewLengthFieldBasedFrameCodec instantiates and returns a codec based on the length field.
+// It is the go implementation of netty LengthFieldBasedFrameecoder and LengthFieldPrepender.
+// you can see javadoc of them to learn more details.
+func NewLengthFieldBasedFrameCodec(encoderConfig EncoderConfig, decoderConfig DecoderConfig) *LengthFieldBasedFrameCodec {
+	return &LengthFieldBasedFrameCodec{encoderConfig, decoderConfig}
 }
 
 // EncoderConfig config for encoder.
