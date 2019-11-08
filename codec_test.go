@@ -49,6 +49,13 @@ func TestLengthFieldBasedFrameCodec(t *testing.T) {
 	bNum := readUint24(binary.BigEndian, buf)
 	p := writeUint24(binary.BigEndian, int(bNum))
 	if string(buf) != string(p) {
-		t.Fatalf("data don't match, raw data: %s, recovered data: %s\n", string(buf), string(p))
+		t.Fatalf("data don't match with big endian, raw data: %s, recovered data: %s\n", string(buf), string(p))
+	}
+
+	rand.Read(buf)
+	bNum = readUint24(binary.LittleEndian, buf)
+	p = writeUint24(binary.LittleEndian, int(bNum))
+	if string(buf) != string(p) {
+		t.Fatalf("data don't match with little endian, raw data: %s, recovered data: %s\n", string(buf), string(p))
 	}
 }
