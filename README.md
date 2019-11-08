@@ -111,7 +111,7 @@ go get -u github.com/panjf2000/gnet
 
 **The detailed documentation is located in here: [docs of gnet](https://gowalker.org/github.com/panjf2000/gnet?lang=en-US), but let's pass through the brief instructions first.**
 
-It is easy to create a network server with `gnet`. All you have to do is just make your implementation of `gnet.EventHandler` interface and register your event-handler functions to it, then pass it to the `gnet.Serve` function along with the binding address(es). Each connection is represented as a `gnet.Conn` interface that is passed to various events to differentiate the clients. At any point you can close a client or shutdown the server by return a `Close` or `Shutdown` action from an event.
+It is easy to create a network server with `gnet`. All you have to do is just to make your implementation of `gnet.EventHandler` interface and register your event-handler functions to it, then pass it to the `gnet.Serve` function along with the binding address(es). Each connection is represented as a `gnet.Conn` interface that is passed to various events to differentiate the clients. At any point you can close a client or shutdown the server by return a `Close` or `Shutdown` action from an event.
 
 The simplest example to get you started playing with `gnet` would be the echo server. So here you are, a simplest echo server upon `gnet` that is listening on port 9000:
 
@@ -184,7 +184,7 @@ func main() {
 }
 ```
 
-Like I said in the 『Multiple Reactors + Goroutine-Pool Model』section, if there are blocking code in your business logic, then you ought to turn them into non-blocking code in any way, for instance you can wrap them into a goroutine, but it will result in a massive amount of goroutines if massive traffic is passing through your server so I would suggest you utilize a goroutine pool like `ants` to manage those goroutines and reduce the cost of system resources.
+Like I said in the 『Multiple Reactors + Goroutine-Pool Model』section, if there are blocking code in your business logic, then you ought to turn them into non-blocking code in any way, for instance you can wrap them into a goroutine, but it will result in a massive amount of goroutines if massive traffic is passing through your server so I would suggest you utilize a goroutine pool like [ants](https://github.com/panjf2000/ants) to manage those goroutines and reduce the cost of system resources.
 
 **All gnet examples:**
 
@@ -652,18 +652,18 @@ func main() {
 
 Current supported I/O events in `gnet`:
 
-- `EventHandler.OnInitComplete` is activated when the server is ready to accept new connections.
-- `EventHandler.OnOpened` is activated when a connection has opened.
-- `EventHandler.OnClosed` is activated when a connection has closed.
-- `EventHandler.React` is activated when the server receives new data from a connection. (usually it is where you write the code of business logic)
-- `EventHandler.Tick` is activated immediately after the server starts and will fire again after a specified interval.
-- `EventHandler.PreWrite` is activated just before any data is written to any client socket.
+- `EventHandler.OnInitComplete` fires when the server has been initialized and ready to accept new connections.
+- `EventHandler.OnOpened` fires once a connection has been opened.
+- `EventHandler.OnClosed` fires after a connection has been closed.
+- `EventHandler.React` fires when the server receives inbound data from a socket/connection. (usually it is where you write the code of business logic)
+- `EventHandler.Tick` fires right after the server starts and then fires every specified interval.
+- `EventHandler.PreWrite` fires just before any data has been written to client.
 
 
 ## Ticker
 
 The `EventHandler.Tick` event fires ticks at a specified interval. 
-The first tick fires immediately after the `Serving` events and if you intend to set up a ticker event, remember to pass an option: `gnet.WithTicker(true)` to `gnet.Serve`.
+The first tick fires right after the gnet server starts up and if you intend to set up a ticker event, don't forget to pass an option: `gnet.WithTicker(true)` to `gnet.Serve`.
 
 ```go
 events.Tick = func() (delay time.Duration, action Action){
@@ -690,7 +690,7 @@ The current built-in load balancing algorithm in `gnet` is Round-Robin.
 
 ## SO_REUSEPORT
 
-Servers can utilize the [SO_REUSEPORT](https://lwn.net/Articles/542629/) option which allows multiple sockets on the same host to bind to the same port and the OS kernel takes care of the load balancing for you, it wakes one socket per `accpet` event coming to resolved the `thundering herd`.
+`gnet` server is able to utilize the [SO_REUSEPORT](https://lwn.net/Articles/542629/) option which allows multiple sockets on the same host to bind to the same port and the OS kernel takes care of the load balancing for you, it wakes one socket per `accpet` event coming to resolved the `thundering herd`.
 
 Just use functional options to set up `SO_REUSEPORT` and you can enjoy this feature:
 

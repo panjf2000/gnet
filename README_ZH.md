@@ -649,7 +649,7 @@ func main() {
 
 - `EventHandler.OnInitComplete` 当 server 初始化完成之后调用。
 - `EventHandler.OnOpened` 当连接被打开的时候调用。
-- `EventHandler.OnClosed` 当连接被关闭的时候调用。
+- `EventHandler.OnClosed` 当连接被关闭的之后调用。
 - `EventHandler.React` 当 server 端接收到从 client 端发送来的数据的时候调用。（你的核心业务代码一般是写在这个方法里）
 - `EventHandler.Tick` 服务器启动的时候会调用一次，之后就以给定的时间间隔定时调用一次，是一个定时器方法。
 - `EventHandler.PreWrite` 预先写数据方法，在 server 端写数据回 client 端之前调用。
@@ -659,7 +659,7 @@ func main() {
 
 `EventHandler.Tick` 会每隔一段时间触发一次，间隔时间你可以自己控制，设定返回的 `delay` 变量就行。
 
-定时器的第一次触发是在 `gnet.Serving` 事件之后，如果你要设置定时器，别忘了设置 option 选项：`WithTicker(true)`。
+定时器的第一次触发是在 gnet server 启动之后，如果你要设置定时器，别忘了设置 option 选项：`WithTicker(true)`。
 
 ```go
 events.Tick = func() (delay time.Duration, action Action){
