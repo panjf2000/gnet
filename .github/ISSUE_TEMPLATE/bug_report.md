@@ -24,9 +24,9 @@ A clear and concise description of what you expected to happen.
 If applicable, add screenshots to help explain your problem.
 
 **System Info (please complete the following information):**
- - OS (e.g. Linux): 
- - Go Version (e.g. Go 1.13): 
- - gnet Version (e.g. v1.0.0-beta.3): 
+ - OS (e.g. Ubuntu 18.04): 
+ - Go version (e.g. Go 1.13): 
+ - gnet version (e.g. v1.0.0): 
 
 **Additional context**
 Add any other context about the problem here.
