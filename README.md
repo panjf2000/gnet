@@ -26,7 +26,7 @@ The goal of this project is to create a server framework for Go that performs on
 
 # 🚀 Features
 
-- [x] [High-performance](#-performance) event-loop under multi-threads/goroutines model
+- [x] [High-performance](#-performance) event-loop under networking model of multiple threads/goroutines
 - [x] Built-in load balancing algorithm: Round-Robin
 - [x] Built-in goroutine pool powered by the library [ants](https://github.com/panjf2000/ants)
 - [x] Built-in memory pool with bytes powered by the library [pool](https://github.com/gobwas/pool/)
@@ -45,10 +45,10 @@ The goal of this project is to create a server framework for Go that performs on
 
 # 💡 Key Designs
 
-## Multiple-Threads/Goroutines Model
-### Multiple Reactors Model
+## Networking Model of Multiple Threads/Goroutines
+### Multiple Reactors
 
-`gnet` redesigns and implements a new built-in multiple-threads/goroutines model: 『Multiple Reactors』 which is also the default multiple-threads model of `netty`, Here's the schematic diagram:
+`gnet` redesigns and implements a new built-in networking model of multiple threads/goroutines: 『multiple reactors』 which is also the default networking model of multiple threads of `netty`, Here's the schematic diagram:
 
 <p align="center">
 <img width="820" alt="multi_reactor" src="https://user-images.githubusercontent.com/7496278/64916634-8f038080-d7b3-11e9-82c8-f77e9791df86.png">
@@ -59,15 +59,15 @@ and it works as the following sequence diagram:
 <img width="869" alt="reactor" src="https://user-images.githubusercontent.com/7496278/64918644-a5213900-d7d3-11e9-88d6-1ec1ec72c1cd.png">
 </p>
 
-### Multiple Reactors + Goroutine-Pool Model
+### Multiple Reactors + Goroutine-Pool
 
 You may ask me a question: what if my business logic in `EventHandler.React`  contains some blocking code which leads to blocking in event-loop of `gnet`, what is the solution for this kind of situation？
 
 As you know, there is a most important tenet when writing code under `gnet`: you should never block the event-loop in the `EventHandler.React`, otherwise, it will lead to a low throughput in your `gnet` server, which is also the most important tenet in `netty`. 
 
-And the solution for that could be found in the subsequent multiple-threads/goroutines model of `gnet`: 『Multiple Reactors with thread/goroutine pool』which pulls you out from the blocking mire, it will construct a worker-pool with fixed capacity and put those blocking jobs in `EventHandler.React` into the worker-pool to make the event-loop goroutines non-blocking.
+And the solution to that could be found in the subsequent networking model of multiple threads/goroutines of `gnet`: 『multiple reactors with thread/goroutine pool』which pulls you out from the blocking mire, it will construct a worker-pool with fixed capacity and put those blocking jobs in `EventHandler.React` into the worker-pool to make the event-loop goroutines non-blocking.
 
-The architecture diagram of『Multiple Reactors with thread/goroutine pool』networking model architecture is in here:
+The architecture diagram of networking model:『multiple reactors with thread/goroutine pool』architecture is in here:
 
 <p align="center">
 <img width="854" alt="multi_reactor_thread_pool" src="https://user-images.githubusercontent.com/7496278/64918783-90de3b80-d7d5-11e9-9190-ff8277c95db1.png">
@@ -78,7 +78,7 @@ and it works as the following sequence diagram:
 <img width="916" alt="multi-reactors" src="https://user-images.githubusercontent.com/7496278/64918646-a7839300-d7d3-11e9-804a-d021ddd23ca3.png">
 </p>
 
-`gnet` implements the networking model of 『Multiple Reactors with thread/goroutine pool』by the aid of a high-performance goroutine pool called [ants](https://github.com/panjf2000/ants) that allows you to manage and recycle a massive number of goroutines in your concurrent programs, the full features and usages in `ants` are documented [here](https://gowalker.org/github.com/panjf2000/ants?lang=en-US).
+`gnet` implements the networking model:『multiple reactors with thread/goroutine pool』by the aid of a high-performance goroutine pool called [ants](https://github.com/panjf2000/ants) that allows you to manage and recycle a massive number of goroutines in your concurrent programs, the full features and usages in `ants` are documented [here](https://gowalker.org/github.com/panjf2000/ants?lang=en-US).
 
 `gnet` integrates `ants` and provides the `pool.NewWorkerPool` method that you can invoke to instantiate a `ants` pool where you are able to put your blocking code logic in `EventHandler.React` and invoke the function of `gnet.Conn.AsyncWrite` to send out data asynchronously in worker pool after you finish the blocking process and get the output data, which makes the goroutine of event-loop non-blocking.
 
@@ -184,7 +184,7 @@ func main() {
 }
 ```
 
-Like I said in the 『Multiple Reactors + Goroutine-Pool Model』section, if there are blocking code in your business logic, then you ought to turn them into non-blocking code in any way, for instance you can wrap them into a goroutine, but it will result in a massive amount of goroutines if massive traffic is passing through your server so I would suggest you utilize a goroutine pool like [ants](https://github.com/panjf2000/ants) to manage those goroutines and reduce the cost of system resources.
+Like I said in the 『Multiple Reactors + Goroutine-Pool』section, if there are blocking code in your business logic, then you ought to turn them into non-blocking code in any way, for instance you can wrap them into a goroutine, but it will result in a massive amount of goroutines if massive traffic is passing through your server so I would suggest you utilize a goroutine pool like [ants](https://github.com/panjf2000/ants) to manage those goroutines and reduce the cost of system resources.
 
 **All gnet examples:**
 
@@ -691,6 +691,8 @@ The current built-in load balancing algorithm in `gnet` is Round-Robin.
 ## SO_REUSEPORT
 
 `gnet` server is able to utilize the [SO_REUSEPORT](https://lwn.net/Articles/542629/) option which allows multiple sockets on the same host to bind to the same port and the OS kernel takes care of the load balancing for you, it wakes one socket per `accpet` event coming to resolved the `thundering herd`.
+
+By default, `gnet` is not going to be haunted by the `thundering herd` under its networking model:『multiple reactors』which gets only **one** main reactor to listen on "address:port" and accept new sockets. So this `SO_REUSEPORT` option is trivial in `gnet` but note that it will fall back to the old networking model of `evio` when you enable the `SO_REUSEPORT` option.
 
 Just use functional options to set up `SO_REUSEPORT` and you can enjoy this feature:
 

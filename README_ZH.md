@@ -26,7 +26,7 @@
 
 # 🚀 功能
 
-- [x] [高性能](#-性能测试) 的基于多线程/Go程模型的 event-loop 事件驱动
+- [x] [高性能](#-性能测试) 的基于多线程/Go程网络模型的 event-loop 事件驱动
 - [x] 内置 Round-Robin 轮询负载均衡算法
 - [x] 内置 goroutine 池，由开源库 [ants](https://github.com/panjf2000/ants) 提供支持
 - [x] 内置 bytes 内存池，由开源库 [pool](https://github.com/gobwas/pool/) 提供支持
@@ -44,10 +44,10 @@
 - [ ] 实现 `gnet` 客户端
 
 # 💡 核心设计
-## 多线程/Go程模型
-### 主从多 Reactors 模型
+## 多线程/Go程网络模型
+### 主从多 Reactors
 
-`gnet` 重新设计开发了一个新内置的多线程/Go程模型：『主从多 Reactors』，这也是 `netty` 默认的线程模型，下面是这个模型的原理图：
+`gnet` 重新设计开发了一个新内置的多线程/Go程网络模型：『主从多 Reactors』，这也是 `netty` 默认的多线程网络模型，下面是这个模型的原理图：
 
 <p align="center">
 <img width="820" alt="multi_reactor" src="https://user-images.githubusercontent.com/7496278/64916634-8f038080-d7b3-11e9-82c8-f77e9791df86.png">
@@ -64,7 +64,7 @@
 
 正如你所知，基于 `gnet` 编写你的网络服务器有一条最重要的原则：永远不能让你业务逻辑（一般写在 `EventHandler.React` 里）阻塞 event-loop 线程，否则的话将会极大地降低服务器的吞吐量，这也是 `netty` 的一条最重要的原则。
 
-我的回答是，基于`gnet` 的另一种多线程/Go程模型：『带线程/Go程池的主从多 Reactors』可以解决阻塞问题，这个新网络模型通过引入一个 worker pool 来解决业务逻辑阻塞的问题：它会在启动的时候初始化一个 worker pool，然后在把 `EventHandler.React`里面的阻塞代码放到 worker pool 里执行，从而避免阻塞 event-loop 线程，
+我的回答是，基于`gnet` 的另一种多线程/Go程网络模型：『带线程/Go程池的主从多 Reactors』可以解决阻塞问题，这个新网络模型通过引入一个 worker pool 来解决业务逻辑阻塞的问题：它会在启动的时候初始化一个 worker pool，然后在把 `EventHandler.React`里面的阻塞代码放到 worker pool 里执行，从而避免阻塞 event-loop 线程，
 
 模型的架构图如下所示：
 
@@ -687,6 +687,8 @@ events.Tick = func() (delay time.Duration, action Action){
 ## SO_REUSEPORT 端口复用
 
 服务器支持 [SO_REUSEPORT](https://lwn.net/Articles/542629/) 端口复用特性，允许多个 sockets 监听同一个端口，然后内核会帮你做好负载均衡，每次只唤醒一个 socket 来处理 accept 请求，避免惊群效应。
+
+默认情况下，`gnet` 也不会有惊群效应，因为 `gnet` 默认的网络模型是主从多 Reactors，只会有一个主 reactor 在监听端口以及接受新连接。所以，开不开启 `SO_REUSEPORT` 选项是无关紧要的，只是开启了这个选项之后 `gnet` 的网络模型将会切换成 `evio` 的旧网络模型，这一点需要注意一下。
 
 开启这个功能也很简单，使用 functional options 设置一下即可：
 
