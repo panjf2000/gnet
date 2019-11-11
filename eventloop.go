@@ -195,25 +195,10 @@ func (lp *loop) loopUDPIn(fd int) error {
 	if err != nil || n == 0 {
 		return nil
 	}
-	var sa6 unix.SockaddrInet6
-	switch sa := sa.(type) {
-	case *unix.SockaddrInet4:
-		sa6.ZoneId = 0
-		sa6.Port = sa.Port
-		for i := 0; i < 12; i++ {
-			sa6.Addr[i] = 0
-		}
-		sa6.Addr[12] = sa.Addr[0]
-		sa6.Addr[13] = sa.Addr[1]
-		sa6.Addr[14] = sa.Addr[2]
-		sa6.Addr[15] = sa.Addr[3]
-	case *unix.SockaddrInet6:
-		sa6 = *sa
-	}
 	c := &conn{
 		fd:            fd,
 		localAddr:     lp.svr.ln.lnaddr,
-		remoteAddr:    netpoll.SockaddrToUDPAddr(&sa6),
+		remoteAddr:    netpoll.SockaddrToUDPAddr(sa),
 		inboundBuffer: lp.svr.bytesPool.Get().(*ringbuffer.RingBuffer),
 	}
 	c.cache = lp.packet[:n]

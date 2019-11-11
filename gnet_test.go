@@ -361,6 +361,7 @@ func (s *testServer) OnOpened(c Conn) (out []byte, action Action) {
 	if c.RemoteAddr() == nil {
 		panic("nil local addr")
 	}
+	//fmt.Printf("TCP from remote addr：%s to local addr: %s\n", c.RemoteAddr().String(), c.LocalAddr().String())
 	return
 }
 func (s *testServer) OnClosed(c Conn, err error) (action Action) {
@@ -405,6 +406,7 @@ func (s *testServer) React(c Conn) (out []byte, action Action) {
 		}
 		return
 	} else if s.network == "udp" {
+		//fmt.Printf("UDP from remote addr：%s to local addr: %s\n", c.RemoteAddr().String(), c.LocalAddr().String())
 		out = c.Read()
 		c.ResetBuffer()
 		return

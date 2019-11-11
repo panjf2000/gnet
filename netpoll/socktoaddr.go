@@ -13,11 +13,12 @@ import (
 // SockaddrToTCPOrUnixAddr converts a Sockaddr to a net.TCPAddr or net.UnixAddr.
 // Returns nil if conversion fails.
 func SockaddrToTCPOrUnixAddr(sa unix.Sockaddr) net.Addr {
-	ip, zone := SockaddrToIPAndZone(sa)
 	switch sa := sa.(type) {
 	case *unix.SockaddrInet4:
+		ip := sockaddrInet4ToIP(sa)
 		return &net.TCPAddr{IP: ip, Port: sa.Port}
 	case *unix.SockaddrInet6:
+		ip, zone := sockaddrInet6ToIPAndZone(sa)
 		return &net.TCPAddr{IP: ip, Port: sa.Port, Zone: zone}
 	case *unix.SockaddrUnix:
 		return &net.UnixAddr{Name: sa.Name, Net: "unix"}
@@ -28,19 +29,39 @@ func SockaddrToTCPOrUnixAddr(sa unix.Sockaddr) net.Addr {
 // SockaddrToUDPAddr converts a Sockaddr to a net.UDPAddr
 // Returns nil if conversion fails.
 func SockaddrToUDPAddr(sa unix.Sockaddr) *net.UDPAddr {
-	ip, zone := SockaddrToIPAndZone(sa)
 	switch sa := sa.(type) {
 	case *unix.SockaddrInet4:
+		ip := sockaddrInet4ToIP(sa)
 		return &net.UDPAddr{IP: ip, Port: sa.Port}
 	case *unix.SockaddrInet6:
+		ip, zone := sockaddrInet6ToIPAndZone(sa)
 		return &net.UDPAddr{IP: ip, Port: sa.Port, Zone: zone}
 	}
 	return nil
 }
 
-// IP6ZoneToString converts an IP6 Zone unix int to a net string
+// sockaddrInet4ToIPAndZone converts a SockaddrInet4 to a net.IP.
+// It returns nil if conversion fails.
+func sockaddrInet4ToIP(sa *unix.SockaddrInet4) net.IP {
+	ip := make([]byte, 16)
+	// V4InV6Prefix
+	ip[10] = 0xff
+	ip[11] = 0xff
+	copy(ip[12:16], sa.Addr[:])
+	return ip
+}
+
+// sockaddrInet6ToIPAndZone converts a SockaddrInet6 to a net.IP with IPv6 Zone.
+// It returns nil if conversion fails.
+func sockaddrInet6ToIPAndZone(sa *unix.SockaddrInet6) (net.IP, string) {
+	ip := make([]byte, 16)
+	copy(ip, sa.Addr[:])
+	return ip, ip6ZoneToString(int(sa.ZoneId))
+}
+
+// ip6ZoneToString converts an IP6 Zone unix int to a net string
 // returns "" if zone is 0
-func IP6ZoneToString(zone int) string {
+func ip6ZoneToString(zone int) string {
 	if zone == 0 {
 		return ""
 	}
@@ -48,26 +69,6 @@ func IP6ZoneToString(zone int) string {
 		return ifi.Name
 	}
 	return int2decimal(uint(zone))
-}
-
-// SockaddrToIPAndZone converts a Sockaddr to a net.IP (with optional IPv6 Zone)
-// Returns nil if conversion fails.
-func SockaddrToIPAndZone(sa unix.Sockaddr) (net.IP, string) {
-	switch sa := sa.(type) {
-	case *unix.SockaddrInet4:
-		ip := make([]byte, 16)
-		// V4InV6Prefix
-		ip[10] = 0xff
-		ip[11] = 0xff
-		copy(ip[12:16], sa.Addr[:])
-		return ip, ""
-
-	case *unix.SockaddrInet6:
-		ip := make([]byte, 16)
-		copy(ip, sa.Addr[:])
-		return ip, IP6ZoneToString(int(sa.ZoneId))
-	}
-	return nil, ""
 }
 
 // Convert int to decimal string.
