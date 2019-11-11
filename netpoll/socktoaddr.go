@@ -13,16 +13,14 @@ import (
 // SockaddrToTCPOrUnixAddr converts a Sockaddr to a net.TCPAddr or net.UnixAddr.
 // Returns nil if conversion fails.
 func SockaddrToTCPOrUnixAddr(sa unix.Sockaddr) net.Addr {
-	if addr := SockaddrToUnixAddr(sa); addr != nil {
-		return addr
-	}
-
 	ip, zone := SockaddrToIPAndZone(sa)
 	switch sa := sa.(type) {
 	case *unix.SockaddrInet4:
 		return &net.TCPAddr{IP: ip, Port: sa.Port}
 	case *unix.SockaddrInet6:
 		return &net.TCPAddr{IP: ip, Port: sa.Port, Zone: zone}
+	case *unix.SockaddrUnix:
+		return &net.UnixAddr{Name: sa.Name, Net: "unix"}
 	}
 	return nil
 }
@@ -36,15 +34,6 @@ func SockaddrToUDPAddr(sa unix.Sockaddr) *net.UDPAddr {
 		return &net.UDPAddr{IP: ip, Port: sa.Port}
 	case *unix.SockaddrInet6:
 		return &net.UDPAddr{IP: ip, Port: sa.Port, Zone: zone}
-	}
-	return nil
-}
-
-// SockaddrToUnixAddr converts a Sockaddr to a net.UnixAddr
-// Returns nil if conversion fails.
-func SockaddrToUnixAddr(sa unix.Sockaddr) *net.UnixAddr {
-	if s, ok := sa.(*unix.SockaddrUnix); ok {
-		return &net.UnixAddr{Name: s.Name, Net: "unix"}
 	}
 	return nil
 }
