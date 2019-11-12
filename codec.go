@@ -8,6 +8,8 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+
+	"github.com/smallnest/goframe"
 )
 
 // CRLFByte represents a byte of CRLF.
@@ -133,30 +135,32 @@ func NewLengthFieldBasedFrameCodec(encoderConfig EncoderConfig, decoderConfig De
 }
 
 // EncoderConfig config for encoder.
-type EncoderConfig struct {
-	// ByteOrder is the ByteOrder of the length field.
-	ByteOrder binary.ByteOrder
-	// LengthFieldLength is the length of the length field.
-	LengthFieldLength int
-	// LengthAdjustment is the compensation value to add to the value of the length field
-	LengthAdjustment int
-	// LengthIncludesLengthFieldLength is true, the length of the prepended length field is added to the value of the prepended length field
-	LengthIncludesLengthFieldLength bool
-}
+type EncoderConfig = goframe.EncoderConfig
+//type EncoderConfig struct {
+//	// ByteOrder is the ByteOrder of the length field.
+//	ByteOrder binary.ByteOrder
+//	// LengthFieldLength is the length of the length field.
+//	LengthFieldLength int
+//	// LengthAdjustment is the compensation value to add to the value of the length field
+//	LengthAdjustment int
+//	// LengthIncludesLengthFieldLength is true, the length of the prepended length field is added to the value of the prepended length field
+//	LengthIncludesLengthFieldLength bool
+//}
 
 // DecoderConfig config for decoder.
-type DecoderConfig struct {
-	// ByteOrder is the ByteOrder of the length field.
-	ByteOrder binary.ByteOrder
-	// LengthFieldOffset is the offset of the length field
-	LengthFieldOffset int
-	// LengthFieldLength is the length of the length field
-	LengthFieldLength int
-	// LengthAdjustment is the compensation value to add to the value of the length field
-	LengthAdjustment int
-	// InitialBytesToStrip is the number of first bytes to strip out from the decoded frame
-	InitialBytesToStrip int
-}
+type DecoderConfig = goframe.DecoderConfig
+//type DecoderConfig struct {
+//	// ByteOrder is the ByteOrder of the length field.
+//	ByteOrder binary.ByteOrder
+//	// LengthFieldOffset is the offset of the length field
+//	LengthFieldOffset int
+//	// LengthFieldLength is the length of the length field
+//	LengthFieldLength int
+//	// LengthAdjustment is the compensation value to add to the value of the length field
+//	LengthAdjustment int
+//	// InitialBytesToStrip is the number of first bytes to strip out from the decoded frame
+//	InitialBytesToStrip int
+//}
 
 // Encode ...
 func (cc *LengthFieldBasedFrameCodec) Encode(buf []byte) (out []byte, err error) {

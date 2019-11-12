@@ -3,13 +3,12 @@
 // Use of this source code is governed by an MIT-style
 // license that can be found in the LICENSE file.
 
-// +build !darwin,!netbsd,!freebsd,!openbsd,!dragonfly,!linux
+// +build !darwin,!netbsd,!freebsd,!openbsd,!dragonfly,!linux,!windows
 
 package gnet
 
 import (
 	"errors"
-	"net"
 	"os"
 )
 
@@ -31,14 +30,4 @@ func (ln *listener) system() error {
 
 func serve(eventHandler EventHandler, listeners []*listener) error {
 	return errors.New("Unsupported platform in gnet")
-}
-
-// ReusePortListenPacket returns a net.PacketConn for UDP.
-func ReusePortListenPacket(proto, addr string) (net.PacketConn, error) {
-	return nil, errors.New("reuseport is not available")
-}
-
-// ReusePortListen returns a net.Listener for TCP.
-func ReusePortListen(proto, addr string) (net.Listener, error) {
-	return nil, errors.New("reuseport is not available")
 }

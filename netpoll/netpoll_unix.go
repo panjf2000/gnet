@@ -3,7 +3,7 @@
 // Use of this source code is governed by an MIT-style
 // license that can be found in the LICENSE file.
 
-// +build netbsd freebsd dragonfly linux
+// +build linux netbsd freebsd dragonfly
 
 package netpoll
 

@@ -17,6 +17,10 @@ import "github.com/gobwas/pool/pbytes"
 // BytesPool is the alias of pbytes.Pool.
 type BytesPool = pbytes.Pool
 
+func PutBytes(buf []byte) {
+	pbytes.Put(buf)
+}
+
 // NewBytesPool instantiates a *BytesPool that reuses slices which size is in logarithmic range [Lower, Upper].
 func NewBytesPool() *BytesPool {
 	//return pbytes.New(Lower, Upper)

@@ -13,7 +13,6 @@ import (
 	"math/rand"
 	"net"
 	"os"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -505,18 +504,20 @@ func must(err error) {
 	}
 }
 func TestTick(t *testing.T) {
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		testTick("tcp", ":9991")
-	}()
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		testTick("unix", "socket1")
-	}()
-	wg.Wait()
+	//var wg sync.WaitGroup
+	//wg.Add(1)
+	//go func() {
+	//	defer wg.Done()
+	//	testTick("tcp", ":9991")
+	//}()
+	//wg.Add(1)
+	//go func() {
+	//	defer wg.Done()
+	//	testTick("unix", "socket1")
+	//}()
+	//wg.Wait()
+
+	testTick("tcp", ":9991")
 }
 
 type testTickServer struct {
@@ -598,18 +599,20 @@ func testWakeConn(network, addr string) {
 }
 
 func TestShutdown(t *testing.T) {
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		testShutdown("tcp", ":9991")
-	}()
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		testShutdown("unix", "socket1")
-	}()
-	wg.Wait()
+	//var wg sync.WaitGroup
+	//wg.Add(1)
+	//go func() {
+	//	defer wg.Done()
+	//	testShutdown("tcp", ":9991")
+	//}()
+	//wg.Add(1)
+	//go func() {
+	//	defer wg.Done()
+	//	testShutdown("unix", "socket1")
+	//}()
+	//wg.Wait()
+
+	testShutdown("tcp", ":9991")
 }
 
 type testShutdownServer struct {

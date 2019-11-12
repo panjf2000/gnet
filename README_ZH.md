@@ -38,8 +38,8 @@
 - [x] 灵活的事件定时器
 - [x] SO_REUSEPORT 端口重用
 - [x] 内置多种编解码器，支持对 TCP 数据流分包：LineBasedFrameCodec, DelimiterBasedFrameCodec, FixedLengthFrameCodec 和 LengthFieldBasedFrameCodec，参考自 [netty codec](https://github.com/netty/netty/tree/4.1/codec/src/main/java/io/netty/handler/codec)，而且支持自定制编解码器
+- [x] 支持 Windows 平台，基于 ~~IOCP 事件驱动机制~~ Go 标准网络库
 - [ ] 加入更多的负载均衡算法：随机、最少连接、一致性哈希等等
-- [ ] 支持 Windows 平台的 IOCP 事件驱动机制
 - [ ] 支持 TLS
 - [ ] 实现 `gnet` 客户端
 

@@ -33,13 +33,13 @@ The goal of this project is to create a server framework for Go that performs on
 - [x] Concise APIs
 - [x] Efficient memory usage: Ring-Buffer
 - [x] Supporting multiple protocols: TCP, UDP, and Unix Sockets
-- [x] Supporting two event-notification mechanisms: epoll on Linux and kqueue on FreeBSD
+- [x] Supporting two event-driven mechanisms: epoll on Linux and kqueue on FreeBSD
 - [x] Supporting asynchronous write operation
 - [x] Flexible ticker event
 - [x] SO_REUSEPORT socket option
 - [x] Built-in multiple codecs to encode/decode network frames into/from TCP stream: LineBasedFrameCodec, DelimiterBasedFrameCodec, FixedLengthFrameCodec and LengthFieldBasedFrameCodec, referencing [netty codec](https://github.com/netty/netty/tree/4.1/codec/src/main/java/io/netty/handler/codec), also supporting customized codecs
+- [x] Supporting Windows platform with ~~event-driven mechanism of IOCP~~ Go stdlib: net
 - [ ] Additional load-balancing algorithms: Random, Least-Connections, Consistent-hashing and so on
-- [ ] New event-notification mechanism: IOCP on Windows platform 
 - [ ] TLS support
 - [ ] Implementation of `gnet` Client
 
