@@ -9,6 +9,7 @@ package netpoll
 
 import (
 	"log"
+	"unsafe"
 
 	"github.com/panjf2000/gnet/internal"
 	"golang.org/x/sys/unix"
@@ -52,12 +53,17 @@ func (p *Poller) Close() error {
 	return unix.Close(p.fd)
 }
 
-var wakeSignal = []byte{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
+// Make the endianness of bytes compatible with more linux OSs under different processor-architectures,
+// according to http://man7.org/linux/man-pages/man2/eventfd.2.html.
+var (
+	u uint64 = 1
+	b        = (*(*[8]byte)(unsafe.Pointer(&u)))[:]
+)
 
 // Trigger wakes up the poller blocked in waiting for network-events and runs jobs in asyncJobQueue.
 func (p *Poller) Trigger(job internal.Job) error {
 	p.asyncJobQueue.Push(job)
-	_, err := unix.Write(p.wfd, wakeSignal)
+	_, err := unix.Write(p.wfd, b)
 	return err
 }
 
