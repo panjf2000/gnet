@@ -17,6 +17,7 @@ import "github.com/gobwas/pool/pbytes"
 // BytesPool is the alias of pbytes.Pool.
 type BytesPool = pbytes.Pool
 
+// PutBytes put bytes back to pool.
 func PutBytes(buf []byte) {
 	pbytes.Put(buf)
 }

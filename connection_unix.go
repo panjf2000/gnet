@@ -171,11 +171,9 @@ func (c *conn) AsyncWrite(buf []byte) {
 }
 
 func (c *conn) Wake() {
-	if c.loop != nil {
-		sniffError(c.loop.poller.Trigger(func() error {
-			return c.loop.loopWake(c)
-		}))
-	}
+	_ = c.loop.poller.Trigger(func() error {
+		return c.loop.loopWake(c)
+	})
 }
 
 //func (c *conn) ShiftN(n int) {

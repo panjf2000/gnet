@@ -133,6 +133,10 @@ func (lp *loop) loopEgress() {
 }
 
 func (lp *loop) loopTicker() {
+	var (
+		delay time.Duration
+		open  bool
+	)
 	for {
 		lp.ch <- func() (err error) {
 			delay, action := lp.svr.eventHandler.Tick()
@@ -143,11 +147,11 @@ func (lp *loop) loopTicker() {
 			}
 			return
 		}
-		delay, ok := <-lp.svr.ticktock
-		if !ok {
+		if delay, open = <-lp.svr.ticktock; open {
+			time.Sleep(delay)
+		} else {
 			break
 		}
-		time.Sleep(delay)
 	}
 }
 

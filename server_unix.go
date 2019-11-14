@@ -20,11 +20,11 @@ import (
 type server struct {
 	ln               *listener          // all the listeners
 	wg               sync.WaitGroup     // loop close WaitGroup
-	tch              chan time.Duration // ticker channel
 	opts             *Options           // options with server
 	once             sync.Once          // make sure only signalShutdown once
 	cond             *sync.Cond         // shutdown signaler
 	codec            ICodec             // codec for TCP stream
+	ticktock         chan time.Duration // ticker channel
 	mainLoop         *loop              // main loop for accepting connections
 	bytesPool        sync.Pool          // pool for storing bytes
 	eventHandler     EventHandler       // user eventHandler
@@ -159,6 +159,7 @@ func (svr *server) stop() {
 	})
 
 	if svr.mainLoop != nil {
+		svr.ln.close()
 		sniffError(svr.mainLoop.poller.Trigger(func() error {
 			return errShutdown
 		}))
@@ -191,12 +192,12 @@ func serve(eventHandler EventHandler, listener *listener, options *Options) erro
 	}
 
 	svr := new(server)
+	svr.opts = options
 	svr.eventHandler = eventHandler
 	svr.ln = listener
 	svr.subLoopGroup = new(eventLoopGroup)
 	svr.cond = sync.NewCond(&sync.Mutex{})
-	svr.tch = make(chan time.Duration)
-	svr.opts = options
+	svr.ticktock = make(chan time.Duration, 1)
 	svr.bytesPool.New = func() interface{} {
 		return ringbuffer.New(socketRingBufferSize)
 	}

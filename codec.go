@@ -136,6 +136,7 @@ func NewLengthFieldBasedFrameCodec(encoderConfig EncoderConfig, decoderConfig De
 
 // EncoderConfig config for encoder.
 type EncoderConfig = goframe.EncoderConfig
+
 //type EncoderConfig struct {
 //	// ByteOrder is the ByteOrder of the length field.
 //	ByteOrder binary.ByteOrder
@@ -149,6 +150,7 @@ type EncoderConfig = goframe.EncoderConfig
 
 // DecoderConfig config for decoder.
 type DecoderConfig = goframe.DecoderConfig
+
 //type DecoderConfig struct {
 //	// ByteOrder is the ByteOrder of the length field.
 //	ByteOrder binary.ByteOrder

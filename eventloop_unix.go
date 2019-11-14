@@ -25,7 +25,12 @@ type loop struct {
 }
 
 func (lp *loop) loopRun() {
-	defer lp.svr.signalShutdown()
+	defer func() {
+		if lp.idx == 0 && lp.svr.opts.Ticker {
+			close(lp.svr.ticktock)
+		}
+		lp.svr.signalShutdown()
+	}()
 
 	if lp.idx == 0 && lp.svr.opts.Ticker {
 		go lp.loopTicker()
@@ -67,7 +72,7 @@ func (lp *loop) loopOpen(c *conn) error {
 	c.action = action
 	if lp.svr.opts.TCPKeepAlive > 0 {
 		if _, ok := lp.svr.ln.ln.(*net.TCPListener); ok {
-			sniffError(netpoll.SetKeepAlive(c.fd, int(lp.svr.opts.TCPKeepAlive/time.Second)))
+			_ = netpoll.SetKeepAlive(c.fd, int(lp.svr.opts.TCPKeepAlive/time.Second))
 		}
 	}
 	if out != nil {
@@ -160,10 +165,14 @@ func (lp *loop) loopWake(c *conn) error {
 }
 
 func (lp *loop) loopTicker() {
+	var (
+		delay time.Duration
+		open  bool
+	)
 	for {
 		if err := lp.poller.Trigger(func() (err error) {
 			delay, action := lp.svr.eventHandler.Tick()
-			lp.svr.tch <- delay
+			lp.svr.ticktock <- delay
 			switch action {
 			case None:
 			case Shutdown:
@@ -173,7 +182,11 @@ func (lp *loop) loopTicker() {
 		}); err != nil {
 			break
 		}
-		time.Sleep(<-lp.svr.tch)
+		if delay, open = <-lp.svr.ticktock; open {
+			time.Sleep(delay)
+		} else {
+			break
+		}
 	}
 }
 
