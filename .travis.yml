@@ -3,6 +3,8 @@ language: go
 env:
   - GO111MODULE=on
 
+dist: bionic
+
 os:
   - linux
   - osx
@@ -12,7 +14,7 @@ go:
   - 1.11.x
   - 1.12.x
   - 1.13.x
-  - master
+#  - master
 
 before_install:
   - if [[ "${GO111MODULE}" = "on" ]]; then mkdir "${HOME}/go"; export GOPATH="${HOME}/go"; fi
