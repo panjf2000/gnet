@@ -51,12 +51,12 @@ The goal of this project is to create a server framework for Go that performs on
 `gnet` redesigns and implements a new built-in networking model of multiple threads/goroutines: 『multiple reactors』 which is also the default networking model of multiple threads of `netty`, Here's the schematic diagram:
 
 <p align="center">
-<img width="820" alt="multi_reactor" src="https://user-images.githubusercontent.com/7496278/64916634-8f038080-d7b3-11e9-82c8-f77e9791df86.png">
+<img width="820" alt="multi_reactor" src="https://raw.githubusercontent.com/panjf2000/illustrations/master/go/multi-reactors.png">
 </p>
 
 and it works as the following sequence diagram:
 <p align="center">
-<img width="869" alt="reactor" src="https://user-images.githubusercontent.com/7496278/64918644-a5213900-d7d3-11e9-88d6-1ec1ec72c1cd.png">
+<img width="869" alt="reactor" src="https://raw.githubusercontent.com/panjf2000/illustrations/master/go/multi-reactors-sequence-diagram.png">
 </p>
 
 ### Multiple Reactors + Goroutine-Pool
@@ -70,12 +70,12 @@ And the solution to that could be found in the subsequent networking model of mu
 The architecture diagram of networking model:『multiple reactors with thread/goroutine pool』architecture is in here:
 
 <p align="center">
-<img width="854" alt="multi_reactor_thread_pool" src="https://user-images.githubusercontent.com/7496278/64918783-90de3b80-d7d5-11e9-9190-ff8277c95db1.png">
+<img width="854" alt="multi_reactor_thread_pool" src="https://raw.githubusercontent.com/panjf2000/illustrations/master/go/multi-reactors%2Bthread-pool.png">
 </p>
 
 and it works as the following sequence diagram:
 <p align="center">
-<img width="916" alt="multi-reactors" src="https://user-images.githubusercontent.com/7496278/64918646-a7839300-d7d3-11e9-804a-d021ddd23ca3.png">
+<img width="916" alt="multi-reactors" src="https://raw.githubusercontent.com/panjf2000/illustrations/master/go/multi-reactors%2Bthread-pool-sequence-diagram.png">
 </p>
 
 `gnet` implements the networking model:『multiple reactors with thread/goroutine pool』by the aid of a high-performance goroutine pool called [ants](https://github.com/panjf2000/ants) that allows you to manage and recycle a massive number of goroutines in your concurrent programs, the full features and usages in `ants` are documented [here](https://gowalker.org/github.com/panjf2000/ants?lang=en-US).
@@ -86,10 +86,12 @@ The details about integrating `gnet`  with `ants` are shown [here](#echo-server-
 
 ## Auto-scaling Ring Buffer
 
-`gnet` utilizes Ring-Buffer to buffer network data and manage memories in networking.
+There are two ring-buffers inside `gnet`: inbound buffer and outbound buffer to buffer and manage inbound/outbound network data.
+
+The purpose of implementing inbound and outbound ring-buffers in `gnet` is to transfer the logic of buffering and managing network data based on application protocol upon TCP stream from business server to framework and unify the network data buffer, which minimizes the complexity of business code so that developers are able to concentrate on business logic instead of the underlying function.
 
 <p align="center">
-<img src="https://user-images.githubusercontent.com/7496278/64916810-4f8b6300-d7b8-11e9-9459-5517760da738.gif">
+<img src="https://raw.githubusercontent.com/panjf2000/illustrations/master/go/ring-buffer.gif">
 </p>
 
 
