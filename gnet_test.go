@@ -172,6 +172,12 @@ func (s *testCodecServer) OnClosed(c Conn, err error) (action Action) {
 	if atomic.LoadInt32(&s.connected) == atomic.LoadInt32(&s.disconnected) &&
 		atomic.LoadInt32(&s.disconnected) == int32(s.nclients) {
 		action = Shutdown
+
+		if in, out := c.InboundBuffer(), c.OutboundBuffer(); in != nil && out != nil {
+			if !(in.IsEmpty() && out.IsEmpty()) {
+				panic("leftover data in buffer!!!")
+			}
+		}
 	}
 
 	return
@@ -376,6 +382,12 @@ func (s *testServer) OnClosed(c Conn, err error) (action Action) {
 			s.bytesPool.Put(s.bytesList[i])
 		}
 		s.workerPool.Release()
+
+		if in, out := c.InboundBuffer(), c.OutboundBuffer(); in != nil && out != nil {
+			if !(in.IsEmpty() && out.IsEmpty()) {
+				panic("leftover data in buffer!!!")
+			}
+		}
 	}
 
 	return
