@@ -37,7 +37,7 @@ The goal of this project is to create a server framework for Go that performs on
 - [x] Supporting asynchronous write operation
 - [x] Flexible ticker event
 - [x] SO_REUSEPORT socket option
-- [x] Built-in multiple codecs to encode/decode network frames into/from TCP stream: LineBasedFrameCodec, DelimiterBasedFrameCodec, FixedLengthFrameCodec and LengthFieldBasedFrameCodec, referencing [netty codec](https://github.com/netty/netty/tree/4.1/codec/src/main/java/io/netty/handler/codec), also supporting customized codecs
+- [x] Built-in multiple codecs to encode/decode network frames into/from TCP stream: LineBasedFrameCodec, DelimiterBasedFrameCodec, FixedLengthFrameCodec and LengthFieldBasedFrameCodec, referencing [netty codec](https://github.com/netty/netty/tree/netty-4.1.43.Final/codec/src/main/java/io/netty/handler/codec), also supporting customized codecs
 - [x] Supporting Windows platform with ~~event-driven mechanism of IOCP~~ Go stdlib: net
 - [ ] Additional load-balancing algorithms: Random, Least-Connections, Consistent-hashing and so on
 - [ ] TLS support
