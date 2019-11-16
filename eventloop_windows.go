@@ -90,7 +90,7 @@ func (lp *loop) loopRead(ti *tcpIn) error {
 	c.cache = ti.in
 loopReact:
 	out, action := lp.svr.eventHandler.React(c)
-	if len(out) != 0 {
+	if out != nil {
 		lp.svr.eventHandler.PreWrite()
 		if frame, err := lp.svr.codec.Encode(out); err == nil {
 			_, _ = c.conn.Write(frame)

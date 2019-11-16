@@ -99,7 +99,7 @@ func (lp *loop) loopIn(c *conn) error {
 
 loopReact:
 	out, action := lp.svr.eventHandler.React(c)
-	if len(out) != 0 {
+	if out != nil {
 		if frame, err := lp.svr.codec.Encode(out); err == nil {
 			c.write(frame)
 		}
