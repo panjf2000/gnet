@@ -92,12 +92,13 @@ loopReact:
 	out, action := lp.svr.eventHandler.React(c)
 	if out != nil {
 		lp.svr.eventHandler.PreWrite()
-		if frame, err := lp.svr.codec.Encode(out); err == nil {
-			_, _ = c.conn.Write(frame)
-		}
 		if lp.loopReact {
-			goto loopReact
+			if frame, err := lp.svr.codec.Encode(out); err == nil {
+				_, _ = c.conn.Write(frame)
+				goto loopReact
+			}
 		}
+		_, _ = c.conn.Write(out)
 	}
 	_, _ = c.inboundBuffer.Write(c.cache)
 	switch action {

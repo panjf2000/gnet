@@ -100,12 +100,13 @@ func (lp *loop) loopIn(c *conn) error {
 loopReact:
 	out, action := lp.svr.eventHandler.React(c)
 	if out != nil {
-		if frame, err := lp.svr.codec.Encode(out); err == nil {
-			c.write(frame)
-		}
 		if lp.loopReact {
-			goto loopReact
+			if frame, err := lp.svr.codec.Encode(out); err == nil {
+				c.write(frame)
+				goto loopReact
+			}
 		}
+		c.write(out)
 	}
 	_, _ = c.inboundBuffer.Write(c.cache)
 
