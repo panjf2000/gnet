@@ -9,15 +9,23 @@ package gnet
 
 import (
 	"errors"
-	"github.com/panjf2000/gnet/ringbuffer"
 	"log"
 	"runtime"
 	"sync"
 	"time"
+
+	"github.com/panjf2000/gnet/ringbuffer"
 )
 
-var errClosing = errors.New("closing")
-var errCloseConns = errors.New("close conns")
+// commandBufferSize represents the buffer size of event-loop command channel on Windows.
+const (
+	commandBufferSize = 512
+)
+
+var (
+	errClosing    = errors.New("closing")
+	errCloseConns = errors.New("close conns")
+)
 
 type server struct {
 	ln               *listener          // all the listeners
@@ -67,7 +75,7 @@ func (svr *server) startLoops(numLoops int) {
 	for i := 0; i < numLoops; i++ {
 		lp := &loop{
 			idx:         i,
-			ch:          make(chan interface{}, 64),
+			ch:          make(chan interface{}, commandBufferSize),
 			connections: make(map[*stdConn]bool),
 			svr:         svr,
 		}

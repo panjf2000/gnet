@@ -17,8 +17,10 @@ import (
 	"github.com/panjf2000/gnet/ringbuffer"
 )
 
-// socketRingBufferSize represents the initial size of connection ring-buffer.
-const socketRingBufferSize = 1024
+const (
+	// socketRingBufferSize represents the initial size of connection ring-buffer.
+	socketRingBufferSize = 1024
+)
 
 // Action is an action that occurs after the completion of an event.
 type Action int

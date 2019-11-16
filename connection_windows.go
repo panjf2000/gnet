@@ -8,9 +8,9 @@
 package gnet
 
 import (
-	"github.com/panjf2000/gnet/pool"
 	"net"
 
+	"github.com/panjf2000/gnet/pool"
 	"github.com/panjf2000/gnet/ringbuffer"
 )
 

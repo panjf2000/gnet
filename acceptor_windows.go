@@ -16,7 +16,7 @@ import (
 
 func (svr *server) listenerRun() {
 	var err error
-	defer svr.signalShutdown(err)
+	defer func() { svr.signalShutdown(err) }()
 	var packet [0xFFFF]byte
 	inBuf := svr.bytesPool.Get().(*ringbuffer.RingBuffer)
 	bytesPool := pool.NewBytesPool()
