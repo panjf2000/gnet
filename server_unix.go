@@ -83,10 +83,11 @@ func (svr *server) activateLoops(numLoops int) error {
 		if p, err := netpoll.OpenPoller(); err == nil {
 			lp := &loop{
 				idx:         i,
+				svr:         svr,
 				poller:      p,
 				packet:      make([]byte, 0xFFFF),
+				loopReact:   svr.opts.Codec != nil,
 				connections: make(map[int]*conn),
-				svr:         svr,
 			}
 			_ = lp.poller.AddRead(svr.ln.fd)
 			svr.subLoopGroup.register(lp)
@@ -105,10 +106,11 @@ func (svr *server) activateReactors(numLoops int) error {
 		if p, err := netpoll.OpenPoller(); err == nil {
 			lp := &loop{
 				idx:         i,
+				svr:         svr,
 				poller:      p,
 				packet:      make([]byte, 0xFFFF),
+				loopReact:   svr.opts.Codec != nil,
 				connections: make(map[int]*conn),
-				svr:         svr,
 			}
 			svr.subLoopGroup.register(lp)
 		} else {

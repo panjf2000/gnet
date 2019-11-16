@@ -21,6 +21,7 @@ type loop struct {
 	svr         *server         // server in loop
 	packet      []byte          // read packet buffer
 	poller      *netpoll.Poller // epoll or kqueue
+	loopReact   bool            // decide to loop react or not
 	connections map[int]*conn   // loop connections fd -> conn
 }
 
@@ -102,7 +103,9 @@ loopReact:
 		if frame, err := lp.svr.codec.Encode(out); err == nil {
 			c.write(frame)
 		}
-		goto loopReact
+		if lp.loopReact {
+			goto loopReact
+		}
 	}
 	_, _ = c.inboundBuffer.Write(c.cache)
 

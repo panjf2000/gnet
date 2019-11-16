@@ -74,10 +74,11 @@ func (svr *server) startListener() {
 func (svr *server) startLoops(numLoops int) {
 	for i := 0; i < numLoops; i++ {
 		lp := &loop{
-			idx:         i,
 			ch:          make(chan interface{}, commandBufferSize),
-			connections: make(map[*stdConn]bool),
+			idx:         i,
 			svr:         svr,
+			loopReact:   svr.opts.Codec != nil,
+			connections: make(map[*stdConn]bool),
 		}
 		svr.subLoopGroup.register(lp)
 	}
