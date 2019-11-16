@@ -7,11 +7,10 @@
 package gnet
 
 import (
-	"github.com/panjf2000/gnet/internal"
 	"github.com/panjf2000/gnet/netpoll"
 )
 
-func (lp *loop) handleEvent(fd int, filter int16, job internal.Job) error {
+func (lp *loop) handleEvent(fd int, filter int16) error {
 	if c, ok := lp.connections[fd]; ok {
 		switch c.opened {
 		case false:

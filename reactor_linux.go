@@ -7,14 +7,13 @@
 package gnet
 
 import (
-	"github.com/panjf2000/gnet/internal"
 	"github.com/panjf2000/gnet/netpoll"
 )
 
 func (svr *server) activateMainReactor() {
 	defer svr.signalShutdown()
 
-	_ = svr.mainLoop.poller.Polling(func(fd int, ev uint32, job internal.Job) error {
+	_ = svr.mainLoop.poller.Polling(func(fd int, ev uint32) error {
 		return svr.acceptNewConnection(fd)
 	})
 }
@@ -31,7 +30,7 @@ func (svr *server) activateSubReactor(lp *loop) {
 		go lp.loopTicker()
 	}
 
-	_ = lp.poller.Polling(func(fd int, ev uint32, job internal.Job) error {
+	_ = lp.poller.Polling(func(fd int, ev uint32) error {
 		if c, ack := lp.connections[fd]; ack {
 			switch c.outboundBuffer.IsEmpty() {
 			// Don't change the ordering of processing EPOLLOUT | EPOLLRDHUP / EPOLLIN unless you're 100%

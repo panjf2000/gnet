@@ -7,11 +7,10 @@
 package gnet
 
 import (
-	"github.com/panjf2000/gnet/internal"
 	"github.com/panjf2000/gnet/netpoll"
 )
 
-func (lp *loop) handleEvent(fd int, ev uint32, job internal.Job) error {
+func (lp *loop) handleEvent(fd int, ev uint32) error {
 	if c, ok := lp.connections[fd]; ok {
 		switch {
 		// Don't change the ordering of processing EPOLLOUT | EPOLLRDHUP / EPOLLIN unless you're 100%
