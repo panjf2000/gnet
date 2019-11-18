@@ -388,7 +388,7 @@ func (s *testServer) React(c Conn) (out []byte, action Action) {
 		copy(buf, data)
 		s.bytesList = append(s.bytesList, buf)
 		// just for test
-		c.ShiftN(bufLen-1)
+		c.ShiftN(bufLen - 1)
 
 		c.ShiftN(bufLen)
 		//c.ResetBuffer()

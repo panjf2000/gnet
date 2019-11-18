@@ -87,7 +87,7 @@ type Conn interface {
 	ResetBuffer()
 
 	// ShiftN shifts "read" pointer in buffer with the given length.
-	ShiftN(n int)
+	ShiftN(n int) (size int)
 
 	// ReadN reads bytes with the given length from inbound ring-buffer and event-loop-buffer, it would move
 	// "read" pointer, which means it will evict the data from buffer and it can't be revoked (put back to buffer),

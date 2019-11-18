@@ -19,7 +19,6 @@ type loop struct {
 	ch          chan interface{}  // command channel
 	idx         int               // loop index
 	svr         *server           // server in loop
-	loopReact   bool              // decide to loop react or not
 	connections map[*stdConn]bool // track all the sockets bound to this loop
 }
 
@@ -92,13 +91,12 @@ loopReact:
 	out, action := lp.svr.eventHandler.React(c)
 	if out != nil {
 		lp.svr.eventHandler.PreWrite()
-		if lp.loopReact {
-			if frame, err := lp.svr.codec.Encode(out); err == nil {
-				_, _ = c.conn.Write(frame)
-				goto loopReact
-			}
+		if frame, err := lp.svr.codec.Encode(out); err == nil {
+			_, _ = c.conn.Write(frame)
 		}
-		_, _ = c.conn.Write(out)
+		if len(c.cache) != 0 {
+			goto loopReact
+		}
 	}
 	_, _ = c.inboundBuffer.Write(c.cache)
 	switch action {

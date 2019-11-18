@@ -110,13 +110,14 @@ func (c *conn) ResetBuffer() {
 	c.inboundBuffer.Reset()
 }
 
-func (c *conn) ShiftN(n int) {
+func (c *conn) ShiftN(n int) (size int) {
 	oneOffBufferLen := len(c.cache)
 	inBufferLen := c.inboundBuffer.Length()
-	if inBufferLen+oneOffBufferLen < n {
+	if inBufferLen+oneOffBufferLen < n || n <= 0 {
 		c.ResetBuffer()
 		return
 	}
+	size = n
 	if c.inboundBuffer.IsEmpty() {
 		if n == oneOffBufferLen {
 			c.cache = c.cache[:0]
@@ -143,11 +144,11 @@ func (c *conn) ShiftN(n int) {
 func (c *conn) ReadN(n int) (size int, buf []byte) {
 	oneOffBufferLen := len(c.cache)
 	inBufferLen := c.inboundBuffer.Length()
-	if inBufferLen+oneOffBufferLen < n {
+	if inBufferLen+oneOffBufferLen < n || n <= 0 {
 		return
 	}
+	size = n
 	if c.inboundBuffer.IsEmpty() {
-		size = n
 		buf = c.cache[:n]
 		if n == oneOffBufferLen {
 			c.cache = c.cache[:0]
@@ -156,7 +157,6 @@ func (c *conn) ReadN(n int) (size int, buf []byte) {
 		}
 		return
 	}
-	size = n
 	buf, tail := c.inboundBuffer.LazyRead(n)
 	if tail != nil {
 		buf = append(buf, tail...)

@@ -77,7 +77,6 @@ func (svr *server) startLoops(numLoops int) {
 			ch:          make(chan interface{}, commandBufferSize),
 			idx:         i,
 			svr:         svr,
-			loopReact:   svr.opts.Codec != nil,
 			connections: make(map[*stdConn]bool),
 		}
 		svr.subLoopGroup.register(lp)

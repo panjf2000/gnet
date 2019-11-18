@@ -21,7 +21,6 @@ type loop struct {
 	svr         *server         // server in loop
 	packet      []byte          // read packet buffer
 	poller      *netpoll.Poller // epoll or kqueue
-	loopReact   bool            // decide to loop react or not
 	connections map[int]*conn   // loop connections fd -> conn
 }
 
@@ -100,13 +99,12 @@ func (lp *loop) loopIn(c *conn) error {
 loopReact:
 	out, action := lp.svr.eventHandler.React(c)
 	if out != nil {
-		if lp.loopReact {
-			if frame, err := lp.svr.codec.Encode(out); err == nil {
-				c.write(frame)
-				goto loopReact
-			}
+		if frame, err := lp.svr.codec.Encode(out); err == nil {
+			c.write(frame)
 		}
-		c.write(out)
+		if len(c.cache) != 0 {
+			goto loopReact
+		}
 	}
 	_, _ = c.inboundBuffer.Write(c.cache)
 

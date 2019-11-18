@@ -62,7 +62,7 @@ func (cc *LineBasedFrameCodec) Decode(c Conn) ([]byte, error) {
 	if idx == -1 {
 		return nil, ErrCRLFNotFound
 	}
-	_, buf = c.ReadN(idx + 1)
+	c.ShiftN(idx + 1)
 	return buf[:idx], nil
 }
 
@@ -88,7 +88,7 @@ func (cc *DelimiterBasedFrameCodec) Decode(c Conn) ([]byte, error) {
 	if idx == -1 {
 		return nil, ErrDelimiterNotFound
 	}
-	_, buf = c.ReadN(idx + 1)
+	c.ShiftN(idx + 1)
 	return buf[:idx], nil
 }
 
@@ -223,7 +223,7 @@ func (cc *LengthFieldBasedFrameCodec) Decode(c Conn) ([]byte, error) {
 	}
 
 	if cc.decoderConfig.LengthAdjustment > 0 { //discard adjust header
-		size, _ := c.ReadN(cc.decoderConfig.LengthAdjustment)
+		size = c.ShiftN(cc.decoderConfig.LengthAdjustment)
 		if size == 0 {
 			return nil, ErrUnexpectedEOF
 		}
@@ -248,9 +248,9 @@ func (cc *LengthFieldBasedFrameCodec) getUnadjustedFrameLength(c Conn) (lenBuf [
 	case 1:
 		size, b := c.ReadN(1)
 		if size == 0 {
-			err = ErrUnexpectedEOF
+			return nil, 0, ErrUnexpectedEOF
 		}
-		return b, uint64(b[0]), err
+		return b, uint64(b[0]), nil
 	case 2:
 		size, lenBuf := c.ReadN(2)
 		if size == 0 {
@@ -274,7 +274,7 @@ func (cc *LengthFieldBasedFrameCodec) getUnadjustedFrameLength(c Conn) (lenBuf [
 		if size == 0 {
 			return nil, 0, ErrUnexpectedEOF
 		}
-		return lenBuf, uint64(cc.decoderConfig.ByteOrder.Uint64(lenBuf)), nil
+		return lenBuf, cc.decoderConfig.ByteOrder.Uint64(lenBuf), nil
 	default:
 		return nil, 0, ErrUnsupportedLength
 	}

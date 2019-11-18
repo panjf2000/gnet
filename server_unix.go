@@ -86,7 +86,6 @@ func (svr *server) activateLoops(numLoops int) error {
 				svr:         svr,
 				poller:      p,
 				packet:      make([]byte, 0xFFFF),
-				loopReact:   svr.opts.Codec != nil,
 				connections: make(map[int]*conn),
 			}
 			_ = lp.poller.AddRead(svr.ln.fd)
@@ -109,7 +108,6 @@ func (svr *server) activateReactors(numLoops int) error {
 				svr:         svr,
 				poller:      p,
 				packet:      make([]byte, 0xFFFF),
-				loopReact:   svr.opts.Codec != nil,
 				connections: make(map[int]*conn),
 			}
 			svr.subLoopGroup.register(lp)
