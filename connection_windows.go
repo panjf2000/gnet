@@ -83,6 +83,36 @@ func (c *stdConn) ResetBuffer() {
 	c.inboundBuffer.Reset()
 }
 
+func (c *stdConn) ShiftN(n int) {
+	oneOffBufferLen := len(c.cache)
+	inBufferLen := c.inboundBuffer.Length()
+	if inBufferLen+oneOffBufferLen < n {
+		c.ResetBuffer()
+		return
+	}
+	if c.inboundBuffer.IsEmpty() {
+		if n == oneOffBufferLen {
+			c.cache = c.cache[:0]
+		} else {
+			c.cache = c.cache[n:]
+		}
+		return
+	}
+	if inBufferLen >= n {
+		c.inboundBuffer.Shift(n)
+		return
+	}
+	c.inboundBuffer.Reset()
+
+	restSize := n - inBufferLen
+	if restSize == oneOffBufferLen {
+		c.cache = c.cache[:0]
+	} else {
+		c.cache = c.cache[restSize:]
+	}
+	return
+}
+
 func (c *stdConn) ReadN(n int) (size int, buf []byte) {
 	oneOffBufferLen := len(c.cache)
 	inBufferLen := c.inboundBuffer.Length()
@@ -120,13 +150,9 @@ func (c *stdConn) ReadN(n int) (size int, buf []byte) {
 	return
 }
 
-func (c *stdConn) InboundBuffer() *ringbuffer.RingBuffer {
-	return c.inboundBuffer
-}
-
-func (c *stdConn) OutboundBuffer() *ringbuffer.RingBuffer {
-	return nil
-}
+//func (c *stdConn) InboundBuffer() *ringbuffer.RingBuffer {
+//	return c.inboundBuffer
+//}
 
 func (c *stdConn) BufferLength() int {
 	return c.inboundBuffer.Length() + len(c.cache)

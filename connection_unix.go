@@ -110,6 +110,36 @@ func (c *conn) ResetBuffer() {
 	c.inboundBuffer.Reset()
 }
 
+func (c *conn) ShiftN(n int) {
+	oneOffBufferLen := len(c.cache)
+	inBufferLen := c.inboundBuffer.Length()
+	if inBufferLen+oneOffBufferLen < n {
+		c.ResetBuffer()
+		return
+	}
+	if c.inboundBuffer.IsEmpty() {
+		if n == oneOffBufferLen {
+			c.cache = c.cache[:0]
+		} else {
+			c.cache = c.cache[n:]
+		}
+		return
+	}
+	if inBufferLen >= n {
+		c.inboundBuffer.Shift(n)
+		return
+	}
+	c.inboundBuffer.Reset()
+
+	restSize := n - inBufferLen
+	if restSize == oneOffBufferLen {
+		c.cache = c.cache[:0]
+	} else {
+		c.cache = c.cache[restSize:]
+	}
+	return
+}
+
 func (c *conn) ReadN(n int) (size int, buf []byte) {
 	oneOffBufferLen := len(c.cache)
 	inBufferLen := c.inboundBuffer.Length()
@@ -147,13 +177,9 @@ func (c *conn) ReadN(n int) (size int, buf []byte) {
 	return
 }
 
-func (c *conn) InboundBuffer() *ringbuffer.RingBuffer {
-	return c.inboundBuffer
-}
-
-func (c *conn) OutboundBuffer() *ringbuffer.RingBuffer {
-	return c.outboundBuffer
-}
+//func (c *conn) InboundBuffer() *ringbuffer.RingBuffer {
+//	return c.inboundBuffer
+//}
 
 func (c *conn) BufferLength() int {
 	return c.inboundBuffer.Length() + len(c.cache)
@@ -175,10 +201,6 @@ func (c *conn) Wake() {
 		return c.loop.loopWake(c)
 	})
 }
-
-//func (c *conn) ShiftN(n int) {
-//	c.inboundBuffer.Shift(n)
-//}
 
 func (c *conn) Context() interface{}       { return c.ctx }
 func (c *conn) SetContext(ctx interface{}) { c.ctx = ctx }

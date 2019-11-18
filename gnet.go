@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/panjf2000/gnet/netpoll"
-	"github.com/panjf2000/gnet/ringbuffer"
 )
 
 const (
@@ -87,6 +86,9 @@ type Conn interface {
 	// ResetBuffer resets the inbound ring-buffer, which means all data in the inbound ring-buffer has been evicted.
 	ResetBuffer()
 
+	// ShiftN shifts "read" pointer in buffer with the given length.
+	ShiftN(n int)
+
 	// ReadN reads bytes with the given length from inbound ring-buffer and event-loop-buffer, it would move
 	// "read" pointer, which means it will evict the data from buffer and it can't be revoked (put back to buffer),
 	// it reads data from the inbound ring-buffer and event-loop-buffer when the length of the available data is equal
@@ -95,17 +97,11 @@ type Conn interface {
 	// Content-Length attribute in an HTTP request which indicates you how much data you should read from inbound ring-buffer.
 	ReadN(n int) (size int, buf []byte)
 
-	// ShiftN shifts "read" pointer in ring buffer with the given length.
-	//ShiftN(n int)
-
 	// BufferLength returns the length of available data in the inbound ring-buffer.
 	BufferLength() (size int)
 
-	// OutboundBuffer returns the outbound ring-buffer.
-	OutboundBuffer() *ringbuffer.RingBuffer
-
 	// InboundBuffer returns the inbound ring-buffer.
-	InboundBuffer() *ringbuffer.RingBuffer
+	//InboundBuffer() *ringbuffer.RingBuffer
 
 	// AsyncWrite writes data to client/connection asynchronously, usually you would invoke it in a biz goroutine instead of
 	// the event-loop goroutine.
