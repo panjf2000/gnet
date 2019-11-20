@@ -10,6 +10,7 @@ package gnet
 import (
 	"net"
 
+	"github.com/panjf2000/gnet/pool"
 	"github.com/panjf2000/gnet/ringbuffer"
 	"golang.org/x/sys/unix"
 )
@@ -101,8 +102,7 @@ func (c *conn) Read() []byte {
 	if c.inboundBuffer.IsEmpty() {
 		return c.cache
 	}
-	head, _ := c.inboundBuffer.LazyReadAll()
-	return append(head, c.cache...)
+	return c.inboundBuffer.WithBytes(c.cache)
 }
 
 func (c *conn) ResetBuffer() {
@@ -190,6 +190,7 @@ func (c *conn) AsyncWrite(buf []byte) {
 		_ = c.loop.poller.Trigger(func() error {
 			if c.opened {
 				c.write(encodedBuf)
+				pool.PutBytes(buf)
 			}
 			return nil
 		})

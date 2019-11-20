@@ -293,13 +293,13 @@ func (r *RingBuffer) Bytes() []byte {
 	} else if r.r == r.w {
 		buf := pbytes.GetLen(r.size)
 		copy(buf, r.buf)
-		return buf
+		return buf[:r.size]
 	}
 
 	if r.w > r.r {
 		buf := pbytes.GetLen(r.w - r.r)
 		copy(buf, r.buf[r.r:r.w])
-		return buf
+		return buf[:r.w-r.r]
 	}
 
 	n := r.size - r.r + r.w
@@ -314,7 +314,7 @@ func (r *RingBuffer) Bytes() []byte {
 		copy(buf[c1:], r.buf[0:c2])
 	}
 
-	return buf
+	return buf[:n]
 }
 
 // WithBytes combines the available read bytes and the given bytes. It does not move the read pointer and only copy the available data.
@@ -326,14 +326,14 @@ func (r *RingBuffer) WithBytes(b []byte) []byte {
 		buf := pbytes.GetLen(r.size + bn)
 		copy(buf, r.buf)
 		copy(buf[r.size:], b)
-		return buf
+		return buf[:r.size+bn]
 	}
 
 	if r.w > r.r {
 		buf := pbytes.GetLen(r.w - r.r + bn)
 		copy(buf, r.buf[r.r:r.w])
 		copy(buf[r.w-r.r:], b)
-		return buf
+		return buf[:r.w-r.r+bn]
 	}
 
 	n := r.size - r.r + r.w
@@ -349,7 +349,7 @@ func (r *RingBuffer) WithBytes(b []byte) []byte {
 	}
 	copy(buf[n:], b)
 
-	return buf
+	return buf[:n+bn]
 }
 
 // Recycle recycles slice of bytes.

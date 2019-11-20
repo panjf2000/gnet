@@ -185,6 +185,7 @@ func (s *testCodecServer) React(c Conn) (out []byte, action Action) {
 		return
 	}
 	out = c.ReadFrame()
+	pool.PutBytes(out)
 	return
 }
 func (s *testCodecServer) Tick() (delay time.Duration, action Action) {
@@ -386,6 +387,7 @@ func (s *testServer) React(c Conn) (out []byte, action Action) {
 		buf := s.bytesPool.GetLen(bufLen)
 		data := c.Read()
 		copy(buf, data)
+		pool.PutBytes(data)
 		s.bytesList = append(s.bytesList, buf)
 		// just for test
 		c.ShiftN(bufLen - 1)
@@ -405,6 +407,7 @@ func (s *testServer) React(c Conn) (out []byte, action Action) {
 		n, data := c.ReadN(readSize)
 		if n == readSize {
 			out = data
+			pool.PutBytes(data)
 			return
 		}
 		return
@@ -412,9 +415,11 @@ func (s *testServer) React(c Conn) (out []byte, action Action) {
 		//fmt.Printf("UDP from remote addr：%s to local addr: %s\n", c.RemoteAddr().String(), c.LocalAddr().String())
 		out = c.Read()
 		c.ResetBuffer()
+		pool.PutBytes(out)
 		return
 	}
 	out = c.ReadFrame()
+	pool.PutBytes(out)
 	return
 }
 func (s *testServer) Tick() (delay time.Duration, action Action) {

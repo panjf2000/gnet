@@ -37,7 +37,7 @@ func (svr *server) listenerRun() {
 				localAddr:     svr.ln.lnaddr,
 				remoteAddr:    addr,
 				inboundBuffer: inBuf,
-				cache:         buf,
+				cache:         buf[:n],
 			}
 			lp.ch <- &udpIn{c}
 		} else {
@@ -61,7 +61,7 @@ func (svr *server) listenerRun() {
 					}
 					buf := bytesPool.GetLen(n)
 					copy(buf, packet[:n])
-					lp.ch <- &tcpIn{c, buf}
+					lp.ch <- &tcpIn{c, buf[:n]}
 				}
 			}()
 		}

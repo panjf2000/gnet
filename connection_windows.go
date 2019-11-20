@@ -74,8 +74,7 @@ func (c *stdConn) Read() []byte {
 	if c.inboundBuffer.IsEmpty() {
 		return c.cache
 	}
-	head, _ := c.inboundBuffer.LazyReadAll()
-	return append(head, c.cache...)
+	return c.inboundBuffer.WithBytes(c.cache)
 }
 
 func (c *stdConn) ResetBuffer() {
@@ -162,6 +161,7 @@ func (c *stdConn) AsyncWrite(buf []byte) {
 	if encodedBuf, err := c.loop.svr.codec.Encode(buf); err == nil {
 		c.loop.ch <- func() error {
 			_, _ = c.conn.Write(encodedBuf)
+			pool.PutBytes(buf)
 			return nil
 		}
 	}
