@@ -22,7 +22,7 @@ The goal of this project is to create a server framework for Go that performs on
 
 `gnet` sells itself as a high-performance, lightweight, non-blocking, event-driven networking framework written in pure Go which works on transport layer with TCP/UDP/Unix-Socket protocols, so it allows developers to implement their own protocols(HTTP, RPC, WebSocket, Redis, etc.) of application layer upon `gnet` for building  diversified network applications, for instance, you get an HTTP Server or Web Framework if you implement HTTP protocol upon `gnet` while you have a Redis Server done with the implementation of Redis protocol upon `gnet` and so on.
 
-**`gnet` derives from the project: `evio` while having a much higher performance.**
+**`gnet` derives from the project: `evio` while having a much higher performance and more features.**
 
 # 🚀 Features
 
@@ -80,7 +80,7 @@ and it works as the following sequence diagram:
 
 `gnet` implements the networking model:『multiple reactors with thread/goroutine pool』by the aid of a high-performance goroutine pool called [ants](https://github.com/panjf2000/ants) that allows you to manage and recycle a massive number of goroutines in your concurrent programs, the full features and usages in `ants` are documented [here](https://gowalker.org/github.com/panjf2000/ants?lang=en-US).
 
-`gnet` integrates `ants` and provides the `pool.NewWorkerPool` method that you can invoke to instantiate a `ants` pool where you are able to put your blocking code logic in `EventHandler.React` and invoke the function of `gnet.Conn.AsyncWrite` to send out data asynchronously in worker pool after you finish the blocking process and get the output data, which makes the goroutine of event-loop non-blocking.
+`gnet` integrates `ants` and provides the `pool.NewWorkerPool` method that you can invoke to instantiate a `ants` pool where you are able to put your blocking code logic in `EventHandler.React` and invoke the function of `gnet.Conn.AsyncWrite([]byte)` to send out data asynchronously in worker pool after you finish the blocking process and get the output data, which makes the goroutine of event-loop non-blocking.
 
 The details about integrating `gnet`  with `ants` are shown [here](#echo-server-with-blocking-logic).
 
@@ -681,6 +681,7 @@ The `gnet.Serve` function can bind to UDP addresses.
 
 - All incoming and outgoing packets will not be buffered but sent individually.
 - The `EventHandler.OnOpened` and `EventHandler.OnClosed` events are not available for UDP sockets, only the `React` event.
+- The UDP equivalents of  `Read()/ReadFrame()` and `AsyncWrite([]byte)` in TCP are `ReadFromUDP()` and `SendTo([]byte)`.
 
 ## Multi-threads
 

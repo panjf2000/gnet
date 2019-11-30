@@ -75,6 +75,9 @@ type Conn interface {
 	// Wake triggers a React event for this connection.
 	//Wake()
 
+	// ReadFromUDP reads data for UDP socket.
+	ReadFromUDP() (buf []byte)
+
 	// ReadFrame returns either a frame from TCP stream based on codec or nil when there isn't a complete frame yet.
 	ReadFrame() (buf []byte)
 
@@ -103,8 +106,11 @@ type Conn interface {
 	// InboundBuffer returns the inbound ring-buffer.
 	//InboundBuffer() *ringbuffer.RingBuffer
 
-	// AsyncWrite writes data to client/connection asynchronously, usually you would invoke it in a biz goroutine instead of
-	// the event-loop goroutine.
+	// SendTo writes data for UDP sockets, it allows you to send data back to UDP socket in individual goroutines.
+	SendTo(buf []byte)
+
+	// AsyncWrite writes data to client/connection asynchronously, usually you would invoke it in individual goroutines
+	// instead of the event-loop goroutines.
 	AsyncWrite(buf []byte)
 
 	// Wake triggers a React event for this connection.

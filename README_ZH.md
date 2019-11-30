@@ -22,7 +22,7 @@
 
 `gnet` 的亮点在于它是一个高性能、轻量级、非阻塞的纯 Go 实现的传输层（TCP/UDP/Unix-Socket）网络框架，开发者可以使用 `gnet` 来实现自己的应用层网络协议(HTTP、RPC、Redis、WebSocket 等等)，从而构建出自己的应用层网络应用：比如在 `gnet` 上实现 HTTP 协议就可以创建出一个 HTTP 服务器 或者 Web 开发框架，实现 Redis 协议就可以创建出自己的 Redis 服务器等等。
 
-**`gnet` 衍生自另一个项目：`evio`，但性能远胜之。**
+**`gnet` 衍生自另一个项目：`evio`，但性能远胜之且拥有更丰富的功能特性。**
 
 # 🚀 功能
 
@@ -79,7 +79,7 @@
 
 `gnet` 通过利用 [ants](https://github.com/panjf2000/ants) goroutine 池（一个基于 Go 开发的高性能的 goroutine 池 ，实现了对大规模 goroutines 的调度管理、goroutines 复用）来实现『主从多 Reactors + 线程/Go程池』网络模型。关于 `ants` 的全部功能和使用，可以在 [ants 文档](https://gowalker.org/github.com/panjf2000/ants?lang=zh-CN) 里找到。
 
-`gnet` 内部集成了 `ants` 以及提供了 `pool.NewWorkerPool` 方法来初始化一个 `ants` goroutine 池，然后你可以把 `EventHandler.React` 中阻塞的业务逻辑提交到 goroutine 池里执行，最后在 goroutine 池里的代码调用 `gnet.Conn.AsyncWrite` 方法把处理完阻塞逻辑之后得到的输出数据异步写回客户端，这样就可以避免阻塞 event-loop 线程。
+`gnet` 内部集成了 `ants` 以及提供了 `pool.NewWorkerPool` 方法来初始化一个 `ants` goroutine 池，然后你可以把 `EventHandler.React` 中阻塞的业务逻辑提交到 goroutine 池里执行，最后在 goroutine 池里的代码调用 `gnet.Conn.AsyncWrite([]byte)` 方法把处理完阻塞逻辑之后得到的输出数据异步写回客户端，这样就可以避免阻塞 event-loop 线程。
 
 有关在 `gnet` 里使用 `ants` goroutine 池的细节可以到[这里](#echo-server-with-blocking-logic)进一步了解。
 
@@ -677,6 +677,7 @@ events.Tick = func() (delay time.Duration, action Action){
 
 - 数据进入服务器之后立刻写回客户端，不做缓存。
 -  `EventHandler.OnOpened` 和 `EventHandler.OnClosed` 这两个事件在 UDP 下不可用，唯一可用的事件是 `React`。
+-  TCP 里的读写操作是 `Read()/ReadFrame()` 和 `AsyncWrite([]byte)` 方法，而在 UDP 里对应的方法是 `ReadFromUDP()` 和 `SendTo([]byte)`。
 
 ## 使用多核
 

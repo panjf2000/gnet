@@ -11,14 +11,12 @@ import (
 	"time"
 
 	"github.com/panjf2000/gnet/pool"
-	"github.com/panjf2000/gnet/ringbuffer"
 )
 
 func (svr *server) listenerRun() {
 	var err error
 	defer func() { svr.signalShutdown(err) }()
 	var packet [0xFFFF]byte
-	inBuf := svr.bytesPool.Get().(*ringbuffer.RingBuffer)
 	bytesPool := pool.NewBytesPool()
 	for {
 		if svr.ln.pconn != nil {
@@ -32,14 +30,7 @@ func (svr *server) listenerRun() {
 			copy(buf, packet[:n])
 
 			lp := svr.subLoopGroup.next()
-			c := &stdConn{
-				loop:          lp,
-				localAddr:     svr.ln.lnaddr,
-				remoteAddr:    addr,
-				inboundBuffer: inBuf,
-				cache:         buf[:n],
-			}
-			lp.ch <- &udpIn{c}
+			lp.ch <- &udpIn{newUDPConn(lp, svr.ln.lnaddr, addr, buf[:n])}
 		} else {
 			// Accept TCP socket.
 			conn, e := svr.ln.ln.Accept()
@@ -48,7 +39,7 @@ func (svr *server) listenerRun() {
 				return
 			}
 			lp := svr.subLoopGroup.next()
-			c := newConn(conn, lp)
+			c := newTCPConn(conn, lp)
 			lp.ch <- c
 			go func() {
 				var packet [0xFFFF]byte

@@ -10,6 +10,7 @@ package gnet
 import (
 	"net"
 
+	"github.com/panjf2000/gnet/netpoll"
 	"github.com/panjf2000/gnet/pool"
 	"github.com/panjf2000/gnet/ringbuffer"
 	"golang.org/x/sys/unix"
@@ -29,17 +30,17 @@ type conn struct {
 	outboundBuffer *ringbuffer.RingBuffer // buffer for data that is ready to write to client
 }
 
-func newConn(fd int, lp *loop, sa unix.Sockaddr) *conn {
+func newTCPConn(fd int, lp *loop, sa unix.Sockaddr) *conn {
 	return &conn{
 		fd:             fd,
-		loop:           lp,
 		sa:             sa,
+		loop:           lp,
 		inboundBuffer:  lp.svr.bytesPool.Get().(*ringbuffer.RingBuffer),
 		outboundBuffer: lp.svr.bytesPool.Get().(*ringbuffer.RingBuffer),
 	}
 }
 
-func (c *conn) release() {
+func (c *conn) releaseTCP() {
 	c.opened = false
 	c.sa = nil
 	c.ctx = nil
@@ -52,6 +53,23 @@ func (c *conn) release() {
 	c.loop.svr.bytesPool.Put(c.outboundBuffer)
 	c.inboundBuffer = nil
 	c.outboundBuffer = nil
+}
+
+func newUDPConn(fd int, lp *loop, sa unix.Sockaddr, buf []byte) *conn {
+	return &conn{
+		fd:         fd,
+		sa:         sa,
+		cache:      buf,
+		localAddr:  lp.svr.ln.lnaddr,
+		remoteAddr: netpoll.SockaddrToUDPAddr(sa),
+	}
+}
+
+func (c *conn) releaseUDP() {
+	c.ctx = nil
+	c.cache = nil
+	c.localAddr = nil
+	c.remoteAddr = nil
 }
 
 func (c *conn) open(buf []byte) {
@@ -87,11 +105,15 @@ func (c *conn) write(buf []byte) {
 	}
 }
 
-func (c *conn) sendTo(buf []byte, sa unix.Sockaddr) {
-	_ = unix.Sendto(c.fd, buf, 0, sa)
+func (c *conn) sendTo(buf []byte) {
+	_ = unix.Sendto(c.fd, buf, 0, c.sa)
 }
 
 // ================================= Public APIs of gnet.Conn =================================
+
+func (c *conn) ReadFromUDP() []byte {
+	return c.cache
+}
 
 func (c *conn) ReadFrame() []byte {
 	buf, _ := c.loop.svr.codec.Decode(c)
@@ -195,6 +217,10 @@ func (c *conn) AsyncWrite(buf []byte) {
 			return nil
 		})
 	}
+}
+
+func (c *conn) SendTo(buf []byte) {
+	c.sendTo(buf)
 }
 
 func (c *conn) Wake() {

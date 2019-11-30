@@ -43,7 +43,7 @@ type stdConn struct {
 	inboundBuffer *ringbuffer.RingBuffer // buffer for data from client
 }
 
-func newConn(conn net.Conn, lp *loop) *stdConn {
+func newTCPConn(conn net.Conn, lp *loop) *stdConn {
 	return &stdConn{
 		conn:          conn,
 		loop:          lp,
@@ -51,8 +51,7 @@ func newConn(conn net.Conn, lp *loop) *stdConn {
 	}
 }
 
-func (c *stdConn) release() {
-	//c.conn = nil
+func (c *stdConn) releaseTCP() {
 	c.ctx = nil
 	c.localAddr = nil
 	c.remoteAddr = nil
@@ -63,7 +62,28 @@ func (c *stdConn) release() {
 	c.cache = nil
 }
 
+func newUDPConn(lp *loop, localAddr, remoteAddr net.Addr, buf []byte) *stdConn {
+	return &stdConn{
+		loop:       lp,
+		localAddr:  localAddr,
+		remoteAddr: remoteAddr,
+		cache:      buf,
+	}
+}
+
+func (c *stdConn) releaseUDP() {
+	c.ctx = nil
+	c.localAddr = nil
+	c.remoteAddr = nil
+	pool.PutBytes(c.cache)
+	c.cache = nil
+}
+
 // ================================= Public APIs of gnet.Conn =================================
+
+func (c *stdConn) ReadFromUDP() []byte {
+	return c.cache
+}
 
 func (c *stdConn) ReadFrame() []byte {
 	buf, _ := c.loop.svr.codec.Decode(c)
@@ -165,6 +185,10 @@ func (c *stdConn) AsyncWrite(buf []byte) {
 			return nil
 		}
 	}
+}
+
+func (c *stdConn) SendTo(buf []byte) {
+	_, _ = c.loop.svr.ln.pconn.WriteTo(buf, c.remoteAddr)
 }
 
 func (c *stdConn) Context() interface{}       { return c.ctx }

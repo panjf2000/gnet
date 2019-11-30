@@ -172,7 +172,7 @@ func (lp *loop) loopError(c *stdConn, err error) (e error) {
 		case Shutdown:
 			return errClosing
 		}
-		c.release()
+		c.releaseTCP()
 	}
 	return
 }
@@ -204,6 +204,6 @@ func (lp *loop) loopReadUDP(c *stdConn) error {
 	case Shutdown:
 		return errClosing
 	}
-	c.release()
+	c.releaseUDP()
 	return nil
 }

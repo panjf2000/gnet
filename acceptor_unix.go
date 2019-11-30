@@ -22,7 +22,7 @@ func (svr *server) acceptNewConnection(fd int) error {
 		return err
 	}
 	lp := svr.subLoopGroup.next()
-	c := newConn(nfd, lp, sa)
+	c := newTCPConn(nfd, lp, sa)
 	_ = lp.poller.Trigger(func() (err error) {
 		if err = lp.poller.AddRead(nfd); err != nil {
 			return

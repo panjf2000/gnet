@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/panjf2000/gnet/netpoll"
-	"github.com/panjf2000/gnet/ringbuffer"
 	"golang.org/x/sys/unix"
 )
 
@@ -54,7 +53,7 @@ func (lp *loop) loopAccept(fd int) error {
 		if err := unix.SetNonblock(nfd, true); err != nil {
 			return err
 		}
-		c := newConn(nfd, lp, sa)
+		c := newTCPConn(nfd, lp, sa)
 		if err = lp.poller.AddReadWrite(c.fd); err == nil {
 			lp.connections[c.fd] = c
 		} else {
@@ -149,7 +148,7 @@ func (lp *loop) loopCloseConn(c *conn, err error) error {
 		case Shutdown:
 			return errShutdown
 		}
-		c.release()
+		c.releaseTCP()
 	}
 	return nil
 }
@@ -210,26 +209,16 @@ func (lp *loop) loopUDPIn(fd int) error {
 	if err != nil || n == 0 {
 		return nil
 	}
-	c := &conn{
-		fd:            fd,
-		localAddr:     lp.svr.ln.lnaddr,
-		remoteAddr:    netpoll.SockaddrToUDPAddr(sa),
-		inboundBuffer: lp.svr.bytesPool.Get().(*ringbuffer.RingBuffer),
-	}
-	c.cache = lp.packet[:n]
+	c := newUDPConn(fd, lp, sa, lp.packet[:n])
 	out, action := lp.svr.eventHandler.React(c)
 	if out != nil {
 		lp.svr.eventHandler.PreWrite()
-		c.sendTo(out, sa)
+		c.sendTo(out)
 	}
 	switch action {
 	case Shutdown:
 		return errShutdown
 	}
-
-	c.inboundBuffer.Reset()
-	lp.svr.bytesPool.Put(c.inboundBuffer)
-	c = nil
-
+	c.releaseUDP()
 	return nil
 }

@@ -383,44 +383,60 @@ func (s *testServer) OnClosed(c Conn, err error) (action Action) {
 }
 func (s *testServer) React(c Conn) (out []byte, action Action) {
 	if s.async {
-		bufLen := c.BufferLength()
-		buf := s.bytesPool.GetLen(bufLen)
-		data := c.Read()
-		copy(buf, data)
-		pool.PutBytes(data)
-		s.bytesList = append(s.bytesList, buf)
-		// just for test
-		c.ShiftN(bufLen - 1)
-
-		c.ShiftN(bufLen)
-		//c.ResetBuffer()
-		_ = s.workerPool.Submit(
-			func() {
-				c.AsyncWrite(buf)
-			})
-		return
-	} else if s.multicore {
-		readSize := 1024 * 1024
-		if s.network == "udp" {
-			readSize = 64
-		}
-		n, data := c.ReadN(readSize)
-		if n == readSize {
-			out = data
+		if s.network == "tcp" {
+			bufLen := c.BufferLength()
+			buf := s.bytesPool.GetLen(bufLen)
+			data := c.Read()
+			copy(buf, data)
 			pool.PutBytes(data)
+			s.bytesList = append(s.bytesList, buf)
+			// just for test
+			c.ShiftN(bufLen - 1)
+
+			c.ShiftN(bufLen)
+			//c.ResetBuffer()
+			_ = s.workerPool.Submit(
+				func() {
+					c.AsyncWrite(buf)
+				})
+			return
+		}
+		if s.network == "udp" {
+			data := c.ReadFromUDP()
+			_ = s.workerPool.Submit(
+				func() {
+					c.SendTo(data)
+				})
 			return
 		}
 		return
-	} else if s.network == "udp" {
+	} else if s.multicore {
+		if s.network == "tcp" {
+			readSize := 1024 * 1024
+			n, data := c.ReadN(readSize)
+			if n == readSize {
+				out = data
+				pool.PutBytes(data)
+			}
+			return
+		}
+		if s.network == "udp" {
+			out = c.ReadFromUDP()
+			return
+		}
+		return
+	} else {
+		if s.network == "tcp" {
+			out = c.ReadFrame()
+			return
+		}
 		//fmt.Printf("UDP from remote addr：%s to local addr: %s\n", c.RemoteAddr().String(), c.LocalAddr().String())
-		out = c.Read()
-		c.ResetBuffer()
-		pool.PutBytes(out)
+		if s.network == "udp" {
+			out = c.ReadFromUDP()
+			return
+		}
 		return
 	}
-	out = c.ReadFrame()
-	pool.PutBytes(out)
-	return
 }
 func (s *testServer) Tick() (delay time.Duration, action Action) {
 	if atomic.LoadInt32(&s.started) == 0 {
@@ -485,7 +501,7 @@ func startClient(network, addr string, multicore, async bool) {
 		sz := 1024 * 1024
 		data := make([]byte, sz)
 		if network == "udp" {
-			n := 64
+			n := 1024
 			//if sz < 64 {
 			//	n = sz
 			//}
