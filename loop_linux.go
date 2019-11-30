@@ -22,7 +22,7 @@ func (lp *loop) handleEvent(fd int, ev uint32) error {
 			if ev&netpoll.OutEvents != 0 {
 				return lp.loopOut(c)
 			}
-			return nil
+			return lp.loopIn(c)
 		case ev&netpoll.InEvents != 0:
 			return lp.loopIn(c)
 		default:
