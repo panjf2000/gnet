@@ -23,9 +23,21 @@ func (es *echoServer) OnInitComplete(srv gnet.Server) (action gnet.Action) {
 	return
 }
 func (es *echoServer) React(c gnet.Conn) (out []byte, action gnet.Action) {
+	// Echo synchronously.
 	out = c.Read()
 	c.ResetBuffer()
 	return
+
+	/*
+		// Echo asynchronously.
+		data := c.Read()
+		c.ResetBuffer()
+		go func() {
+			time.Sleep(time.Second)
+			c.AsyncWrite(append([]byte{}, data...))
+		}()
+		return
+	*/
 }
 
 func main() {

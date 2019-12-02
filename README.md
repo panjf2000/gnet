@@ -193,10 +193,11 @@ Like I said in the 『Multiple Reactors + Goroutine-Pool』section, if there are
 **All gnet examples:**
 
 <details>
-	<summary> Echo Server </summary>
+	<summary> TCP Echo Server </summary>
 
 ```go
 package main
+
 import (
 	"flag"
 	"fmt"
@@ -215,9 +216,21 @@ func (es *echoServer) OnInitComplete(srv gnet.Server) (action gnet.Action) {
 	return
 }
 func (es *echoServer) React(c gnet.Conn) (out []byte, action gnet.Action) {
+	// Echo synchronously.
 	out = c.Read()
 	c.ResetBuffer()
 	return
+
+	/*
+		// Echo asynchronously.
+		data := c.Read()
+		c.ResetBuffer()
+		go func() {
+			time.Sleep(time.Second)
+			c.AsyncWrite(append([]byte{}, data...))
+		}()
+		return
+	*/
 }
 
 func main() {
@@ -230,6 +243,59 @@ func main() {
 	flag.Parse()
 	echo := new(echoServer)
 	log.Fatal(gnet.Serve(echo, fmt.Sprintf("tcp://:%d", port), gnet.WithMulticore(multicore)))
+}
+```
+</details>
+
+<details>
+	<summary> UDP Echo Server </summary>
+
+```go
+package main
+
+import (
+	"flag"
+	"fmt"
+	"log"
+
+	"github.com/panjf2000/gnet"
+)
+
+type echoServer struct {
+	*gnet.EventServer
+}
+
+func (es *echoServer) OnInitComplete(srv gnet.Server) (action gnet.Action) {
+	log.Printf("UDP Echo server is listening on %s (multi-cores: %t, loops: %d)\n",
+		srv.Addr.String(), srv.Multicore, srv.NumLoops)
+	return
+}
+func (es *echoServer) React(c gnet.Conn) (out []byte, action gnet.Action) {
+	// Echo synchronously.
+	out = c.ReadFromUDP()
+	return
+
+	/*
+		// Echo asynchronously.
+		data := c.ReadFromUDP()
+		go func() {
+			time.Sleep(time.Second)
+			c.SendTo(append([]byte{}, data...))
+		}()
+		return
+	*/
+}
+
+func main() {
+	var port int
+	var multicore bool
+
+	// Example command: go run echo.go --port 9000 --multicore true
+	flag.IntVar(&port, "port", 9000, "server port")
+	flag.BoolVar(&multicore, "multicore", true, "multicore")
+	flag.Parse()
+	echo := new(echoServer)
+	log.Fatal(gnet.Serve(echo, fmt.Sprintf("udp://:%d", port), gnet.WithMulticore(multicore)))
 }
 ```
 </details>
