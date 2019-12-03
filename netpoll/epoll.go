@@ -62,9 +62,11 @@ var (
 
 // Trigger wakes up the poller blocked in waiting for network-events and runs jobs in asyncJobQueue.
 func (p *Poller) Trigger(job internal.Job) error {
-	p.asyncJobQueue.Push(job)
-	_, err := unix.Write(p.wfd, b)
-	return err
+	if jobsNum := p.asyncJobQueue.Push(job); jobsNum == 1 {
+		_, err := unix.Write(p.wfd, b)
+		return err
+	}
+	return nil
 }
 
 // Polling blocks the current goroutine, waiting for network-events.
