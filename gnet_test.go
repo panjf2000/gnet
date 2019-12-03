@@ -201,23 +201,33 @@ func (s *testCodecServer) Tick() (delay time.Duration, action Action) {
 	return
 }
 
+var (
+	n            = 0
+	fieldLengths = []int{1, 2, 3, 4, 8}
+)
+
 func testCodecServe(network, addr string, multicore, async bool, nclients int, reuseport bool, codec ICodec) {
 	var err error
+	fieldLength := fieldLengths[n]
 	if codec == nil {
 		encoderConfig := EncoderConfig{
 			ByteOrder:                       binary.BigEndian,
-			LengthFieldLength:               4,
+			LengthFieldLength:               fieldLength,
 			LengthAdjustment:                0,
 			LengthIncludesLengthFieldLength: false,
 		}
 		decoderConfig := DecoderConfig{
 			ByteOrder:           binary.BigEndian,
 			LengthFieldOffset:   0,
-			LengthFieldLength:   4,
+			LengthFieldLength:   fieldLength,
 			LengthAdjustment:    0,
-			InitialBytesToStrip: 4,
+			InitialBytesToStrip: fieldLength,
 		}
 		codec = NewLengthFieldBasedFrameCodec(encoderConfig, decoderConfig)
+	}
+	n++
+	if n > 4 {
+		n = 0
 	}
 	ts := &testCodecServer{network: network, addr: addr, multicore: multicore, async: async, nclients: nclients, codec: codec, workerPool: pool.NewWorkerPool()}
 	if reuseport {
