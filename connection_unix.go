@@ -22,6 +22,7 @@ type conn struct {
 	ctx            interface{}            // user-defined context
 	loop           *loop                  // connected loop
 	cache          []byte                 // reuse memory of inbound data
+	codec          ICodec                 // codec for TCP
 	opened         bool                   // connection opened event fired
 	action         Action                 // next user action
 	localAddr      net.Addr               // local addr
@@ -35,8 +36,9 @@ func newTCPConn(fd int, lp *loop, sa unix.Sockaddr) *conn {
 		fd:             fd,
 		sa:             sa,
 		loop:           lp,
-		inboundBuffer:  lp.svr.bytesPool.Get().(*ringbuffer.RingBuffer),
-		outboundBuffer: lp.svr.bytesPool.Get().(*ringbuffer.RingBuffer),
+		codec:          lp.codec,
+		inboundBuffer:  ringbuffer.Get(),
+		outboundBuffer: ringbuffer.Get(),
 	}
 }
 
@@ -49,8 +51,8 @@ func (c *conn) releaseTCP() {
 	c.remoteAddr = nil
 	c.inboundBuffer.Reset()
 	c.outboundBuffer.Reset()
-	c.loop.svr.bytesPool.Put(c.inboundBuffer)
-	c.loop.svr.bytesPool.Put(c.outboundBuffer)
+	ringbuffer.Put(c.inboundBuffer)
+	ringbuffer.Put(c.outboundBuffer)
 	c.inboundBuffer = nil
 	c.outboundBuffer = nil
 }
@@ -116,7 +118,7 @@ func (c *conn) ReadFromUDP() []byte {
 }
 
 func (c *conn) ReadFrame() []byte {
-	buf, _ := c.loop.svr.codec.Decode(c)
+	buf, _ := c.codec.Decode(c)
 	return buf
 }
 
@@ -208,7 +210,7 @@ func (c *conn) BufferLength() int {
 }
 
 func (c *conn) AsyncWrite(buf []byte) {
-	if encodedBuf, err := c.loop.svr.codec.Encode(buf); err == nil {
+	if encodedBuf, err := c.codec.Encode(buf); err == nil {
 		_ = c.loop.poller.Trigger(func() error {
 			if c.opened {
 				c.write(encodedBuf)

@@ -16,11 +16,13 @@ import (
 )
 
 type loop struct {
-	idx         int             // loop index in the server loops list
-	svr         *server         // server in loop
-	packet      []byte          // read packet buffer
-	poller      *netpoll.Poller // epoll or kqueue
-	connections map[int]*conn   // loop connections fd -> conn
+	idx          int             // loop index in the server loops list
+	svr          *server         // server in loop
+	codec        ICodec          // codec for TCP
+	packet       []byte          // read packet buffer
+	poller       *netpoll.Poller // epoll or kqueue
+	connections  map[int]*conn   // loop connections fd -> conn
+	eventHandler EventHandler    // user eventHandler
 }
 
 func (lp *loop) loopRun() {
@@ -67,7 +69,7 @@ func (lp *loop) loopOpen(c *conn) error {
 	c.opened = true
 	c.localAddr = lp.svr.ln.lnaddr
 	c.remoteAddr = netpoll.SockaddrToTCPOrUnixAddr(c.sa)
-	out, action := lp.svr.eventHandler.OnOpened(c)
+	out, action := lp.eventHandler.OnOpened(c)
 	c.action = action
 	if lp.svr.opts.TCPKeepAlive > 0 {
 		if _, ok := lp.svr.ln.ln.(*net.TCPListener); ok {
@@ -96,9 +98,9 @@ func (lp *loop) loopIn(c *conn) error {
 	c.cache = lp.packet[:n]
 
 loopReact:
-	out, action := lp.svr.eventHandler.React(c)
+	out, action := lp.eventHandler.React(c)
 	if out != nil {
-		if frame, err := lp.svr.codec.Encode(out); err == nil {
+		if frame, err := lp.codec.Encode(out); err == nil {
 			c.write(frame)
 		}
 		if len(c.cache) != 0 {
@@ -112,7 +114,7 @@ loopReact:
 }
 
 func (lp *loop) loopOut(c *conn) error {
-	lp.svr.eventHandler.PreWrite()
+	lp.eventHandler.PreWrite()
 
 	head, tail := c.outboundBuffer.LazyReadAll()
 	n, err := unix.Write(c.fd, head)
@@ -144,7 +146,7 @@ func (lp *loop) loopOut(c *conn) error {
 func (lp *loop) loopCloseConn(c *conn, err error) error {
 	if lp.poller.Delete(c.fd) == nil && unix.Close(c.fd) == nil {
 		delete(lp.connections, c.fd)
-		switch lp.svr.eventHandler.OnClosed(c, err) {
+		switch lp.eventHandler.OnClosed(c, err) {
 		case Shutdown:
 			return errShutdown
 		}
@@ -157,7 +159,7 @@ func (lp *loop) loopWake(c *conn) error {
 	if co, ok := lp.connections[c.fd]; !ok || co != c {
 		return nil // ignore stale wakes.
 	}
-	out, action := lp.svr.eventHandler.React(c)
+	out, action := lp.eventHandler.React(c)
 	c.action = action
 	if out != nil {
 		c.write(out)
@@ -172,7 +174,7 @@ func (lp *loop) loopTicker() {
 	)
 	for {
 		if err := lp.poller.Trigger(func() (err error) {
-			delay, action := lp.svr.eventHandler.Tick()
+			delay, action := lp.eventHandler.Tick()
 			lp.svr.ticktock <- delay
 			switch action {
 			case None:
@@ -210,9 +212,9 @@ func (lp *loop) loopUDPIn(fd int) error {
 		return nil
 	}
 	c := newUDPConn(fd, lp, sa, lp.packet[:n])
-	out, action := lp.svr.eventHandler.React(c)
+	out, action := lp.eventHandler.React(c)
 	if out != nil {
-		lp.svr.eventHandler.PreWrite()
+		lp.eventHandler.PreWrite()
 		c.sendTo(out)
 	}
 	switch action {

@@ -38,6 +38,7 @@ type stdConn struct {
 	loop          *loop                  // owner loop
 	done          int32                  // 0: attached, 1: closed
 	cache         []byte                 // reuse memory of inbound data
+	codec         ICodec                 // codec for TCP
 	localAddr     net.Addr               // local server addr
 	remoteAddr    net.Addr               // remote peer addr
 	inboundBuffer *ringbuffer.RingBuffer // buffer for data from client
@@ -47,7 +48,8 @@ func newTCPConn(conn net.Conn, lp *loop) *stdConn {
 	return &stdConn{
 		conn:          conn,
 		loop:          lp,
-		inboundBuffer: lp.svr.bytesPool.Get().(*ringbuffer.RingBuffer),
+		codec:         lp.codec,
+		inboundBuffer: ringbuffer.Get(),
 	}
 }
 
@@ -56,7 +58,7 @@ func (c *stdConn) releaseTCP() {
 	c.localAddr = nil
 	c.remoteAddr = nil
 	c.inboundBuffer.Reset()
-	c.loop.svr.bytesPool.Put(c.inboundBuffer)
+	ringbuffer.Put(c.inboundBuffer)
 	c.inboundBuffer = nil
 	pool.PutBytes(c.cache)
 	c.cache = nil
@@ -86,7 +88,7 @@ func (c *stdConn) ReadFromUDP() []byte {
 }
 
 func (c *stdConn) ReadFrame() []byte {
-	buf, _ := c.loop.svr.codec.Decode(c)
+	buf, _ := c.codec.Decode(c)
 	return buf
 }
 
@@ -178,7 +180,7 @@ func (c *stdConn) BufferLength() int {
 }
 
 func (c *stdConn) AsyncWrite(buf []byte) {
-	if encodedBuf, err := c.loop.svr.codec.Encode(buf); err == nil {
+	if encodedBuf, err := c.codec.Encode(buf); err == nil {
 		c.loop.ch <- func() error {
 			_, _ = c.conn.Write(encodedBuf)
 			pool.PutBytes(buf)

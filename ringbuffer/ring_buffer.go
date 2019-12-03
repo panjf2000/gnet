@@ -8,14 +8,41 @@ package ringbuffer
 
 import (
 	"errors"
+	"sync"
 	"unsafe"
 
 	"github.com/gobwas/pool/pbytes"
 	"github.com/panjf2000/gnet/internal"
 )
 
-// ErrIsEmpty will be returned when trying to read a empty ring-buffer
-var ErrIsEmpty = errors.New("ring-buffer is empty")
+const (
+	// defaultRingBufferSize represents the initial size of connection ring-buffer.
+	defaultRingBufferSize = 1 << 12
+)
+
+var (
+	// pool for caching ring-buffers.
+	pool sync.Pool
+	// ErrIsEmpty will be returned when trying to read a empty ring-buffer.
+	ErrIsEmpty error
+)
+
+func init() {
+	ErrIsEmpty = errors.New("ring-buffer is empty")
+	pool.New = func() interface{} {
+		return New(defaultRingBufferSize)
+	}
+}
+
+// Get gets ring-buffer from pool.
+func Get() *RingBuffer {
+	return pool.Get().(*RingBuffer)
+}
+
+// Put put ring-buffer back into pool.
+func Put(rb *RingBuffer) {
+	pool.Put(rb)
+}
 
 // RingBuffer is a circular buffer that implement io.ReaderWriter interface.
 type RingBuffer struct {
@@ -29,9 +56,7 @@ type RingBuffer struct {
 
 // New returns a new RingBuffer whose buffer has the given size.
 func New(size int) *RingBuffer {
-	if !internal.IsPowerOfTwo(size) {
-		panic("the size of ring-buffer must be power of two integer value, e.g. 2, 4, 8, 16, 32, 64, etc.")
-	}
+	size = internal.CeilToPowerOfTwo(size)
 	return &RingBuffer{
 		buf:     make([]byte, size),
 		size:    size,

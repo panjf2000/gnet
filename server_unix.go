@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/panjf2000/gnet/netpoll"
-	"github.com/panjf2000/gnet/ringbuffer"
 )
 
 type server struct {
@@ -26,7 +25,6 @@ type server struct {
 	codec            ICodec             // codec for TCP stream
 	ticktock         chan time.Duration // ticker channel
 	mainLoop         *loop              // main loop for accepting connections
-	bytesPool        sync.Pool          // pool for storing bytes
 	eventHandler     EventHandler       // user eventHandler
 	subLoopGroup     IEventLoopGroup    // loops for handling events
 	subLoopGroupSize int                // number of loops
@@ -82,11 +80,13 @@ func (svr *server) activateLoops(numLoops int) error {
 	for i := 0; i < numLoops; i++ {
 		if p, err := netpoll.OpenPoller(); err == nil {
 			lp := &loop{
-				idx:         i,
-				svr:         svr,
-				poller:      p,
-				packet:      make([]byte, 0xFFFF),
-				connections: make(map[int]*conn),
+				idx:          i,
+				svr:          svr,
+				codec:        svr.codec,
+				poller:       p,
+				packet:       make([]byte, 0xFFFF),
+				connections:  make(map[int]*conn),
+				eventHandler: svr.eventHandler,
 			}
 			_ = lp.poller.AddRead(svr.ln.fd)
 			svr.subLoopGroup.register(lp)
@@ -104,11 +104,13 @@ func (svr *server) activateReactors(numLoops int) error {
 	for i := 0; i < numLoops; i++ {
 		if p, err := netpoll.OpenPoller(); err == nil {
 			lp := &loop{
-				idx:         i,
-				svr:         svr,
-				poller:      p,
-				packet:      make([]byte, 0xFFFF),
-				connections: make(map[int]*conn),
+				idx:          i,
+				svr:          svr,
+				codec:        svr.codec,
+				poller:       p,
+				packet:       make([]byte, 0xFFFF),
+				connections:  make(map[int]*conn),
+				eventHandler: svr.eventHandler,
 			}
 			svr.subLoopGroup.register(lp)
 		} else {
@@ -198,9 +200,6 @@ func serve(eventHandler EventHandler, listener *listener, options *Options) erro
 	svr.subLoopGroup = new(eventLoopGroup)
 	svr.cond = sync.NewCond(&sync.Mutex{})
 	svr.ticktock = make(chan time.Duration, 1)
-	svr.bytesPool.New = func() interface{} {
-		return ringbuffer.New(socketRingBufferSize)
-	}
 	svr.codec = func() ICodec {
 		if options.Codec == nil {
 			return new(BuiltInFrameCodec)

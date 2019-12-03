@@ -16,11 +16,6 @@ import (
 	"github.com/panjf2000/gnet/netpoll"
 )
 
-const (
-	// socketRingBufferSize represents the initial size of connection ring-buffer.
-	socketRingBufferSize = 1024
-)
-
 // Action is an action that occurs after the completion of an event.
 type Action int
 

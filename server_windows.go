@@ -13,8 +13,6 @@ import (
 	"runtime"
 	"sync"
 	"time"
-
-	"github.com/panjf2000/gnet/ringbuffer"
 )
 
 // commandBufferSize represents the buffer size of event-loop command channel on Windows.
@@ -37,7 +35,6 @@ type server struct {
 	loops            []*loop            // all the loops
 	loopWG           sync.WaitGroup     // loop close WaitGroup
 	ticktock         chan time.Duration // ticker channel
-	bytesPool        sync.Pool          // pool for storing bytes
 	listenerWG       sync.WaitGroup     // listener close WaitGroup
 	eventHandler     EventHandler       // user eventHandler
 	subLoopGroup     IEventLoopGroup    // loops for handling events
@@ -74,10 +71,12 @@ func (svr *server) startListener() {
 func (svr *server) startLoops(numLoops int) {
 	for i := 0; i < numLoops; i++ {
 		lp := &loop{
-			ch:          make(chan interface{}, commandBufferSize),
-			idx:         i,
-			svr:         svr,
-			connections: make(map[*stdConn]bool),
+			ch:           make(chan interface{}, commandBufferSize),
+			idx:          i,
+			svr:          svr,
+			codec:        svr.codec,
+			connections:  make(map[*stdConn]bool),
+			eventHandler: svr.eventHandler,
 		}
 		svr.subLoopGroup.register(lp)
 	}
@@ -132,9 +131,6 @@ func serve(eventHandler EventHandler, listener *listener, options *Options) (err
 	svr.subLoopGroup = new(eventLoopGroup)
 	svr.ticktock = make(chan time.Duration, 1)
 	svr.cond = sync.NewCond(&sync.Mutex{})
-	svr.bytesPool.New = func() interface{} {
-		return ringbuffer.New(socketRingBufferSize)
-	}
 	svr.codec = func() ICodec {
 		if options.Codec == nil {
 			return new(BuiltInFrameCodec)
