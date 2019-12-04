@@ -45,8 +45,8 @@ func main() {
 	var multicore bool
 
 	// Example command: go run echo.go --port 9000 --multicore true
-	flag.IntVar(&port, "port", 9000, "server port")
-	flag.BoolVar(&multicore, "multicore", true, "multicore")
+	flag.IntVar(&port, "port", 9000, "--port 9000")
+	flag.BoolVar(&multicore, "multicore", false, "--multicore true")
 	flag.Parse()
 	echo := new(echoServer)
 	log.Fatal(gnet.Serve(echo, fmt.Sprintf("tcp://:%d", port), gnet.WithMulticore(multicore)))
