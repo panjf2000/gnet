@@ -180,7 +180,7 @@ func (c *stdConn) BufferLength() int {
 }
 
 func (c *stdConn) AsyncWrite(buf []byte) {
-	if encodedBuf, err := c.codec.Encode(buf); err == nil {
+	if encodedBuf, err := c.codec.Encode(c, buf); err == nil {
 		c.loop.ch <- func() error {
 			_, _ = c.conn.Write(encodedBuf)
 			pool.PutBytes(buf)

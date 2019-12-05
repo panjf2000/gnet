@@ -210,7 +210,7 @@ func (c *conn) BufferLength() int {
 }
 
 func (c *conn) AsyncWrite(buf []byte) {
-	if encodedBuf, err := c.codec.Encode(buf); err == nil {
+	if encodedBuf, err := c.codec.Encode(c, buf); err == nil {
 		_ = c.loop.poller.Trigger(func() error {
 			if c.opened {
 				c.write(encodedBuf)

@@ -261,7 +261,7 @@ func startCodecClient(network, addr string, multicore, async bool, codec ICodec)
 	start := time.Now()
 	for time.Since(start) < duration {
 		data := []byte("Hello, World")
-		encodedData, _ := codec.Encode(data)
+		encodedData, _ := codec.Encode(nil, data)
 		if _, err := c.Write(encodedData); err != nil {
 			panic(err)
 		}

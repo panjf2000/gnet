@@ -26,7 +26,7 @@ func TestLengthFieldBasedFrameCodecWith1(t *testing.T) {
 	if _, err := rand.Read(data); err != nil {
 		panic(err)
 	}
-	out, _ := codec.Encode(data)
+	out, _ := codec.Encode(nil, data)
 	if string(out[1:]) != string(data) {
 		t.Fatalf("data don't match with big endian, raw data: %s, encoded data: %s\n", string(data), string(out))
 	}
@@ -37,7 +37,7 @@ func TestLengthFieldBasedFrameCodecWith1(t *testing.T) {
 	if _, err := rand.Read(data); err != nil {
 		panic(err)
 	}
-	out, _ = codec.Encode(data)
+	out, _ = codec.Encode(nil, data)
 	if string(out[1:]) != string(data) {
 		t.Fatalf("data don't match with little endian, raw data: %s, encoded data: %s\n", string(data), string(out))
 	}
@@ -63,7 +63,7 @@ func TestLengthFieldBasedFrameCodecWith2(t *testing.T) {
 	if _, err := rand.Read(data); err != nil {
 		panic(err)
 	}
-	out, _ := codec.Encode(data)
+	out, _ := codec.Encode(nil, data)
 	if string(out[2:]) != string(data) {
 		t.Fatalf("data don't match with big endian, raw data: %s, encoded data: %s\n", string(data), string(out))
 	}
@@ -76,7 +76,7 @@ func TestLengthFieldBasedFrameCodecWith2(t *testing.T) {
 	if _, err := rand.Read(data); err != nil {
 		panic(err)
 	}
-	out, _ = codec.Encode(data)
+	out, _ = codec.Encode(nil, data)
 	if string(out[2:]) != string(data) {
 		t.Fatalf("data don't match with little endian, raw data: %s, encoded data: %s\n", string(data), string(out))
 	}
@@ -102,7 +102,7 @@ func TestLengthFieldBasedFrameCodecWith3(t *testing.T) {
 	if _, err := rand.Read(data); err != nil {
 		panic(err)
 	}
-	out, _ := codec.Encode(data)
+	out, _ := codec.Encode(nil, data)
 	if string(out[3:]) != string(data) {
 		t.Fatalf("data don't match with big endian, raw data: %s, encoded data: %s\n", string(data), string(out))
 	}
@@ -115,7 +115,7 @@ func TestLengthFieldBasedFrameCodecWith3(t *testing.T) {
 	if _, err := rand.Read(data); err != nil {
 		panic(err)
 	}
-	out, _ = codec.Encode(data)
+	out, _ = codec.Encode(nil, data)
 	if string(out[3:]) != string(data) {
 		t.Fatalf("data don't match with little endian, raw data: %s, encoded data: %s\n", string(data), string(out))
 	}
@@ -156,7 +156,7 @@ func TestLengthFieldBasedFrameCodecWith8(t *testing.T) {
 	if _, err := rand.Read(data); err != nil {
 		panic(err)
 	}
-	out, _ := codec.Encode(data)
+	out, _ := codec.Encode(nil, data)
 	if string(out[8:]) != string(data) {
 		t.Fatalf("data don't match with big endian, raw data: %s, encoded data: %s\n", string(data), string(out))
 	}
@@ -169,7 +169,7 @@ func TestLengthFieldBasedFrameCodecWith8(t *testing.T) {
 	if _, err := rand.Read(data); err != nil {
 		panic(err)
 	}
-	out, _ = codec.Encode(data)
+	out, _ = codec.Encode(nil, data)
 	if string(out[8:]) != string(data) {
 		t.Fatalf("data don't match with little endian, raw data: %s, encoded data: %s\n", string(data), string(out))
 	}

@@ -18,7 +18,7 @@ var CRLFByte = byte('\n')
 // ICodec is the interface of gnet codec.
 type ICodec interface {
 	// Encode encodes frames upon server responses into TCP stream.
-	Encode(buf []byte) ([]byte, error)
+	Encode(c Conn, buf []byte) ([]byte, error)
 	// Decode decodes frames from TCP stream via specific implementation.
 	Decode(c Conn) ([]byte, error)
 }
@@ -35,7 +35,7 @@ type BuiltInFrameCodec struct {
 }
 
 // Encode ...
-func (cc *BuiltInFrameCodec) Encode(buf []byte) ([]byte, error) {
+func (cc *BuiltInFrameCodec) Encode(c Conn, buf []byte) ([]byte, error) {
 	return buf, nil
 }
 
@@ -51,7 +51,7 @@ type LineBasedFrameCodec struct {
 }
 
 // Encode ...
-func (cc *LineBasedFrameCodec) Encode(buf []byte) ([]byte, error) {
+func (cc *LineBasedFrameCodec) Encode(c Conn, buf []byte) ([]byte, error) {
 	return append(buf, CRLFByte), nil
 }
 
@@ -77,7 +77,7 @@ func NewDelimiterBasedFrameCodec(delimiter byte) *DelimiterBasedFrameCodec {
 }
 
 // Encode ...
-func (cc *DelimiterBasedFrameCodec) Encode(buf []byte) ([]byte, error) {
+func (cc *DelimiterBasedFrameCodec) Encode(c Conn, buf []byte) ([]byte, error) {
 	return append(buf, cc.delimiter), nil
 }
 
@@ -103,7 +103,7 @@ func NewFixedLengthFrameCodec(frameLength int) *FixedLengthFrameCodec {
 }
 
 // Encode ...
-func (cc *FixedLengthFrameCodec) Encode(buf []byte) ([]byte, error) {
+func (cc *FixedLengthFrameCodec) Encode(c Conn, buf []byte) ([]byte, error) {
 	if len(buf)%cc.frameLength != 0 {
 		return nil, ErrInvalidFixedLength
 	}
@@ -165,7 +165,7 @@ type DecoderConfig = goframe.DecoderConfig
 //}
 
 // Encode ...
-func (cc *LengthFieldBasedFrameCodec) Encode(buf []byte) (out []byte, err error) {
+func (cc *LengthFieldBasedFrameCodec) Encode(c Conn, buf []byte) (out []byte, err error) {
 	length := len(buf) + cc.encoderConfig.LengthAdjustment
 	if cc.encoderConfig.LengthIncludesLengthFieldLength {
 		length += cc.encoderConfig.LengthFieldLength

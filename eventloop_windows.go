@@ -93,7 +93,7 @@ loopReact:
 	out, action := lp.eventHandler.React(c)
 	if out != nil {
 		lp.eventHandler.PreWrite()
-		if frame, err := lp.codec.Encode(out); err == nil {
+		if frame, err := lp.codec.Encode(c, out); err == nil {
 			_, _ = c.conn.Write(frame)
 		}
 		if len(c.cache) != 0 {

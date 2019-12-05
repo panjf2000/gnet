@@ -100,7 +100,7 @@ func (lp *loop) loopIn(c *conn) error {
 loopReact:
 	out, action := lp.eventHandler.React(c)
 	if out != nil {
-		if frame, err := lp.codec.Encode(out); err == nil {
+		if frame, err := lp.codec.Encode(c, out); err == nil {
 			c.write(frame)
 		}
 		if len(c.cache) != 0 {
