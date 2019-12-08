@@ -29,10 +29,10 @@ func (es *echoServer) React(c gnet.Conn) (out []byte, action gnet.Action) {
 
 	/*
 		// Echo asynchronously.
-		data := c.ReadFromUDP()
+		data := append([]byte{}, c.ReadFromUDP()...)
 		go func() {
 			time.Sleep(time.Second)
-			c.SendTo(append([]byte{}, data...))
+			c.SendTo(data)
 		}()
 		return
 	*/

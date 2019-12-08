@@ -223,11 +223,11 @@ func (es *echoServer) React(c gnet.Conn) (out []byte, action gnet.Action) {
 
 	/*
 		// Echo asynchronously.
-		data := c.Read()
+		data := append([]byte{}, c.Read()...)
 		c.ResetBuffer()
 		go func() {
 			time.Sleep(time.Second)
-			c.AsyncWrite(append([]byte{}, data...))
+			c.AsyncWrite(data)
 		}()
 		return
 	*/
@@ -277,10 +277,10 @@ func (es *echoServer) React(c gnet.Conn) (out []byte, action gnet.Action) {
 
 	/*
 		// Echo asynchronously.
-		data := c.ReadFromUDP()
+		data := append([]byte{}, c.ReadFromUDP()...)
 		go func() {
 			time.Sleep(time.Second)
-			c.SendTo(append([]byte{}, data...))
+			c.SendTo(data)
 		}()
 		return
 	*/

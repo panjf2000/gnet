@@ -30,11 +30,11 @@ func (es *echoServer) React(c gnet.Conn) (out []byte, action gnet.Action) {
 
 	/*
 		// Echo asynchronously.
-		data := c.Read()
+		data := append([]byte{}, c.Read()...)
 		c.ResetBuffer()
 		go func() {
 			time.Sleep(time.Second)
-			c.AsyncWrite(append([]byte{}, data...))
+			c.AsyncWrite(data)
 		}()
 		return
 	*/
