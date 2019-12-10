@@ -39,7 +39,7 @@ func Get() *RingBuffer {
 	return pool.Get().(*RingBuffer)
 }
 
-// Put put ring-buffer back into pool.
+// Put puts ring-buffer back into pool.
 func Put(rb *RingBuffer) {
 	pool.Put(rb)
 }
