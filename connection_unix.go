@@ -10,8 +10,9 @@ package gnet
 import (
 	"net"
 
-	"github.com/panjf2000/gnet/netpoll"
-	"github.com/panjf2000/gnet/pool"
+	"github.com/panjf2000/gnet/internal/netpoll"
+	"github.com/panjf2000/gnet/pool/bytes"
+	prb "github.com/panjf2000/gnet/pool/ringbuffer"
 	"github.com/panjf2000/gnet/ringbuffer"
 	"golang.org/x/sys/unix"
 )
@@ -37,8 +38,8 @@ func newTCPConn(fd int, lp *loop, sa unix.Sockaddr) *conn {
 		sa:             sa,
 		loop:           lp,
 		codec:          lp.codec,
-		inboundBuffer:  ringbuffer.Get(),
-		outboundBuffer: ringbuffer.Get(),
+		inboundBuffer:  prb.Get(),
+		outboundBuffer: prb.Get(),
 	}
 }
 
@@ -49,10 +50,8 @@ func (c *conn) releaseTCP() {
 	c.cache = nil
 	c.localAddr = nil
 	c.remoteAddr = nil
-	c.inboundBuffer.Reset()
-	c.outboundBuffer.Reset()
-	ringbuffer.Put(c.inboundBuffer)
-	ringbuffer.Put(c.outboundBuffer)
+	prb.Put(c.inboundBuffer)
+	prb.Put(c.outboundBuffer)
 	c.inboundBuffer = nil
 	c.outboundBuffer = nil
 }
@@ -214,7 +213,7 @@ func (c *conn) AsyncWrite(buf []byte) {
 		_ = c.loop.poller.Trigger(func() error {
 			if c.opened {
 				c.write(encodedBuf)
-				pool.PutBytes(buf)
+				bytes.Put(buf)
 			}
 			return nil
 		})

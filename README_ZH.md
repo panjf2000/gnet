@@ -154,12 +154,12 @@ import (
 	"time"
 
 	"github.com/panjf2000/gnet"
-	"github.com/panjf2000/gnet/pool"
+	"github.com/panjf2000/gnet/pool/goroutine"
 )
 
 type echoServer struct {
 	*gnet.EventServer
-	pool *pool.WorkerPool
+	pool *goroutine.Pool
 }
 
 func (es *echoServer) React(c gnet.Conn) (out []byte, action gnet.Action) {
@@ -176,7 +176,7 @@ func (es *echoServer) React(c gnet.Conn) (out []byte, action gnet.Action) {
 }
 
 func main() {
-	p := pool.NewWorkerPool()
+	p := goroutine.Default()
 	defer p.Release()
 	
 	echo := &echoServer{pool: p}
@@ -643,7 +643,7 @@ import (
 	"time"
 
 	"github.com/panjf2000/gnet"
-	"github.com/panjf2000/gnet/pool"
+	"github.com/panjf2000/gnet/pool/goroutine"
 )
 
 type codecServer struct {
@@ -652,7 +652,7 @@ type codecServer struct {
 	multicore  bool
 	async      bool
 	codec      gnet.ICodec
-	workerPool *pool.WorkerPool
+	workerPool *goroutine.Pool
 }
 
 func (cs *codecServer) OnInitComplete(srv gnet.Server) (action gnet.Action) {
@@ -691,7 +691,7 @@ func testCodecServe(addr string, multicore, async bool, codec gnet.ICodec) {
 		}
 		codec = gnet.NewLengthFieldBasedFrameCodec(encoderConfig, decoderConfig)
 	}
-	cs := &codecServer{addr: addr, multicore: multicore, async: async, codec: codec, workerPool: pool.NewWorkerPool()}
+	cs := &codecServer{addr: addr, multicore: multicore, async: async, codec: codec, workerPool: goroutine.Default()}
 	err = gnet.Serve(cs, addr, gnet.WithMulticore(multicore), gnet.WithTCPKeepAlive(time.Minute*5), gnet.WithCodec(codec))
 	if err != nil {
 		panic(err)

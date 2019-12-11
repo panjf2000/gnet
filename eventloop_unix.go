@@ -11,7 +11,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/panjf2000/gnet/netpoll"
+	"github.com/panjf2000/gnet/internal/netpoll"
 	"golang.org/x/sys/unix"
 )
 

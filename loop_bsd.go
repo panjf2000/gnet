@@ -7,7 +7,7 @@
 package gnet
 
 import (
-	"github.com/panjf2000/gnet/netpoll"
+	"github.com/panjf2000/gnet/internal/netpoll"
 )
 
 func (lp *loop) handleEvent(fd int, filter int16) error {

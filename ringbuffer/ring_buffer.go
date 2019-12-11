@@ -8,41 +8,14 @@ package ringbuffer
 
 import (
 	"errors"
-	"sync"
 	"unsafe"
 
 	"github.com/gobwas/pool/pbytes"
 	"github.com/panjf2000/gnet/internal"
 )
 
-const (
-	// defaultRingBufferSize represents the initial size of connection ring-buffer.
-	defaultRingBufferSize = 1 << 12
-)
-
-var (
-	// pool for caching ring-buffers.
-	pool sync.Pool
-	// ErrIsEmpty will be returned when trying to read a empty ring-buffer.
-	ErrIsEmpty error
-)
-
-func init() {
-	ErrIsEmpty = errors.New("ring-buffer is empty")
-	pool.New = func() interface{} {
-		return New(defaultRingBufferSize)
-	}
-}
-
-// Get gets ring-buffer from pool.
-func Get() *RingBuffer {
-	return pool.Get().(*RingBuffer)
-}
-
-// Put puts ring-buffer back into pool.
-func Put(rb *RingBuffer) {
-	pool.Put(rb)
-}
+// ErrIsEmpty will be returned when trying to read a empty ring-buffer.
+var ErrIsEmpty = errors.New("ring-buffer is empty")
 
 // RingBuffer is a circular buffer that implement io.ReaderWriter interface.
 type RingBuffer struct {
@@ -375,11 +348,6 @@ func (r *RingBuffer) WithBytes(b []byte) []byte {
 	copy(buf[n:], b)
 
 	return buf[:n+bn]
-}
-
-// Recycle recycles slice of bytes.
-func Recycle(p []byte) {
-	pbytes.Put(p)
 }
 
 // IsFull returns this ringbuffer is full.

@@ -10,14 +10,14 @@ package gnet
 import (
 	"time"
 
-	"github.com/panjf2000/gnet/pool"
+	"github.com/panjf2000/gnet/pool/bytes"
 )
 
 func (svr *server) listenerRun() {
 	var err error
 	defer func() { svr.signalShutdown(err) }()
 	var packet [0xFFFF]byte
-	bytesPool := pool.NewBytesPool()
+	bytesPool := bytes.Default()
 	for {
 		if svr.ln.pconn != nil {
 			// Read data from UDP socket.

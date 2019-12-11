@@ -10,7 +10,8 @@ package gnet
 import (
 	"net"
 
-	"github.com/panjf2000/gnet/pool"
+	"github.com/panjf2000/gnet/pool/bytes"
+	prb "github.com/panjf2000/gnet/pool/ringbuffer"
 	"github.com/panjf2000/gnet/ringbuffer"
 )
 
@@ -49,7 +50,7 @@ func newTCPConn(conn net.Conn, lp *loop) *stdConn {
 		conn:          conn,
 		loop:          lp,
 		codec:         lp.codec,
-		inboundBuffer: ringbuffer.Get(),
+		inboundBuffer: prb.Get(),
 	}
 }
 
@@ -57,10 +58,9 @@ func (c *stdConn) releaseTCP() {
 	c.ctx = nil
 	c.localAddr = nil
 	c.remoteAddr = nil
-	c.inboundBuffer.Reset()
-	ringbuffer.Put(c.inboundBuffer)
+	prb.Put(c.inboundBuffer)
 	c.inboundBuffer = nil
-	pool.PutBytes(c.cache)
+	bytes.Put(c.cache)
 	c.cache = nil
 }
 
@@ -77,7 +77,7 @@ func (c *stdConn) releaseUDP() {
 	c.ctx = nil
 	c.localAddr = nil
 	c.remoteAddr = nil
-	pool.PutBytes(c.cache)
+	bytes.Put(c.cache)
 	c.cache = nil
 }
 
@@ -183,7 +183,7 @@ func (c *stdConn) AsyncWrite(buf []byte) {
 	if encodedBuf, err := c.codec.Encode(c, buf); err == nil {
 		c.loop.ch <- func() error {
 			_, _ = c.conn.Write(encodedBuf)
-			pool.PutBytes(buf)
+			bytes.Put(buf)
 			return nil
 		}
 	}

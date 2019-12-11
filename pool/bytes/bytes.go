@@ -2,7 +2,7 @@
 // Use of this source code is governed by an MIT-style
 // license that can be found in the LICENSE file.
 
-package pool
+package bytes
 
 import "github.com/gobwas/pool/pbytes"
 
@@ -14,16 +14,16 @@ import "github.com/gobwas/pool/pbytes"
 //	Upper = 64 * 1024
 //)
 
-// BytesPool is the alias of pbytes.Pool.
-type BytesPool = pbytes.Pool
+// Pool is the alias of pbytes.Pool.
+type Pool = pbytes.Pool
 
-// PutBytes put bytes back to pool.
-func PutBytes(buf []byte) {
+// Put puts bytes back to pool.
+func Put(buf []byte) {
 	pbytes.Put(buf)
 }
 
-// NewBytesPool instantiates a *BytesPool that reuses slices which size is in logarithmic range [Lower, Upper].
-func NewBytesPool() *BytesPool {
-	//return pbytes.New(Lower, Upper)
+// Default instantiates a *BytesPool that reuses slices which size is in logarithmic range [Lower, Upper].
+func Default() *Pool {
+	//return pbytes.Default(Lower, Upper)
 	return pbytes.DefaultPool
 }

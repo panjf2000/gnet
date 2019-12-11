@@ -17,7 +17,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/panjf2000/gnet/pool"
+	"github.com/panjf2000/gnet/pool/bytes"
+	"github.com/panjf2000/gnet/pool/goroutine"
 )
 
 func TestCodecServe(t *testing.T) {
@@ -148,7 +149,7 @@ type testCodecServer struct {
 	connected    int32
 	disconnected int32
 	codec        ICodec
-	workerPool   *pool.WorkerPool
+	workerPool   *goroutine.Pool
 }
 
 func (s *testCodecServer) OnOpened(c Conn) (out []byte, action Action) {
@@ -185,7 +186,7 @@ func (s *testCodecServer) React(c Conn) (out []byte, action Action) {
 		return
 	}
 	out = c.ReadFrame()
-	pool.PutBytes(out)
+	bytes.Put(out)
 	return
 }
 func (s *testCodecServer) Tick() (delay time.Duration, action Action) {
@@ -229,7 +230,7 @@ func testCodecServe(network, addr string, multicore, async bool, nclients int, r
 	if n > 4 {
 		n = 0
 	}
-	ts := &testCodecServer{network: network, addr: addr, multicore: multicore, async: async, nclients: nclients, codec: codec, workerPool: pool.NewWorkerPool()}
+	ts := &testCodecServer{network: network, addr: addr, multicore: multicore, async: async, nclients: nclients, codec: codec, workerPool: goroutine.Default()}
 	if reuseport {
 		err = Serve(ts, network+"://"+addr, WithMulticore(multicore), WithTicker(true),
 			WithTCPKeepAlive(time.Minute*5), WithCodec(codec), WithReusePort(true))
@@ -356,8 +357,8 @@ type testServer struct {
 	connected    int32
 	clientActive int32
 	disconnected int32
-	bytesPool    *pool.BytesPool
-	workerPool   *pool.WorkerPool
+	bytesPool    *bytes.Pool
+	workerPool   *goroutine.Pool
 	bytesList    [][]byte
 }
 
@@ -398,7 +399,7 @@ func (s *testServer) React(c Conn) (out []byte, action Action) {
 			buf := s.bytesPool.GetLen(bufLen)
 			data := c.Read()
 			copy(buf, data)
-			pool.PutBytes(data)
+			bytes.Put(data)
 			s.bytesList = append(s.bytesList, buf)
 			// just for test
 			c.ShiftN(bufLen - 1)
@@ -426,7 +427,7 @@ func (s *testServer) React(c Conn) (out []byte, action Action) {
 			n, data := c.ReadN(readSize)
 			if n == readSize {
 				out = data
-				pool.PutBytes(data)
+				bytes.Put(data)
 			}
 			return
 		}
@@ -470,7 +471,7 @@ func (s *testServer) Tick() (delay time.Duration, action Action) {
 func testServe(network, addr string, reuseport, multicore, async bool, nclients int) {
 	var err error
 	ts := &testServer{network: network, addr: addr, multicore: multicore, async: async, nclients: nclients,
-		bytesPool: pool.NewBytesPool(), workerPool: pool.NewWorkerPool()}
+		bytesPool: bytes.Default(), workerPool: goroutine.Default()}
 	if network == "unix" {
 		_ = os.RemoveAll(addr)
 		defer os.RemoveAll(addr)
