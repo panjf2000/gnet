@@ -291,13 +291,13 @@ func (r *RingBuffer) Bytes() []byte {
 	} else if r.r == r.w {
 		buf := pbytes.GetLen(r.size)
 		copy(buf, r.buf)
-		return buf[:r.size]
+		return buf
 	}
 
 	if r.w > r.r {
 		buf := pbytes.GetLen(r.w - r.r)
 		copy(buf, r.buf[r.r:r.w])
-		return buf[:r.w-r.r]
+		return buf
 	}
 
 	n := r.size - r.r + r.w
@@ -312,7 +312,7 @@ func (r *RingBuffer) Bytes() []byte {
 		copy(buf[c1:], r.buf[0:c2])
 	}
 
-	return buf[:n]
+	return buf
 }
 
 // WithBytes combines the available read bytes and the given bytes. It does not move the read pointer and only copy the available data.
@@ -324,14 +324,14 @@ func (r *RingBuffer) WithBytes(b []byte) []byte {
 		buf := pbytes.GetLen(r.size + bn)
 		copy(buf, r.buf)
 		copy(buf[r.size:], b)
-		return buf[:r.size+bn]
+		return buf
 	}
 
 	if r.w > r.r {
 		buf := pbytes.GetLen(r.w - r.r + bn)
 		copy(buf, r.buf[r.r:r.w])
 		copy(buf[r.w-r.r:], b)
-		return buf[:r.w-r.r+bn]
+		return buf
 	}
 
 	n := r.size - r.r + r.w
@@ -347,7 +347,7 @@ func (r *RingBuffer) WithBytes(b []byte) []byte {
 	}
 	copy(buf[n:], b)
 
-	return buf[:n+bn]
+	return buf
 }
 
 // IsFull returns this ringbuffer is full.
@@ -369,8 +369,8 @@ func (r *RingBuffer) Reset() {
 
 func (r *RingBuffer) malloc(cap int) {
 	newCap := internal.CeilToPowerOfTwo(r.size + cap)
-	//newBuf := pbytes.GetLen(newCap)
 	newBuf := make([]byte, newCap)
+	//newBuf := pbytes.GetLen(r.size + cap)
 	oldLen := r.Length()
 	_, _ = r.Read(newBuf)
 	r.r = 0
