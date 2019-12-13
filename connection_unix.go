@@ -123,6 +123,9 @@ func (c *conn) ReadFromUDP() []byte {
 
 func (c *conn) ReadFrame() []byte {
 	buf, _ := c.codec.Decode(c)
+	if buf == nil {
+		c.action = Flow
+	}
 	return buf
 }
 
@@ -130,11 +133,14 @@ func (c *conn) Read() []byte {
 	if c.inboundBuffer.IsEmpty() {
 		return c.cache
 	}
-	c.byteBuffer = c.inboundBuffer.WithByteBuffer(c.cache)
+	if c.byteBuffer == nil {
+		c.byteBuffer = c.inboundBuffer.WithByteBuffer(c.cache)
+	}
 	return c.byteBuffer.Bytes()
 }
 
 func (c *conn) ResetBuffer() {
+	c.action = Flow
 	c.cache = c.cache[:0]
 	c.inboundBuffer.Reset()
 	if c.byteBuffer != nil {
@@ -144,10 +150,6 @@ func (c *conn) ResetBuffer() {
 }
 
 func (c *conn) ShiftN(n int) (size int) {
-	if c.byteBuffer != nil {
-		bytes.Put(c.byteBuffer)
-		c.byteBuffer = nil
-	}
 	oneOffBufferLen := len(c.cache)
 	inBufferLen := c.inboundBuffer.Length()
 	if inBufferLen+oneOffBufferLen < n || n <= 0 {
@@ -162,6 +164,12 @@ func (c *conn) ShiftN(n int) (size int) {
 			c.cache = c.cache[n:]
 		}
 		return
+	}
+	c.byteBuffer.B = c.byteBuffer.B[n:]
+	if c.byteBuffer.Len() == 0 {
+		c.action = Flow
+		bytes.Put(c.byteBuffer)
+		c.byteBuffer = nil
 	}
 	if inBufferLen >= n {
 		c.inboundBuffer.Shift(n)
@@ -182,6 +190,7 @@ func (c *conn) ReadN(n int) (size int, buf []byte) {
 	oneOffBufferLen := len(c.cache)
 	inBufferLen := c.inboundBuffer.Length()
 	if inBufferLen+oneOffBufferLen < n || n <= 0 {
+		c.action = Flow
 		return
 	}
 	size = n
@@ -208,6 +217,7 @@ func (c *conn) ReadN(n int) (size int, buf []byte) {
 	buf = append(buf, c.cache[:restSize]...)
 	if restSize == oneOffBufferLen {
 		c.cache = c.cache[:0]
+		c.action = Flow
 	} else {
 		c.cache = c.cache[restSize:]
 	}

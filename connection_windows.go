@@ -40,8 +40,10 @@ type stdConn struct {
 	done          int32                  // 0: attached, 1: closed
 	cache         *bytes.ByteBuffer      // reuse memory of inbound data
 	codec         ICodec                 // codec for TCP
+	action        Action                 // next user action
 	localAddr     net.Addr               // local server addr
 	remoteAddr    net.Addr               // remote peer addr
+	byteBuffer    *bytes.ByteBuffer      // bytes buffer for buffering current packet and data in ring-buffer
 	inboundBuffer *ringbuffer.RingBuffer // buffer for data from client
 }
 
@@ -93,6 +95,9 @@ func (c *stdConn) ReadFromUDP() []byte {
 
 func (c *stdConn) ReadFrame() []byte {
 	buf, _ := c.codec.Decode(c)
+	if buf == nil {
+		c.action = Flow
+	}
 	return buf
 }
 
@@ -100,12 +105,20 @@ func (c *stdConn) Read() []byte {
 	if c.inboundBuffer.IsEmpty() {
 		return c.cache.Bytes()
 	}
-	return c.inboundBuffer.WithBytes(c.cache.Bytes())
+	if c.byteBuffer == nil {
+		c.inboundBuffer.WithByteBuffer(c.cache.Bytes())
+	}
+	return c.byteBuffer.Bytes()
 }
 
 func (c *stdConn) ResetBuffer() {
+	c.action = Flow
 	c.cache.Reset()
 	c.inboundBuffer.Reset()
+	if c.byteBuffer != nil {
+		bytes.Put(c.byteBuffer)
+		c.byteBuffer = nil
+	}
 }
 
 func (c *stdConn) ShiftN(n int) (size int) {
@@ -123,6 +136,12 @@ func (c *stdConn) ShiftN(n int) (size int) {
 			c.cache.B = c.cache.B[n:]
 		}
 		return
+	}
+	c.byteBuffer.B = c.byteBuffer.B[n:]
+	if c.byteBuffer.Len() == 0 {
+		c.action = Flow
+		bytes.Put(c.byteBuffer)
+		c.byteBuffer = nil
 	}
 	if inBufferLen >= n {
 		c.inboundBuffer.Shift(n)
@@ -143,6 +162,7 @@ func (c *stdConn) ReadN(n int) (size int, buf []byte) {
 	oneOffBufferLen := c.cache.Len()
 	inBufferLen := c.inboundBuffer.Length()
 	if inBufferLen+oneOffBufferLen < n || n <= 0 {
+		c.action = Flow
 		return
 	}
 	size = n
@@ -169,6 +189,7 @@ func (c *stdConn) ReadN(n int) (size int, buf []byte) {
 	buf = append(buf, c.cache.B[:restSize]...)
 	if restSize == oneOffBufferLen {
 		c.cache.Reset()
+		c.action = Flow
 	} else {
 		c.cache.B = c.cache.B[restSize:]
 	}

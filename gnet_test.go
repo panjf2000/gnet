@@ -38,7 +38,7 @@ func TestCodecServe(t *testing.T) {
 				testCodecServe("tcp", ":9992", false, false, 10, false, NewDelimiterBasedFrameCodec('|'))
 			})
 			t.Run("1-loop-FixedLengthFrameCodec", func(t *testing.T) {
-				testCodecServe("tcp", ":9993", false, false, 10, false, NewFixedLengthFrameCodec(12))
+				testCodecServe("tcp", ":9993", false, false, 10, false, NewFixedLengthFrameCodec(64))
 			})
 			t.Run("1-loop-LengthFieldBasedFrameCodec", func(t *testing.T) {
 				testCodecServe("tcp", ":9994", false, false, 10, false, nil)
@@ -50,7 +50,7 @@ func TestCodecServe(t *testing.T) {
 				testCodecServe("tcp", ":9996", true, false, 10, false, NewDelimiterBasedFrameCodec('|'))
 			})
 			t.Run("N-loop-FixedLengthFrameCodec", func(t *testing.T) {
-				testCodecServe("tcp", ":9997", true, false, 10, false, NewFixedLengthFrameCodec(12))
+				testCodecServe("tcp", ":9997", true, false, 10, false, NewFixedLengthFrameCodec(64))
 			})
 			t.Run("N-loop-LengthFieldBasedFrameCodec", func(t *testing.T) {
 				testCodecServe("tcp", ":9998", true, false, 10, false, nil)
@@ -64,7 +64,7 @@ func TestCodecServe(t *testing.T) {
 				testCodecServe("tcp", ":9992", false, true, 10, false, NewDelimiterBasedFrameCodec('|'))
 			})
 			t.Run("1-loop-FixedLengthFrameCodec", func(t *testing.T) {
-				testCodecServe("tcp", ":9993", false, true, 10, false, NewFixedLengthFrameCodec(12))
+				testCodecServe("tcp", ":9993", false, true, 10, false, NewFixedLengthFrameCodec(64))
 			})
 			t.Run("1-loop-LengthFieldBasedFrameCodec", func(t *testing.T) {
 				testCodecServe("tcp", ":9994", false, true, 10, false, nil)
@@ -76,7 +76,7 @@ func TestCodecServe(t *testing.T) {
 				testCodecServe("tcp", ":9996", true, true, 10, false, NewDelimiterBasedFrameCodec('|'))
 			})
 			t.Run("N-loop-FixedLengthFrameCodec", func(t *testing.T) {
-				testCodecServe("tcp", ":9997", true, true, 10, false, NewFixedLengthFrameCodec(12))
+				testCodecServe("tcp", ":9997", true, true, 10, false, NewFixedLengthFrameCodec(64))
 			})
 			t.Run("N-loop-LengthFieldBasedFrameCodec", func(t *testing.T) {
 				testCodecServe("tcp", ":9998", true, true, 10, false, nil)
@@ -92,7 +92,7 @@ func TestCodecServe(t *testing.T) {
 				testCodecServe("tcp", ":9992", false, false, 10, true, NewDelimiterBasedFrameCodec('|'))
 			})
 			t.Run("1-loop-FixedLengthFrameCodec", func(t *testing.T) {
-				testCodecServe("tcp", ":9993", false, false, 10, true, NewFixedLengthFrameCodec(12))
+				testCodecServe("tcp", ":9993", false, false, 10, true, NewFixedLengthFrameCodec(64))
 			})
 			t.Run("1-loop-LengthFieldBasedFrameCodec", func(t *testing.T) {
 				testCodecServe("tcp", ":9994", false, false, 10, true, nil)
@@ -104,7 +104,7 @@ func TestCodecServe(t *testing.T) {
 				testCodecServe("tcp", ":9996", true, false, 10, true, NewDelimiterBasedFrameCodec('|'))
 			})
 			t.Run("N-loop-FixedLengthFrameCodec", func(t *testing.T) {
-				testCodecServe("tcp", ":9997", true, false, 10, true, NewFixedLengthFrameCodec(12))
+				testCodecServe("tcp", ":9997", true, false, 10, true, NewFixedLengthFrameCodec(64))
 			})
 			t.Run("N-loop-LengthFieldBasedFrameCodec", func(t *testing.T) {
 				testCodecServe("tcp", ":9998", true, false, 10, true, nil)
@@ -118,7 +118,7 @@ func TestCodecServe(t *testing.T) {
 				testCodecServe("tcp", ":9992", false, true, 10, true, NewDelimiterBasedFrameCodec('|'))
 			})
 			t.Run("1-loop-FixedLengthFrameCodec", func(t *testing.T) {
-				testCodecServe("tcp", ":9993", false, true, 10, true, NewFixedLengthFrameCodec(12))
+				testCodecServe("tcp", ":9993", false, true, 10, true, NewFixedLengthFrameCodec(64))
 			})
 			t.Run("1-loop-LengthFieldBasedFrameCodec", func(t *testing.T) {
 				testCodecServe("tcp", ":9994", false, true, 10, true, nil)
@@ -130,7 +130,7 @@ func TestCodecServe(t *testing.T) {
 				testCodecServe("tcp", ":9996", true, true, 10, true, NewDelimiterBasedFrameCodec('|'))
 			})
 			t.Run("N-loop-FixedLengthFrameCodec", func(t *testing.T) {
-				testCodecServe("tcp", ":9997", true, true, 10, true, NewFixedLengthFrameCodec(12))
+				testCodecServe("tcp", ":9997", true, true, 10, true, NewFixedLengthFrameCodec(64))
 			})
 			t.Run("N-loop-LengthFieldBasedFrameCodec", func(t *testing.T) {
 				testCodecServe("tcp", ":9998", true, true, 10, true, nil)
@@ -180,10 +180,12 @@ func (s *testCodecServer) OnClosed(c Conn, err error) (action Action) {
 }
 func (s *testCodecServer) React(c Conn) (out []byte, action Action) {
 	if s.async {
-		data := append([]byte{}, c.ReadFrame()...)
-		_ = s.workerPool.Submit(func() {
-			c.AsyncWrite(data)
-		})
+		if frame := c.ReadFrame(); frame != nil {
+			data := append([]byte{}, frame...)
+			_ = s.workerPool.Submit(func() {
+				c.AsyncWrite(data)
+			})
+		}
 		return
 	}
 	out = c.ReadFrame()
@@ -261,7 +263,9 @@ func startCodecClient(network, addr string, multicore, async bool, codec ICodec)
 	duration := time.Duration((rand.Float64()*2+1)*float64(time.Second)) / 8
 	start := time.Now()
 	for time.Since(start) < duration {
-		data := []byte("Hello, World")
+		//data := []byte("Hello, World")
+		data := make([]byte, 1024)
+		rand.Read(data)
 		encodedData, _ := codec.Encode(nil, data)
 		if _, err := c.Write(encodedData); err != nil {
 			panic(err)

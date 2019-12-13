@@ -103,9 +103,11 @@ loopReact:
 		if frame, err := lp.codec.Encode(c, out); err == nil {
 			c.write(frame)
 		}
-		if len(c.cache) != 0 {
-			goto loopReact
-		}
+	}
+	switch c.action {
+	case None:
+		goto loopReact
+	default:
 	}
 	_, _ = c.inboundBuffer.Write(c.cache)
 

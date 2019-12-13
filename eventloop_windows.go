@@ -13,6 +13,8 @@ import (
 	"net"
 	"sync/atomic"
 	"time"
+
+	"github.com/panjf2000/gnet/pool/bytes"
 )
 
 type loop struct {
@@ -96,17 +98,21 @@ loopReact:
 		if frame, err := lp.codec.Encode(c, out); err == nil {
 			_, _ = c.conn.Write(frame)
 		}
-		if c.cache.Len() != 0 {
-			goto loopReact
-		}
+	}
+	switch c.action {
+	case None:
+		goto loopReact
+	default:
 	}
 	_, _ = c.inboundBuffer.Write(c.cache.Bytes())
+	bytes.Put(c.cache)
 	switch action {
 	case Shutdown:
 		return errClosing
 	case Close:
 		return lp.loopClose(c)
 	}
+	c.action = action
 	return nil
 }
 
