@@ -96,11 +96,11 @@ loopReact:
 		if frame, err := lp.codec.Encode(c, out); err == nil {
 			_, _ = c.conn.Write(frame)
 		}
-		if len(c.cache) != 0 {
+		if c.cache.Len() != 0 {
 			goto loopReact
 		}
 	}
-	_, _ = c.inboundBuffer.Write(c.cache)
+	_, _ = c.inboundBuffer.Write(c.cache.Bytes())
 	switch action {
 	case Shutdown:
 		return errClosing

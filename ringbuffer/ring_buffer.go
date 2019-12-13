@@ -254,6 +254,7 @@ func (r *RingBuffer) Length() int {
 	return r.size - r.r + r.w
 }
 
+// Len returns the length of the underlying buffer.
 func (r *RingBuffer) Len() int {
 	return len(r.buf)
 }

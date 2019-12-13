@@ -17,7 +17,6 @@ func (svr *server) listenerRun() {
 	var err error
 	defer func() { svr.signalShutdown(err) }()
 	var packet [0xFFFF]byte
-	bytesPool := bytes.Default()
 	for {
 		if svr.ln.pconn != nil {
 			// Read data from UDP socket.
@@ -26,11 +25,11 @@ func (svr *server) listenerRun() {
 				err = e
 				return
 			}
-			buf := bytesPool.GetLen(n)
-			copy(buf, packet[:n])
+			buf := bytes.Get()
+			_, _ = buf.Write(packet[:n])
 
 			lp := svr.subLoopGroup.next()
-			lp.ch <- &udpIn{newUDPConn(lp, svr.ln.lnaddr, addr, buf[:n])}
+			lp.ch <- &udpIn{newUDPConn(lp, svr.ln.lnaddr, addr, buf)}
 		} else {
 			// Accept TCP socket.
 			conn, e := svr.ln.ln.Accept()
@@ -50,9 +49,9 @@ func (svr *server) listenerRun() {
 						lp.ch <- &stderr{c, err}
 						return
 					}
-					buf := bytesPool.GetLen(n)
-					copy(buf, packet[:n])
-					lp.ch <- &tcpIn{c, buf[:n]}
+					buf := bytes.Get()
+					_, _ = buf.Write(packet[:n])
+					lp.ch <- &tcpIn{c, buf}
 				}
 			}()
 		}

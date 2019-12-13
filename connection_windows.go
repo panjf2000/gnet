@@ -10,6 +10,7 @@ package gnet
 import (
 	"net"
 
+	"github.com/panjf2000/gnet/pool/bytes"
 	prb "github.com/panjf2000/gnet/pool/ringbuffer"
 	"github.com/panjf2000/gnet/ringbuffer"
 )
@@ -25,7 +26,7 @@ type wakeReq struct {
 
 type tcpIn struct {
 	c  *stdConn
-	in []byte
+	in *bytes.ByteBuffer
 }
 
 type udpIn struct {
@@ -37,7 +38,7 @@ type stdConn struct {
 	conn          net.Conn               // original connection
 	loop          *loop                  // owner loop
 	done          int32                  // 0: attached, 1: closed
-	cache         []byte                 // reuse memory of inbound data
+	cache         *bytes.ByteBuffer      // reuse memory of inbound data
 	codec         ICodec                 // codec for TCP
 	localAddr     net.Addr               // local server addr
 	remoteAddr    net.Addr               // remote peer addr
@@ -59,11 +60,13 @@ func (c *stdConn) releaseTCP() {
 	c.remoteAddr = nil
 	prb.Put(c.inboundBuffer)
 	c.inboundBuffer = nil
-	bytes.Put(c.cache)
-	c.cache = nil
+	if c.cache != nil {
+		bytes.Put(c.cache)
+		c.cache = nil
+	}
 }
 
-func newUDPConn(lp *loop, localAddr, remoteAddr net.Addr, buf []byte) *stdConn {
+func newUDPConn(lp *loop, localAddr, remoteAddr net.Addr, buf *bytes.ByteBuffer) *stdConn {
 	return &stdConn{
 		loop:       lp,
 		localAddr:  localAddr,
@@ -76,14 +79,16 @@ func (c *stdConn) releaseUDP() {
 	c.ctx = nil
 	c.localAddr = nil
 	c.remoteAddr = nil
-	bytes.Put(c.cache)
-	c.cache = nil
+	if c.cache != nil {
+		bytes.Put(c.cache)
+		c.cache = nil
+	}
 }
 
 // ================================= Public APIs of gnet.Conn =================================
 
 func (c *stdConn) ReadFromUDP() []byte {
-	return c.cache
+	return c.cache.Bytes()
 }
 
 func (c *stdConn) ReadFrame() []byte {
@@ -93,18 +98,18 @@ func (c *stdConn) ReadFrame() []byte {
 
 func (c *stdConn) Read() []byte {
 	if c.inboundBuffer.IsEmpty() {
-		return c.cache
+		return c.cache.Bytes()
 	}
-	return c.inboundBuffer.WithBytes(c.cache)
+	return c.inboundBuffer.WithBytes(c.cache.Bytes())
 }
 
 func (c *stdConn) ResetBuffer() {
-	c.cache = c.cache[:0]
+	c.cache.Reset()
 	c.inboundBuffer.Reset()
 }
 
 func (c *stdConn) ShiftN(n int) (size int) {
-	oneOffBufferLen := len(c.cache)
+	oneOffBufferLen := c.cache.Len()
 	inBufferLen := c.inboundBuffer.Length()
 	if inBufferLen+oneOffBufferLen < n || n <= 0 {
 		c.ResetBuffer()
@@ -113,9 +118,9 @@ func (c *stdConn) ShiftN(n int) (size int) {
 	size = n
 	if c.inboundBuffer.IsEmpty() {
 		if n == oneOffBufferLen {
-			c.cache = c.cache[:0]
+			c.cache.Reset()
 		} else {
-			c.cache = c.cache[n:]
+			c.cache.B = c.cache.B[n:]
 		}
 		return
 	}
@@ -127,26 +132,26 @@ func (c *stdConn) ShiftN(n int) (size int) {
 
 	restSize := n - inBufferLen
 	if restSize == oneOffBufferLen {
-		c.cache = c.cache[:0]
+		c.cache.Reset()
 	} else {
-		c.cache = c.cache[restSize:]
+		c.cache.B = c.cache.B[restSize:]
 	}
 	return
 }
 
 func (c *stdConn) ReadN(n int) (size int, buf []byte) {
-	oneOffBufferLen := len(c.cache)
+	oneOffBufferLen := c.cache.Len()
 	inBufferLen := c.inboundBuffer.Length()
 	if inBufferLen+oneOffBufferLen < n || n <= 0 {
 		return
 	}
 	size = n
 	if c.inboundBuffer.IsEmpty() {
-		buf = c.cache[:n]
+		buf = c.cache.B[:n]
 		if n == oneOffBufferLen {
-			c.cache = c.cache[:0]
+			c.cache.Reset()
 		} else {
-			c.cache = c.cache[n:]
+			c.cache.B = c.cache.B[n:]
 		}
 		return
 	}
@@ -161,11 +166,11 @@ func (c *stdConn) ReadN(n int) (size int, buf []byte) {
 	c.inboundBuffer.Reset()
 
 	restSize := n - inBufferLen
-	buf = append(buf, c.cache[:restSize]...)
+	buf = append(buf, c.cache.B[:restSize]...)
 	if restSize == oneOffBufferLen {
-		c.cache = c.cache[:0]
+		c.cache.Reset()
 	} else {
-		c.cache = c.cache[restSize:]
+		c.cache.B = c.cache.B[restSize:]
 	}
 	return
 }
@@ -175,7 +180,7 @@ func (c *stdConn) ReadN(n int) (size int, buf []byte) {
 //}
 
 func (c *stdConn) BufferLength() int {
-	return c.inboundBuffer.Length() + len(c.cache)
+	return c.inboundBuffer.Length() + c.cache.Len()
 }
 
 func (c *stdConn) AsyncWrite(buf []byte) {

@@ -6,8 +6,8 @@ package bytes
 
 import "github.com/valyala/bytebufferpool"
 
-// Pool is the alias of pbytes.Pool.
-type Pool = bytebufferpool.ByteBuffer
+// ByteBuffer is the alias of bytebufferpool.ByteBuffer.
+type ByteBuffer = bytebufferpool.ByteBuffer
 
 var (
 	// Get returns an empty byte buffer from the pool, exported from gnet/bytes.

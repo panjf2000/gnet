@@ -24,6 +24,7 @@ const (
 	maxPercentile           = 0.95
 )
 
+// RingBuffer is the alias of ringbuffer.RingBuffer
 type RingBuffer = ringbuffer.RingBuffer
 
 // Pool represents byte buffer pool.
@@ -42,6 +43,10 @@ type Pool struct {
 }
 
 var defaultPool Pool
+
+func init() {
+	defaultPool.defaultSize = 1 << 12
+}
 
 // Get returns an empty byte buffer from the pool.
 //
