@@ -11,6 +11,7 @@ import (
 	"unsafe"
 
 	"github.com/panjf2000/gnet/internal"
+	"github.com/panjf2000/gnet/pool/bytes"
 )
 
 // ErrIsEmpty will be returned when trying to read a empty ring-buffer.
@@ -312,44 +313,42 @@ func (r *RingBuffer) Bytes() []byte {
 		c1 := r.size - r.r
 		copy(buf, r.buf[r.r:r.size])
 		c2 := n - c1
-		copy(buf[c1:], r.buf[0:c2])
+		copy(buf[c1:], r.buf[:c2])
 	}
 
 	return buf
 }
 
-// WithBytes combines the available read bytes and the given bytes. It does not move the read pointer and only copy the available data.
-func (r *RingBuffer) WithBytes(b []byte) []byte {
-	bn := len(b)
+// WithByteBuffer combines the available read bytes and the given bytes. It does not move the read pointer and only copy the available data.
+func (r *RingBuffer) WithByteBuffer(b []byte) *bytes.ByteBuffer {
 	if r.isEmpty {
-		return b
+		return &bytes.ByteBuffer{B: b}
 	} else if r.w == r.r {
-		buf := make([]byte, r.size+bn)
-		copy(buf, r.buf)
-		copy(buf[r.size:], b)
-		return buf
+		bb := bytes.Get()
+		_, _ = bb.Write(r.buf)
+		_, _ = bb.Write(b)
+		return bb
 	}
 
+	bb := bytes.Get()
 	if r.w > r.r {
-		buf := make([]byte, r.w-r.r+bn)
-		copy(buf, r.buf[r.r:r.w])
-		copy(buf[r.w-r.r:], b)
-		return buf
+		_, _ = bb.Write(r.buf[r.r:r.w])
+		_, _ = bb.Write(b)
+		return bb
 	}
 
 	n := r.size - r.r + r.w
-	buf := make([]byte, n+bn)
 	if r.r+n < r.size {
-		copy(buf, r.buf[r.r:r.r+n])
+		_, _ = bb.Write(r.buf[r.r : r.r+n])
 	} else {
 		c1 := r.size - r.r
-		copy(buf, r.buf[r.r:r.size])
+		_, _ = bb.Write(r.buf[r.r:r.size])
 		c2 := n - c1
-		copy(buf[c1:], r.buf[0:c2])
+		_, _ = bb.Write(r.buf[:c2])
 	}
-	copy(buf[n:], b)
+	_, _ = bb.Write(b)
 
-	return buf
+	return bb
 }
 
 // IsFull returns this ringbuffer is full.
