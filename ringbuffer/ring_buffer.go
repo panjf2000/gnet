@@ -10,7 +10,6 @@ import (
 	"errors"
 	"unsafe"
 
-	"github.com/gobwas/pool/pbytes"
 	"github.com/panjf2000/gnet/internal"
 )
 
@@ -255,8 +254,12 @@ func (r *RingBuffer) Length() int {
 	return r.size - r.r + r.w
 }
 
-// Capacity returns the size of the underlying buffer.
-func (r *RingBuffer) Capacity() int {
+func (r *RingBuffer) Len() int {
+	return len(r.buf)
+}
+
+// Cap returns the size of the underlying buffer.
+func (r *RingBuffer) Cap() int {
 	return r.size
 }
 
@@ -288,21 +291,20 @@ func (r *RingBuffer) WriteString(s string) (n int, err error) {
 func (r *RingBuffer) Bytes() []byte {
 	if r.isEmpty {
 		return nil
-	} else if r.r == r.w {
-		buf := pbytes.GetLen(r.size)
+	} else if r.w == r.r {
+		buf := make([]byte, r.size)
 		copy(buf, r.buf)
 		return buf
 	}
 
 	if r.w > r.r {
-		buf := pbytes.GetLen(r.w - r.r)
+		buf := make([]byte, r.w-r.r)
 		copy(buf, r.buf[r.r:r.w])
 		return buf
 	}
 
 	n := r.size - r.r + r.w
-	buf := pbytes.GetLen(n)
-
+	buf := make([]byte, n)
 	if r.r+n < r.size {
 		copy(buf, r.buf[r.r:r.r+n])
 	} else {
@@ -320,23 +322,22 @@ func (r *RingBuffer) WithBytes(b []byte) []byte {
 	bn := len(b)
 	if r.isEmpty {
 		return b
-	} else if r.r == r.w {
-		buf := pbytes.GetLen(r.size + bn)
+	} else if r.w == r.r {
+		buf := make([]byte, r.size+bn)
 		copy(buf, r.buf)
 		copy(buf[r.size:], b)
 		return buf
 	}
 
 	if r.w > r.r {
-		buf := pbytes.GetLen(r.w - r.r + bn)
+		buf := make([]byte, r.w-r.r+bn)
 		copy(buf, r.buf[r.r:r.w])
 		copy(buf[r.w-r.r:], b)
 		return buf
 	}
 
 	n := r.size - r.r + r.w
-	buf := pbytes.GetLen(n + bn)
-
+	buf := make([]byte, n+bn)
 	if r.r+n < r.size {
 		copy(buf, r.buf[r.r:r.r+n])
 	} else {

@@ -31,7 +31,7 @@
 - [x] [高性能](#-性能测试) 的基于多线程/Go程网络模型的 event-loop 事件驱动
 - [x] 内置 Round-Robin 轮询负载均衡算法
 - [x] 内置 goroutine 池，由开源库 [ants](https://github.com/panjf2000/ants) 提供支持
-- [x] 内置 bytes 内存池，由开源库 [pool](https://github.com/gobwas/pool/) 提供支持
+- [x] 内置 bytes 内存池，由开源库 [bytebufferpool](https://github.com/valyala/bytebufferpool) 提供支持
 - [x] 简洁的 APIs
 - [x] 基于 Ring-Buffer 的高效内存利用
 - [x] 支持多种网络协议：TCP、UDP、Unix Sockets
@@ -841,7 +841,7 @@ GOMAXPROCS=4
 - [evio](https://github.com/tidwall/evio)
 - [netty](https://github.com/netty/netty)
 - [ants](https://github.com/panjf2000/ants)
-- [pool](https://github.com/gobwas/pool)
+- [bytebufferpool](https://github.com/valyala/bytebufferpool)
 - [goframe](https://github.com/smallnest/goframe)
 
 # 📚 相关文章

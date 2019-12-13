@@ -4,26 +4,14 @@
 
 package bytes
 
-import "github.com/gobwas/pool/pbytes"
-
-//const (
-//	// Lower represents the lower value of the logarithmic range of the pbytes.Pool.
-//	Lower = 64
-//
-//	// Upper represents the upper value of the logarithmic range of the pbytes.Pool.
-//	Upper = 64 * 1024
-//)
+import "github.com/valyala/bytebufferpool"
 
 // Pool is the alias of pbytes.Pool.
-type Pool = pbytes.Pool
+type Pool = bytebufferpool.ByteBuffer
 
-// Put puts bytes back to pool.
-func Put(buf []byte) {
-	pbytes.Put(buf)
-}
-
-// Default instantiates a *BytesPool that reuses slices which size is in logarithmic range [Lower, Upper].
-func Default() *Pool {
-	//return pbytes.Default(Lower, Upper)
-	return pbytes.DefaultPool
-}
+var (
+	// Get returns an empty byte buffer from the pool, exported from gnet/bytes.
+	Get = bytebufferpool.Get
+	// Put returns byte buffer to the pool, exported from gnet/bytes.
+	Put = bytebufferpool.Put
+)

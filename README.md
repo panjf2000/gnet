@@ -31,7 +31,7 @@ The goal of this project is to create a server framework for Go that performs on
 - [x] [High-performance](#-performance) event-loop under networking model of multiple threads/goroutines
 - [x] Built-in load balancing algorithm: Round-Robin
 - [x] Built-in goroutine pool powered by the library [ants](https://github.com/panjf2000/ants)
-- [x] Built-in memory pool with bytes powered by the library [pool](https://github.com/gobwas/pool/)
+- [x] Built-in memory pool with bytes powered by the library [bytebufferpool](https://github.com/valyala/bytebufferpool)
 - [x] Concise APIs
 - [x] Efficient memory usage: Ring-Buffer
 - [x] Supporting multiple protocols: TCP, UDP, and Unix Sockets
@@ -847,7 +847,7 @@ Please read our [Contributing Guidelines](CONTRIBUTING.md) before opening a PR a
 - [evio](https://github.com/tidwall/evio)
 - [netty](https://github.com/netty/netty)
 - [ants](https://github.com/panjf2000/ants)
-- [pool](https://github.com/gobwas/pool)
+- [bytebufferpool](https://github.com/valyala/bytebufferpool)
 - [goframe](https://github.com/smallnest/goframe)
 
 # 📚 Relevant Articles

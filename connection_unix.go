@@ -11,7 +11,6 @@ import (
 	"net"
 
 	"github.com/panjf2000/gnet/internal/netpoll"
-	"github.com/panjf2000/gnet/pool/bytes"
 	prb "github.com/panjf2000/gnet/pool/ringbuffer"
 	"github.com/panjf2000/gnet/ringbuffer"
 	"golang.org/x/sys/unix"
@@ -213,7 +212,6 @@ func (c *conn) AsyncWrite(buf []byte) {
 		_ = c.loop.poller.Trigger(func() error {
 			if c.opened {
 				c.write(encodedBuf)
-				bytes.Put(buf)
 			}
 			return nil
 		})

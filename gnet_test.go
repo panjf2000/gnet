@@ -19,6 +19,7 @@ import (
 
 	"github.com/panjf2000/gnet/pool/bytes"
 	"github.com/panjf2000/gnet/pool/goroutine"
+	"github.com/valyala/bytebufferpool"
 )
 
 func TestCodecServe(t *testing.T) {
@@ -186,7 +187,6 @@ func (s *testCodecServer) React(c Conn) (out []byte, action Action) {
 		return
 	}
 	out = c.ReadFrame()
-	bytes.Put(out)
 	return
 }
 func (s *testCodecServer) Tick() (delay time.Duration, action Action) {
@@ -357,9 +357,8 @@ type testServer struct {
 	connected    int32
 	clientActive int32
 	disconnected int32
-	bytesPool    *bytes.Pool
 	workerPool   *goroutine.Pool
-	bytesList    [][]byte
+	bytesList    []*bytebufferpool.ByteBuffer
 }
 
 func (s *testServer) OnOpened(c Conn) (out []byte, action Action) {
@@ -385,7 +384,7 @@ func (s *testServer) OnClosed(c Conn, err error) (action Action) {
 		atomic.LoadInt32(&s.disconnected) == int32(s.nclients) {
 		action = Shutdown
 		for i := range s.bytesList {
-			s.bytesPool.Put(s.bytesList[i])
+			bytes.Put(s.bytesList[i])
 		}
 		s.workerPool.Release()
 	}
@@ -396,10 +395,8 @@ func (s *testServer) React(c Conn) (out []byte, action Action) {
 	if s.async {
 		if s.network == "tcp" {
 			bufLen := c.BufferLength()
-			buf := s.bytesPool.GetLen(bufLen)
-			data := c.Read()
-			copy(buf, data)
-			bytes.Put(data)
+			buf := bytes.Get()
+			_, _ = buf.Write(c.Read())
 			s.bytesList = append(s.bytesList, buf)
 			// just for test
 			c.ShiftN(bufLen - 1)
@@ -408,7 +405,7 @@ func (s *testServer) React(c Conn) (out []byte, action Action) {
 			//c.ResetBuffer()
 			_ = s.workerPool.Submit(
 				func() {
-					c.AsyncWrite(buf)
+					c.AsyncWrite(buf.Bytes())
 				})
 			return
 		}
@@ -427,7 +424,6 @@ func (s *testServer) React(c Conn) (out []byte, action Action) {
 			n, data := c.ReadN(readSize)
 			if n == readSize {
 				out = data
-				bytes.Put(data)
 			}
 			return
 		}
@@ -470,8 +466,7 @@ func (s *testServer) Tick() (delay time.Duration, action Action) {
 
 func testServe(network, addr string, reuseport, multicore, async bool, nclients int) {
 	var err error
-	ts := &testServer{network: network, addr: addr, multicore: multicore, async: async, nclients: nclients,
-		bytesPool: bytes.Default(), workerPool: goroutine.Default()}
+	ts := &testServer{network: network, addr: addr, multicore: multicore, async: async, nclients: nclients, workerPool: goroutine.Default()}
 	if network == "unix" {
 		_ = os.RemoveAll(addr)
 		defer os.RemoveAll(addr)
