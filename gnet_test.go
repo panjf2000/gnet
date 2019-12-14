@@ -17,7 +17,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/panjf2000/gnet/pool/bytes"
+	"github.com/panjf2000/gnet/pool/bytebuffer"
 	"github.com/panjf2000/gnet/pool/goroutine"
 	"github.com/valyala/bytebufferpool"
 )
@@ -388,7 +388,7 @@ func (s *testServer) OnClosed(c Conn, err error) (action Action) {
 		atomic.LoadInt32(&s.disconnected) == int32(s.nclients) {
 		action = Shutdown
 		for i := range s.bytesList {
-			bytes.Put(s.bytesList[i])
+			bytebuffer.Put(s.bytesList[i])
 		}
 		s.workerPool.Release()
 	}
@@ -399,7 +399,7 @@ func (s *testServer) React(c Conn) (out []byte, action Action) {
 	if s.async {
 		if s.network == "tcp" {
 			bufLen := c.BufferLength()
-			buf := bytes.Get()
+			buf := bytebuffer.Get()
 			_, _ = buf.Write(c.Read())
 			s.bytesList = append(s.bytesList, buf)
 			// just for test

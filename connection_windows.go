@@ -10,7 +10,7 @@ package gnet
 import (
 	"net"
 
-	"github.com/panjf2000/gnet/pool/bytes"
+	"github.com/panjf2000/gnet/pool/bytebuffer"
 	prb "github.com/panjf2000/gnet/pool/ringbuffer"
 	"github.com/panjf2000/gnet/ringbuffer"
 )
@@ -26,7 +26,7 @@ type wakeReq struct {
 
 type tcpIn struct {
 	c  *stdConn
-	in *bytes.ByteBuffer
+	in *bytebuffer.ByteBuffer
 }
 
 type udpIn struct {
@@ -38,12 +38,12 @@ type stdConn struct {
 	conn          net.Conn               // original connection
 	loop          *loop                  // owner loop
 	done          int32                  // 0: attached, 1: closed
-	cache         *bytes.ByteBuffer      // reuse memory of inbound data
+	cache         *bytebuffer.ByteBuffer      // reuse memory of inbound data
 	codec         ICodec                 // codec for TCP
 	action        Action                 // next user action
 	localAddr     net.Addr               // local server addr
 	remoteAddr    net.Addr               // remote peer addr
-	byteBuffer    *bytes.ByteBuffer      // bytes buffer for buffering current packet and data in ring-buffer
+	byteBuffer    *bytebuffer.ByteBuffer      // bytes buffer for buffering current packet and data in ring-buffer
 	inboundBuffer *ringbuffer.RingBuffer // buffer for data from client
 }
 
@@ -63,12 +63,12 @@ func (c *stdConn) releaseTCP() {
 	prb.Put(c.inboundBuffer)
 	c.inboundBuffer = nil
 	if c.cache != nil {
-		bytes.Put(c.cache)
+		bytebuffer.Put(c.cache)
 		c.cache = nil
 	}
 }
 
-func newUDPConn(lp *loop, localAddr, remoteAddr net.Addr, buf *bytes.ByteBuffer) *stdConn {
+func newUDPConn(lp *loop, localAddr, remoteAddr net.Addr, buf *bytebuffer.ByteBuffer) *stdConn {
 	return &stdConn{
 		loop:       lp,
 		localAddr:  localAddr,
@@ -82,7 +82,7 @@ func (c *stdConn) releaseUDP() {
 	c.localAddr = nil
 	c.remoteAddr = nil
 	if c.cache != nil {
-		bytes.Put(c.cache)
+		bytebuffer.Put(c.cache)
 		c.cache = nil
 	}
 }
@@ -116,7 +116,7 @@ func (c *stdConn) ResetBuffer() {
 	c.cache.Reset()
 	c.inboundBuffer.Reset()
 	if c.byteBuffer != nil {
-		bytes.Put(c.byteBuffer)
+		bytebuffer.Put(c.byteBuffer)
 		c.byteBuffer = nil
 	}
 }
@@ -140,7 +140,7 @@ func (c *stdConn) ShiftN(n int) (size int) {
 	c.byteBuffer.B = c.byteBuffer.B[n:]
 	if c.byteBuffer.Len() == 0 {
 		c.action = Flow
-		bytes.Put(c.byteBuffer)
+		bytebuffer.Put(c.byteBuffer)
 		c.byteBuffer = nil
 	}
 	if inBufferLen >= n {

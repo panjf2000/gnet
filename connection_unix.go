@@ -11,7 +11,7 @@ import (
 	"net"
 
 	"github.com/panjf2000/gnet/internal/netpoll"
-	"github.com/panjf2000/gnet/pool/bytes"
+	"github.com/panjf2000/gnet/pool/bytebuffer"
 	prb "github.com/panjf2000/gnet/pool/ringbuffer"
 	"github.com/panjf2000/gnet/ringbuffer"
 	"golang.org/x/sys/unix"
@@ -28,7 +28,7 @@ type conn struct {
 	action         Action                 // next user action
 	localAddr      net.Addr               // local addr
 	remoteAddr     net.Addr               // remote addr
-	byteBuffer     *bytes.ByteBuffer      // bytes buffer for buffering current packet and data in ring-buffer
+	byteBuffer     *bytebuffer.ByteBuffer      // bytes buffer for buffering current packet and data in ring-buffer
 	inboundBuffer  *ringbuffer.RingBuffer // buffer for data from client
 	outboundBuffer *ringbuffer.RingBuffer // buffer for data that is ready to write to client
 }
@@ -56,7 +56,7 @@ func (c *conn) releaseTCP() {
 	c.inboundBuffer = nil
 	c.outboundBuffer = nil
 	if c.byteBuffer != nil {
-		bytes.Put(c.byteBuffer)
+		bytebuffer.Put(c.byteBuffer)
 		c.byteBuffer = nil
 	}
 }
@@ -144,7 +144,7 @@ func (c *conn) ResetBuffer() {
 	c.cache = c.cache[:0]
 	c.inboundBuffer.Reset()
 	if c.byteBuffer != nil {
-		bytes.Put(c.byteBuffer)
+		bytebuffer.Put(c.byteBuffer)
 		c.byteBuffer = nil
 	}
 }
@@ -168,7 +168,7 @@ func (c *conn) ShiftN(n int) (size int) {
 	c.byteBuffer.B = c.byteBuffer.B[n:]
 	if c.byteBuffer.Len() == 0 {
 		c.action = Flow
-		bytes.Put(c.byteBuffer)
+		bytebuffer.Put(c.byteBuffer)
 		c.byteBuffer = nil
 	}
 	if inBufferLen >= n {

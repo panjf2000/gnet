@@ -11,7 +11,7 @@ import (
 	"unsafe"
 
 	"github.com/panjf2000/gnet/internal"
-	"github.com/panjf2000/gnet/pool/bytes"
+	"github.com/panjf2000/gnet/pool/bytebuffer"
 )
 
 // ErrIsEmpty will be returned when trying to read a empty ring-buffer.
@@ -320,17 +320,17 @@ func (r *RingBuffer) Bytes() []byte {
 }
 
 // WithByteBuffer combines the available read bytes and the given bytes. It does not move the read pointer and only copy the available data.
-func (r *RingBuffer) WithByteBuffer(b []byte) *bytes.ByteBuffer {
+func (r *RingBuffer) WithByteBuffer(b []byte) *bytebuffer.ByteBuffer {
 	if r.isEmpty {
-		return &bytes.ByteBuffer{B: b}
+		return &bytebuffer.ByteBuffer{B: b}
 	} else if r.w == r.r {
-		bb := bytes.Get()
+		bb := bytebuffer.Get()
 		_, _ = bb.Write(r.buf)
 		_, _ = bb.Write(b)
 		return bb
 	}
 
-	bb := bytes.Get()
+	bb := bytebuffer.Get()
 	if r.w > r.r {
 		_, _ = bb.Write(r.buf[r.r:r.w])
 		_, _ = bb.Write(b)

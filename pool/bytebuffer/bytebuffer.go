@@ -2,7 +2,7 @@
 // Use of this source code is governed by an MIT-style
 // license that can be found in the LICENSE file.
 
-package bytes
+package bytebuffer
 
 import "github.com/valyala/bytebufferpool"
 
@@ -10,8 +10,8 @@ import "github.com/valyala/bytebufferpool"
 type ByteBuffer = bytebufferpool.ByteBuffer
 
 var (
-	// Get returns an empty byte buffer from the pool, exported from gnet/bytes.
+	// Get returns an empty byte buffer from the pool, exported from gnet/bytebuffer.
 	Get = bytebufferpool.Get
-	// Put returns byte buffer to the pool, exported from gnet/bytes.
+	// Put returns byte buffer to the pool, exported from gnet/bytebuffer.
 	Put = bytebufferpool.Put
 )

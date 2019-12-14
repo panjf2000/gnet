@@ -14,7 +14,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/panjf2000/gnet/pool/bytes"
+	"github.com/panjf2000/gnet/pool/bytebuffer"
 )
 
 type loop struct {
@@ -105,7 +105,7 @@ loopReact:
 	default:
 	}
 	_, _ = c.inboundBuffer.Write(c.cache.Bytes())
-	bytes.Put(c.cache)
+	bytebuffer.Put(c.cache)
 	c.cache = nil
 	switch action {
 	case Shutdown:

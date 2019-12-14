@@ -10,7 +10,7 @@ package gnet
 import (
 	"time"
 
-	"github.com/panjf2000/gnet/pool/bytes"
+	"github.com/panjf2000/gnet/pool/bytebuffer"
 )
 
 func (svr *server) listenerRun() {
@@ -25,7 +25,7 @@ func (svr *server) listenerRun() {
 				err = e
 				return
 			}
-			buf := bytes.Get()
+			buf := bytebuffer.Get()
 			_, _ = buf.Write(packet[:n])
 
 			lp := svr.subLoopGroup.next()
@@ -49,7 +49,7 @@ func (svr *server) listenerRun() {
 						lp.ch <- &stderr{c, err}
 						return
 					}
-					buf := bytes.Get()
+					buf := bytebuffer.Get()
 					_, _ = buf.Write(packet[:n])
 					lp.ch <- &tcpIn{c, buf}
 				}
