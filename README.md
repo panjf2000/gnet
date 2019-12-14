@@ -50,7 +50,7 @@ The goal of this project is to create a server framework for Go that performs on
 ## Networking Model of Multiple Threads/Goroutines
 ### Multiple Reactors
 
-`gnet` redesigns and implements a new built-in networking model of multiple threads/goroutines: 『multiple reactors』 which is also the default networking model of multiple threads of `netty`, Here's the schematic diagram:
+`gnet` redesigns and implements a new built-in networking model of multiple threads/goroutines: 『multiple reactors』 which is also the default networking model of multiple threads in `netty`, Here's the schematic diagram:
 
 <p align="center">
 <img width="820" alt="multi_reactor" src="https://raw.githubusercontent.com/panjf2000/illustrations/master/go/multi-reactors.png">
@@ -65,11 +65,11 @@ and it works as the following sequence diagram:
 
 You may ask me a question: what if my business logic in `EventHandler.React`  contains some blocking code which leads to blocking in event-loop of `gnet`, what is the solution for this kind of situation？
 
-As you know, there is a most important tenet when writing code under `gnet`: you should never block the event-loop in the `EventHandler.React`, otherwise, it will lead to a low throughput in your `gnet` server, which is also the most important tenet in `netty`. 
+As you know, there is a most important tenet when writing code under `gnet`: you should never block the event-loop goroutine in the `EventHandler.React`, which is also the most important tenet in `netty`, otherwise, it will lead to a low throughput in your `gnet` server.
 
-And the solution to that could be found in the subsequent networking model of multiple threads/goroutines of `gnet`: 『multiple reactors with thread/goroutine pool』which pulls you out from the blocking mire, it will construct a worker-pool with fixed capacity and put those blocking jobs in `EventHandler.React` into the worker-pool to make the event-loop goroutines non-blocking.
+And the solution to that could be found in the subsequent networking model of multiple threads/goroutines in `gnet`: 『multiple reactors with thread/goroutine pool』which pulls you out from the blocking mire, it will construct a worker-pool with fixed capacity and put those blocking jobs in `EventHandler.React` into the worker-pool to make the event-loop goroutines non-blocking.
 
-The architecture diagram of networking model:『multiple reactors with thread/goroutine pool』architecture is in here:
+The networking model:『multiple reactors with thread/goroutine pool』dissolves the blocking jobs by introducing a goroutine pool, as shown below:
 
 <p align="center">
 <img width="854" alt="multi_reactor_thread_pool" src="https://raw.githubusercontent.com/panjf2000/illustrations/master/go/multi-reactors%2Bthread-pool.png">
@@ -82,7 +82,7 @@ and it works as the following sequence diagram:
 
 `gnet` implements the networking model:『multiple reactors with thread/goroutine pool』by the aid of a high-performance goroutine pool called [ants](https://github.com/panjf2000/ants) that allows you to manage and recycle a massive number of goroutines in your concurrent programs, the full features and usages in `ants` are documented [here](https://gowalker.org/github.com/panjf2000/ants?lang=en-US).
 
-`gnet` integrates `ants` and provides the `pool.NewWorkerPool` method that you can invoke to instantiate a `ants` pool where you are able to put your blocking code logic in `EventHandler.React` and invoke the function of `gnet.Conn.AsyncWrite([]byte)` to send out data asynchronously in worker pool after you finish the blocking process and get the output data, which makes the goroutine of event-loop non-blocking.
+`gnet` integrates `ants` and provides the `pool.goroutine.Default()` method that you can invoke to instantiate a `ants` pool where you are able to put your blocking code logic and invoke the function `gnet.Conn.AsyncWrite([]byte)` to send out data asynchronously after you finish the blocking process and get the output data, which makes the goroutine of event-loop non-blocking.
 
 The details about integrating `gnet`  with `ants` are shown [here](#echo-server-with-blocking-logic).
 
@@ -90,7 +90,7 @@ The details about integrating `gnet`  with `ants` are shown [here](#echo-server-
 
 There are two ring-buffers inside `gnet`: inbound buffer and outbound buffer to buffer and manage inbound/outbound network data.
 
-The purpose of implementing inbound and outbound ring-buffers in `gnet` is to transfer the logic of buffering and managing network data based on application protocol upon TCP stream from business server to framework and unify the network data buffer, which minimizes the complexity of business code so that developers are able to concentrate on business logic instead of the underlying function.
+The purpose of implementing inbound and outbound ring-buffers in `gnet` is to transfer the logic of buffering and managing network data based on application protocol upon TCP stream from business server to framework and unify the network data buffer, which minimizes the complexity of business code so that developers are able to concentrate on business logic instead of the underlying implementation.
 
 <p align="center">
 <img src="https://raw.githubusercontent.com/panjf2000/illustrations/master/go/ring-buffer.gif">
@@ -115,7 +115,7 @@ go get -u github.com/panjf2000/gnet
 
 **The detailed documentation is located in here: [docs of gnet](https://gowalker.org/github.com/panjf2000/gnet?lang=en-US), but let's pass through the brief instructions first.**
 
-It is easy to create a network server with `gnet`. All you have to do is just to make your implementation of `gnet.EventHandler` interface and register your event-handler functions to it, then pass it to the `gnet.Serve` function along with the binding address(es). Each connection is represented as a `gnet.Conn` interface that is passed to various events to differentiate the clients. At any point you can close a client or shutdown the server by return a `Close` or `Shutdown` action from an event.
+It is easy to create a network server with `gnet`. All you have to do is just to make your implementation of `gnet.EventHandler` interface and register your event-handler functions to it, then pass it to the `gnet.Serve` function along with the binding address(es). Each connection is represented as a `gnet.Conn` interface that is passed to various events to differentiate the clients. At any point you can close a connection or shutdown the server by return a `Close` or `Shutdown` action from an event function.
 
 The simplest example to get you started playing with `gnet` would be the echo server. So here you are, a simplest echo server upon `gnet` that is listening on port 9000:
 
