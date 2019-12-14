@@ -106,6 +106,7 @@ loopReact:
 	}
 	_, _ = c.inboundBuffer.Write(c.cache.Bytes())
 	bytes.Put(c.cache)
+	c.cache = nil
 	switch action {
 	case Shutdown:
 		return errClosing
