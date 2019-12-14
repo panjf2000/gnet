@@ -19,18 +19,20 @@ package gnet
 //)
 
 // IEventLoopGroup represents a set of event-loops.
-type IEventLoopGroup interface {
-	register(*loop)
-	next() *loop
-	iterate(func(int, *loop) bool)
-	len() int
-}
+type (
+	IEventLoopGroup interface {
+		register(*loop)
+		next() *loop
+		iterate(func(int, *loop) bool)
+		len() int
+	}
 
-type eventLoopGroup struct {
-	nextLoopIndex int
-	eventLoops    []*loop
-	size          int
-}
+	eventLoopGroup struct {
+		nextLoopIndex int
+		eventLoops    []*loop
+		size          int
+	}
+)
 
 func (g *eventLoopGroup) register(lp *loop) {
 	g.eventLoops = append(g.eventLoops, lp)

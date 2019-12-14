@@ -15,24 +15,41 @@ import (
 // CRLFByte represents a byte of CRLF.
 var CRLFByte = byte('\n')
 
-// ICodec is the interface of gnet codec.
-type ICodec interface {
-	// Encode encodes frames upon server responses into TCP stream.
-	Encode(c Conn, buf []byte) ([]byte, error)
-	// Decode decodes frames from TCP stream via specific implementation.
-	Decode(c Conn) ([]byte, error)
-}
+type (
+	// ICodec is the interface of gnet codec.
+	ICodec interface {
+		// Encode encodes frames upon server responses into TCP stream.
+		Encode(c Conn, buf []byte) ([]byte, error)
+		// Decode decodes frames from TCP stream via specific implementation.
+		Decode(c Conn) ([]byte, error)
+	}
 
-//type Decoder interface {
-//	Decode(c Conn) ([]byte, error)
-//}
-//type Encoder interface {
-//	Encode(buf []byte) ([]byte, error)
-//}
+	// BuiltInFrameCodec is the built-in codec which will be assigned to gnet server when customized codec is not set up.
+	BuiltInFrameCodec struct {
+	}
 
-// BuiltInFrameCodec is the built-in codec which will be assigned to gnet server when customized codec is not set up.
-type BuiltInFrameCodec struct {
-}
+	// LineBasedFrameCodec encodes/decodes line-separated frames into/from TCP stream.
+	LineBasedFrameCodec struct {
+	}
+
+	// DelimiterBasedFrameCodec encodes/decodes specific-delimiter-separated frames into/from TCP stream.
+	DelimiterBasedFrameCodec struct {
+		delimiter byte
+	}
+
+	// FixedLengthFrameCodec encodes/decodes fixed-length-separated frames into/from TCP stream.
+	FixedLengthFrameCodec struct {
+		frameLength int
+	}
+
+	// LengthFieldBasedFrameCodec is the refactoring from https://github.com/smallnest/goframe/blob/master/length_field_based_frameconn.go, licensed by Apache License 2.0.
+	// It encodes/decodes frames into/from TCP stream with value of the length field in the message.
+	// Original implementation: https://github.com/netty/netty/blob/4.1/codec/src/main/java/io/netty/handler/codec/LengthFieldBasedFrameDecoder.java
+	LengthFieldBasedFrameCodec struct {
+		encoderConfig EncoderConfig
+		decoderConfig DecoderConfig
+	}
+)
 
 // Encode ...
 func (cc *BuiltInFrameCodec) Encode(c Conn, buf []byte) ([]byte, error) {
@@ -44,10 +61,6 @@ func (cc *BuiltInFrameCodec) Decode(c Conn) ([]byte, error) {
 	buf := c.Read()
 	c.ResetBuffer()
 	return buf, nil
-}
-
-// LineBasedFrameCodec encodes/decodes line-separated frames into/from TCP stream.
-type LineBasedFrameCodec struct {
 }
 
 // Encode ...
@@ -64,11 +77,6 @@ func (cc *LineBasedFrameCodec) Decode(c Conn) ([]byte, error) {
 	}
 	c.ShiftN(idx + 1)
 	return buf[:idx], nil
-}
-
-// DelimiterBasedFrameCodec encodes/decodes specific-delimiter-separated frames into/from TCP stream.
-type DelimiterBasedFrameCodec struct {
-	delimiter byte
 }
 
 // NewDelimiterBasedFrameCodec instantiates and returns a codec with a specific delimiter.
@@ -92,11 +100,6 @@ func (cc *DelimiterBasedFrameCodec) Decode(c Conn) ([]byte, error) {
 	return buf[:idx], nil
 }
 
-// FixedLengthFrameCodec encodes/decodes fixed-length-separated frames into/from TCP stream.
-type FixedLengthFrameCodec struct {
-	frameLength int
-}
-
 // NewFixedLengthFrameCodec instantiates and returns a codec with fixed length.
 func NewFixedLengthFrameCodec(frameLength int) *FixedLengthFrameCodec {
 	return &FixedLengthFrameCodec{frameLength}
@@ -117,14 +120,6 @@ func (cc *FixedLengthFrameCodec) Decode(c Conn) ([]byte, error) {
 		return nil, ErrUnexpectedEOF
 	}
 	return buf, nil
-}
-
-// LengthFieldBasedFrameCodec is the refactoring from https://github.com/smallnest/goframe/blob/master/length_field_based_frameconn.go, licensed by Apache License 2.0.
-// It encodes/decodes frames into/from TCP stream with value of the length field in the message.
-// Original implementation: https://github.com/netty/netty/blob/4.1/codec/src/main/java/io/netty/handler/codec/LengthFieldBasedFrameDecoder.java
-type LengthFieldBasedFrameCodec struct {
-	encoderConfig EncoderConfig
-	decoderConfig DecoderConfig
 }
 
 // NewLengthFieldBasedFrameCodec instantiates and returns a codec based on the length field.
