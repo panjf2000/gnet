@@ -312,7 +312,6 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -331,7 +330,32 @@ type request struct {
 
 type httpServer struct {
 	*gnet.EventServer
-	noparse bool
+}
+
+var errMsg = []byte("Internal Server Error")
+
+type httpCodec struct {
+	req request
+	res []byte
+}
+
+func (hc *httpCodec) Encode(c gnet.Conn, buf []byte) ([]byte, error) {
+	return appendHandle(nil, string(buf)), nil
+}
+
+func (hc *httpCodec) Decode(c gnet.Conn) ([]byte, error) {
+	buf := c.Read()
+	// process the pipeline
+	leftover, err := parseReq(buf, &hc.req)
+	// bad thing happened
+	if err != nil {
+		return errMsg, err
+	} else if len(leftover) == len(buf) {
+		// request not ready, yet
+		return nil, nil
+	}
+	c.ResetBuffer()
+	return buf, nil
 }
 
 func (hs *httpServer) OnInitComplete(srv gnet.Server) (action gnet.Action) {
@@ -341,72 +365,50 @@ func (hs *httpServer) OnInitComplete(srv gnet.Server) (action gnet.Action) {
 }
 
 func (hs *httpServer) React(c gnet.Conn) (out []byte, action gnet.Action) {
-	data := c.Read()
-	if hs.noparse && bytes.Contains(data, []byte("\r\n\r\n")) {
-		// for testing minimal single packet request -> response.
-		out = appendresp(nil, "200 OK", "", res)
-		c.ResetBuffer()
-		return
-	}
+	data := c.ReadFrame()
 	// process the pipeline
-	var req request
-	leftover, err := parsereq(data, &req)
-	if err != nil {
+	if bytes.Equal(data, errMsg) {
 		// bad thing happened
-		out = appendresp(out, "500 Error", "", err.Error()+"\n")
+		out = appendResp(out, "500 Error", "", string(errMsg)+"\n")
 		action = gnet.Close
 		return
-	} else if len(leftover) == len(data) {
+	} else if data == nil {
 		// request not ready, yet
 		return
 	}
 	// handle the request
-	req.remoteAddr = c.RemoteAddr().String()
-	out = appendhandle(out, &req)
-	c.ResetBuffer()
+	out = appendHandle(out, res)
 	return
 }
 
 func main() {
 	var port int
 	var multicore bool
-	var aaaa bool
-	var noparse bool
 
 	// Example command: go run http.go --port 8080 --multicore true
 	flag.IntVar(&port, "port", 8080, "server port")
-	flag.BoolVar(&aaaa, "aaaa", false, "aaaaa....")
-	flag.BoolVar(&noparse, "noparse", true, "do not parse requests")
 	flag.BoolVar(&multicore, "multicore", true, "multicore")
 	flag.Parse()
 
-	if os.Getenv("NOPARSE") == "1" {
-		noparse = true
-	}
+	res = "Hello World!\r\n"
 
-	if aaaa {
-		res = strings.Repeat("a", 1024)
-	} else {
-		res = "Hello World!\r\n"
-	}
+	http := new(httpServer)
+	hc := &httpCodec{res: []byte(res)}
 
-	http := &httpServer{noparse: noparse}
-	// We at least want the single http address.
-	addr := fmt.Sprintf("tcp"+"://:%d", port)
 	// Start serving!
-	log.Fatal(gnet.Serve(http, addr, gnet.WithMulticore(multicore)))
+	log.Fatal(gnet.Serve(http, fmt.Sprintf("tcp://:%d", port), gnet.WithMulticore(multicore), gnet.WithCodec(hc)))
 }
 
-// appendhandle handles the incoming request and appends the response to
+// appendHandle handles the incoming request and appends the response to
 // the provided bytes, which is then returned to the caller.
-func appendhandle(b []byte, req *request) []byte {
-	return appendresp(b, "200 OK", "", res)
+func appendHandle(b []byte, res string) []byte {
+	return appendResp(b, "200 OK", "", res)
 }
 
-// appendresp will append a valid http response to the provide bytes.
+// appendResp will append a valid http response to the provide bytes.
 // The status param should be the code plus text such as "200 OK".
 // The head parameter should be a series of lines ending with "\r\n" or empty.
-func appendresp(b []byte, status, head, body string) []byte {
+func appendResp(b []byte, status, head, body string) []byte {
 	b = append(b, "HTTP/1.1"...)
 	b = append(b, ' ')
 	b = append(b, status...)
@@ -428,10 +430,10 @@ func appendresp(b []byte, status, head, body string) []byte {
 	return b
 }
 
-// parsereq is a very simple http request parser. This operation
+// parseReq is a very simple http request parser. This operation
 // waits for the entire payload to be buffered before returning a
 // valid request.
-func parsereq(data []byte, req *request) (leftover []byte, err error) {
+func parseReq(data []byte, req *request) (leftover []byte, err error) {
 	sdata := string(data)
 	var i, s int
 	var head string

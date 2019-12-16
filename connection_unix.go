@@ -28,7 +28,7 @@ type conn struct {
 	action         Action                 // next user action
 	localAddr      net.Addr               // local addr
 	remoteAddr     net.Addr               // remote addr
-	byteBuffer     *bytebuffer.ByteBuffer      // bytes buffer for buffering current packet and data in ring-buffer
+	byteBuffer     *bytebuffer.ByteBuffer // bytes buffer for buffering current packet and data in ring-buffer
 	inboundBuffer  *ringbuffer.RingBuffer // buffer for data from client
 	outboundBuffer *ringbuffer.RingBuffer // buffer for data that is ready to write to client
 }
@@ -55,10 +55,8 @@ func (c *conn) releaseTCP() {
 	prb.Put(c.outboundBuffer)
 	c.inboundBuffer = nil
 	c.outboundBuffer = nil
-	if c.byteBuffer != nil {
-		bytebuffer.Put(c.byteBuffer)
-		c.byteBuffer = nil
-	}
+	bytebuffer.Put(c.byteBuffer)
+	c.byteBuffer = nil
 }
 
 func newUDPConn(fd int, lp *loop, sa unix.Sockaddr, buf []byte) *conn {
@@ -133,9 +131,8 @@ func (c *conn) Read() []byte {
 	if c.inboundBuffer.IsEmpty() {
 		return c.cache
 	}
-	if c.byteBuffer == nil {
-		c.byteBuffer = c.inboundBuffer.WithByteBuffer(c.cache)
-	}
+	bytebuffer.Put(c.byteBuffer)
+	c.byteBuffer = c.inboundBuffer.WithByteBuffer(c.cache)
 	return c.byteBuffer.Bytes()
 }
 
@@ -143,10 +140,8 @@ func (c *conn) ResetBuffer() {
 	c.action = Flow
 	c.cache = c.cache[:0]
 	c.inboundBuffer.Reset()
-	if c.byteBuffer != nil {
-		bytebuffer.Put(c.byteBuffer)
-		c.byteBuffer = nil
-	}
+	bytebuffer.Put(c.byteBuffer)
+	c.byteBuffer = nil
 }
 
 func (c *conn) ShiftN(n int) (size int) {

@@ -13,5 +13,9 @@ var (
 	// Get returns an empty byte buffer from the pool, exported from gnet/bytebuffer.
 	Get = bytebufferpool.Get
 	// Put returns byte buffer to the pool, exported from gnet/bytebuffer.
-	Put = bytebufferpool.Put
+	Put = func(b *ByteBuffer) {
+		if b != nil {
+			bytebufferpool.Put(b)
+		}
+	}
 )

@@ -38,12 +38,12 @@ type stdConn struct {
 	conn          net.Conn               // original connection
 	loop          *loop                  // owner loop
 	done          int32                  // 0: attached, 1: closed
-	cache         *bytebuffer.ByteBuffer      // reuse memory of inbound data
+	cache         *bytebuffer.ByteBuffer // reuse memory of inbound data
 	codec         ICodec                 // codec for TCP
 	action        Action                 // next user action
 	localAddr     net.Addr               // local server addr
 	remoteAddr    net.Addr               // remote peer addr
-	byteBuffer    *bytebuffer.ByteBuffer      // bytes buffer for buffering current packet and data in ring-buffer
+	byteBuffer    *bytebuffer.ByteBuffer // bytes buffer for buffering current packet and data in ring-buffer
 	inboundBuffer *ringbuffer.RingBuffer // buffer for data from client
 }
 
@@ -62,10 +62,8 @@ func (c *stdConn) releaseTCP() {
 	c.remoteAddr = nil
 	prb.Put(c.inboundBuffer)
 	c.inboundBuffer = nil
-	if c.cache != nil {
-		bytebuffer.Put(c.cache)
-		c.cache = nil
-	}
+	bytebuffer.Put(c.cache)
+	c.cache = nil
 }
 
 func newUDPConn(lp *loop, localAddr, remoteAddr net.Addr, buf *bytebuffer.ByteBuffer) *stdConn {
@@ -81,10 +79,8 @@ func (c *stdConn) releaseUDP() {
 	c.ctx = nil
 	c.localAddr = nil
 	c.remoteAddr = nil
-	if c.cache != nil {
-		bytebuffer.Put(c.cache)
-		c.cache = nil
-	}
+	bytebuffer.Put(c.cache)
+	c.cache = nil
 }
 
 // ================================= Public APIs of gnet.Conn =================================
@@ -105,9 +101,8 @@ func (c *stdConn) Read() []byte {
 	if c.inboundBuffer.IsEmpty() {
 		return c.cache.Bytes()
 	}
-	if c.byteBuffer == nil {
-		c.inboundBuffer.WithByteBuffer(c.cache.Bytes())
-	}
+	bytebuffer.Put(c.byteBuffer)
+	c.byteBuffer = c.inboundBuffer.WithByteBuffer(c.cache.Bytes())
 	return c.byteBuffer.Bytes()
 }
 
@@ -115,10 +110,8 @@ func (c *stdConn) ResetBuffer() {
 	c.action = Flow
 	c.cache.Reset()
 	c.inboundBuffer.Reset()
-	if c.byteBuffer != nil {
-		bytebuffer.Put(c.byteBuffer)
-		c.byteBuffer = nil
-	}
+	bytebuffer.Put(c.byteBuffer)
+	c.byteBuffer = nil
 }
 
 func (c *stdConn) ShiftN(n int) (size int) {
