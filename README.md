@@ -320,6 +320,7 @@ import (
 )
 
 var res string
+var resBytes []byte
 
 type request struct {
 	proto, method string
@@ -336,11 +337,10 @@ var errMsg = []byte("Internal Server Error")
 
 type httpCodec struct {
 	req request
-	res []byte
 }
 
 func (hc *httpCodec) Encode(c gnet.Conn, buf []byte) ([]byte, error) {
-	return appendHandle(nil, string(buf)), nil
+	return appendHandle(nil, res), nil
 }
 
 func (hc *httpCodec) Decode(c gnet.Conn) ([]byte, error) {
@@ -377,7 +377,7 @@ func (hs *httpServer) React(c gnet.Conn) (out []byte, action gnet.Action) {
 		return
 	}
 	// handle the request
-	out = appendHandle(out, res)
+	out = resBytes
 	return
 }
 
@@ -391,9 +391,10 @@ func main() {
 	flag.Parse()
 
 	res = "Hello World!\r\n"
+	resBytes = []byte(res)
 
 	http := new(httpServer)
-	hc := &httpCodec{res: []byte(res)}
+	hc := new(httpCodec)
 
 	// Start serving!
 	log.Fatal(gnet.Serve(http, fmt.Sprintf("tcp://:%d", port), gnet.WithMulticore(multicore), gnet.WithCodec(hc)))
