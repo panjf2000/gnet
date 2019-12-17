@@ -246,8 +246,9 @@ func parseAddr(addr string) (network, address string) {
 	network = "tcp"
 	address = addr
 	if strings.Contains(address, "://") {
-		network = strings.Split(address, "://")[0]
-		address = strings.Split(address, "://")[1]
+		parts := strings.Split(address, "://")
+		network = parts[0]
+		address = parts[1]
 	}
 	return
 }
