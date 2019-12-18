@@ -92,7 +92,7 @@ func (c *stdConn) ReadFromUDP() []byte {
 func (c *stdConn) ReadFrame() []byte {
 	buf, _ := c.codec.Decode(c)
 	if buf == nil {
-		c.action = Flow
+		c.action = Skip
 	}
 	return buf
 }
@@ -107,7 +107,7 @@ func (c *stdConn) Read() []byte {
 }
 
 func (c *stdConn) ResetBuffer() {
-	c.action = Flow
+	c.action = Skip
 	c.cache.Reset()
 	c.inboundBuffer.Reset()
 	bytebuffer.Put(c.byteBuffer)
@@ -132,7 +132,7 @@ func (c *stdConn) ShiftN(n int) (size int) {
 	}
 	c.byteBuffer.B = c.byteBuffer.B[n:]
 	if c.byteBuffer.Len() == 0 {
-		c.action = Flow
+		c.action = Skip
 		bytebuffer.Put(c.byteBuffer)
 		c.byteBuffer = nil
 	}
@@ -155,7 +155,7 @@ func (c *stdConn) ReadN(n int) (size int, buf []byte) {
 	oneOffBufferLen := c.cache.Len()
 	inBufferLen := c.inboundBuffer.Length()
 	if inBufferLen+oneOffBufferLen < n || n <= 0 {
-		c.action = Flow
+		c.action = Skip
 		return
 	}
 	size = n
@@ -182,7 +182,7 @@ func (c *stdConn) ReadN(n int) (size int, buf []byte) {
 	buf = append(buf, c.cache.B[:restSize]...)
 	if restSize == oneOffBufferLen {
 		c.cache.Reset()
-		c.action = Flow
+		c.action = Skip
 	} else {
 		c.cache.B = c.cache.B[restSize:]
 	}

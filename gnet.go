@@ -29,8 +29,8 @@ const (
 	// Shutdown shutdowns the server.
 	Shutdown
 
-	// Flow indicates that it ought to break the "loopReact" and resume.
-	Flow
+	// Skip indicates that the connection ought to break the "loopReact" and resume.
+	Skip
 )
 
 // Server represents a server context which provides information about the

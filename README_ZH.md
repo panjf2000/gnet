@@ -303,7 +303,6 @@ func main() {
 package main
 
 import (
-	"bytes"
 	"flag"
 	"fmt"
 	"log"
@@ -328,14 +327,18 @@ type httpServer struct {
 	*gnet.EventServer
 }
 
-var errMsg = []byte("Internal Server Error")
+var errMsg = "Internal Server Error"
+var errMsgBytes = []byte(errMsg)
 
 type httpCodec struct {
 	req request
 }
 
-func (hc *httpCodec) Encode(c gnet.Conn, buf []byte) ([]byte, error) {
-	return appendHandle(nil, res), nil
+func (hc *httpCodec) Encode(c gnet.Conn, buf []byte) (out []byte, err error) {
+	if c.Context() == nil {
+		return appendHandle(out, res), nil
+	}
+	return appendResp(out, "500 Error", "", errMsg+"\n"), nil
 }
 
 func (hc *httpCodec) Decode(c gnet.Conn) ([]byte, error) {
@@ -344,7 +347,8 @@ func (hc *httpCodec) Decode(c gnet.Conn) ([]byte, error) {
 	leftover, err := parseReq(buf, &hc.req)
 	// bad thing happened
 	if err != nil {
-		return errMsg, err
+		c.SetContext(err)
+		return nil, err
 	} else if len(leftover) == len(buf) {
 		// request not ready, yet
 		return nil, nil
@@ -362,9 +366,9 @@ func (hs *httpServer) OnInitComplete(srv gnet.Server) (action gnet.Action) {
 func (hs *httpServer) React(c gnet.Conn) (out []byte, action gnet.Action) {
 	data := c.ReadFrame()
 	// process the pipeline
-	if bytes.Equal(data, errMsg) {
+	if c.Context() != nil {
 		// bad thing happened
-		out = appendResp(out, "500 Error", "", string(errMsg)+"\n")
+		out = errMsgBytes
 		action = gnet.Close
 		return
 	} else if data == nil {
