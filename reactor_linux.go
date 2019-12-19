@@ -38,7 +38,7 @@ func (svr *server) activateSubReactor(lp *loop) {
 				if ev&netpoll.OutEvents != 0 {
 					return lp.loopOut(c)
 				}
-				return nil
+				return lp.loopIn(c)
 			case true:
 				if ev&netpoll.InEvents != 0 {
 					return lp.loopIn(c)
