@@ -9,12 +9,12 @@ package netpoll
 import "golang.org/x/sys/unix"
 
 const (
-	// EVFilterWrite ...
+	// EVFilterWrite represents writeable events from sockets.
 	EVFilterWrite = unix.EVFILT_WRITE
-	// EVFilterRead ...
+	// EVFilterRead represents readable events from sockets.
 	EVFilterRead = unix.EVFILT_READ
 	// EVFilterSock ...
-	EVFilterSock = -0xd
+	//EVFilterSock = -0xd
 )
 
 type eventList struct {

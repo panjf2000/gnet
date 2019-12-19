@@ -4,9 +4,7 @@
 
 package gnet
 
-import (
-	"time"
-)
+import "time"
 
 // Option is a function that will set up option.
 type Option func(opts *Options)

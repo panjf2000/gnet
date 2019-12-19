@@ -6,9 +6,7 @@
 
 package gnet
 
-import (
-	"github.com/panjf2000/gnet/internal/netpoll"
-)
+import "github.com/panjf2000/gnet/internal/netpoll"
 
 func (svr *server) activateMainReactor() {
 	defer svr.signalShutdown()
@@ -40,7 +38,7 @@ func (svr *server) activateSubReactor(lp *loop) {
 				if ev&netpoll.OutEvents != 0 {
 					return lp.loopOut(c)
 				}
-				return lp.loopIn(c)
+				return nil
 			case true:
 				if ev&netpoll.InEvents != 0 {
 					return lp.loopIn(c)

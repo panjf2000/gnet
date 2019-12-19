@@ -5,9 +5,7 @@
 
 package internal
 
-import (
-	"sync"
-)
+import "sync"
 
 // Job is a asynchronous function.
 type Job func() error
