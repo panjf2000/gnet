@@ -97,12 +97,12 @@ loopReact:
 	switch c.action == action {
 	case true:
 		goto loopReact
-	default:
+	case false:
+		c.action = action
 	}
 	_, _ = c.inboundBuffer.Write(c.cache.Bytes())
 	bytebuffer.Put(c.cache)
 	c.cache = nil
-	c.action = action
 	return lp.handleAction(c)
 }
 

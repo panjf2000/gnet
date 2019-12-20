@@ -39,7 +39,6 @@ func (lp *loop) handleEvent(fd int, filter int16) error {
 				if filter == netpoll.EVFilterWrite {
 					return lp.loopOut(c)
 				}
-				//return lp.loopIn(c)
 				return nil
 			case true:
 				if filter == netpoll.EVFilterRead {
