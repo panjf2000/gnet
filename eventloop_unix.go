@@ -104,14 +104,14 @@ loopReact:
 			c.write(frame)
 		}
 	}
-	switch c.action {
-	case None:
+	switch c.action == action {
+	case true:
 		goto loopReact
-	default:
+	case false:
+		c.action = action
 	}
 	_, _ = c.inboundBuffer.Write(c.cache)
 
-	c.action = action
 	return lp.handleAction(c)
 }
 
@@ -204,6 +204,7 @@ func (lp *loop) handleAction(c *conn) error {
 	case Shutdown:
 		return errShutdown
 	default:
+		c.action = None
 		return nil
 	}
 }

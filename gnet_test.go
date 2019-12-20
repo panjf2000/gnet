@@ -718,3 +718,52 @@ func TestBadAddresses(t *testing.T) {
 		t.Fatalf("expected nil, got '%v'", err)
 	}
 }
+
+func TestActionError(t *testing.T) {
+	testActionError("tcp", ":9991")
+}
+
+type testActionErrorServer struct {
+	*EventServer
+	network, addr string
+	action        bool
+}
+
+func (t *testActionErrorServer) OnClosed(c Conn, err error) (action Action) {
+	action = Shutdown
+	return
+}
+
+func (t *testActionErrorServer) React(c Conn) (out []byte, action Action) {
+	out = c.ReadFrame()
+	action = Close
+	return
+}
+
+func (t *testActionErrorServer) Tick() (delay time.Duration, action Action) {
+	if !t.action {
+		t.action = true
+		delay = time.Millisecond * 100
+		go func() {
+			conn, err := net.Dial(t.network, t.addr)
+			must(err)
+			defer conn.Close()
+			r := make([]byte, 10)
+			rand.Read(r)
+			_, _ = conn.Write(r)
+			_, err = conn.Read(r)
+			if err != nil {
+				panic(err)
+			}
+			fmt.Println(string(r))
+		}()
+		return
+	}
+	delay = time.Millisecond * 100
+	return
+}
+
+func testActionError(network, addr string) {
+	events := &testActionErrorServer{network: network, addr: addr}
+	must(Serve(events, network+"://"+addr, WithTicker(true)))
+}

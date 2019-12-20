@@ -79,13 +79,8 @@ func (lp *loop) loopAccept(c *stdConn) error {
 			_ = c.SetKeepAlivePeriod(lp.svr.opts.TCPKeepAlive)
 		}
 	}
-	switch action {
-	case Shutdown:
-		return errClosing
-	case Close:
-		return lp.loopClose(c)
-	}
-	return nil
+	c.action = action
+	return lp.handleAction(c)
 }
 
 func (lp *loop) loopRead(ti *tcpIn) error {
@@ -99,22 +94,16 @@ loopReact:
 			_, _ = c.conn.Write(frame)
 		}
 	}
-	switch c.action {
-	case None:
+	switch c.action == action {
+	case true:
 		goto loopReact
 	default:
 	}
 	_, _ = c.inboundBuffer.Write(c.cache.Bytes())
 	bytebuffer.Put(c.cache)
 	c.cache = nil
-	switch action {
-	case Shutdown:
-		return errClosing
-	case Close:
-		return lp.loopClose(c)
-	}
 	c.action = action
-	return nil
+	return lp.handleAction(c)
 }
 
 func (lp *loop) loopClose(c *stdConn) error {
@@ -194,13 +183,22 @@ func (lp *loop) loopWake(c *stdConn) error {
 	if out != nil {
 		_, _ = c.conn.Write(out)
 	}
-	switch action {
-	case Shutdown:
-		return errClosing
+	c.action = action
+	return lp.handleAction(c)
+}
+
+func (lp *loop) handleAction(c *stdConn) error {
+	switch c.action {
+	case None:
+		return nil
 	case Close:
 		return lp.loopClose(c)
+	case Shutdown:
+		return errShutdown
+	default:
+		c.action = None
+		return nil
 	}
-	return nil
 }
 
 func (lp *loop) loopReadUDP(c *stdConn) error {
