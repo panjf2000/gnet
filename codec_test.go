@@ -21,8 +21,18 @@ func TestLengthFieldBasedFrameCodecWith1(t *testing.T) {
 		InitialBytesToStrip: 1,
 	}
 	codec := NewLengthFieldBasedFrameCodec(encoderConfig, decoderConfig)
-	sz := 255
+
+	sz := 256
 	data := make([]byte, sz)
+	if _, err := rand.Read(data); err != nil {
+		panic(err)
+	}
+	if _, err := codec.Encode(nil, data); err == nil {
+		panic("should have a error of exceeding bytes.")
+	}
+
+	sz = 255
+	data = make([]byte, sz)
 	if _, err := rand.Read(data); err != nil {
 		panic(err)
 	}
@@ -58,8 +68,18 @@ func TestLengthFieldBasedFrameCodecWith2(t *testing.T) {
 		InitialBytesToStrip: 2,
 	}
 	codec := NewLengthFieldBasedFrameCodec(encoderConfig, decoderConfig)
-	sz := rand.Intn(10) * 1024
+
+	sz := 65536
 	data := make([]byte, sz)
+	if _, err := rand.Read(data); err != nil {
+		panic(err)
+	}
+	if _, err := codec.Encode(nil, data); err == nil {
+		panic("should have a error of exceeding bytes.")
+	}
+
+	sz = rand.Intn(10) * 1024
+	data = make([]byte, sz)
 	if _, err := rand.Read(data); err != nil {
 		panic(err)
 	}
@@ -97,8 +117,18 @@ func TestLengthFieldBasedFrameCodecWith3(t *testing.T) {
 		InitialBytesToStrip: 3,
 	}
 	codec := NewLengthFieldBasedFrameCodec(encoderConfig, decoderConfig)
-	sz := rand.Intn(10) * 64 * 1024
+
+	sz := 16777216
 	data := make([]byte, sz)
+	if _, err := rand.Read(data); err != nil {
+		panic(err)
+	}
+	if _, err := codec.Encode(nil, data); err == nil {
+		panic("should have a error of exceeding bytes.")
+	}
+
+	sz = rand.Intn(10) * 64 * 1024
+	data = make([]byte, sz)
 	if _, err := rand.Read(data); err != nil {
 		panic(err)
 	}
@@ -172,5 +202,12 @@ func TestLengthFieldBasedFrameCodecWith8(t *testing.T) {
 	out, _ = codec.Encode(nil, data)
 	if string(out[8:]) != string(data) {
 		t.Fatalf("data don't match with little endian, raw data: %s, encoded data: %s\n", string(data), string(out))
+	}
+}
+
+func TestFixedLengthFrameCodec_Encode(t *testing.T) {
+	codec := NewFixedLengthFrameCodec(8)
+	if data, err := codec.Encode(nil, make([]byte, 15)); data != nil || err != ErrInvalidFixedLength {
+		panic("should have a error of invalid fixed length")
 	}
 }
