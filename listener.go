@@ -8,14 +8,15 @@ package gnet
 import (
 	"net"
 	"os"
+	"sync"
 )
 
 type listener struct {
-	ln      net.Listener
-	lnaddr  net.Addr
-	pconn   net.PacketConn
-	f       *os.File
-	fd      int
-	network string
-	addr    string
+	f             *os.File
+	fd            int
+	ln            net.Listener
+	once          sync.Once
+	pconn         net.PacketConn
+	lnaddr        net.Addr
+	addr, network string
 }

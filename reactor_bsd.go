@@ -11,9 +11,9 @@ import "github.com/panjf2000/gnet/internal/netpoll"
 func (svr *server) activateMainReactor() {
 	defer svr.signalShutdown()
 
-	_ = svr.mainLoop.poller.Polling(func(fd int, filter int16) error {
+	sniffError(svr.mainLoop.poller.Polling(func(fd int, filter int16) error {
 		return svr.acceptNewConnection(fd)
-	})
+	}))
 }
 
 func (svr *server) activateSubReactor(lp *loop) {
@@ -23,7 +23,7 @@ func (svr *server) activateSubReactor(lp *loop) {
 		go lp.loopTicker()
 	}
 
-	_ = lp.poller.Polling(func(fd int, filter int16) error {
+	sniffError(lp.poller.Polling(func(fd int, filter int16) error {
 		if c, ack := lp.connections[fd]; ack {
 			//switch filter {
 			//// Don't change the ordering of processing EVFILT_WRITE | EVFILT_READ | EV_ERROR/EV_EOF unless you're 100%
@@ -57,5 +57,5 @@ func (svr *server) activateSubReactor(lp *loop) {
 			}
 		}
 		return nil
-	})
+	}))
 }

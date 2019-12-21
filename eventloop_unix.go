@@ -37,7 +37,7 @@ func (lp *loop) loopRun() {
 		go lp.loopTicker()
 	}
 
-	_ = lp.poller.Polling(lp.handleEvent)
+	sniffError(lp.poller.Polling(lp.handleEvent))
 }
 
 func (lp *loop) loopAccept(fd int) error {

@@ -10,15 +10,17 @@ package gnet
 import "os"
 
 func (ln *listener) close() {
-	if ln.ln != nil {
-		_ = ln.ln.Close()
-	}
-	if ln.pconn != nil {
-		_ = ln.pconn.Close()
-	}
-	if ln.network == "unix" {
-		_ = os.RemoveAll(ln.addr)
-	}
+	ln.once.Do(func() {
+		if ln.ln != nil {
+			sniffError(ln.ln.Close())
+		}
+		if ln.pconn != nil {
+			sniffError(ln.pconn.Close())
+		}
+		if ln.network == "unix" {
+			sniffError(os.RemoveAll(ln.addr))
+		}
+	})
 }
 
 func (ln *listener) system() error {
