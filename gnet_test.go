@@ -312,6 +312,14 @@ func TestServe(t *testing.T) {
 				testServe("udp", ":9992", false, true, false, 10)
 			})
 		})
+		t.Run("udp-async", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				testServe("udp", ":9991", false, false, true, 10)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				testServe("udp", ":9992", false, true, true, 10)
+			})
+		})
 		//t.Run("unix", func(t *testing.T) {
 		//	t.Run("1-loop", func(t *testing.T) {
 		//		testServe("unix", "socket9991", false, false, false, 10)
@@ -398,15 +406,12 @@ func (s *testServer) OnClosed(c Conn, err error) (action Action) {
 func (s *testServer) React(frame []byte, c Conn) (out []byte, action Action) {
 	if s.async {
 		if s.network == "tcp" {
-			//bufLen := c.BufferLength()
+			_ = c.BufferLength()
 			buf := bytebuffer.Get()
 			_, _ = buf.Write(frame)
 			s.bytesList = append(s.bytesList, buf)
 			// just for test
-			//c.ShiftN(bufLen - 1)
-			//
-			//c.ShiftN(bufLen)
-			//c.ResetBuffer()
+			c.ShiftN(1)
 			_ = s.workerPool.Submit(
 				func() {
 					c.AsyncWrite(buf.Bytes())
