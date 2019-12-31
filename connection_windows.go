@@ -77,7 +77,6 @@ func newUDPConn(lp *loop, localAddr, remoteAddr net.Addr, buf *bytebuffer.ByteBu
 func (c *stdConn) releaseUDP() {
 	c.ctx = nil
 	c.localAddr = nil
-	c.remoteAddr = nil
 	bytebuffer.Put(c.cache)
 	c.cache = nil
 }
