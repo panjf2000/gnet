@@ -435,18 +435,17 @@ func (s *testServer) React(frame []byte, c Conn) (out []byte, action Action) {
 		//		return
 		//	}
 		//	return
-	} else {
-		if s.network == "tcp" {
-			out = frame
-			return
-		}
-		//fmt.Printf("UDP from remote addr：%s to local addr: %s\n", c.RemoteAddr().String(), c.LocalAddr().String())
-		if s.network == "udp" {
-			out = frame
-			return
-		}
+	}
+	if s.network == "tcp" {
+		out = frame
 		return
 	}
+	//fmt.Printf("UDP from remote addr：%s to local addr: %s\n", c.RemoteAddr().String(), c.LocalAddr().String())
+	if s.network == "udp" {
+		out = frame
+		return
+	}
+	return
 }
 func (s *testServer) Tick() (delay time.Duration, action Action) {
 	if atomic.LoadInt32(&s.started) == 0 {
