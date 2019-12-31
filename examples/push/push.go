@@ -42,9 +42,8 @@ func (ps *pushServer) Tick() (delay time.Duration, action gnet.Action) {
 	delay = ps.tick
 	return
 }
-func (ps *pushServer) React(c gnet.Conn) (out []byte, action gnet.Action) {
-	out = c.Read()
-	c.ResetBuffer()
+func (ps *pushServer) React(frame []byte, c gnet.Conn) (out []byte, action gnet.Action) {
+	out = frame
 	return
 }
 
@@ -54,7 +53,7 @@ func main() {
 	var interval time.Duration
 	var ticker bool
 
-	// Example command: go run push.go --port 9000 --tick 1s
+	// Example command: go run push.go --port 9000 --tick 1s --multicore=true
 	flag.IntVar(&port, "port", 9000, "server port")
 	flag.BoolVar(&multicore, "multicore", true, "multicore")
 	flag.DurationVar(&interval, "tick", 0, "pushing tick")

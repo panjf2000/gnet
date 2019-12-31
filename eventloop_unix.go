@@ -70,7 +70,6 @@ func (lp *loop) loopOpen(c *conn) error {
 	c.localAddr = lp.svr.ln.lnaddr
 	c.remoteAddr = netpoll.SockaddrToTCPOrUnixAddr(c.sa)
 	out, action := lp.eventHandler.OnOpened(c)
-	c.action = action
 	if lp.svr.opts.TCPKeepAlive > 0 {
 		if _, ok := lp.svr.ln.ln.(*net.TCPListener); ok {
 			_ = netpoll.SetKeepAlive(c.fd, int(lp.svr.opts.TCPKeepAlive/time.Second))
@@ -84,7 +83,7 @@ func (lp *loop) loopOpen(c *conn) error {
 		_ = lp.poller.AddWrite(c.fd)
 	}
 
-	return lp.handleAction(c)
+	return lp.handleAction(c, action)
 }
 
 func (lp *loop) loopIn(c *conn) error {
@@ -97,22 +96,25 @@ func (lp *loop) loopIn(c *conn) error {
 	}
 	c.cache = lp.packet[:n]
 
-loopReact:
-	out, action := lp.eventHandler.React(c)
-	if out != nil {
-		if frame, err := lp.codec.Encode(c, out); err == nil {
-			c.write(frame)
+	for inFrame, _ := c.read(); inFrame != nil; inFrame, _ = c.read() {
+		out, action := lp.eventHandler.React(inFrame, c)
+		if out != nil {
+			if outFrame, err := lp.codec.Encode(c, out); err == nil {
+				c.write(outFrame)
+			}
 		}
-	}
-	switch c.action == action {
-	case true:
-		goto loopReact
-	case false:
-		c.action = action
+
+		switch action {
+		case None:
+		case Close:
+			return lp.loopCloseConn(c, nil)
+		case Shutdown:
+			return errShutdown
+		}
 	}
 	_, _ = c.inboundBuffer.Write(c.cache)
 
-	return lp.handleAction(c)
+	return nil
 }
 
 func (lp *loop) loopOut(c *conn) error {
@@ -161,12 +163,11 @@ func (lp *loop) loopWake(c *conn) error {
 	if co, ok := lp.connections[c.fd]; !ok || co != c {
 		return nil // ignore stale wakes.
 	}
-	out, action := lp.eventHandler.React(c)
-	c.action = action
+	out, action := lp.eventHandler.React(nil, c)
 	if out != nil {
 		c.write(out)
 	}
-	return lp.handleAction(c)
+	return lp.handleAction(c, action)
 }
 
 func (lp *loop) loopTicker() {
@@ -195,8 +196,8 @@ func (lp *loop) loopTicker() {
 	}
 }
 
-func (lp *loop) handleAction(c *conn) error {
-	switch c.action {
+func (lp *loop) handleAction(c *conn, action Action) error {
+	switch action {
 	case None:
 		return nil
 	case Close:
@@ -204,7 +205,6 @@ func (lp *loop) handleAction(c *conn) error {
 	case Shutdown:
 		return errShutdown
 	default:
-		c.action = None
 		return nil
 	}
 }
@@ -214,8 +214,8 @@ func (lp *loop) loopUDPIn(fd int) error {
 	if err != nil || n == 0 {
 		return nil
 	}
-	c := newUDPConn(fd, lp, sa, lp.packet[:n])
-	out, action := lp.eventHandler.React(c)
+	c := newUDPConn(fd, lp, sa)
+	out, action := lp.eventHandler.React(lp.packet[:n], c)
 	if out != nil {
 		lp.eventHandler.PreWrite()
 		c.sendTo(out)

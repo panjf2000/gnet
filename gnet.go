@@ -28,9 +28,6 @@ const (
 
 	// Shutdown shutdowns the server.
 	Shutdown
-
-	// Skip indicates that the connection ought to break the "loopReact" and resume.
-	Skip
 )
 
 // Server represents a server context which provides information about the
@@ -69,15 +66,6 @@ type Conn interface {
 
 	// RemoteAddr is the connection's remote peer address.
 	RemoteAddr() (addr net.Addr)
-
-	// Wake triggers a React event for this connection.
-	//Wake()
-
-	// ReadFromUDP reads data for UDP socket.
-	ReadFromUDP() (buf []byte)
-
-	// ReadFrame returns either a frame from TCP stream based on codec or nil when there isn't a complete frame yet.
-	ReadFrame() (buf []byte)
 
 	// Read reads all data from inbound ring-buffer without moving "read" pointer, which means
 	// it does not evict the data from ring-buffer actually and those data will present in ring-buffer until the
@@ -140,7 +128,7 @@ type (
 		// React fires when a connection sends the server data.
 		// Invoke c.Read() or c.ReadN(n) within the parameter c to read incoming data from client/connection.
 		// Use the out return value to write data to the client/connection.
-		React(c Conn) (out []byte, action Action)
+		React(frame []byte, c Conn) (out []byte, action Action)
 
 		// Tick fires immediately after the server starts and will fire again
 		// following the duration specified by the delay return value.
@@ -180,7 +168,7 @@ func (es *EventServer) PreWrite() {
 // React fires when a connection sends the server data.
 // Invoke c.Read() or c.ReadN(n) within the parameter c to read incoming data from client/connection.
 // Use the out return value to write data to the client/connection.
-func (es *EventServer) React(c Conn) (out []byte, action Action) {
+func (es *EventServer) React(frame []byte, c Conn) (out []byte, action Action) {
 	return
 }
 

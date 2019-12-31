@@ -25,7 +25,6 @@ type conn struct {
 	cache          []byte                 // reuse memory of inbound data
 	codec          ICodec                 // codec for TCP
 	opened         bool                   // connection opened event fired
-	action         Action                 // next user action
 	localAddr      net.Addr               // local addr
 	remoteAddr     net.Addr               // remote addr
 	byteBuffer     *bytebuffer.ByteBuffer // bytes buffer for buffering current packet and data in ring-buffer
@@ -53,17 +52,16 @@ func (c *conn) releaseTCP() {
 	c.remoteAddr = nil
 	prb.Put(c.inboundBuffer)
 	prb.Put(c.outboundBuffer)
-	c.inboundBuffer = nil
-	c.outboundBuffer = nil
+	//c.inboundBuffer = nil
+	//c.outboundBuffer = nil
 	bytebuffer.Put(c.byteBuffer)
 	c.byteBuffer = nil
 }
 
-func newUDPConn(fd int, lp *loop, sa unix.Sockaddr, buf []byte) *conn {
+func newUDPConn(fd int, lp *loop, sa unix.Sockaddr) *conn {
 	return &conn{
 		fd:         fd,
 		sa:         sa,
-		cache:      buf,
 		localAddr:  lp.svr.ln.lnaddr,
 		remoteAddr: netpoll.SockaddrToUDPAddr(sa),
 	}
@@ -71,7 +69,6 @@ func newUDPConn(fd int, lp *loop, sa unix.Sockaddr, buf []byte) *conn {
 
 func (c *conn) releaseUDP() {
 	c.ctx = nil
-	c.cache = nil
 	c.localAddr = nil
 	c.remoteAddr = nil
 }
@@ -86,6 +83,10 @@ func (c *conn) open(buf []byte) {
 	if n < len(buf) {
 		_, _ = c.outboundBuffer.Write(buf[n:])
 	}
+}
+
+func (c *conn) read() ([]byte, error) {
+	return c.codec.Decode(c)
 }
 
 func (c *conn) write(buf []byte) {
@@ -115,18 +116,6 @@ func (c *conn) sendTo(buf []byte) {
 
 // ================================= Public APIs of gnet.Conn =================================
 
-func (c *conn) ReadFromUDP() []byte {
-	return c.cache
-}
-
-func (c *conn) ReadFrame() []byte {
-	buf, _ := c.codec.Decode(c)
-	if buf == nil {
-		c.action = Skip
-	}
-	return buf
-}
-
 func (c *conn) Read() []byte {
 	if c.inboundBuffer.IsEmpty() {
 		return c.cache
@@ -137,8 +126,7 @@ func (c *conn) Read() []byte {
 }
 
 func (c *conn) ResetBuffer() {
-	c.action = Skip
-	c.cache = c.cache[:0]
+	c.cache = nil
 	c.inboundBuffer.Reset()
 	bytebuffer.Put(c.byteBuffer)
 	c.byteBuffer = nil
@@ -162,7 +150,6 @@ func (c *conn) ShiftN(n int) (size int) {
 	}
 	c.byteBuffer.B = c.byteBuffer.B[n:]
 	if c.byteBuffer.Len() == 0 {
-		c.action = Skip
 		bytebuffer.Put(c.byteBuffer)
 		c.byteBuffer = nil
 	}
@@ -185,7 +172,6 @@ func (c *conn) ReadN(n int) (size int, buf []byte) {
 	oneOffBufferLen := len(c.cache)
 	inBufferLen := c.inboundBuffer.Length()
 	if inBufferLen+oneOffBufferLen < n || n <= 0 {
-		c.action = Skip
 		return
 	}
 	size = n
@@ -212,16 +198,11 @@ func (c *conn) ReadN(n int) (size int, buf []byte) {
 	buf = append(buf, c.cache[:restSize]...)
 	if restSize == oneOffBufferLen {
 		c.cache = c.cache[:0]
-		c.action = Skip
 	} else {
 		c.cache = c.cache[restSize:]
 	}
 	return
 }
-
-//func (c *conn) InboundBuffer() *ringbuffer.RingBuffer {
-//	return c.inboundBuffer
-//}
 
 func (c *conn) BufferLength() int {
 	return c.inboundBuffer.Length() + len(c.cache)

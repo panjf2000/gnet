@@ -178,9 +178,9 @@ func (s *testCodecServer) OnClosed(c Conn, err error) (action Action) {
 
 	return
 }
-func (s *testCodecServer) React(c Conn) (out []byte, action Action) {
+func (s *testCodecServer) React(frame []byte, c Conn) (out []byte, action Action) {
 	if s.async {
-		if frame := c.ReadFrame(); frame != nil {
+		if frame != nil {
 			data := append([]byte{}, frame...)
 			_ = s.workerPool.Submit(func() {
 				c.AsyncWrite(data)
@@ -188,7 +188,7 @@ func (s *testCodecServer) React(c Conn) (out []byte, action Action) {
 		}
 		return
 	}
-	out = c.ReadFrame()
+	out = frame
 	return
 }
 func (s *testCodecServer) Tick() (delay time.Duration, action Action) {
@@ -395,17 +395,17 @@ func (s *testServer) OnClosed(c Conn, err error) (action Action) {
 
 	return
 }
-func (s *testServer) React(c Conn) (out []byte, action Action) {
+func (s *testServer) React(frame []byte, c Conn) (out []byte, action Action) {
 	if s.async {
 		if s.network == "tcp" {
-			bufLen := c.BufferLength()
+			//bufLen := c.BufferLength()
 			buf := bytebuffer.Get()
-			_, _ = buf.Write(c.Read())
+			_, _ = buf.Write(frame)
 			s.bytesList = append(s.bytesList, buf)
 			// just for test
-			c.ShiftN(bufLen - 1)
-
-			c.ShiftN(bufLen)
+			//c.ShiftN(bufLen - 1)
+			//
+			//c.ShiftN(bufLen)
 			//c.ResetBuffer()
 			_ = s.workerPool.Submit(
 				func() {
@@ -414,36 +414,35 @@ func (s *testServer) React(c Conn) (out []byte, action Action) {
 			return
 		}
 		if s.network == "udp" {
-			data := c.ReadFromUDP()
 			_ = s.workerPool.Submit(
 				func() {
-					c.SendTo(data)
+					c.SendTo(frame)
 				})
 			return
 		}
 		return
-	} else if s.multicore {
-		if s.network == "tcp" {
-			readSize := 1024 * 1024
-			n, data := c.ReadN(readSize)
-			if n == readSize {
-				out = data
-			}
-			return
-		}
-		if s.network == "udp" {
-			out = c.ReadFromUDP()
-			return
-		}
-		return
+		//} else if s.multicore {
+		//	if s.network == "tcp" {
+		//		readSize := 1024 * 1024
+		//		n, data := c.ReadN(readSize)
+		//		if n == readSize {
+		//			out = data
+		//		}
+		//		return
+		//	}
+		//	if s.network == "udp" {
+		//		out = frame
+		//		return
+		//	}
+		//	return
 	} else {
 		if s.network == "tcp" {
-			out = c.ReadFrame()
+			out = frame
 			return
 		}
 		//fmt.Printf("UDP from remote addr：%s to local addr: %s\n", c.RemoteAddr().String(), c.LocalAddr().String())
 		if s.network == "udp" {
-			out = c.ReadFromUDP()
+			out = frame
 			return
 		}
 		return
@@ -602,7 +601,7 @@ func (t *testWakeConnServer) OnClosed(c Conn, err error) (action Action) {
 	return
 }
 
-func (t *testWakeConnServer) React(c Conn) (out []byte, action Action) {
+func (t *testWakeConnServer) React(frame []byte, c Conn) (out []byte, action Action) {
 	out = []byte("Waking up.")
 	return
 }
@@ -734,8 +733,8 @@ func (t *testActionErrorServer) OnClosed(c Conn, err error) (action Action) {
 	return
 }
 
-func (t *testActionErrorServer) React(c Conn) (out []byte, action Action) {
-	out = c.ReadFrame()
+func (t *testActionErrorServer) React(frame []byte, c Conn) (out []byte, action Action) {
+	out = frame
 	action = Close
 	return
 }

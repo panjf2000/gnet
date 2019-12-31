@@ -79,31 +79,34 @@ func (lp *loop) loopAccept(c *stdConn) error {
 			_ = c.SetKeepAlivePeriod(lp.svr.opts.TCPKeepAlive)
 		}
 	}
-	c.action = action
-	return lp.handleAction(c)
+	return lp.handleAction(c, action)
 }
 
 func (lp *loop) loopRead(ti *tcpIn) error {
 	c := ti.c
 	c.cache = ti.in
-loopReact:
-	out, action := lp.eventHandler.React(c)
-	if out != nil {
-		lp.eventHandler.PreWrite()
-		if frame, err := lp.codec.Encode(c, out); err == nil {
-			_, _ = c.conn.Write(frame)
+
+	for inFrame, _ := c.read(); inFrame != nil; inFrame, _ = c.read() {
+		out, action := lp.eventHandler.React(inFrame, c)
+		if out != nil {
+			lp.eventHandler.PreWrite()
+			if frame, err := lp.codec.Encode(c, out); err == nil {
+				_, _ = c.conn.Write(frame)
+			}
 		}
-	}
-	switch c.action == action {
-	case true:
-		goto loopReact
-	case false:
-		c.action = action
+
+		switch action {
+		case None:
+		case Close:
+			return lp.loopClose(c)
+		case Shutdown:
+			return errShutdown
+		}
 	}
 	_, _ = c.inboundBuffer.Write(c.cache.Bytes())
 	bytebuffer.Put(c.cache)
 	c.cache = nil
-	return lp.handleAction(c)
+	return nil
 }
 
 func (lp *loop) loopClose(c *stdConn) error {
@@ -179,16 +182,15 @@ func (lp *loop) loopWake(c *stdConn) error {
 	if _, ok := lp.connections[c]; !ok {
 		return nil // ignore stale wakes.
 	}
-	out, action := lp.eventHandler.React(c)
+	out, action := lp.eventHandler.React(nil, c)
 	if out != nil {
 		_, _ = c.conn.Write(out)
 	}
-	c.action = action
-	return lp.handleAction(c)
+	return lp.handleAction(c, action)
 }
 
-func (lp *loop) handleAction(c *stdConn) error {
-	switch c.action {
+func (lp *loop) handleAction(c *stdConn, action Action) error {
+	switch action {
 	case None:
 		return nil
 	case Close:
@@ -196,13 +198,12 @@ func (lp *loop) handleAction(c *stdConn) error {
 	case Shutdown:
 		return errShutdown
 	default:
-		c.action = None
 		return nil
 	}
 }
 
 func (lp *loop) loopReadUDP(c *stdConn) error {
-	out, action := lp.eventHandler.React(c)
+	out, action := lp.eventHandler.React(c.cache.Bytes(), c)
 	if out != nil {
 		lp.eventHandler.PreWrite()
 		_, _ = lp.svr.ln.pconn.WriteTo(out, c.remoteAddr)

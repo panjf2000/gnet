@@ -40,7 +40,6 @@ type stdConn struct {
 	done          int32                  // 0: attached, 1: closed
 	cache         *bytebuffer.ByteBuffer // reuse memory of inbound data
 	codec         ICodec                 // codec for TCP
-	action        Action                 // next user action
 	localAddr     net.Addr               // local server addr
 	remoteAddr    net.Addr               // remote peer addr
 	byteBuffer    *bytebuffer.ByteBuffer // bytes buffer for buffering current packet and data in ring-buffer
@@ -61,7 +60,7 @@ func (c *stdConn) releaseTCP() {
 	c.localAddr = nil
 	c.remoteAddr = nil
 	prb.Put(c.inboundBuffer)
-	c.inboundBuffer = nil
+	//c.inboundBuffer = nil
 	bytebuffer.Put(c.cache)
 	c.cache = nil
 }
@@ -83,22 +82,17 @@ func (c *stdConn) releaseUDP() {
 	c.cache = nil
 }
 
+func (c *stdConn) read() ([]byte, error) {
+	return c.codec.Decode(c)
+}
+
 // ================================= Public APIs of gnet.Conn =================================
-
-func (c *stdConn) ReadFromUDP() []byte {
-	return c.cache.Bytes()
-}
-
-func (c *stdConn) ReadFrame() []byte {
-	buf, _ := c.codec.Decode(c)
-	if buf == nil {
-		c.action = Skip
-	}
-	return buf
-}
 
 func (c *stdConn) Read() []byte {
 	if c.inboundBuffer.IsEmpty() {
+		if c.cache.Len() == 0 {
+			return nil
+		}
 		return c.cache.Bytes()
 	}
 	bytebuffer.Put(c.byteBuffer)
@@ -107,7 +101,6 @@ func (c *stdConn) Read() []byte {
 }
 
 func (c *stdConn) ResetBuffer() {
-	c.action = Skip
 	c.cache.Reset()
 	c.inboundBuffer.Reset()
 	bytebuffer.Put(c.byteBuffer)
@@ -132,7 +125,6 @@ func (c *stdConn) ShiftN(n int) (size int) {
 	}
 	c.byteBuffer.B = c.byteBuffer.B[n:]
 	if c.byteBuffer.Len() == 0 {
-		c.action = Skip
 		bytebuffer.Put(c.byteBuffer)
 		c.byteBuffer = nil
 	}
@@ -155,7 +147,6 @@ func (c *stdConn) ReadN(n int) (size int, buf []byte) {
 	oneOffBufferLen := c.cache.Len()
 	inBufferLen := c.inboundBuffer.Length()
 	if inBufferLen+oneOffBufferLen < n || n <= 0 {
-		c.action = Skip
 		return
 	}
 	size = n
@@ -182,16 +173,11 @@ func (c *stdConn) ReadN(n int) (size int, buf []byte) {
 	buf = append(buf, c.cache.B[:restSize]...)
 	if restSize == oneOffBufferLen {
 		c.cache.Reset()
-		c.action = Skip
 	} else {
 		c.cache.B = c.cache.B[restSize:]
 	}
 	return
 }
-
-//func (c *stdConn) InboundBuffer() *ringbuffer.RingBuffer {
-//	return c.inboundBuffer
-//}
 
 func (c *stdConn) BufferLength() int {
 	return c.inboundBuffer.Length() + c.cache.Len()

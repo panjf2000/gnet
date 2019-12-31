@@ -26,15 +26,15 @@ func (cs *codecServer) OnInitComplete(srv gnet.Server) (action gnet.Action) {
 	return
 }
 
-func (cs *codecServer) React(c gnet.Conn) (out []byte, action gnet.Action) {
+func (cs *codecServer) React(frame []byte, c gnet.Conn) (out []byte, action gnet.Action) {
 	if cs.async {
-		data := append([]byte{}, c.ReadFrame()...)
+		data := append([]byte{}, frame...)
 		_ = cs.workerPool.Submit(func() {
 			c.AsyncWrite(data)
 		})
 		return
 	}
-	out = c.ReadFrame()
+	out = frame
 	return
 }
 
@@ -67,10 +67,10 @@ func main() {
 	var port int
 	var multicore bool
 
-	// Example command: go run server.go --port 9000 --multicore true
+	// Example command: go run server.go --port 9000 --multicore=true
 	flag.IntVar(&port, "port", 9000, "server port")
 	flag.BoolVar(&multicore, "multicore", true, "multicore")
 	flag.Parse()
 	addr := fmt.Sprintf("tcp://:%d", port)
-	testCodecServe(addr, true, false, nil)
+	testCodecServe(addr, multicore, false, nil)
 }

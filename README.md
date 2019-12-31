@@ -121,6 +121,9 @@ The simplest example to get you started playing with `gnet` would be the echo se
 
 ### Echo server without blocking logic
 
+<details>
+	<summary> Old version(<=v1.0.0-rc.4)  </summary>
+
 ```go
 package main
 
@@ -145,10 +148,38 @@ func main() {
 	log.Fatal(gnet.Serve(echo, "tcp://:9000", gnet.WithMulticore(true)))
 }
 ```
+</details>
+
+```go
+package main
+
+import (
+	"log"
+
+	"github.com/panjf2000/gnet"
+)
+
+type echoServer struct {
+	*gnet.EventServer
+}
+
+func (es *echoServer) React(frame []byte, c gnet.Conn) (out []byte, action gnet.Action) {
+	out = frame
+	return
+}
+
+func main() {
+	echo := new(echoServer)
+	log.Fatal(gnet.Serve(echo, "tcp://:9000", gnet.WithMulticore(true)))
+}
+```
 
 As you can see, this example of echo server only sets up the `EventHandler.React` function where you commonly write your main business code and it will be invoked once the server receives input data from a client. The output data will be then sent back to that client by assigning the `out` variable and return it after your business code finish processing data(in this case, it just echo the data back).
 
 ### Echo server with blocking logic
+
+<details>
+	<summary> Old version(<=v1.0.0-rc.4)  </summary>
 
 ```go
 package main
@@ -187,6 +218,44 @@ func main() {
 	log.Fatal(gnet.Serve(echo, "tcp://:9000", gnet.WithMulticore(true)))
 }
 ```
+</details>
+
+```go
+package main
+
+import (
+	"log"
+	"time"
+
+	"github.com/panjf2000/gnet"
+	"github.com/panjf2000/gnet/pool/goroutine"
+)
+
+type echoServer struct {
+	*gnet.EventServer
+	pool *goroutine.Pool
+}
+
+func (es *echoServer) React(frame []byte, c gnet.Conn) (out []byte, action gnet.Action) {
+	data := append([]byte{}, frame...)
+
+	// Use ants pool to unblock the event-loop.
+	_ = es.pool.Submit(func() {
+		time.Sleep(1 * time.Second)
+		c.AsyncWrite(data)
+	})
+
+	return
+}
+
+func main() {
+	p := goroutine.Default()
+	defer p.Release()
+
+	echo := &echoServer{pool: p}
+	log.Fatal(gnet.Serve(echo, "tcp://:9000", gnet.WithMulticore(true)))
+}
+```
 
 Like I said in the 『Multiple Reactors + Goroutine-Pool』section, if there are blocking code in your business logic, then you ought to turn them into non-blocking code in any way, for instance you can wrap them into a goroutine, but it will result in a massive amount of goroutines if massive traffic is passing through your server so I would suggest you utilize a goroutine pool like [ants](https://github.com/panjf2000/ants) to manage those goroutines and reduce the cost of system resources.
 
@@ -215,16 +284,14 @@ func (es *echoServer) OnInitComplete(srv gnet.Server) (action gnet.Action) {
 		srv.Addr.String(), srv.Multicore, srv.NumLoops)
 	return
 }
-func (es *echoServer) React(c gnet.Conn) (out []byte, action gnet.Action) {
+func (es *echoServer) React(frame []byte, c gnet.Conn) (out []byte, action gnet.Action) {
 	// Echo synchronously.
-	out = c.Read()
-	c.ResetBuffer()
+	out = frame
 	return
 
 	/*
 		// Echo asynchronously.
-		data := append([]byte{}, c.Read()...)
-		c.ResetBuffer()
+		data := append([]byte{}, frame...)
 		go func() {
 			time.Sleep(time.Second)
 			c.AsyncWrite(data)
@@ -237,7 +304,7 @@ func main() {
 	var port int
 	var multicore bool
 
-	// Example command: go run echo.go --port 9000 --multicore true
+	// Example command: go run echo.go --port 9000 --multicore=true
 	flag.IntVar(&port, "port", 9000, "--port 9000")
 	flag.BoolVar(&multicore, "multicore", false, "--multicore true")
 	flag.Parse()
@@ -270,14 +337,14 @@ func (es *echoServer) OnInitComplete(srv gnet.Server) (action gnet.Action) {
 		srv.Addr.String(), srv.Multicore, srv.NumLoops)
 	return
 }
-func (es *echoServer) React(c gnet.Conn) (out []byte, action gnet.Action) {
+func (es *echoServer) React(frame []byte, c gnet.Conn) (out []byte, action gnet.Action) {
 	// Echo synchronously.
-	out = c.ReadFromUDP()
+	out = frame
 	return
 
 	/*
 		// Echo asynchronously.
-		data := append([]byte{}, c.ReadFromUDP()...)
+		data := append([]byte{}, frame...)
 		go func() {
 			time.Sleep(time.Second)
 			c.SendTo(data)
@@ -290,7 +357,7 @@ func main() {
 	var port int
 	var multicore, reuseport bool
 
-	// Example command: go run echo.go --port 9000 --multicore true --reuseport true
+	// Example command: go run echo.go --port 9000 --multicore=true --reuseport=true
 	flag.IntVar(&port, "port", 9000, "--port 9000")
 	flag.BoolVar(&multicore, "multicore", false, "--multicore true")
 	flag.BoolVar(&reuseport, "reuseport", false, "--reuseport true")
@@ -368,16 +435,12 @@ func (hs *httpServer) OnInitComplete(srv gnet.Server) (action gnet.Action) {
 	return
 }
 
-func (hs *httpServer) React(c gnet.Conn) (out []byte, action gnet.Action) {
-	data := c.ReadFrame()
+func (hs *httpServer) React(frame []byte, c gnet.Conn) (out []byte, action gnet.Action) {
 	// process the pipeline
 	if c.Context() != nil {
 		// bad thing happened
 		out = errMsgBytes
 		action = gnet.Close
-		return
-	} else if data == nil {
-		// request not ready, yet
 		return
 	}
 	// handle the request
@@ -389,7 +452,7 @@ func main() {
 	var port int
 	var multicore bool
 
-	// Example command: go run http.go --port 8080 --multicore true
+	// Example command: go run http.go --port 8080 --multicore=true
 	flag.IntVar(&port, "port", 8080, "server port")
 	flag.BoolVar(&multicore, "multicore", true, "multicore")
 	flag.Parse()
@@ -553,9 +616,8 @@ func (ps *pushServer) Tick() (delay time.Duration, action gnet.Action) {
 	delay = ps.tick
 	return
 }
-func (ps *pushServer) React(c gnet.Conn) (out []byte, action gnet.Action) {
-	out = c.Read()
-	c.ResetBuffer()
+func (ps *pushServer) React(frame []byte, c gnet.Conn) (out []byte, action gnet.Action) {
+	out = frame
 	return
 }
 
@@ -565,7 +627,7 @@ func main() {
 	var interval time.Duration
 	var ticker bool
 
-	// Example command: go run push.go --port 9000 --tick 1s
+	// Example command: go run push.go --port 9000 --tick 1s --multicore=true
 	flag.IntVar(&port, "port", 9000, "server port")
 	flag.BoolVar(&multicore, "multicore", true, "multicore")
 	flag.DurationVar(&interval, "tick", 0, "pushing tick")
@@ -673,15 +735,15 @@ func (cs *codecServer) OnInitComplete(srv gnet.Server) (action gnet.Action) {
 	return
 }
 
-func (cs *codecServer) React(c gnet.Conn) (out []byte, action gnet.Action) {
+func (cs *codecServer) React(frame []byte, c gnet.Conn) (out []byte, action gnet.Action) {
 	if cs.async {
-		data := append([]byte{}, c.ReadFrame()...)
+		data := append([]byte{}, frame...)
 		_ = cs.workerPool.Submit(func() {
 			c.AsyncWrite(data)
 		})
 		return
 	}
-	out = c.ReadFrame()
+	out = frame
 	return
 }
 
@@ -714,12 +776,12 @@ func main() {
 	var port int
 	var multicore bool
 
-	// Example command: go run server.go --port 9000 --multicore true
+	// Example command: go run server.go --port 9000 --multicore=true
 	flag.IntVar(&port, "port", 9000, "server port")
 	flag.BoolVar(&multicore, "multicore", true, "multicore")
 	flag.Parse()
 	addr := fmt.Sprintf("tcp://:%d", port)
-	testCodecServe(addr, true, false, nil)
+	testCodecServe(addr, multicore, false, nil)
 }
 ```
 </details>

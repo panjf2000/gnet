@@ -66,16 +66,12 @@ func (hs *httpServer) OnInitComplete(srv gnet.Server) (action gnet.Action) {
 	return
 }
 
-func (hs *httpServer) React(c gnet.Conn) (out []byte, action gnet.Action) {
-	data := c.ReadFrame()
+func (hs *httpServer) React(frame []byte, c gnet.Conn) (out []byte, action gnet.Action) {
 	// process the pipeline
 	if c.Context() != nil {
 		// bad thing happened
 		out = errMsgBytes
 		action = gnet.Close
-		return
-	} else if data == nil {
-		// request not ready, yet
 		return
 	}
 	// handle the request
@@ -87,7 +83,7 @@ func main() {
 	var port int
 	var multicore bool
 
-	// Example command: go run http.go --port 8080 --multicore true
+	// Example command: go run http.go --port 8080 --multicore=true
 	flag.IntVar(&port, "port", 8080, "server port")
 	flag.BoolVar(&multicore, "multicore", true, "multicore")
 	flag.Parse()

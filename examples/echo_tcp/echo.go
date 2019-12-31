@@ -22,16 +22,14 @@ func (es *echoServer) OnInitComplete(srv gnet.Server) (action gnet.Action) {
 		srv.Addr.String(), srv.Multicore, srv.NumLoops)
 	return
 }
-func (es *echoServer) React(c gnet.Conn) (out []byte, action gnet.Action) {
+func (es *echoServer) React(frame []byte, c gnet.Conn) (out []byte, action gnet.Action) {
 	// Echo synchronously.
-	out = c.Read()
-	c.ResetBuffer()
+	out = frame
 	return
 
 	/*
 		// Echo asynchronously.
-		data := append([]byte{}, c.Read()...)
-		c.ResetBuffer()
+		data := append([]byte{}, frame...)
 		go func() {
 			time.Sleep(time.Second)
 			c.AsyncWrite(data)
@@ -44,7 +42,7 @@ func main() {
 	var port int
 	var multicore bool
 
-	// Example command: go run echo.go --port 9000 --multicore true
+	// Example command: go run echo.go --port 9000 --multicore=true
 	flag.IntVar(&port, "port", 9000, "--port 9000")
 	flag.BoolVar(&multicore, "multicore", false, "--multicore true")
 	flag.Parse()
