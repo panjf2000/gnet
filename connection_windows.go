@@ -60,7 +60,7 @@ func (c *stdConn) releaseTCP() {
 	c.localAddr = nil
 	c.remoteAddr = nil
 	prb.Put(c.inboundBuffer)
-	//c.inboundBuffer = nil
+	c.inboundBuffer = nil
 	bytebuffer.Put(c.cache)
 	c.cache = nil
 }

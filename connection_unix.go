@@ -52,8 +52,8 @@ func (c *conn) releaseTCP() {
 	c.remoteAddr = nil
 	prb.Put(c.inboundBuffer)
 	prb.Put(c.outboundBuffer)
-	//c.inboundBuffer = nil
-	//c.outboundBuffer = nil
+	c.inboundBuffer = nil
+	c.outboundBuffer = nil
 	bytebuffer.Put(c.byteBuffer)
 	c.byteBuffer = nil
 }
