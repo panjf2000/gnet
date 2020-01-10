@@ -890,7 +890,7 @@ func (c *Conn) flush() (int, error) {
 	if n == 0 {
 		return 0, nil
 	}
-	c.conn.SendTo(c.sendBuf.Bytes())
+	c.conn.AsyncWrite(c.sendBuf.Bytes())
 	c.bytesSent += int64(n)
 	c.sendBuf.Reset()
 	return n, nil
