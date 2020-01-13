@@ -10,19 +10,20 @@ import "github.com/panjf2000/gnet/internal/netpoll"
 
 func (lp *loop) handleEvent(fd int, ev uint32) error {
 	if c, ok := lp.connections[fd]; ok {
-		switch {
+		switch c.outboundBuffer.IsEmpty() {
 		// Don't change the ordering of processing EPOLLOUT | EPOLLRDHUP / EPOLLIN unless you're 100%
 		// sure what you're doing!
 		// Re-ordering can easily introduce bugs and bad side-effects, as I found out painfully in the past.
-		case !c.opened:
-			return lp.loopOpen(c)
-		case !c.outboundBuffer.IsEmpty():
+		case false:
 			if ev&netpoll.OutEvents != 0 {
 				return lp.loopOut(c)
 			}
 			return nil
-		case ev&netpoll.InEvents != 0:
-			return lp.loopIn(c)
+		case true:
+			if ev&netpoll.InEvents != 0 {
+				return lp.loopIn(c)
+			}
+			return nil
 		default:
 			return nil
 		}

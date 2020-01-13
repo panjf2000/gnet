@@ -56,11 +56,11 @@ func (lp *loop) loopAccept(fd int) error {
 			return err
 		}
 		c := newTCPConn(nfd, lp, sa)
-		if err = lp.poller.AddReadWrite(c.fd); err == nil {
+		if err = lp.poller.AddRead(c.fd); err == nil {
 			lp.connections[c.fd] = c
-		} else {
-			return err
+			return lp.loopOpen(c)
 		}
+		return err
 	}
 	return nil
 }
