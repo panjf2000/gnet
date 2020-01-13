@@ -3,8 +3,8 @@ package gnet
 import "errors"
 
 var (
-	// errShutdown server is closing.
-	errShutdown = errors.New("server is going to be shutdown")
+	// errServerShutdown server is closing.
+	errServerShutdown = errors.New("server is going to be shutdown")
 	// ErrInvalidFixedLength invalid fixed length.
 	ErrInvalidFixedLength = errors.New("invalid fixed length of bytes")
 	// ErrUnexpectedEOF no enough data to read.

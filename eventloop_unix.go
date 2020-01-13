@@ -109,7 +109,11 @@ func (lp *loop) loopIn(c *conn) error {
 		case Close:
 			return lp.loopCloseConn(c, nil)
 		case Shutdown:
-			return errShutdown
+			return errServerShutdown
+		}
+
+		if !c.opened {
+			return nil
 		}
 	}
 	_, _ = c.inboundBuffer.Write(c.cache)
@@ -152,7 +156,7 @@ func (lp *loop) loopCloseConn(c *conn, err error) error {
 		delete(lp.connections, c.fd)
 		switch lp.eventHandler.OnClosed(c, err) {
 		case Shutdown:
-			return errShutdown
+			return errServerShutdown
 		}
 		c.releaseTCP()
 	}
@@ -182,7 +186,7 @@ func (lp *loop) loopTicker() {
 			switch action {
 			case None:
 			case Shutdown:
-				err = errShutdown
+				err = errServerShutdown
 			}
 			return
 		}); err != nil {
@@ -203,7 +207,7 @@ func (lp *loop) handleAction(c *conn, action Action) error {
 	case Close:
 		return lp.loopCloseConn(c, nil)
 	case Shutdown:
-		return errShutdown
+		return errServerShutdown
 	default:
 		return nil
 	}
@@ -222,7 +226,7 @@ func (lp *loop) loopUDPIn(fd int) error {
 	}
 	switch action {
 	case Shutdown:
-		return errShutdown
+		return errServerShutdown
 	}
 	c.releaseUDP()
 	return nil

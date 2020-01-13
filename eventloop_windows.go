@@ -85,13 +85,14 @@ func (lp *loop) loopAccept(c *stdConn) error {
 func (lp *loop) loopRead(ti *tcpIn) error {
 	c := ti.c
 	c.cache = ti.in
+	var e error
 
 	for inFrame, _ := c.read(); inFrame != nil; inFrame, _ = c.read() {
 		out, action := lp.eventHandler.React(inFrame, c)
 		if out != nil {
 			lp.eventHandler.PreWrite()
 			if frame, err := lp.codec.Encode(c, out); err == nil {
-				_, _ = c.conn.Write(frame)
+				_, e = c.conn.Write(frame)
 			}
 		}
 
@@ -100,7 +101,11 @@ func (lp *loop) loopRead(ti *tcpIn) error {
 		case Close:
 			return lp.loopClose(c)
 		case Shutdown:
-			return errShutdown
+			return errServerShutdown
+		}
+
+		if e != nil {
+			return lp.loopClose(c)
 		}
 	}
 	_, _ = c.inboundBuffer.Write(c.cache.Bytes())
@@ -196,7 +201,7 @@ func (lp *loop) handleAction(c *stdConn, action Action) error {
 	case Close:
 		return lp.loopClose(c)
 	case Shutdown:
-		return errShutdown
+		return errServerShutdown
 	default:
 		return nil
 	}
