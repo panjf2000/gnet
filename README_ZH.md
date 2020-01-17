@@ -34,7 +34,7 @@
 - [x] 内置 bytes 内存池，由开源库 [bytebufferpool](https://github.com/valyala/bytebufferpool) 提供支持
 - [x] 简洁的 APIs
 - [x] 基于 Ring-Buffer 的高效内存利用
-- [x] 支持多种网络协议：TCP、UDP、Unix Sockets
+- [x] 支持多种网络协议：TCP、UDP 和 Unix domain socket
 - [x] 支持两种事件驱动机制：Linux 里的 epoll 以及 FreeBSD 里的 kqueue
 - [x] 支持异步写操作
 - [x] 灵活的事件定时器

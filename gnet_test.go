@@ -320,20 +320,36 @@ func TestServe(t *testing.T) {
 				testServe("udp", ":9992", false, true, true, 10)
 			})
 		})
-		//t.Run("unix", func(t *testing.T) {
-		//	t.Run("1-loop", func(t *testing.T) {
-		//		testServe("unix", "socket9991", false, false, false, 10)
-		//	})
-		//	t.Run("N-loop", func(t *testing.T) {
-		//		testServe("unix", "socket9992", false, true, false, 10)
-		//	})
-		//})
+		t.Run("unix", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				testServe("unix", "gnet1.sock", false, false, false, 10)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				testServe("unix", "gnet2.sock", false, true, false, 10)
+			})
+		})
+		t.Run("unix-async", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				testServe("unix", "gnet1.sock", false, false, true, 10)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				testServe("unix", "gnet2.sock", false, true, true, 10)
+			})
+		})
 	})
 
 	t.Run("poll-reuseport", func(t *testing.T) {
 		t.Run("tcp", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
 				testServe("tcp", ":9991", true, false, false, 10)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				testServe("tcp", ":9992", true, true, false, 10)
+			})
+		})
+		t.Run("tcp-async", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				testServe("tcp", ":9991", true, false, true, 10)
 			})
 			t.Run("N-loop", func(t *testing.T) {
 				testServe("tcp", ":9992", true, true, false, 10)
@@ -347,14 +363,30 @@ func TestServe(t *testing.T) {
 				testServe("udp", ":9992", true, true, false, 10)
 			})
 		})
-		//t.Run("unix", func(t *testing.T) {
-		//	t.Run("1-loop", func(t *testing.T) {
-		//		testServe("unix", "socket9991", true, false, false, 10)
-		//	})
-		//	t.Run("N-loop", func(t *testing.T) {
-		//		testServe("unix", "socket9992", true, true, false, 10)
-		//	})
-		//})
+		t.Run("udp-async", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				testServe("udp", ":9991", true, false, false, 10)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				testServe("udp", ":9992", true, true, true, 10)
+			})
+		})
+		t.Run("unix", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				testServe("unix", "gnet1.sock", true, false, false, 10)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				testServe("unix", "gnet2.sock", true, true, false, 10)
+			})
+		})
+		t.Run("unix-async", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				testServe("unix", "gnet1.sock", true, false, true, 10)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				testServe("unix", "gnet2.sock", true, true, true, 10)
+			})
+		})
 	})
 }
 
@@ -383,10 +415,12 @@ func (s *testServer) OnOpened(c Conn) (out []byte, action Action) {
 	if c.RemoteAddr() == nil {
 		panic("nil local addr")
 	}
-	//fmt.Printf("TCP from remote addr：%s to local addr: %s\n", c.RemoteAddr().String(), c.LocalAddr().String())
 	return
 }
 func (s *testServer) OnClosed(c Conn, err error) (action Action) {
+	if err != nil {
+		fmt.Printf("error occurred on closed, %v\n", err)
+	}
 	if c.Context() != c {
 		panic("invalid context")
 	}
@@ -405,7 +439,7 @@ func (s *testServer) OnClosed(c Conn, err error) (action Action) {
 }
 func (s *testServer) React(frame []byte, c Conn) (out []byte, action Action) {
 	if s.async {
-		if s.network == "tcp" {
+		if s.network == "tcp" || s.network == "unix" {
 			_ = c.BufferLength()
 			buf := bytebuffer.Get()
 			_, _ = buf.Write(frame)
@@ -426,30 +460,8 @@ func (s *testServer) React(frame []byte, c Conn) (out []byte, action Action) {
 			return
 		}
 		return
-		//} else if s.multicore {
-		//	if s.network == "tcp" {
-		//		readSize := 1024 * 1024
-		//		n, data := c.ReadN(readSize)
-		//		if n == readSize {
-		//			out = data
-		//		}
-		//		return
-		//	}
-		//	if s.network == "udp" {
-		//		out = frame
-		//		return
-		//	}
-		//	return
 	}
-	if s.network == "tcp" {
-		out = frame
-		return
-	}
-	//fmt.Printf("UDP from remote addr：%s to local addr: %s\n", c.RemoteAddr().String(), c.LocalAddr().String())
-	if s.network == "udp" {
-		out = frame
-		return
-	}
+	out = frame
 	return
 }
 func (s *testServer) Tick() (delay time.Duration, action Action) {
@@ -472,22 +484,12 @@ func (s *testServer) Tick() (delay time.Duration, action Action) {
 }
 
 func testServe(network, addr string, reuseport, multicore, async bool, nclients int) {
-	var err error
 	ts := &testServer{network: network, addr: addr, multicore: multicore, async: async, nclients: nclients, workerPool: goroutine.Default()}
 	if network == "unix" {
 		_ = os.RemoveAll(addr)
 		defer os.RemoveAll(addr)
-		err = Serve(ts, network+"://"+addr, WithMulticore(multicore), WithTicker(true), WithTCPKeepAlive(time.Minute*5))
-	} else {
-		if reuseport {
-			err = Serve(ts, network+"://"+addr, WithMulticore(multicore), WithReusePort(true), WithTicker(true), WithTCPKeepAlive(time.Minute*5))
-		} else {
-			err = Serve(ts, network+"://"+addr, WithMulticore(multicore), WithTicker(true), WithTCPKeepAlive(time.Minute*5))
-		}
 	}
-	if err != nil {
-		panic(err)
-	}
+	must(Serve(ts, network+"://"+addr, WithMulticore(multicore), WithReusePort(reuseport), WithTicker(true), WithTCPKeepAlive(time.Minute*5)))
 }
 
 func startClient(network, addr string, multicore, async bool) {
@@ -513,11 +515,8 @@ func startClient(network, addr string, multicore, async bool) {
 		//sz := rand.Intn(10) * (1024 * 1024)
 		sz := 1024 * 1024
 		data := make([]byte, sz)
-		if network == "udp" {
+		if network == "udp" || network == "unix" {
 			n := 1024
-			//if sz < 64 {
-			//	n = sz
-			//}
 			data = data[:n]
 		}
 		if _, err := rand.Read(data); err != nil {
@@ -537,24 +536,22 @@ func startClient(network, addr string, multicore, async bool) {
 }
 
 func must(err error) {
-	if err != nil {
+	if err != nil && err != errProtocolNotSupported {
 		panic(err)
 	}
 }
-func TestTick(t *testing.T) {
-	//var wg sync.WaitGroup
-	//wg.Add(1)
-	//go func() {
-	//	defer wg.Done()
-	//	testTick("tcp", ":9991")
-	//}()
-	//wg.Add(1)
-	//go func() {
-	//	defer wg.Done()
-	//	testTick("unix", "socket1")
-	//}()
-	//wg.Wait()
 
+func TestDefaultGnetServer(t *testing.T) {
+	svr := EventServer{}
+	svr.OnInitComplete(Server{})
+	svr.OnOpened(nil)
+	svr.OnClosed(nil, nil)
+	svr.PreWrite()
+	svr.React(nil, nil)
+	svr.Tick()
+}
+
+func TestTick(t *testing.T) {
 	testTick("tcp", ":9991")
 }
 
@@ -572,6 +569,7 @@ func (t *testTickServer) Tick() (delay time.Duration, action Action) {
 	delay = time.Millisecond * 10
 	return
 }
+
 func testTick(network, addr string) {
 	events := &testTickServer{}
 	start := time.Now()
@@ -599,12 +597,10 @@ func (t *testWakeConnServer) OnOpened(c Conn) (out []byte, action Action) {
 	t.conn = c
 	return
 }
-
 func (t *testWakeConnServer) OnClosed(c Conn, err error) (action Action) {
 	action = Shutdown
 	return
 }
-
 func (t *testWakeConnServer) React(frame []byte, c Conn) (out []byte, action Action) {
 	out = []byte("Waking up.")
 	return
@@ -637,19 +633,6 @@ func testWakeConn(network, addr string) {
 }
 
 func TestShutdown(t *testing.T) {
-	//var wg sync.WaitGroup
-	//wg.Add(1)
-	//go func() {
-	//	defer wg.Done()
-	//	testShutdown("tcp", ":9991")
-	//}()
-	//wg.Add(1)
-	//go func() {
-	//	defer wg.Done()
-	//	testShutdown("unix", "socket1")
-	//}()
-	//wg.Wait()
-
 	testShutdown("tcp", ":9991")
 }
 
@@ -693,6 +676,7 @@ func (t *testShutdownServer) Tick() (delay time.Duration, action Action) {
 	delay = time.Second / 20
 	return
 }
+
 func testShutdown(network, addr string) {
 	events := &testShutdownServer{network: network, addr: addr, N: 10}
 	must(Serve(events, network+"://"+addr, WithTicker(true)))
@@ -736,13 +720,11 @@ func (t *testActionErrorServer) OnClosed(c Conn, err error) (action Action) {
 	action = Shutdown
 	return
 }
-
 func (t *testActionErrorServer) React(frame []byte, c Conn) (out []byte, action Action) {
 	out = frame
 	action = Close
 	return
 }
-
 func (t *testActionErrorServer) Tick() (delay time.Duration, action Action) {
 	if !t.action {
 		t.action = true

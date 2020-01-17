@@ -34,7 +34,7 @@ The goal of this project is to create a server framework for Go that performs on
 - [x] Built-in memory pool with bytes powered by the library [bytebufferpool](https://github.com/valyala/bytebufferpool)
 - [x] Concise APIs
 - [x] Efficient memory usage: Ring-Buffer
-- [x] Supporting multiple protocols: TCP, UDP, and Unix Sockets
+- [x] Supporting multiple protocols: TCP, UDP and Unix domain socket
 - [x] Supporting two event-driven mechanisms: epoll on Linux and kqueue on FreeBSD
 - [x] Supporting asynchronous write operation
 - [x] Flexible ticker event

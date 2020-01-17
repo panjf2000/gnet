@@ -201,6 +201,9 @@ func Serve(eventHandler EventHandler, addr string, opts ...Option) error {
 	ln.network, ln.addr = parseAddr(addr)
 	if ln.network == "unix" {
 		sniffError(os.RemoveAll(ln.addr))
+		if runtime.GOOS == "windows" {
+			return errProtocolNotSupported
+		}
 	}
 	var err error
 	if ln.network == "udp" {
