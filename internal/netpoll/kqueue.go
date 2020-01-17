@@ -62,7 +62,7 @@ func (p *Poller) Trigger(job internal.Job) error {
 
 // Polling blocks the current goroutine, waiting for network-events.
 func (p *Poller) Polling(callback func(fd int, filter int16) error) (err error) {
-	el := newEventList(initEvents)
+	el := newEventList(InitEvents)
 	var wakenUp bool
 	for {
 		n, err0 := unix.Kevent(p.fd, nil, el.events, nil)
