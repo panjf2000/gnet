@@ -70,14 +70,14 @@ func (p *Poller) Polling(callback func(fd int, filter int16) error) (err error) 
 			log.Println(err0)
 			continue
 		}
-		//var evFilter int16
+		var evFilter int16
 		for i := 0; i < n; i++ {
 			if fd := int(el.events[i].Ident); fd != 0 {
-				//evFilter = el.events[i].Filter
-				//if (el.events[i].Flags&unix.EV_EOF != 0) || (el.events[i].Flags&unix.EV_ERROR != 0) {
-				//	evFilter = EVFilterSock
-				//}
-				if err = callback(fd, el.events[i].Filter); err != nil {
+				evFilter = el.events[i].Filter
+				if (el.events[i].Flags&unix.EV_EOF != 0) || (el.events[i].Flags&unix.EV_ERROR != 0) {
+					evFilter = EVFilterSock
+				}
+				if err = callback(fd, evFilter); err != nil {
 					return
 				}
 			} else {

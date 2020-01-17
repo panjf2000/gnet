@@ -13,8 +13,8 @@ const (
 	EVFilterWrite = unix.EVFILT_WRITE
 	// EVFilterRead represents readable events from sockets.
 	EVFilterRead = unix.EVFILT_READ
-	// EVFilterSock ...
-	//EVFilterSock = -0xd
+	// EVFilterSock represents exception events from sockets.
+	EVFilterSock = -0xd
 )
 
 type eventList struct {
