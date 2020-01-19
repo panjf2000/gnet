@@ -12,7 +12,6 @@ import (
 	"io"
 	"math/rand"
 	"net"
-	"os"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -485,10 +484,6 @@ func (s *testServer) Tick() (delay time.Duration, action Action) {
 
 func testServe(network, addr string, reuseport, multicore, async bool, nclients int) {
 	ts := &testServer{network: network, addr: addr, multicore: multicore, async: async, nclients: nclients, workerPool: goroutine.Default()}
-	if network == "unix" {
-		_ = os.RemoveAll(addr)
-		defer os.RemoveAll(addr)
-	}
 	must(Serve(ts, network+"://"+addr, WithMulticore(multicore), WithReusePort(reuseport), WithTicker(true), WithTCPKeepAlive(time.Minute*5)))
 }
 

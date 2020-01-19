@@ -13,7 +13,7 @@ type echoServer struct {
 }
 
 func (es *echoServer) OnInitComplete(srv gnet.Server) (action gnet.Action) {
-	log.Printf("UDP Echo server is listening on %s (multi-cores: %t, loops: %d)\n",
+	log.Printf("Echo server is listening on %s (multi-cores: %t, loops: %d)\n",
 		srv.Addr.String(), srv.Multicore, srv.NumLoops)
 	return
 }
@@ -27,21 +27,21 @@ func (es *echoServer) React(frame []byte, c gnet.Conn) (out []byte, action gnet.
 		data := append([]byte{}, frame...)
 		go func() {
 			time.Sleep(time.Second)
-			c.SendTo(data)
+			c.AsyncWrite(data)
 		}()
 		return
 	*/
 }
 
 func main() {
-	var port int
-	var multicore, reuseport bool
+	var addr string
+	var multicore bool
 
-	// Example command: go run echo.go --port 9000 --multicore=true --reuseport=true
-	flag.IntVar(&port, "port", 9000, "--port 9000")
+	// Example command: go run echo.go --sock echo.sock --multicore=true
+	flag.StringVar(&addr, "sock", "echo.sock", "--port 9000")
 	flag.BoolVar(&multicore, "multicore", false, "--multicore true")
-	flag.BoolVar(&reuseport, "reuseport", false, "--reuseport true")
 	flag.Parse()
+
 	echo := new(echoServer)
-	log.Fatal(gnet.Serve(echo, fmt.Sprintf("udp://:%d", port), gnet.WithMulticore(multicore), gnet.WithReusePort(reuseport)))
+	log.Fatal(gnet.Serve(echo, fmt.Sprintf("unix://%s", addr), gnet.WithMulticore(multicore)))
 }

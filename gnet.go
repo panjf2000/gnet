@@ -194,7 +194,12 @@ func (es *EventServer) Tick() (delay time.Duration, action Action) {
 // The "tcp" network scheme is assumed when one is not specified.
 func Serve(eventHandler EventHandler, addr string, opts ...Option) error {
 	var ln listener
-	defer ln.close()
+	defer func() {
+		ln.close()
+		if ln.network == "unix" {
+			sniffError(os.RemoveAll(ln.addr))
+		}
+	}()
 
 	options := initOptions(opts...)
 

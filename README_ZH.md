@@ -22,7 +22,7 @@
 
 这个项目存在的价值是提供一个在网络包处理方面能和 [Redis](http://redis.io)、[Haproxy](http://www.haproxy.org) 这两个项目具有相近性能的 Go 语言网络服务器框架。
 
-`gnet` 的亮点在于它是一个高性能、轻量级、非阻塞的纯 Go 实现的传输层（TCP/UDP/Unix-Socket）网络框架，开发者可以使用 `gnet` 来实现自己的应用层网络协议(HTTP、RPC、Redis、WebSocket 等等)，从而构建出自己的应用层网络应用：比如在 `gnet` 上实现 HTTP 协议就可以创建出一个 HTTP 服务器 或者 Web 开发框架，实现 Redis 协议就可以创建出自己的 Redis 服务器等等。
+`gnet` 的亮点在于它是一个高性能、轻量级、非阻塞的纯 Go 实现的传输层（TCP/UDP/Unix Domain Socket）网络框架，开发者可以使用 `gnet` 来实现自己的应用层网络协议(HTTP、RPC、Redis、WebSocket 等等)，从而构建出自己的应用层网络应用：比如在 `gnet` 上实现 HTTP 协议就可以创建出一个 HTTP 服务器 或者 Web 开发框架，实现 Redis 协议就可以创建出自己的 Redis 服务器等等。
 
 **`gnet` 衍生自另一个项目：`evio`，但性能远胜之且拥有更丰富的功能特性。**
 
@@ -34,7 +34,7 @@
 - [x] 内置 bytes 内存池，由开源库 [bytebufferpool](https://github.com/valyala/bytebufferpool) 提供支持
 - [x] 简洁的 APIs
 - [x] 基于 Ring-Buffer 的高效内存利用
-- [x] 支持多种网络协议：TCP、UDP 和 Unix domain socket
+- [x] 支持多种网络协议/IPC 机制：TCP、UDP 和 Unix Domain Socket
 - [x] 支持两种事件驱动机制：Linux 里的 epoll 以及 FreeBSD 里的 kqueue
 - [x] 支持异步写操作
 - [x] 灵活的事件定时器
@@ -255,7 +255,7 @@ func main() {
 }
 ```
 
-正如我在『主从多 Reactors + 线程/Go程池』那一节所说的那样，如果你的业务逻辑里包含阻塞代码，那么你应该把这些阻塞代码变成非阻塞的，比如通过把这部分代码通过 goroutine 去运行，但是要注意一点，如果你的服务器处理的流量足够的大，那么这种做法将会导致创建大量的 goroutines 极大地消耗系统资源，所以我一般建议你用 goroutine pool 来做 goroutines 的复用和管理，以及节省系统资源。
+正如我在『主从多 Reactors + 线程/Go程池』那一节所说的那样，如果你的业务逻辑里包含阻塞代码，那么你应该把这些阻塞代码变成非阻塞的，比如通过把这部分代码放到独立的 goroutines 去运行，但是要注意一点，如果你的服务器处理的流量足够的大，那么这种做法将会导致创建大量的 goroutines 极大地消耗系统资源，所以我一般建议你用 goroutine pool 来做 goroutines 的复用和管理，以及节省系统资源。
 
 **各种 gnet 示例:**
 
@@ -362,6 +362,60 @@ func main() {
 	flag.Parse()
 	echo := new(echoServer)
 	log.Fatal(gnet.Serve(echo, fmt.Sprintf("udp://:%d", port), gnet.WithMulticore(multicore), gnet.WithReusePort(reuseport)))
+}
+```
+</details>
+
+<details>
+	<summary> UDS Echo Server </summary>
+
+```go
+package main
+
+import (
+	"flag"
+	"fmt"
+	"log"
+
+	"github.com/panjf2000/gnet"
+)
+
+type echoServer struct {
+	*gnet.EventServer
+}
+
+func (es *echoServer) OnInitComplete(srv gnet.Server) (action gnet.Action) {
+	log.Printf("Echo server is listening on %s (multi-cores: %t, loops: %d)\n",
+		srv.Addr.String(), srv.Multicore, srv.NumLoops)
+	return
+}
+func (es *echoServer) React(frame []byte, c gnet.Conn) (out []byte, action gnet.Action) {
+	// Echo synchronously.
+	out = frame
+	return
+
+	/*
+		// Echo asynchronously.
+		data := append([]byte{}, frame...)
+		go func() {
+			time.Sleep(time.Second)
+			c.AsyncWrite(data)
+		}()
+		return
+	*/
+}
+
+func main() {
+	var addr string
+	var multicore bool
+
+	// Example command: go run echo.go --sock echo.sock --multicore=true
+	flag.StringVar(&addr, "sock", "echo.sock", "--port 9000")
+	flag.BoolVar(&multicore, "multicore", false, "--multicore true")
+	flag.Parse()
+
+	echo := new(echoServer)
+	log.Fatal(gnet.Serve(echo, fmt.Sprintf("unix://%s", addr), gnet.WithMulticore(multicore)))
 }
 ```
 </details>
@@ -814,11 +868,17 @@ events.Tick = func() (delay time.Duration, action Action){
 
 ## UDP 支持
 
-`gnet` 支持 UDP 协议，在 `gnet.Serve` 里绑定 UDP 地址即可，`gnet` 的 UDP 支持有如下的特性：
+`gnet` 支持 UDP 协议，所以在 `gnet.Serve` 里绑定允许绑定 UDP 地址，`gnet` 的 UDP 支持有如下的特性：
 
-- 数据进入服务器之后立刻写回客户端，不做缓存。
+- 网络数据的读入和写出不做缓冲，会一次性读写客户端。
 -  `EventHandler.OnOpened` 和 `EventHandler.OnClosed` 这两个事件在 UDP 下不可用，唯一可用的事件是 `React`。
 -  TCP 里的读写操作是 `Read()/ReadFrame()` 和 `AsyncWrite([]byte)` 方法，而在 UDP 里对应的方法是 `ReadFromUDP()` 和 `SendTo([]byte)`。
+
+## Unix Domain Socket 支持
+
+`gnet` 还支持 UDS(Unix Domain Socket) 机制，只需要把类似 "unix://xxx" 的 UDS 地址传参给 `gnet.Serve` 函数绑定就行了。
+
+在 `gnet` 里使用 UDS 和使用 TCP 没有什么不同，所有 TCP 协议下可以使用的事件函数都可以在 UDS 中使用。
 
 ## 使用多核
 

@@ -22,7 +22,7 @@ English | [🇨🇳中文](README_ZH.md)
 
 The goal of this project is to create a server framework for Go that performs on par with [Redis](http://redis.io) and [Haproxy](http://www.haproxy.org) for packet handling.
 
-`gnet` sells itself as a high-performance, lightweight, non-blocking, event-driven networking framework written in pure Go which works on transport layer with TCP/UDP/Unix-Socket protocols, so it allows developers to implement their own protocols(HTTP, RPC, WebSocket, Redis, etc.) of application layer upon `gnet` for building  diversified network applications, for instance, you get an HTTP Server or Web Framework if you implement HTTP protocol upon `gnet` while you have a Redis Server done with the implementation of Redis protocol upon `gnet` and so on.
+`gnet` sells itself as a high-performance, lightweight, non-blocking, event-driven networking framework written in pure Go which works on transport layer with TCP/UDP protocols and Unix Domain Socket , so it allows developers to implement their own protocols(HTTP, RPC, WebSocket, Redis, etc.) of application layer upon `gnet` for building  diversified network applications, for instance, you get an HTTP Server or Web Framework if you implement HTTP protocol upon `gnet` while you have a Redis Server done with the implementation of Redis protocol upon `gnet` and so on.
 
 **`gnet` derives from the project: `evio` while having a much higher performance and more features.**
 
@@ -34,7 +34,7 @@ The goal of this project is to create a server framework for Go that performs on
 - [x] Built-in memory pool with bytes powered by the library [bytebufferpool](https://github.com/valyala/bytebufferpool)
 - [x] Concise APIs
 - [x] Efficient memory usage: Ring-Buffer
-- [x] Supporting multiple protocols: TCP, UDP and Unix domain socket
+- [x] Supporting multiple protocols/IPC mechanism: TCP, UDP and Unix Domain Socket
 - [x] Supporting two event-driven mechanisms: epoll on Linux and kqueue on FreeBSD
 - [x] Supporting asynchronous write operation
 - [x] Flexible ticker event
@@ -364,6 +364,60 @@ func main() {
 	flag.Parse()
 	echo := new(echoServer)
 	log.Fatal(gnet.Serve(echo, fmt.Sprintf("udp://:%d", port), gnet.WithMulticore(multicore), gnet.WithReusePort(reuseport)))
+}
+```
+</details>
+
+<details>
+	<summary> UDS Echo Server </summary>
+
+```go
+package main
+
+import (
+	"flag"
+	"fmt"
+	"log"
+
+	"github.com/panjf2000/gnet"
+)
+
+type echoServer struct {
+	*gnet.EventServer
+}
+
+func (es *echoServer) OnInitComplete(srv gnet.Server) (action gnet.Action) {
+	log.Printf("Echo server is listening on %s (multi-cores: %t, loops: %d)\n",
+		srv.Addr.String(), srv.Multicore, srv.NumLoops)
+	return
+}
+func (es *echoServer) React(frame []byte, c gnet.Conn) (out []byte, action gnet.Action) {
+	// Echo synchronously.
+	out = frame
+	return
+
+	/*
+		// Echo asynchronously.
+		data := append([]byte{}, frame...)
+		go func() {
+			time.Sleep(time.Second)
+			c.AsyncWrite(data)
+		}()
+		return
+	*/
+}
+
+func main() {
+	var addr string
+	var multicore bool
+
+	// Example command: go run echo.go --sock echo.sock --multicore=true
+	flag.StringVar(&addr, "sock", "echo.sock", "--port 9000")
+	flag.BoolVar(&multicore, "multicore", false, "--multicore true")
+	flag.Parse()
+
+	echo := new(echoServer)
+	log.Fatal(gnet.Serve(echo, fmt.Sprintf("unix://%s", addr), gnet.WithMulticore(multicore)))
 }
 ```
 </details>
@@ -815,11 +869,17 @@ events.Tick = func() (delay time.Duration, action Action){
 
 ## UDP
 
-The `gnet.Serve` function can bind to UDP addresses. 
+`gnet` supports UDP protocol so the `gnet.Serve` method can bind to UDP addresses. 
 
-- All incoming and outgoing packets will not be buffered but sent individually.
+- All incoming and outgoing packets will not be buffered but read and sent directly.
 - The `EventHandler.OnOpened` and `EventHandler.OnClosed` events are not available for UDP sockets, only the `React` event.
 - The UDP equivalents of  `Read()/ReadFrame()` and `AsyncWrite([]byte)` in TCP are `ReadFromUDP()` and `SendTo([]byte)`.
+
+## Unix Domain Socket
+
+`gnet` also supports UDS(Unix Domain Socket), just pass the UDS addresses like "unix://xxx" to the `gnet.Serve` method and you could play with this protocol.
+
+It is nothing different from making use of TCP when doing stuff with UDS, so the `gnet` UDS servers are able to leverage all event functions which are available under TCP protocol.
 
 ## Multi-threads
 
