@@ -873,7 +873,7 @@ events.Tick = func() (delay time.Duration, action Action){
 
 - All incoming and outgoing packets will not be buffered but read and sent directly.
 - The `EventHandler.OnOpened` and `EventHandler.OnClosed` events are not available for UDP sockets, only the `React` event.
-- The UDP equivalents of  `Read()/ReadFrame()` and `AsyncWrite([]byte)` in TCP are `ReadFromUDP()` and `SendTo([]byte)`.
+- The UDP equivalents of  `AsyncWrite([]byte)` in TCP is `SendTo([]byte)`.
 
 ## Unix Domain Socket
 
@@ -891,7 +891,7 @@ The current built-in load balancing algorithm in `gnet` is Round-Robin.
 
 ## SO_REUSEPORT
 
-`gnet` server is able to utilize the [SO_REUSEPORT](https://lwn.net/Articles/542629/) option which allows multiple sockets on the same host to bind to the same port and the OS kernel takes care of the load balancing for you, it wakes one socket per `accpet` event coming to resolved the `thundering herd`.
+`gnet` server is able to utilize the [SO_REUSEPORT](https://lwn.net/Articles/542629/) option which allows multiple sockets on the same host to bind to the same port and the OS kernel takes care of the load balancing for you, it wakes one socket per `connect` event coming to resolved the `thundering herd`.
 
 By default, `gnet` is not going to be haunted by the `thundering herd` under its networking model:『multiple reactors』which gets only **one** main reactor to listen on "address:port" and accept new sockets. So this `SO_REUSEPORT` option is trivial in `gnet` but note that it will fall back to the old networking model of `evio` when you enable the `SO_REUSEPORT` option.
 

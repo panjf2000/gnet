@@ -872,7 +872,7 @@ events.Tick = func() (delay time.Duration, action Action){
 
 - 网络数据的读入和写出不做缓冲，会一次性读写客户端。
 -  `EventHandler.OnOpened` 和 `EventHandler.OnClosed` 这两个事件在 UDP 下不可用，唯一可用的事件是 `React`。
--  TCP 里的读写操作是 `Read()/ReadFrame()` 和 `AsyncWrite([]byte)` 方法，而在 UDP 里对应的方法是 `ReadFromUDP()` 和 `SendTo([]byte)`。
+-  TCP 里的异步写操作是 `AsyncWrite([]byte)` 方法，而在 UDP 里对应的方法是  `SendTo([]byte)`。
 
 ## Unix Domain Socket 支持
 
@@ -890,7 +890,7 @@ events.Tick = func() (delay time.Duration, action Action){
 
 ## SO_REUSEPORT 端口复用
 
-服务器支持 [SO_REUSEPORT](https://lwn.net/Articles/542629/) 端口复用特性，允许多个 sockets 监听同一个端口，然后内核会帮你做好负载均衡，每次只唤醒一个 socket 来处理 accept 请求，避免惊群效应。
+服务器支持 [SO_REUSEPORT](https://lwn.net/Articles/542629/) 端口复用特性，允许多个 sockets 监听同一个端口，然后内核会帮你做好负载均衡，每次只唤醒一个 socket 来处理 `connect` 请求，避免惊群效应。
 
 默认情况下，`gnet` 也不会有惊群效应，因为 `gnet` 默认的网络模型是主从多 Reactors，只会有一个主 reactor 在监听端口以及接受新连接。所以，开不开启 `SO_REUSEPORT` 选项是无关紧要的，只是开启了这个选项之后 `gnet` 的网络模型将会切换成 `evio` 的旧网络模型，这一点需要注意一下。
 
