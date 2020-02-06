@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/panjf2000/gnet/internal/netpoll"
+	"github.com/panjf2000/gnet/pool/bytebuffer"
 	"golang.org/x/sys/unix"
 )
 
@@ -96,26 +97,27 @@ func (lp *loop) loopIn(c *conn) error {
 	}
 	c.cache = lp.packet[:n]
 
+	outBuffer := bytebuffer.Get()
 	for inFrame, _ := c.read(); inFrame != nil; inFrame, _ = c.read() {
 		out, action := lp.eventHandler.React(inFrame, c)
 		if out != nil {
-			if outFrame, err := lp.codec.Encode(c, out); err == nil {
-				c.write(outFrame)
-			}
+			outFrame, _ := lp.codec.Encode(c, out)
+			_, _ = outBuffer.Write(outFrame)
 		}
-
 		switch action {
 		case None:
 		case Close:
+			c.write(outBuffer.Bytes())
+			bytebuffer.Put(outBuffer)
 			return lp.loopCloseConn(c, nil)
 		case Shutdown:
+			c.write(outBuffer.Bytes())
+			bytebuffer.Put(outBuffer)
 			return errServerShutdown
 		}
-
-		if !c.opened {
-			return nil
-		}
 	}
+	c.write(outBuffer.Bytes())
+	bytebuffer.Put(outBuffer)
 	_, _ = c.inboundBuffer.Write(c.cache)
 
 	return nil

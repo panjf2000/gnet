@@ -85,28 +85,31 @@ func (lp *loop) loopAccept(c *stdConn) error {
 func (lp *loop) loopRead(ti *tcpIn) error {
 	c := ti.c
 	c.cache = ti.in
-	var e error
 
+	outBuffer := bytebuffer.Get()
 	for inFrame, _ := c.read(); inFrame != nil; inFrame, _ = c.read() {
 		out, action := lp.eventHandler.React(inFrame, c)
 		if out != nil {
 			lp.eventHandler.PreWrite()
-			if frame, err := lp.codec.Encode(c, out); err == nil {
-				_, e = c.conn.Write(frame)
-			}
+			outFrame, _ := lp.codec.Encode(c, out)
+			_, _ = outBuffer.Write(outFrame)
 		}
-
 		switch action {
 		case None:
 		case Close:
+			_, _ = c.conn.Write(outBuffer.Bytes())
+			bytebuffer.Put(outBuffer)
 			return lp.loopClose(c)
 		case Shutdown:
+			_, _ = c.conn.Write(outBuffer.Bytes())
+			bytebuffer.Put(outBuffer)
 			return errServerShutdown
 		}
-
-		if e != nil {
-			return lp.loopClose(c)
-		}
+	}
+	_, err := c.conn.Write(outBuffer.Bytes())
+	bytebuffer.Put(outBuffer)
+	if err != nil {
+		return lp.loopClose(c)
 	}
 	_, _ = c.inboundBuffer.Write(c.cache.Bytes())
 	bytebuffer.Put(c.cache)
