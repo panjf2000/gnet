@@ -84,7 +84,7 @@ func (lp *loop) loopAccept(c *stdConn) error {
 
 func (lp *loop) loopRead(ti *tcpIn) error {
 	c := ti.c
-	c.cache = ti.in
+	c.buffer = ti.in
 
 	outBuffer := bytebuffer.Get()
 	for inFrame, _ := c.read(); inFrame != nil; inFrame, _ = c.read() {
@@ -111,9 +111,9 @@ func (lp *loop) loopRead(ti *tcpIn) error {
 	if err != nil {
 		return lp.loopClose(c)
 	}
-	_, _ = c.inboundBuffer.Write(c.cache.Bytes())
-	bytebuffer.Put(c.cache)
-	c.cache = nil
+	_, _ = c.inboundBuffer.Write(c.buffer.Bytes())
+	bytebuffer.Put(c.buffer)
+	c.buffer = nil
 	return nil
 }
 
@@ -211,7 +211,7 @@ func (lp *loop) handleAction(c *stdConn, action Action) error {
 }
 
 func (lp *loop) loopReadUDP(c *stdConn) error {
-	out, action := lp.eventHandler.React(c.cache.Bytes(), c)
+	out, action := lp.eventHandler.React(c.buffer.Bytes(), c)
 	if out != nil {
 		lp.eventHandler.PreWrite()
 		_, _ = lp.svr.ln.pconn.WriteTo(out, c.remoteAddr)

@@ -38,7 +38,7 @@ type stdConn struct {
 	conn          net.Conn               // original connection
 	loop          *loop                  // owner loop
 	done          int32                  // 0: attached, 1: closed
-	cache         *bytebuffer.ByteBuffer // reuse memory of inbound data
+	buffer        *bytebuffer.ByteBuffer // reuse memory of inbound data as a temporary buffer
 	codec         ICodec                 // codec for TCP
 	localAddr     net.Addr               // local server addr
 	remoteAddr    net.Addr               // remote peer addr
@@ -61,8 +61,8 @@ func (c *stdConn) releaseTCP() {
 	c.remoteAddr = nil
 	prb.Put(c.inboundBuffer)
 	c.inboundBuffer = nil
-	bytebuffer.Put(c.cache)
-	c.cache = nil
+	bytebuffer.Put(c.buffer)
+	c.buffer = nil
 }
 
 func newUDPConn(lp *loop, localAddr, remoteAddr net.Addr, buf *bytebuffer.ByteBuffer) *stdConn {
@@ -70,15 +70,15 @@ func newUDPConn(lp *loop, localAddr, remoteAddr net.Addr, buf *bytebuffer.ByteBu
 		loop:       lp,
 		localAddr:  localAddr,
 		remoteAddr: remoteAddr,
-		cache:      buf,
+		buffer:     buf,
 	}
 }
 
 func (c *stdConn) releaseUDP() {
 	c.ctx = nil
 	c.localAddr = nil
-	bytebuffer.Put(c.cache)
-	c.cache = nil
+	bytebuffer.Put(c.buffer)
+	c.buffer = nil
 }
 
 func (c *stdConn) read() ([]byte, error) {
@@ -89,36 +89,36 @@ func (c *stdConn) read() ([]byte, error) {
 
 func (c *stdConn) Read() []byte {
 	if c.inboundBuffer.IsEmpty() {
-		if c.cache.Len() == 0 {
+		if c.buffer.Len() == 0 {
 			return nil
 		}
-		return c.cache.Bytes()
+		return c.buffer.Bytes()
 	}
 	bytebuffer.Put(c.byteBuffer)
-	c.byteBuffer = c.inboundBuffer.WithByteBuffer(c.cache.Bytes())
+	c.byteBuffer = c.inboundBuffer.WithByteBuffer(c.buffer.Bytes())
 	return c.byteBuffer.Bytes()
 }
 
 func (c *stdConn) ResetBuffer() {
-	c.cache.Reset()
+	c.buffer.Reset()
 	c.inboundBuffer.Reset()
 	bytebuffer.Put(c.byteBuffer)
 	c.byteBuffer = nil
 }
 
 func (c *stdConn) ShiftN(n int) (size int) {
-	oneOffBufferLen := c.cache.Len()
+	tempBufferLen := c.buffer.Len()
 	inBufferLen := c.inboundBuffer.Length()
-	if inBufferLen+oneOffBufferLen < n || n <= 0 {
+	if inBufferLen+tempBufferLen < n || n <= 0 {
 		c.ResetBuffer()
 		return
 	}
 	size = n
 	if c.inboundBuffer.IsEmpty() {
-		if n == oneOffBufferLen {
-			c.cache.Reset()
+		if n == tempBufferLen {
+			c.buffer.Reset()
 		} else {
-			c.cache.B = c.cache.B[n:]
+			c.buffer.B = c.buffer.B[n:]
 		}
 		return
 	}
@@ -134,27 +134,27 @@ func (c *stdConn) ShiftN(n int) (size int) {
 	c.inboundBuffer.Reset()
 
 	restSize := n - inBufferLen
-	if restSize == oneOffBufferLen {
-		c.cache.Reset()
+	if restSize == tempBufferLen {
+		c.buffer.Reset()
 	} else {
-		c.cache.B = c.cache.B[restSize:]
+		c.buffer.B = c.buffer.B[restSize:]
 	}
 	return
 }
 
 func (c *stdConn) ReadN(n int) (size int, buf []byte) {
-	oneOffBufferLen := c.cache.Len()
+	tempBufferLen := c.buffer.Len()
 	inBufferLen := c.inboundBuffer.Length()
-	if inBufferLen+oneOffBufferLen < n || n <= 0 {
+	if inBufferLen+tempBufferLen < n || n <= 0 {
 		return
 	}
 	size = n
 	if c.inboundBuffer.IsEmpty() {
-		buf = c.cache.B[:n]
-		if n == oneOffBufferLen {
-			c.cache.Reset()
+		buf = c.buffer.B[:n]
+		if n == tempBufferLen {
+			c.buffer.Reset()
 		} else {
-			c.cache.B = c.cache.B[n:]
+			c.buffer.B = c.buffer.B[n:]
 		}
 		return
 	}
@@ -169,17 +169,17 @@ func (c *stdConn) ReadN(n int) (size int, buf []byte) {
 	c.inboundBuffer.Reset()
 
 	restSize := n - inBufferLen
-	buf = append(buf, c.cache.B[:restSize]...)
-	if restSize == oneOffBufferLen {
-		c.cache.Reset()
+	buf = append(buf, c.buffer.B[:restSize]...)
+	if restSize == tempBufferLen {
+		c.buffer.Reset()
 	} else {
-		c.cache.B = c.cache.B[restSize:]
+		c.buffer.B = c.buffer.B[restSize:]
 	}
 	return
 }
 
 func (c *stdConn) BufferLength() int {
-	return c.inboundBuffer.Length() + c.cache.Len()
+	return c.inboundBuffer.Length() + c.buffer.Len()
 }
 
 func (c *stdConn) AsyncWrite(buf []byte) {

@@ -95,7 +95,7 @@ func (lp *loop) loopIn(c *conn) error {
 		}
 		return lp.loopCloseConn(c, err)
 	}
-	c.cache = lp.packet[:n]
+	c.buffer = lp.packet[:n]
 
 	outBuffer := bytebuffer.Get()
 	for inFrame, _ := c.read(); inFrame != nil; inFrame, _ = c.read() {
@@ -118,7 +118,7 @@ func (lp *loop) loopIn(c *conn) error {
 	}
 	c.write(outBuffer.Bytes())
 	bytebuffer.Put(outBuffer)
-	_, _ = c.inboundBuffer.Write(c.cache)
+	_, _ = c.inboundBuffer.Write(c.buffer)
 
 	return nil
 }
