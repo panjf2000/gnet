@@ -877,7 +877,7 @@ events.Tick = func() (delay time.Duration, action Action){
 
 ## Unix Domain Socket
 
-`gnet` also supports UDS(Unix Domain Socket), just pass the UDS addresses like "unix://xxx" to the `gnet.Serve` method and you could play with this protocol.
+`gnet` also supports UDS(Unix Domain Socket), just pass the UDS addresses like "unix://xxx" to the `gnet.Serve` method and you could play with it.
 
 It is nothing different from making use of TCP when doing stuff with UDS, so the `gnet` UDS servers are able to leverage all event functions which are available under TCP protocol.
 
