@@ -18,7 +18,7 @@ const (
 	steps      = 20
 
 	minSize = 1 << minBitSize
-	maxSize = 1 << (minBitSize + steps - 1)
+	//maxSize = 1 << (minBitSize + steps - 1)
 
 	calibrateCallsThreshold = 42000
 	maxPercentile           = 0.95
