@@ -32,7 +32,7 @@ type server struct {
 	serr             error              // signal error
 	once             sync.Once          // make sure only signalShutdown once
 	codec            ICodec             // codec for TCP stream
-	loops            []*loop            // all the loops
+	loops            []*eventloop       // all the loops
 	loopWG           sync.WaitGroup     // loop close WaitGroup
 	ticktock         chan time.Duration // ticker channel
 	listenerWG       sync.WaitGroup     // listener close WaitGroup
@@ -70,7 +70,7 @@ func (svr *server) startListener() {
 
 func (svr *server) startLoops(numLoops int) {
 	for i := 0; i < numLoops; i++ {
-		lp := &loop{
+		el := &eventloop{
 			ch:           make(chan interface{}, commandBufferSize),
 			idx:          i,
 			svr:          svr,
@@ -78,12 +78,12 @@ func (svr *server) startLoops(numLoops int) {
 			connections:  make(map[*stdConn]bool),
 			eventHandler: svr.eventHandler,
 		}
-		svr.subLoopGroup.register(lp)
+		svr.subLoopGroup.register(el)
 	}
 	svr.subLoopGroupSize = svr.subLoopGroup.len()
 	svr.loopWG.Add(svr.subLoopGroupSize)
-	svr.subLoopGroup.iterate(func(i int, lp *loop) bool {
-		go lp.loopRun()
+	svr.subLoopGroup.iterate(func(i int, el *eventloop) bool {
+		go el.loopRun()
 		return true
 	})
 }
@@ -97,8 +97,8 @@ func (svr *server) stop() {
 	svr.listenerWG.Wait()
 
 	// Notify all loops to close.
-	svr.subLoopGroup.iterate(func(i int, lp *loop) bool {
-		lp.ch <- errClosing
+	svr.subLoopGroup.iterate(func(i int, el *eventloop) bool {
+		el.ch <- errClosing
 		return true
 	})
 
@@ -107,8 +107,8 @@ func (svr *server) stop() {
 
 	// Close all connections.
 	svr.loopWG.Add(svr.subLoopGroupSize)
-	svr.subLoopGroup.iterate(func(i int, lp *loop) bool {
-		lp.ch <- errCloseConns
+	svr.subLoopGroup.iterate(func(i int, el *eventloop) bool {
+		el.ch <- errCloseConns
 		return true
 	})
 	svr.loopWG.Wait()

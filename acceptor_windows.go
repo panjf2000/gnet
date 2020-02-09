@@ -28,8 +28,8 @@ func (svr *server) listenerRun() {
 			buf := bytebuffer.Get()
 			_, _ = buf.Write(packet[:n])
 
-			lp := svr.subLoopGroup.next()
-			lp.ch <- &udpIn{newUDPConn(lp, svr.ln.lnaddr, addr, buf)}
+			el := svr.subLoopGroup.next()
+			el.ch <- &udpIn{newUDPConn(el, svr.ln.lnaddr, addr, buf)}
 		} else {
 			// Accept TCP socket.
 			conn, e := svr.ln.ln.Accept()
@@ -37,21 +37,21 @@ func (svr *server) listenerRun() {
 				err = e
 				return
 			}
-			lp := svr.subLoopGroup.next()
-			c := newTCPConn(conn, lp)
-			lp.ch <- c
+			el := svr.subLoopGroup.next()
+			c := newTCPConn(conn, el)
+			el.ch <- c
 			go func() {
 				var packet [0xFFFF]byte
 				for {
 					n, err := c.conn.Read(packet[:])
 					if err != nil {
 						_ = c.conn.SetReadDeadline(time.Time{})
-						lp.ch <- &stderr{c, err}
+						el.ch <- &stderr{c, err}
 						return
 					}
 					buf := bytebuffer.Get()
 					_, _ = buf.Write(packet[:n])
-					lp.ch <- &tcpIn{c, buf}
+					el.ch <- &tcpIn{c, buf}
 				}
 			}()
 		}

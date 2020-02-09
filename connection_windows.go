@@ -36,7 +36,7 @@ type udpIn struct {
 type stdConn struct {
 	ctx           interface{}            // user-defined context
 	conn          net.Conn               // original connection
-	loop          *loop                  // owner loop
+	loop          *eventloop             // owner event-loop
 	done          int32                  // 0: attached, 1: closed
 	buffer        *bytebuffer.ByteBuffer // reuse memory of inbound data as a temporary buffer
 	codec         ICodec                 // codec for TCP
@@ -46,11 +46,11 @@ type stdConn struct {
 	inboundBuffer *ringbuffer.RingBuffer // buffer for data from client
 }
 
-func newTCPConn(conn net.Conn, lp *loop) *stdConn {
+func newTCPConn(conn net.Conn, el *eventloop) *stdConn {
 	return &stdConn{
 		conn:          conn,
-		loop:          lp,
-		codec:         lp.codec,
+		loop:          el,
+		codec:         el.codec,
 		inboundBuffer: prb.Get(),
 	}
 }
@@ -65,9 +65,9 @@ func (c *stdConn) releaseTCP() {
 	c.buffer = nil
 }
 
-func newUDPConn(lp *loop, localAddr, remoteAddr net.Addr, buf *bytebuffer.ByteBuffer) *stdConn {
+func newUDPConn(el *eventloop, localAddr, remoteAddr net.Addr, buf *bytebuffer.ByteBuffer) *stdConn {
 	return &stdConn{
-		loop:       lp,
+		loop:       el,
 		localAddr:  localAddr,
 		remoteAddr: remoteAddr,
 		buffer:     buf,

@@ -21,7 +21,7 @@ type conn struct {
 	fd             int                    // file descriptor
 	sa             unix.Sockaddr          // remote socket address
 	ctx            interface{}            // user-defined context
-	loop           *loop                  // connected loop
+	loop           *eventloop             // connected event-loop
 	buffer         []byte                 // reuse memory of inbound data as a temporary buffer
 	codec          ICodec                 // codec for TCP
 	opened         bool                   // connection opened event fired
@@ -32,12 +32,12 @@ type conn struct {
 	outboundBuffer *ringbuffer.RingBuffer // buffer for data that is ready to write to client
 }
 
-func newTCPConn(fd int, lp *loop, sa unix.Sockaddr) *conn {
+func newTCPConn(fd int, el *eventloop, sa unix.Sockaddr) *conn {
 	return &conn{
 		fd:             fd,
 		sa:             sa,
-		loop:           lp,
-		codec:          lp.codec,
+		loop:           el,
+		codec:          el.codec,
 		inboundBuffer:  prb.Get(),
 		outboundBuffer: prb.Get(),
 	}
@@ -58,11 +58,11 @@ func (c *conn) releaseTCP() {
 	c.byteBuffer = nil
 }
 
-func newUDPConn(fd int, lp *loop, sa unix.Sockaddr) *conn {
+func newUDPConn(fd int, el *eventloop, sa unix.Sockaddr) *conn {
 	return &conn{
 		fd:         fd,
 		sa:         sa,
-		localAddr:  lp.svr.ln.lnaddr,
+		localAddr:  el.svr.ln.lnaddr,
 		remoteAddr: netpoll.SockaddrToUDPAddr(sa),
 	}
 }

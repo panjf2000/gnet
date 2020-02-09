@@ -19,14 +19,14 @@ func (svr *server) acceptNewConnection(fd int) error {
 	if err := unix.SetNonblock(nfd, true); err != nil {
 		return err
 	}
-	lp := svr.subLoopGroup.next()
-	c := newTCPConn(nfd, lp, sa)
-	_ = lp.poller.Trigger(func() (err error) {
-		if err = lp.poller.AddRead(nfd); err != nil {
+	el := svr.subLoopGroup.next()
+	c := newTCPConn(nfd, el, sa)
+	_ = el.poller.Trigger(func() (err error) {
+		if err = el.poller.AddRead(nfd); err != nil {
 			return
 		}
-		lp.connections[nfd] = c
-		err = lp.loopOpen(c)
+		el.connections[nfd] = c
+		err = el.loopOpen(c)
 		return
 	})
 	return nil
