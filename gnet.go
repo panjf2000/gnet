@@ -250,7 +250,7 @@ func parseAddr(addr string) (network, address string) {
 }
 
 func sniffError(err error) {
-	if err != nil {
+	if err != nil && err != errServerShutdown {
 		log.Println(err)
 	}
 }
