@@ -701,26 +701,26 @@ func TestBadAddresses(t *testing.T) {
 	}
 }
 
-func TestActionError(t *testing.T) {
-	testActionError("tcp", ":9991")
+func TestCloseActionError(t *testing.T) {
+	testCloseActionError("tcp", ":9991")
 }
 
-type testActionErrorServer struct {
+type testCloseActionErrorServer struct {
 	*EventServer
 	network, addr string
 	action        bool
 }
 
-func (t *testActionErrorServer) OnClosed(c Conn, err error) (action Action) {
+func (t *testCloseActionErrorServer) OnClosed(c Conn, err error) (action Action) {
 	action = Shutdown
 	return
 }
-func (t *testActionErrorServer) React(frame []byte, c Conn) (out []byte, action Action) {
+func (t *testCloseActionErrorServer) React(frame []byte, c Conn) (out []byte, action Action) {
 	out = frame
 	action = Close
 	return
 }
-func (t *testActionErrorServer) Tick() (delay time.Duration, action Action) {
+func (t *testCloseActionErrorServer) Tick() (delay time.Duration, action Action) {
 	if !t.action {
 		t.action = true
 		delay = time.Millisecond * 100
@@ -743,7 +743,122 @@ func (t *testActionErrorServer) Tick() (delay time.Duration, action Action) {
 	return
 }
 
-func testActionError(network, addr string) {
-	events := &testActionErrorServer{network: network, addr: addr}
+func testCloseActionError(network, addr string) {
+	events := &testCloseActionErrorServer{network: network, addr: addr}
+	must(Serve(events, network+"://"+addr, WithTicker(true)))
+}
+
+func TestShutdownActionError(t *testing.T) {
+	testShutdownActionError("tcp", ":9991")
+}
+
+type testShutdownActionErrorServer struct {
+	*EventServer
+	network, addr string
+	action        bool
+}
+
+func (t *testShutdownActionErrorServer) React(frame []byte, c Conn) (out []byte, action Action) {
+	out = frame
+	action = Shutdown
+	return
+}
+func (t *testShutdownActionErrorServer) Tick() (delay time.Duration, action Action) {
+	if !t.action {
+		t.action = true
+		delay = time.Millisecond * 100
+		go func() {
+			conn, err := net.Dial(t.network, t.addr)
+			must(err)
+			defer conn.Close()
+			r := make([]byte, 10)
+			rand.Read(r)
+			_, _ = conn.Write(r)
+			_, err = conn.Read(r)
+			if err != nil {
+				panic(err)
+			}
+			fmt.Println(string(r))
+		}()
+		return
+	}
+	delay = time.Millisecond * 100
+	return
+}
+
+func testShutdownActionError(network, addr string) {
+	events := &testShutdownActionErrorServer{network: network, addr: addr}
+	must(Serve(events, network+"://"+addr, WithTicker(true)))
+}
+
+func TestCloseActionOnOpen(t *testing.T) {
+	testCloseActionOnOpen("tcp", ":9991")
+}
+
+type testCloseActionOnOpenServer struct {
+	*EventServer
+	network, addr string
+	action        bool
+}
+
+func (t *testCloseActionOnOpenServer) OnOpened(c Conn) (out []byte, action Action) {
+	action = Close
+	return
+}
+func (t *testCloseActionOnOpenServer) OnClosed(c Conn, err error) (action Action) {
+	action = Shutdown
+	return
+}
+func (t *testCloseActionOnOpenServer) Tick() (delay time.Duration, action Action) {
+	if !t.action {
+		t.action = true
+		delay = time.Millisecond * 100
+		go func() {
+			conn, err := net.Dial(t.network, t.addr)
+			must(err)
+			defer conn.Close()
+		}()
+		return
+	}
+	delay = time.Millisecond * 100
+	return
+}
+
+func testCloseActionOnOpen(network, addr string) {
+	events := &testCloseActionOnOpenServer{network: network, addr: addr}
+	must(Serve(events, network+"://"+addr, WithTicker(true)))
+}
+
+func TestShutdownActionOnOpen(t *testing.T) {
+	testShutdownActionOnOpen("tcp", ":9991")
+}
+
+type testShutdownActionOnOpenServer struct {
+	*EventServer
+	network, addr string
+	action        bool
+}
+
+func (t *testShutdownActionOnOpenServer) OnOpened(c Conn) (out []byte, action Action) {
+	action = Shutdown
+	return
+}
+func (t *testShutdownActionOnOpenServer) Tick() (delay time.Duration, action Action) {
+	if !t.action {
+		t.action = true
+		delay = time.Millisecond * 100
+		go func() {
+			conn, err := net.Dial(t.network, t.addr)
+			must(err)
+			defer conn.Close()
+		}()
+		return
+	}
+	delay = time.Millisecond * 100
+	return
+}
+
+func testShutdownActionOnOpen(network, addr string) {
+	events := &testShutdownActionOnOpenServer{network: network, addr: addr}
 	must(Serve(events, network+"://"+addr, WithTicker(true)))
 }
