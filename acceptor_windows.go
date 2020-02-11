@@ -16,7 +16,7 @@ import (
 func (svr *server) listenerRun() {
 	var err error
 	defer func() { svr.signalShutdown(err) }()
-	var packet [0xFFFF]byte
+	var packet [0x10000]byte
 	for {
 		if svr.ln.pconn != nil {
 			// Read data from UDP socket.
@@ -41,7 +41,7 @@ func (svr *server) listenerRun() {
 			c := newTCPConn(conn, el)
 			el.ch <- c
 			go func() {
-				var packet [0xFFFF]byte
+				var packet [0x10000]byte
 				for {
 					n, err := c.conn.Read(packet[:])
 					if err != nil {

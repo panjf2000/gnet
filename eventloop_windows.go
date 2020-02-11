@@ -82,34 +82,27 @@ func (el *eventloop) loopAccept(c *stdConn) error {
 	return el.handleAction(c, action)
 }
 
-func (el *eventloop) loopRead(ti *tcpIn) error {
+func (el *eventloop) loopRead(ti *tcpIn) (err error) {
 	c := ti.c
 	c.buffer = ti.in
 
-	outBuffer := bytebuffer.Get()
 	for inFrame, _ := c.read(); inFrame != nil; inFrame, _ = c.read() {
 		out, action := el.eventHandler.React(inFrame, c)
 		if out != nil {
 			el.eventHandler.PreWrite()
 			outFrame, _ := el.codec.Encode(c, out)
-			_, _ = outBuffer.Write(outFrame)
+			_, err = c.conn.Write(outFrame)
 		}
 		switch action {
 		case None:
 		case Close:
-			_, _ = c.conn.Write(outBuffer.Bytes())
-			bytebuffer.Put(outBuffer)
 			return el.loopClose(c)
 		case Shutdown:
-			_, _ = c.conn.Write(outBuffer.Bytes())
-			bytebuffer.Put(outBuffer)
 			return errServerShutdown
 		}
-	}
-	_, err := c.conn.Write(outBuffer.Bytes())
-	bytebuffer.Put(outBuffer)
-	if err != nil {
-		return el.loopClose(c)
+		if err != nil {
+			return el.loopClose(c)
+		}
 	}
 	_, _ = c.inboundBuffer.Write(c.buffer.Bytes())
 	bytebuffer.Put(c.buffer)

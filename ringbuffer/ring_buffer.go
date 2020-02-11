@@ -371,7 +371,6 @@ func (r *RingBuffer) Reset() {
 func (r *RingBuffer) malloc(cap int) {
 	newCap := internal.CeilToPowerOfTwo(r.size + cap)
 	newBuf := make([]byte, newCap)
-	//newBuf := pbytes.GetLen(r.size + cap)
 	oldLen := r.Length()
 	_, _ = r.Read(newBuf)
 	r.r = 0

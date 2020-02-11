@@ -84,7 +84,7 @@ func (svr *server) activateLoops(numLoops int) error {
 				svr:          svr,
 				codec:        svr.codec,
 				poller:       p,
-				packet:       make([]byte, 0xFFFF),
+				packet:       make([]byte, 0x10000),
 				connections:  make(map[int]*conn),
 				eventHandler: svr.eventHandler,
 			}
@@ -108,7 +108,7 @@ func (svr *server) activateReactors(numLoops int) error {
 				svr:          svr,
 				codec:        svr.codec,
 				poller:       p,
-				packet:       make([]byte, 0xFFFF),
+				packet:       make([]byte, 0x10000),
 				connections:  make(map[int]*conn),
 				eventHandler: svr.eventHandler,
 			}
