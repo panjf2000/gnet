@@ -180,9 +180,9 @@ func (el *eventloop) loopError(c *stdConn, err error) (e error) {
 }
 
 func (el *eventloop) loopWake(c *stdConn) error {
-	if _, ok := el.connections[c]; !ok {
-		return nil // ignore stale wakes.
-	}
+	//if co, ok := el.connections[c]; !ok || co != c {
+	//	return nil // ignore stale wakes.
+	//}
 	out, action := el.eventHandler.React(nil, c)
 	if out != nil {
 		frame, _ := el.codec.Encode(c, out)

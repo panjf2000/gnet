@@ -593,7 +593,6 @@ func (t *testWakeConnServer) OnOpened(c Conn) (out []byte, action Action) {
 	return
 }
 func (t *testWakeConnServer) OnClosed(c Conn, err error) (action Action) {
-	_ = t.conn.Wake()
 	action = Shutdown
 	return
 }

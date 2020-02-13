@@ -163,9 +163,9 @@ func (el *eventloop) loopCloseConn(c *conn, err error) error {
 }
 
 func (el *eventloop) loopWake(c *conn) error {
-	if co, ok := el.connections[c.fd]; !ok || co != c {
-		return nil // ignore stale wakes.
-	}
+	//if co, ok := el.connections[c.fd]; !ok || co != c {
+	//	return nil // ignore stale wakes.
+	//}
 	out, action := el.eventHandler.React(nil, c)
 	if out != nil {
 		frame, _ := el.codec.Encode(c, out)
