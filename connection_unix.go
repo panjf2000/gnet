@@ -223,9 +223,15 @@ func (c *conn) SendTo(buf []byte) {
 	c.sendTo(buf)
 }
 
-func (c *conn) Wake() {
-	_ = c.loop.poller.Trigger(func() error {
+func (c *conn) Wake() error {
+	return c.loop.poller.Trigger(func() error {
 		return c.loop.loopWake(c)
+	})
+}
+
+func (c *conn) Close() error {
+	return c.loop.poller.Trigger(func() error {
+		return c.loop.loopCloseConn(c, nil)
 	})
 }
 

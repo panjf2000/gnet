@@ -24,8 +24,6 @@ func (el *eventloop) handleEvent(fd int, ev uint32) error {
 				return el.loopRead(c)
 			}
 			return nil
-		default:
-			return nil
 		}
 	}
 	return el.loopAccept(fd)

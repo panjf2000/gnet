@@ -195,8 +195,17 @@ func (c *stdConn) SendTo(buf []byte) {
 	_, _ = c.loop.svr.ln.pconn.WriteTo(buf, c.remoteAddr)
 }
 
+func (c *stdConn) Wake() error {
+	c.loop.ch <- wakeReq{c}
+	return nil
+}
+
+func (c *stdConn) Close() error {
+	c.loop.ch <- stderr{c, nil}
+	return nil
+}
+
 func (c *stdConn) Context() interface{}       { return c.ctx }
 func (c *stdConn) SetContext(ctx interface{}) { c.ctx = ctx }
 func (c *stdConn) LocalAddr() net.Addr        { return c.localAddr }
 func (c *stdConn) RemoteAddr() net.Addr       { return c.remoteAddr }
-func (c *stdConn) Wake()                      { c.loop.ch <- wakeReq{c} }

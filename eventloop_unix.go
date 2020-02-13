@@ -168,7 +168,8 @@ func (el *eventloop) loopWake(c *conn) error {
 	}
 	out, action := el.eventHandler.React(nil, c)
 	if out != nil {
-		c.write(out)
+		frame, _ := el.codec.Encode(c, out)
+		c.write(frame)
 	}
 	return el.handleAction(c, action)
 }
@@ -179,7 +180,7 @@ func (el *eventloop) loopTicker() {
 		open  bool
 	)
 	for {
-		if err := el.poller.Trigger(func() (err error) {
+		sniffError(el.poller.Trigger(func() (err error) {
 			delay, action := el.eventHandler.Tick()
 			el.svr.ticktock <- delay
 			switch action {
@@ -188,9 +189,7 @@ func (el *eventloop) loopTicker() {
 				err = errServerShutdown
 			}
 			return
-		}); err != nil {
-			break
-		}
+		}))
 		if delay, open = <-el.svr.ticktock; open {
 			time.Sleep(delay)
 		} else {

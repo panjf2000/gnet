@@ -593,11 +593,13 @@ func (t *testWakeConnServer) OnOpened(c Conn) (out []byte, action Action) {
 	return
 }
 func (t *testWakeConnServer) OnClosed(c Conn, err error) (action Action) {
+	_ = t.conn.Wake()
 	action = Shutdown
 	return
 }
 func (t *testWakeConnServer) React(frame []byte, c Conn) (out []byte, action Action) {
 	out = []byte("Waking up.")
+	action = -1
 	return
 }
 func (t *testWakeConnServer) Tick() (delay time.Duration, action Action) {
@@ -617,7 +619,7 @@ func (t *testWakeConnServer) Tick() (delay time.Duration, action Action) {
 		}()
 		return
 	}
-	t.conn.Wake()
+	_ = t.conn.Wake()
 	delay = time.Millisecond * 100
 	return
 }
@@ -728,14 +730,13 @@ func (t *testCloseActionErrorServer) Tick() (delay time.Duration, action Action)
 			conn, err := net.Dial(t.network, t.addr)
 			must(err)
 			defer conn.Close()
-			r := make([]byte, 10)
-			rand.Read(r)
-			_, _ = conn.Write(r)
-			_, err = conn.Read(r)
+			data := []byte("Hello World!")
+			_, _ = conn.Write(data)
+			_, err = conn.Read(data)
 			if err != nil {
 				panic(err)
 			}
-			fmt.Println(string(r))
+			fmt.Println(string(data))
 		}()
 		return
 	}
@@ -771,14 +772,13 @@ func (t *testShutdownActionErrorServer) Tick() (delay time.Duration, action Acti
 			conn, err := net.Dial(t.network, t.addr)
 			must(err)
 			defer conn.Close()
-			r := make([]byte, 10)
-			rand.Read(r)
-			_, _ = conn.Write(r)
-			_, err = conn.Read(r)
+			data := []byte("Hello World!")
+			_, _ = conn.Write(data)
+			_, err = conn.Read(data)
 			if err != nil {
 				panic(err)
 			}
-			fmt.Println(string(r))
+			fmt.Println(string(data))
 		}()
 		return
 	}
@@ -860,5 +860,98 @@ func (t *testShutdownActionOnOpenServer) Tick() (delay time.Duration, action Act
 
 func testShutdownActionOnOpen(network, addr string) {
 	events := &testShutdownActionOnOpenServer{network: network, addr: addr}
+	must(Serve(events, network+"://"+addr, WithTicker(true)))
+}
+
+func TestUDPShutdown(t *testing.T) {
+	testUDPShutdown("udp", ":9000")
+}
+
+type testUDPShutdownServer struct {
+	*EventServer
+	network string
+	addr    string
+	tick    bool
+}
+
+func (t *testUDPShutdownServer) React(frame []byte, c Conn) (out []byte, action Action) {
+	out = frame
+	action = Shutdown
+	return
+}
+func (t *testUDPShutdownServer) Tick() (delay time.Duration, action Action) {
+	if !t.tick {
+		t.tick = true
+		delay = time.Millisecond * 100
+		go func() {
+			conn, err := net.Dial(t.network, t.addr)
+			must(err)
+			defer conn.Close()
+			data := []byte("Hello World!")
+			if _, err = conn.Write(data); err != nil {
+				panic(err)
+			}
+			if _, err = conn.Read(data); err != nil {
+				panic(err)
+			}
+			fmt.Println(string(data))
+		}()
+		return
+	}
+	delay = time.Millisecond * 100
+	return
+}
+
+func testUDPShutdown(network, addr string) {
+	svr := &testUDPShutdownServer{network: network, addr: addr}
+	must(Serve(svr, network+"://"+addr, WithTicker(true)))
+}
+
+func TestCloseConnection(t *testing.T) {
+	testCloseConnection("tcp", ":9991")
+}
+
+type testCloseConnectionServer struct {
+	*EventServer
+	network, addr string
+	action        bool
+}
+
+func (t *testCloseConnectionServer) OnClosed(c Conn, err error) (action Action) {
+	action = Shutdown
+	return
+}
+func (t *testCloseConnectionServer) React(frame []byte, c Conn) (out []byte, action Action) {
+	out = frame
+	go func() {
+		time.Sleep(time.Second)
+		_ = c.Close()
+	}()
+	return
+}
+func (t *testCloseConnectionServer) Tick() (delay time.Duration, action Action) {
+	if !t.action {
+		t.action = true
+		delay = time.Millisecond * 100
+		go func() {
+			conn, err := net.Dial(t.network, t.addr)
+			must(err)
+			defer conn.Close()
+			data := []byte("Hello World!")
+			_, _ = conn.Write(data)
+			_, err = conn.Read(data)
+			if err != nil {
+				panic(err)
+			}
+			fmt.Println(string(data))
+		}()
+		return
+	}
+	delay = time.Millisecond * 100
+	return
+}
+
+func testCloseConnection(network, addr string) {
+	events := &testCloseConnectionServer{network: network, addr: addr}
 	must(Serve(events, network+"://"+addr, WithTicker(true)))
 }

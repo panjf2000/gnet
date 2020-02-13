@@ -100,7 +100,10 @@ type Conn interface {
 	AsyncWrite(buf []byte)
 
 	// Wake triggers a React event for this connection.
-	Wake()
+	Wake() error
+
+	// Close closes the current connection.
+	Close() error
 }
 
 type (
