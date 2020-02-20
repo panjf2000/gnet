@@ -25,9 +25,8 @@ Echo server built upon gnet is shown below:
 		*gnet.EventServer
 	}
 
-	func (es *echoServer) React(c gnet.Conn) (out []byte, action gnet.Action) {
-		out = c.Read()
-		c.ResetBuffer()
+	func (es *echoServer) React(frame []byte, c gnet.Conn) (out []byte, action gnet.Action) {
+		out = frame
 		return
 	}
 
