@@ -112,8 +112,7 @@ func (el *eventloop) loopRead(ti *tcpIn) (err error) {
 
 func (el *eventloop) loopClose(c *stdConn) error {
 	atomic.StoreInt32(&c.done, 1)
-	_ = c.conn.SetReadDeadline(time.Now())
-	return nil
+	return c.conn.SetReadDeadline(time.Now())
 }
 
 func (el *eventloop) loopEgress() {
