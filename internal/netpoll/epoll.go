@@ -26,7 +26,7 @@ type Poller struct {
 // OpenPoller instantiates a poller.
 func OpenPoller() (*Poller, error) {
 	poller := new(Poller)
-	epollFD, err := unix.EpollCreate1(0)
+	epollFD, err := unix.EpollCreate1(unix.EPOLL_CLOEXEC)
 	if err != nil {
 		return nil, err
 	}
