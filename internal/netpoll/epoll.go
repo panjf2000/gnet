@@ -31,7 +31,7 @@ func OpenPoller() (*Poller, error) {
 		return nil, err
 	}
 	poller.fd = epollFD
-	r0, _, errno := unix.Syscall(unix.SYS_EVENTFD2, 0, 0, 0)
+	r0, _, errno := unix.Syscall(unix.SYS_EVENTFD2, unix.O_CLOEXEC, unix.O_NONBLOCK, 0)
 	if errno != 0 {
 		_ = unix.Close(epollFD)
 		return nil, errno
