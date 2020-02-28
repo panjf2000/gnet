@@ -174,7 +174,7 @@ func main() {
 }
 ```
 
-As you can see, this example of echo server only sets up the `EventHandler.React` function where you commonly write your main business code and it will be invoked once the server receives input data from a client. The output data will be then sent back to that client by assigning the `out` variable and return it after your business code finish processing data(in this case, it just echo the data back).
+As you can see, this example of echo server only sets up the `EventHandler.React` function where you commonly write your main business code and it will be invoked once the server receives input data from a client. The output data will be then sent back to that client by assigning the `out` variable and returning it after your business code finish processing data(in this case, it just echo the data back).
 
 ### Echo server with blocking logic
 
