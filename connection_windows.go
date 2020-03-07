@@ -107,19 +107,16 @@ func (c *stdConn) ResetBuffer() {
 }
 
 func (c *stdConn) ShiftN(n int) (size int) {
-	tempBufferLen := c.buffer.Len()
 	inBufferLen := c.inboundBuffer.Length()
+	tempBufferLen := c.buffer.Len()
 	if inBufferLen+tempBufferLen < n || n <= 0 {
 		c.ResetBuffer()
+		size = inBufferLen + tempBufferLen
 		return
 	}
 	size = n
 	if c.inboundBuffer.IsEmpty() {
-		if n == tempBufferLen {
-			c.buffer.Reset()
-		} else {
-			c.buffer.B = c.buffer.B[n:]
-		}
+		c.buffer.B = c.buffer.B[n:]
 		return
 	}
 	c.byteBuffer.B = c.byteBuffer.B[n:]
@@ -143,19 +140,15 @@ func (c *stdConn) ShiftN(n int) (size int) {
 }
 
 func (c *stdConn) ReadN(n int) (size int, buf []byte) {
-	tempBufferLen := c.buffer.Len()
 	inBufferLen := c.inboundBuffer.Length()
+	tempBufferLen := c.buffer.Len()
 	if inBufferLen+tempBufferLen < n || n <= 0 {
 		return
 	}
 	size = n
 	if c.inboundBuffer.IsEmpty() {
 		buf = c.buffer.B[:n]
-		if n == tempBufferLen {
-			c.buffer.Reset()
-		} else {
-			c.buffer.B = c.buffer.B[n:]
-		}
+		c.buffer.B = c.buffer.B[n:]
 		return
 	}
 	buf, tail := c.inboundBuffer.LazyRead(n)

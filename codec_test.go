@@ -211,3 +211,24 @@ func TestFixedLengthFrameCodec_Encode(t *testing.T) {
 		panic("should have a error of invalid fixed length")
 	}
 }
+
+func TestInnerBufferReadN(t *testing.T) {
+	var in innerBuffer
+	data := make([]byte, 10)
+	if _, err := rand.Read(data); err != nil {
+		panic(err)
+	}
+	in = data
+	if _, err := in.readN(-1); err == nil {
+		t.Fatal("error missing")
+	}
+	if _, err := in.readN(11); err == nil {
+		t.Fatal("error missing")
+	}
+	if _, err := in.readN(1); err != nil {
+		t.Fatal("unexpected error")
+	}
+	if len(in) != 9 {
+		t.Fatal("wrong length of leftover bytes")
+	}
+}

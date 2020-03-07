@@ -274,7 +274,8 @@ func startCodecClient(network, addr string, multicore, async bool, codec ICodec)
 			panic(err)
 		}
 		if string(encodedData) != string(data2) && !async {
-			panic(fmt.Sprintf("mismatch %s/multi-core:%t: %d vs %d bytes\n", network, multicore, len(encodedData), len(data2)))
+			//panic(fmt.Sprintf("mismatch %s/multi-core:%t: %d vs %d bytes, %s:%s", network, multicore, len(encodedData), len(data2), string(encodedData), string(data2)))
+			panic(fmt.Sprintf("mismatch %s/multi-core:%t: %d vs %d bytes", network, multicore, len(encodedData), len(data2)))
 		}
 	}
 }

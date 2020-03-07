@@ -23,7 +23,7 @@ before_install:
 go_import_path: github.com/panjf2000/gnet
 
 script:
-  - go test -v -coverprofile=coverage.txt -covermode=count -timeout 30s
+  - go test -v -coverprofile=coverage.txt -covermode=count -timeout 60s
 
 after_success:
   - if [[ "$TRAVIS_OS_NAME" == "windows" ]]; then curl -s https://codecov.io/bash > .codecov && chmod +x .codecov && ./.codecov; else bash <(curl -s https://codecov.io/bash); fi
