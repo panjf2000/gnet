@@ -12,6 +12,7 @@ import (
 	"io"
 	"math/rand"
 	"net"
+	"runtime"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -626,7 +627,7 @@ func (t *testWakeConnServer) Tick() (delay time.Duration, action Action) {
 
 func testWakeConn(network, addr string) {
 	svr := &testWakeConnServer{network: network, addr: addr}
-	must(Serve(svr, network+"://"+addr, WithTicker(true)))
+	must(Serve(svr, network+"://"+addr, WithTicker(true), WithNumEventLoop(2*runtime.NumCPU())))
 }
 
 func TestShutdown(t *testing.T) {

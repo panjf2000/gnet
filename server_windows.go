@@ -68,8 +68,8 @@ func (svr *server) startListener() {
 	}()
 }
 
-func (svr *server) startLoops(numLoops int) {
-	for i := 0; i < numLoops; i++ {
+func (svr *server) startLoops(numEventLoop int) {
+	for i := 0; i < numEventLoop; i++ {
 		el := &eventloop{
 			ch:           make(chan interface{}, commandBufferSize),
 			idx:          i,
@@ -117,11 +117,12 @@ func (svr *server) stop() {
 
 func serve(eventHandler EventHandler, listener *listener, options *Options) (err error) {
 	// Figure out the correct number of loops/goroutines to use.
-	var numCPU int
+	numEventLoop := 1
 	if options.Multicore {
-		numCPU = runtime.NumCPU()
-	} else {
-		numCPU = 1
+		numEventLoop = runtime.NumCPU()
+	}
+	if options.NumEventLoop > 0 {
+		numEventLoop = options.NumEventLoop
 	}
 
 	svr := new(server)
@@ -141,8 +142,8 @@ func serve(eventHandler EventHandler, listener *listener, options *Options) (err
 	server := Server{
 		Multicore:    options.Multicore,
 		Addr:         listener.lnaddr,
-		NumLoops:     numCPU,
-		ReUsePort:    options.ReusePort,
+		NumEventLoop: numEventLoop,
+		ReusePort:    options.ReusePort,
 		TCPKeepAlive: options.TCPKeepAlive,
 	}
 	switch svr.eventHandler.OnInitComplete(server) {
@@ -152,7 +153,7 @@ func serve(eventHandler EventHandler, listener *listener, options *Options) (err
 	}
 
 	// Start all loops.
-	svr.startLoops(numCPU)
+	svr.startLoops(numEventLoop)
 	// Start listener.
 	svr.startListener()
 	defer svr.stop()

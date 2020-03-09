@@ -43,11 +43,11 @@ type Server struct {
 	// with the addr strings passed to the Serve function.
 	Addr net.Addr
 
-	// NumLoops is the number of loops that the server is using.
-	NumLoops int
+	// NumEventLoop is the number of event-loops that the server is using.
+	NumEventLoop int
 
-	// ReUsePort indicates whether SO_REUSEPORT is enable.
-	ReUsePort bool
+	// ReusePort indicates whether SO_REUSEPORT is enable.
+	ReusePort bool
 
 	// TCPKeepAlive (SO_KEEPALIVE) socket option.
 	TCPKeepAlive time.Duration
@@ -204,7 +204,7 @@ func Serve(eventHandler EventHandler, addr string, opts ...Option) error {
 		}
 	}()
 
-	options := initOptions(opts...)
+	options := loadOptions(opts...)
 
 	ln.network, ln.addr = parseAddr(addr)
 	if ln.network == "unix" {

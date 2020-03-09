@@ -279,7 +279,7 @@ type echoServer struct {
 
 func (es *echoServer) OnInitComplete(srv gnet.Server) (action gnet.Action) {
 	log.Printf("Echo server is listening on %s (multi-cores: %t, loops: %d)\n",
-		srv.Addr.String(), srv.Multicore, srv.NumLoops)
+		srv.Addr.String(), srv.Multicore, srv.NumEventLoop)
 	return
 }
 func (es *echoServer) React(frame []byte, c gnet.Conn) (out []byte, action gnet.Action) {
@@ -332,7 +332,7 @@ type echoServer struct {
 
 func (es *echoServer) OnInitComplete(srv gnet.Server) (action gnet.Action) {
 	log.Printf("UDP Echo server is listening on %s (multi-cores: %t, loops: %d)\n",
-		srv.Addr.String(), srv.Multicore, srv.NumLoops)
+		srv.Addr.String(), srv.Multicore, srv.NumEventLoop)
 	return
 }
 func (es *echoServer) React(frame []byte, c gnet.Conn) (out []byte, action gnet.Action) {
@@ -386,7 +386,7 @@ type echoServer struct {
 
 func (es *echoServer) OnInitComplete(srv gnet.Server) (action gnet.Action) {
 	log.Printf("Echo server is listening on %s (multi-cores: %t, loops: %d)\n",
-		srv.Addr.String(), srv.Multicore, srv.NumLoops)
+		srv.Addr.String(), srv.Multicore, srv.NumEventLoop)
 	return
 }
 func (es *echoServer) React(frame []byte, c gnet.Conn) (out []byte, action gnet.Action) {
@@ -487,7 +487,7 @@ pipeline:
 
 func (hs *httpServer) OnInitComplete(srv gnet.Server) (action gnet.Action) {
 	log.Printf("HTTP server is listening on %s (multi-cores: %t, loops: %d)\n",
-		srv.Addr.String(), srv.Multicore, srv.NumLoops)
+		srv.Addr.String(), srv.Multicore, srv.NumEventLoop)
 	return
 }
 
@@ -646,7 +646,7 @@ type pushServer struct {
 
 func (ps *pushServer) OnInitComplete(srv gnet.Server) (action gnet.Action) {
 	log.Printf("Push server is listening on %s (multi-cores: %t, loops: %d), "+
-		"pushing data every %s ...\n", srv.Addr.String(), srv.Multicore, srv.NumLoops, ps.tick.String())
+		"pushing data every %s ...\n", srv.Addr.String(), srv.Multicore, srv.NumEventLoop, ps.tick.String())
 	return
 }
 func (ps *pushServer) OnOpened(c gnet.Conn) (out []byte, action gnet.Action) {
@@ -785,7 +785,7 @@ type codecServer struct {
 
 func (cs *codecServer) OnInitComplete(srv gnet.Server) (action gnet.Action) {
 	log.Printf("Test codec server is listening on %s (multi-cores: %t, loops: %d)\n",
-		srv.Addr.String(), srv.Multicore, srv.NumLoops)
+		srv.Addr.String(), srv.Multicore, srv.NumEventLoop)
 	return
 }
 

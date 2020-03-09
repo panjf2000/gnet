@@ -18,7 +18,7 @@ type pushServer struct {
 
 func (ps *pushServer) OnInitComplete(srv gnet.Server) (action gnet.Action) {
 	log.Printf("Push server is listening on %s (multi-cores: %t, loops: %d), "+
-		"pushing data every %s ...\n", srv.Addr.String(), srv.Multicore, srv.NumLoops, ps.tick.String())
+		"pushing data every %s ...\n", srv.Addr.String(), srv.Multicore, srv.NumEventLoop, ps.tick.String())
 	return
 }
 func (ps *pushServer) OnOpened(c gnet.Conn) (out []byte, action gnet.Action) {

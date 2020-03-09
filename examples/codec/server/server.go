@@ -22,7 +22,7 @@ type codecServer struct {
 
 func (cs *codecServer) OnInitComplete(srv gnet.Server) (action gnet.Action) {
 	log.Printf("Test codec server is listening on %s (multi-cores: %t, loops: %d)\n",
-		srv.Addr.String(), srv.Multicore, srv.NumLoops)
+		srv.Addr.String(), srv.Multicore, srv.NumEventLoop)
 	return
 }
 

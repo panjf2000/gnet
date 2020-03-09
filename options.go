@@ -9,7 +9,7 @@ import "time"
 // Option is a function that will set up option.
 type Option func(opts *Options)
 
-func initOptions(options ...Option) *Options {
+func loadOptions(options ...Option) *Options {
 	opts := new(Options)
 	for _, option := range options {
 		option(opts)
@@ -24,6 +24,10 @@ type Options struct {
 	// it will run the server with single thread. The number of threads in the server will be automatically
 	// assigned to the value of runtime.NumCPU().
 	Multicore bool
+
+	// NumEventLoop is set up to start the given number of event-loop goroutine.
+	// Note: Setting up NumEventLoop will override Multicore.
+	NumEventLoop int
 
 	// ReusePort indicates whether to set up the SO_REUSEPORT socket option.
 	ReusePort bool
@@ -45,10 +49,17 @@ func WithOptions(options Options) Option {
 	}
 }
 
-// WithMulticore sets up multi-cores with gnet.
+// WithMulticore sets up multi-cores in gnet server.
 func WithMulticore(multicore bool) Option {
 	return func(opts *Options) {
 		opts.Multicore = multicore
+	}
+}
+
+// WithNumEventLoop sets up NumEventLoop in gnet server.
+func WithNumEventLoop(numEventLoop int) Option {
+	return func(opts *Options) {
+		opts.NumEventLoop = numEventLoop
 	}
 }
 

@@ -75,9 +75,9 @@ func (svr *server) startReactors() {
 	})
 }
 
-func (svr *server) activateLoops(numLoops int) error {
+func (svr *server) activateLoops(numEventLoop int) error {
 	// Create loops locally and bind the listeners.
-	for i := 0; i < numLoops; i++ {
+	for i := 0; i < numEventLoop; i++ {
 		if p, err := netpoll.OpenPoller(); err == nil {
 			el := &eventloop{
 				idx:          i,
@@ -100,8 +100,8 @@ func (svr *server) activateLoops(numLoops int) error {
 	return nil
 }
 
-func (svr *server) activateReactors(numLoops int) error {
-	for i := 0; i < numLoops; i++ {
+func (svr *server) activateReactors(numEventLoop int) error {
+	for i := 0; i < numEventLoop; i++ {
 		if p, err := netpoll.OpenPoller(); err == nil {
 			el := &eventloop{
 				idx:          i,
@@ -141,11 +141,11 @@ func (svr *server) activateReactors(numLoops int) error {
 	return nil
 }
 
-func (svr *server) start(numCPU int) error {
+func (svr *server) start(numEventLoop int) error {
 	if svr.opts.ReusePort || svr.ln.pconn != nil {
-		return svr.activateLoops(numCPU)
+		return svr.activateLoops(numEventLoop)
 	}
-	return svr.activateReactors(numCPU)
+	return svr.activateReactors(numEventLoop)
 }
 
 func (svr *server) stop() {
@@ -186,11 +186,12 @@ func (svr *server) stop() {
 
 func serve(eventHandler EventHandler, listener *listener, options *Options) error {
 	// Figure out the correct number of loops/goroutines to use.
-	var numCPU int
+	numEventLoop := 1
 	if options.Multicore {
-		numCPU = runtime.NumCPU()
-	} else {
-		numCPU = 1
+		numEventLoop = runtime.NumCPU()
+	}
+	if options.NumEventLoop > 0 {
+		numEventLoop = options.NumEventLoop
 	}
 
 	svr := new(server)
@@ -210,8 +211,8 @@ func serve(eventHandler EventHandler, listener *listener, options *Options) erro
 	server := Server{
 		Multicore:    options.Multicore,
 		Addr:         listener.lnaddr,
-		NumLoops:     numCPU,
-		ReUsePort:    options.ReusePort,
+		NumEventLoop: numEventLoop,
+		ReusePort:    options.ReusePort,
 		TCPKeepAlive: options.TCPKeepAlive,
 	}
 	switch svr.eventHandler.OnInitComplete(server) {
@@ -220,7 +221,7 @@ func serve(eventHandler EventHandler, listener *listener, options *Options) erro
 		return nil
 	}
 
-	if err := svr.start(numCPU); err != nil {
+	if err := svr.start(numEventLoop); err != nil {
 		svr.closeLoops()
 		log.Printf("gnet server is stoping with error: %v\n", err)
 		return err
