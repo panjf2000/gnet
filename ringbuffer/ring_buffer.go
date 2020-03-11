@@ -289,34 +289,33 @@ func (r *RingBuffer) WriteString(s string) (n int, err error) {
 	return r.Write(buf)
 }
 
-// Bytes returns all available read bytes. It does not move the read pointer and only copy the available data.
-func (r *RingBuffer) Bytes() []byte {
+// ByteBuffer returns all available read bytes. It does not move the read pointer and only copy the available data.
+func (r *RingBuffer) ByteBuffer() *bytebuffer.ByteBuffer {
 	if r.isEmpty {
 		return nil
 	} else if r.w == r.r {
-		buf := make([]byte, r.size)
-		copy(buf, r.buf)
-		return buf
+		bb := bytebuffer.Get()
+		_, _ = bb.Write(r.buf)
+		return bb
 	}
 
+	bb := bytebuffer.Get()
 	if r.w > r.r {
-		buf := make([]byte, r.w-r.r)
-		copy(buf, r.buf[r.r:r.w])
-		return buf
+		_, _ = bb.Write(r.buf[r.r:r.w])
+		return bb
 	}
 
 	n := r.size - r.r + r.w
-	buf := make([]byte, n)
 	if r.r+n < r.size {
-		copy(buf, r.buf[r.r:r.r+n])
+		_, _ = bb.Write(r.buf[r.r : r.r+n])
 	} else {
 		c1 := r.size - r.r
-		copy(buf, r.buf[r.r:r.size])
+		_, _ = bb.Write(r.buf[r.r:r.size])
 		c2 := n - c1
-		copy(buf[c1:], r.buf[:c2])
+		_, _ = bb.Write(r.buf[:c2])
 	}
 
-	return buf
+	return bb
 }
 
 // WithByteBuffer combines the available read bytes and the given bytes. It does not move the read pointer and only copy the available data.

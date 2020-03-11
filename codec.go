@@ -118,6 +118,7 @@ func (cc *FixedLengthFrameCodec) Decode(c Conn) ([]byte, error) {
 	if size == 0 {
 		return nil, ErrUnexpectedEOF
 	}
+	c.ShiftN(size)
 	return buf, nil
 }
 
