@@ -39,7 +39,7 @@ The goal of this project is to create a server framework for Go that performs on
 - [x] Supporting asynchronous write operation
 - [x] Flexible ticker event
 - [x] SO_REUSEPORT socket option
-- [x] Built-in multiple codecs to encode/decode network frames into/from TCP stream: LineBasedFrameCodec, DelimiterBasedFrameCodec, FixedLengthFrameCodec and LengthFieldBasedFrameCodec, referencing [netty codec](https://github.com/netty/netty/tree/netty-4.1.43.Final/codec/src/main/java/io/netty/handler/codec), also supporting customized codecs
+- [x] Built-in multiple codecs to encode/decode network frames into/from TCP stream: LineBasedFrameCodec, DelimiterBasedFrameCodec, FixedLengthFrameCodec and LengthFieldBasedFrameCodec, referencing [netty codec](https://netty.io/4.1/api/io/netty/handler/codec/package-summary.html), also supporting customized codecs
 - [x] Supporting Windows platform with ~~event-driven mechanism of IOCP~~ Go stdlib: net
 - [ ] Additional load-balancing algorithms: Random, Least-Connections, Consistent-hashing and so on
 - [ ] TLS support
@@ -174,7 +174,7 @@ func main() {
 }
 ```
 
-As you can see, this example of echo server only sets up the `EventHandler.React` function where you commonly write your main business code and it will be invoked once the server receives input data from a client. The output data will be then sent back to that client by assigning the `out` variable and returning it after your business code finish processing data(in this case, it just echo the data back).
+As you can see, this example of echo server only sets up the `EventHandler.React` function where you commonly write your main business code and it will be invoked once the server receives input data from a client. What you should know is that the input parameter: `frame` is a complete packet which has been decoded by the codec, as a general rule, you should implement the `gnet` [codec interface](https://github.com/panjf2000/gnet/blob/master/codec.go#L18-L24) as the business codec to packet and unpacket TCP stream, but if you don't, your `gnet` server is going to work with the [default codec](https://github.com/panjf2000/gnet/blob/master/codec.go#L53-L63) under the acquiescence, which means all data inculding latest data and previous data in buffer will be stored in the input parameter: `frame` when `EventHandler.React` is being triggered. The output data will be then encoded and sent back to that client by assigning the `out` variable and returning it after your business code finish processing data(in this case, it just echo the data back).
 
 ### Echo server with blocking logic
 

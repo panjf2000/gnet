@@ -39,7 +39,7 @@
 - [x] 支持异步写操作
 - [x] 灵活的事件定时器
 - [x] SO_REUSEPORT 端口重用
-- [x] 内置多种编解码器，支持对 TCP 数据流分包：LineBasedFrameCodec, DelimiterBasedFrameCodec, FixedLengthFrameCodec 和 LengthFieldBasedFrameCodec，参考自 [netty codec](https://github.com/netty/netty/tree/netty-4.1.43.Final/codec/src/main/java/io/netty/handler/codec)，而且支持自定制编解码器
+- [x] 内置多种编解码器，支持对 TCP 数据流分包：LineBasedFrameCodec, DelimiterBasedFrameCodec, FixedLengthFrameCodec 和 LengthFieldBasedFrameCodec，参考自 [netty codec](https://netty.io/4.1/api/io/netty/handler/codec/package-summary.html)，而且支持自定制编解码器
 - [x] 支持 Windows 平台，基于 ~~IOCP 事件驱动机制~~ Go 标准网络库
 - [ ] 加入更多的负载均衡算法：随机、最少连接、一致性哈希等等
 - [ ] 支持 TLS
@@ -172,7 +172,7 @@ func main() {
 }
 ```
 
-正如你所见，上面的例子里 `gnet` 实例只注册了一个 `EventHandler.React` 事件。一般来说，主要的业务逻辑代码会写在这个事件方法里，这个方法会在服务器接收到客户端写过来的数据之时被调用，然后处理输入数据（这里只是把数据 echo 回去）并且在处理完之后把需要输出的数据赋值给 `out` 变量然后返回，之后你就不用管了，`gnet` 会帮你把数据写回客户端的。
+正如你所见，上面的例子里 `gnet` 实例只注册了一个 `EventHandler.React` 事件。一般来说，主要的业务逻辑代码会写在这个事件方法里，这个方法会在服务器接收到客户端写过来的数据之时被调用，此时的输入参数: `frame` 已经是解码过后的一个完整的网络数据包，一般来说你需要实现 `gnet` 的[codec 接口](https://github.com/panjf2000/gnet/blob/master/codec.go#L18-L24)作为你自己的业务编解码器来处理 TCP 组包和分包的问题，如果你不实现那个接口的话，那么 `gnet` 将会使用[默认的 codec](https://github.com/panjf2000/gnet/blob/master/codec.go#L53-L63)，这意味着在 `EventHandler.React` 被触发调用之时输入参数: `frame` 里存储的是所有网络数据：包括最新的以及还在 buffer 里的旧数据，然后处理输入数据（这里只是把数据 echo 回去）并且在处理完之后把需要输出的数据赋值给 `out` 变量并返回，接着输出的数据会经过编码，最后被写回客户端。
 
 ### 带阻塞逻辑的 echo 服务器
 
