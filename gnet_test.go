@@ -10,8 +10,10 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"log"
 	"math/rand"
 	"net"
+	"os"
 	"runtime"
 	"sync/atomic"
 	"testing"
@@ -533,7 +535,7 @@ func startClient(network, addr string, multicore, async bool) {
 }
 
 func must(err error) {
-	if err != nil && err != errProtocolNotSupported {
+	if err != nil && err != ErrProtocolNotSupported {
 		panic(err)
 	}
 }
@@ -627,7 +629,7 @@ func (t *testWakeConnServer) Tick() (delay time.Duration, action Action) {
 
 func testWakeConn(network, addr string) {
 	svr := &testWakeConnServer{network: network, addr: addr}
-	must(Serve(svr, network+"://"+addr, WithTicker(true), WithNumEventLoop(2*runtime.NumCPU())))
+	must(Serve(svr, network+"://"+addr, WithTicker(true), WithNumEventLoop(2*runtime.NumCPU()), WithLogger(log.New(os.Stderr, "", log.LstdFlags))))
 }
 
 func TestShutdown(t *testing.T) {

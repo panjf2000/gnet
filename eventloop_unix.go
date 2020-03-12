@@ -37,7 +37,7 @@ func (el *eventloop) loopRun() {
 		go el.loopTicker()
 	}
 
-	sniffError(el.poller.Polling(el.handleEvent))
+	el.svr.logger.Printf("event-loop:%d exits with error: %v\n", el.idx, el.poller.Polling(el.handleEvent))
 }
 
 func (el *eventloop) loopAccept(fd int) error {
@@ -52,7 +52,7 @@ func (el *eventloop) loopAccept(fd int) error {
 			}
 			return err
 		}
-		if err := unix.SetNonblock(nfd, true); err != nil {
+		if err = unix.SetNonblock(nfd, true); err != nil {
 			return err
 		}
 		c := newTCPConn(nfd, el, sa)
@@ -100,6 +100,7 @@ func (el *eventloop) loopRead(c *conn) error {
 		out, action := el.eventHandler.React(inFrame, c)
 		if out != nil {
 			outFrame, _ := el.codec.Encode(c, out)
+			el.eventHandler.PreWrite()
 			c.write(outFrame)
 		}
 		switch action {
@@ -109,7 +110,7 @@ func (el *eventloop) loopRead(c *conn) error {
 			return el.loopCloseConn(c, nil)
 		case Shutdown:
 			_ = el.loopWrite(c)
-			return errServerShutdown
+			return ErrServerShutdown
 		}
 		if !c.opened {
 			return nil
@@ -151,13 +152,21 @@ func (el *eventloop) loopWrite(c *conn) error {
 }
 
 func (el *eventloop) loopCloseConn(c *conn, err error) error {
-	if el.poller.Delete(c.fd) == nil && unix.Close(c.fd) == nil {
+	err0, err1 := el.poller.Delete(c.fd), unix.Close(c.fd)
+	if err0 == nil && err1 == nil {
 		delete(el.connections, c.fd)
 		switch el.eventHandler.OnClosed(c, err) {
 		case Shutdown:
-			return errServerShutdown
+			return ErrServerShutdown
 		}
 		c.releaseTCP()
+	} else {
+		if err0 != nil {
+			el.svr.logger.Printf("failed to delete fd:%d from poller, error:%v\n", c.fd, err0)
+		}
+		if err1 != nil {
+			el.svr.logger.Printf("failed to close fd:%d, error:%v\n", c.fd, err1)
+		}
 	}
 	return nil
 }
@@ -178,18 +187,23 @@ func (el *eventloop) loopTicker() {
 	var (
 		delay time.Duration
 		open  bool
+		err   error
 	)
 	for {
-		sniffError(el.poller.Trigger(func() (err error) {
+		err = el.poller.Trigger(func() (err error) {
 			delay, action := el.eventHandler.Tick()
 			el.svr.ticktock <- delay
 			switch action {
 			case None:
 			case Shutdown:
-				err = errServerShutdown
+				err = ErrServerShutdown
 			}
 			return
-		}))
+		})
+		if err != nil {
+			el.svr.logger.Printf("failed to awake poller with error:%v, stopping ticker\n", err)
+			break
+		}
 		if delay, open = <-el.svr.ticktock; open {
 			time.Sleep(delay)
 		} else {
@@ -207,7 +221,7 @@ func (el *eventloop) handleAction(c *conn, action Action) error {
 		return el.loopCloseConn(c, nil)
 	case Shutdown:
 		_ = el.loopWrite(c)
-		return errServerShutdown
+		return ErrServerShutdown
 	default:
 		return nil
 	}
@@ -216,17 +230,20 @@ func (el *eventloop) handleAction(c *conn, action Action) error {
 func (el *eventloop) loopReadUDP(fd int) error {
 	n, sa, err := unix.Recvfrom(fd, el.packet, 0)
 	if err != nil || n == 0 {
+		if err != nil && err != unix.EAGAIN {
+			el.svr.logger.Printf("failed to read UPD packet from fd:%d, error:%v\n", fd, err)
+		}
 		return nil
 	}
 	c := newUDPConn(fd, el, sa)
 	out, action := el.eventHandler.React(el.packet[:n], c)
 	if out != nil {
 		el.eventHandler.PreWrite()
-		c.sendTo(out)
+		_ = c.sendTo(out)
 	}
 	switch action {
 	case Shutdown:
-		return errServerShutdown
+		return ErrServerShutdown
 	}
 	c.releaseUDP()
 	return nil

@@ -9,7 +9,6 @@ package gnet
 
 import (
 	"io"
-	"log"
 	"net"
 	"sync/atomic"
 	"time"
@@ -58,7 +57,8 @@ func (el *eventloop) loopRun() {
 			err = v()
 		}
 		if err != nil {
-			return
+			el.svr.logger.Printf("event-loop:%d exits with error:%v\n", el.idx, err)
+			break
 		}
 	}
 }
@@ -89,8 +89,8 @@ func (el *eventloop) loopRead(ti *tcpIn) (err error) {
 	for inFrame, _ := c.read(); inFrame != nil; inFrame, _ = c.read() {
 		out, action := el.eventHandler.React(inFrame, c)
 		if out != nil {
-			el.eventHandler.PreWrite()
 			outFrame, _ := el.codec.Encode(c, out)
+			el.eventHandler.PreWrite()
 			_, err = c.conn.Write(outFrame)
 		}
 		switch action {
@@ -98,7 +98,7 @@ func (el *eventloop) loopRead(ti *tcpIn) (err error) {
 		case Close:
 			return el.loopClose(c)
 		case Shutdown:
-			return errServerShutdown
+			return ErrServerShutdown
 		}
 		if err != nil {
 			return el.loopError(c, err)
@@ -164,16 +164,18 @@ func (el *eventloop) loopError(c *stdConn, err error) (e error) {
 		switch atomic.LoadInt32(&c.done) {
 		case 0: // read error
 			if err != io.EOF {
-				log.Printf("socket: %s with err: %v\n", c.remoteAddr.String(), err)
+				el.svr.logger.Printf("socket: %s with err: %v\n", c.remoteAddr.String(), err)
 			}
 		case 1: // closed
-			log.Printf("socket: %s has been closed by client\n", c.remoteAddr.String())
+			el.svr.logger.Printf("socket: %s has been closed by client\n", c.remoteAddr.String())
 		}
 		switch el.eventHandler.OnClosed(c, err) {
 		case Shutdown:
 			return errClosing
 		}
 		c.releaseTCP()
+	} else {
+		el.svr.logger.Printf("failed to close connection:%s, error:%v\n", c.remoteAddr.String(), e)
 	}
 	return
 }
@@ -197,7 +199,7 @@ func (el *eventloop) handleAction(c *stdConn, action Action) error {
 	case Close:
 		return el.loopClose(c)
 	case Shutdown:
-		return errServerShutdown
+		return ErrServerShutdown
 	default:
 		return nil
 	}

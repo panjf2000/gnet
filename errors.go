@@ -3,10 +3,10 @@ package gnet
 import "errors"
 
 var (
-	// errProtocolNotSupported occurs when trying to use protocol that is not supported.
-	errProtocolNotSupported = errors.New("not supported protocol on this platform")
-	// errServerShutdown occurs when server is closing.
-	errServerShutdown = errors.New("server is going to be shutdown")
+	// ErrProtocolNotSupported occurs when trying to use protocol that is not supported.
+	ErrProtocolNotSupported = errors.New("not supported protocol on this platform")
+	// ErrServerShutdown occurs when server is closing.
+	ErrServerShutdown = errors.New("server is going to be shutdown")
 	// ErrInvalidFixedLength occurs when the output data have invalid fixed length.
 	ErrInvalidFixedLength = errors.New("invalid fixed length of bytes")
 	// ErrUnexpectedEOF occurs when no enough data to read by codec.

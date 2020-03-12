@@ -8,7 +8,6 @@
 package gnet
 
 import (
-	"log"
 	"runtime"
 	"sync"
 	"time"
@@ -23,6 +22,7 @@ type server struct {
 	once             sync.Once          // make sure only signalShutdown once
 	cond             *sync.Cond         // shutdown signaler
 	codec            ICodec             // codec for TCP stream
+	logger           Logger             // customized logger for logging info
 	ticktock         chan time.Duration // ticker channel
 	mainLoop         *eventloop         // main loop for accepting connections
 	eventHandler     EventHandler       // user eventHandler
@@ -155,7 +155,7 @@ func (svr *server) stop() {
 	// Notify all loops to close by closing all listeners
 	svr.subLoopGroup.iterate(func(i int, el *eventloop) bool {
 		sniffError(el.poller.Trigger(func() error {
-			return errServerShutdown
+			return ErrServerShutdown
 		}))
 		return true
 	})
@@ -163,7 +163,7 @@ func (svr *server) stop() {
 	if svr.mainLoop != nil {
 		svr.ln.close()
 		sniffError(svr.mainLoop.poller.Trigger(func() error {
-			return errServerShutdown
+			return ErrServerShutdown
 		}))
 	}
 
@@ -201,6 +201,12 @@ func serve(eventHandler EventHandler, listener *listener, options *Options) erro
 	svr.subLoopGroup = new(eventLoopGroup)
 	svr.cond = sync.NewCond(&sync.Mutex{})
 	svr.ticktock = make(chan time.Duration, 1)
+	svr.logger = func() Logger {
+		if options.Logger == nil {
+			return defaultLogger
+		}
+		return options.Logger
+	}()
 	svr.codec = func() ICodec {
 		if options.Codec == nil {
 			return new(BuiltInFrameCodec)
@@ -223,7 +229,7 @@ func serve(eventHandler EventHandler, listener *listener, options *Options) erro
 
 	if err := svr.start(numEventLoop); err != nil {
 		svr.closeLoops()
-		log.Printf("gnet server is stoping with error: %v\n", err)
+		svr.logger.Printf("gnet server is stoping with error: %v\n", err)
 		return err
 	}
 	defer svr.stop()

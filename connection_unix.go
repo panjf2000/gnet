@@ -110,8 +110,8 @@ func (c *conn) write(buf []byte) {
 	}
 }
 
-func (c *conn) sendTo(buf []byte) {
-	_ = unix.Sendto(c.fd, buf, 0, c.sa)
+func (c *conn) sendTo(buf []byte) error {
+	return unix.Sendto(c.fd, buf, 0, c.sa)
 }
 
 // ================================= Public APIs of gnet.Conn =================================
@@ -190,19 +190,21 @@ func (c *conn) BufferLength() int {
 	return c.inboundBuffer.Length() + len(c.buffer)
 }
 
-func (c *conn) AsyncWrite(buf []byte) {
-	if encodedBuf, err := c.codec.Encode(c, buf); err == nil {
-		_ = c.loop.poller.Trigger(func() error {
+func (c *conn) AsyncWrite(buf []byte) (err error) {
+	var encodedBuf []byte
+	if encodedBuf, err = c.codec.Encode(c, buf); err == nil {
+		return c.loop.poller.Trigger(func() error {
 			if c.opened {
 				c.write(encodedBuf)
 			}
 			return nil
 		})
 	}
+	return
 }
 
-func (c *conn) SendTo(buf []byte) {
-	c.sendTo(buf)
+func (c *conn) SendTo(buf []byte) error {
+	return c.sendTo(buf)
 }
 
 func (c *conn) Wake() error {

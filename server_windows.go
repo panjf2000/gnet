@@ -9,7 +9,6 @@ package gnet
 
 import (
 	"errors"
-	"log"
 	"runtime"
 	"sync"
 	"time"
@@ -34,6 +33,7 @@ type server struct {
 	codec            ICodec             // codec for TCP stream
 	loops            []*eventloop       // all the loops
 	loopWG           sync.WaitGroup     // loop close WaitGroup
+	logger           Logger             // customized logger for logging info
 	ticktock         chan time.Duration // ticker channel
 	listenerWG       sync.WaitGroup     // listener close WaitGroup
 	eventHandler     EventHandler       // user eventHandler
@@ -90,7 +90,7 @@ func (svr *server) startLoops(numEventLoop int) {
 
 func (svr *server) stop() {
 	// Wait on a signal for shutdown.
-	log.Printf("server is being shutdown with err: %v\n", svr.waitForShutdown())
+	svr.logger.Printf("server is being shutdown with err: %v\n", svr.waitForShutdown())
 
 	// Close listener.
 	svr.ln.close()
@@ -132,6 +132,12 @@ func serve(eventHandler EventHandler, listener *listener, options *Options) (err
 	svr.subLoopGroup = new(eventLoopGroup)
 	svr.ticktock = make(chan time.Duration, 1)
 	svr.cond = sync.NewCond(&sync.Mutex{})
+	svr.logger = func() Logger {
+		if options.Logger == nil {
+			return defaultLogger
+		}
+		return options.Logger
+	}()
 	svr.codec = func() ICodec {
 		if options.Codec == nil {
 			return new(BuiltInFrameCodec)

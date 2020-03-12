@@ -40,6 +40,9 @@ type Options struct {
 
 	// ICodec encodes and decodes TCP stream.
 	Codec ICodec
+
+	// Logger is the customized logger for logging info, if it is not set, default standard logger from log package is used.
+	Logger Logger
 }
 
 // WithOptions sets up all options.
@@ -88,5 +91,12 @@ func WithTicker(ticker bool) Option {
 func WithCodec(codec ICodec) Option {
 	return func(opts *Options) {
 		opts.Codec = codec
+	}
+}
+
+// WithLogger sets up a customized logger.
+func WithLogger(logger Logger) Option {
+	return func(opts *Options) {
+		opts.Logger = logger
 	}
 }

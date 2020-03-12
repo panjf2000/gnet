@@ -30,6 +30,14 @@ const (
 	Shutdown
 )
 
+var defaultLogger = Logger(log.New(os.Stderr, "", log.LstdFlags))
+
+// Logger is used for logging formatted messages.
+type Logger interface {
+	// Printf must have the same semantics as log.Printf.
+	Printf(format string, args ...interface{})
+}
+
 // Server represents a server context which provides information about the
 // running server and has control functions for managing state.
 type Server struct {
@@ -39,8 +47,8 @@ type Server struct {
 	// assigned to the value of runtime.NumCPU().
 	Multicore bool
 
-	// The Addr parameter is an array of listening addresses that align
-	// with the addr strings passed to the Serve function.
+	// The Addr parameter is the listening address that align
+	// with the addr string passed to the Serve function.
 	Addr net.Addr
 
 	// NumEventLoop is the number of event-loops that the server is using.
@@ -95,11 +103,11 @@ type Conn interface {
 	//InboundBuffer() *ringbuffer.RingBuffer
 
 	// SendTo writes data for UDP sockets, it allows you to send data back to UDP socket in individual goroutines.
-	SendTo(buf []byte)
+	SendTo(buf []byte) error
 
 	// AsyncWrite writes data to client/connection asynchronously, usually you would invoke it in individual goroutines
 	// instead of the event-loop goroutines.
-	AsyncWrite(buf []byte)
+	AsyncWrite(buf []byte) error
 
 	// Wake triggers a React event for this connection.
 	Wake() error
@@ -212,7 +220,7 @@ func Serve(eventHandler EventHandler, addr string, opts ...Option) error {
 	if ln.network == "unix" {
 		sniffError(os.RemoveAll(ln.addr))
 		if runtime.GOOS == "windows" {
-			return errProtocolNotSupported
+			return ErrProtocolNotSupported
 		}
 	}
 	var err error
@@ -255,7 +263,7 @@ func parseAddr(addr string) (network, address string) {
 }
 
 func sniffError(err error) {
-	if err != nil && err != errServerShutdown {
+	if err != nil {
 		log.Println(err)
 	}
 }

@@ -164,17 +164,20 @@ func (c *stdConn) BufferLength() int {
 	return c.inboundBuffer.Length() + c.buffer.Len()
 }
 
-func (c *stdConn) AsyncWrite(buf []byte) {
-	if encodedBuf, err := c.codec.Encode(c, buf); err == nil {
+func (c *stdConn) AsyncWrite(buf []byte) (err error) {
+	var encodedBuf []byte
+	if encodedBuf, err = c.codec.Encode(c, buf); err == nil {
 		c.loop.ch <- func() error {
 			_, _ = c.conn.Write(encodedBuf)
 			return nil
 		}
 	}
+	return
 }
 
-func (c *stdConn) SendTo(buf []byte) {
-	_, _ = c.loop.svr.ln.pconn.WriteTo(buf, c.remoteAddr)
+func (c *stdConn) SendTo(buf []byte) (err error) {
+	_, err = c.loop.svr.ln.pconn.WriteTo(buf, c.remoteAddr)
+	return
 }
 
 func (c *stdConn) Wake() error {

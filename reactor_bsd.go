@@ -11,7 +11,7 @@ import "github.com/panjf2000/gnet/internal/netpoll"
 func (svr *server) activateMainReactor() {
 	defer svr.signalShutdown()
 
-	sniffError(svr.mainLoop.poller.Polling(func(fd int, filter int16) error {
+	svr.logger.Printf("main reactor exits with error:%v\n", svr.mainLoop.poller.Polling(func(fd int, filter int16) error {
 		return svr.acceptNewConnection(fd)
 	}))
 }
@@ -23,7 +23,7 @@ func (svr *server) activateSubReactor(el *eventloop) {
 		go el.loopTicker()
 	}
 
-	sniffError(el.poller.Polling(func(fd int, filter int16) error {
+	svr.logger.Printf("event-loop:%d exits with error:%v\n", el.idx, el.poller.Polling(func(fd int, filter int16) error {
 		if c, ack := el.connections[fd]; ack {
 			if filter == netpoll.EVFilterSock {
 				return el.loopCloseConn(c, nil)

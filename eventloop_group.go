@@ -43,8 +43,7 @@ func (g *eventLoopGroup) register(el *eventloop) {
 // TODO: support more load-balance algorithms.
 func (g *eventLoopGroup) next() (el *eventloop) {
 	el = g.eventLoops[g.nextLoopIndex]
-	g.nextLoopIndex++
-	if g.nextLoopIndex >= g.size {
+	if g.nextLoopIndex++; g.nextLoopIndex >= g.size {
 		g.nextLoopIndex = 0
 	}
 	return
