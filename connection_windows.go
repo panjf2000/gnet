@@ -144,11 +144,10 @@ func (c *stdConn) ShiftN(n int) (size int) {
 		c.buffer.B = c.buffer.B[n:]
 		return
 	}
-	c.byteBuffer.B = c.byteBuffer.B[n:]
-	if c.byteBuffer.Len() == 0 {
-		bytebuffer.Put(c.byteBuffer)
-		c.byteBuffer = nil
-	}
+
+	bytebuffer.Put(c.byteBuffer)
+	c.byteBuffer = nil
+
 	if inBufferLen >= n {
 		c.inboundBuffer.Shift(n)
 		return
