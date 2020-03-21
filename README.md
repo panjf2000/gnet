@@ -918,6 +918,28 @@ Here is an [example](https://github.com/panjf2000/gnet/blob/master/examples/code
 
 # 📊 Performance
 
+## Benchmarks on TechEmpower
+
+```powershell
+# Hardware
+CPU: 28 HT Cores Intel(R) Xeon(R) Gold 5120 CPU @ 2.20GHz
+Mem: 32GB RAM
+OS : Ubuntu 18.04.3 4.15.0-88-generic #88-Ubuntu
+Net: Switched 10-gigabit ethernet
+Go : go1.14 linux/amd64
+```
+
+![All language](https://raw.githubusercontent.com/panjf2000/illustrations/master/benchmark/techempower-all.jpg)
+
+This is the top 50 on the framework ranking of all programming languages (386 frameworks in total).
+
+
+![Golang](https://raw.githubusercontent.com/panjf2000/illustrations/master/benchmark/techempower-go.png)
+
+This is the full framework ranking of Golang.
+
+To see the full ranking list, visit [Full ranking list of Plaintext](https://www.techempower.com/benchmarks/#section=test&runid=71407829-eaa7-4b5d-a6a2-54b8ba3b2d3f&hw=ph&test=plaintext).
+
 ## Contrasts to the similar networking libraries
 
 ## On Linux (epoll)
@@ -934,8 +956,6 @@ Here is an [example](https://github.com/panjf2000/gnet/blob/master/examples/code
 Go Version : go1.12.9 linux/amd64
 GOMAXPROCS=8
 ```
-
-### 
 
 #### Echo Server
 

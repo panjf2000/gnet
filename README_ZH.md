@@ -917,6 +917,28 @@ gnet.Serve(events, "tcp://:9000", gnet.WithMulticore(true), gnet.WithReusePort(t
 
 # 📊 性能测试
 
+## TechEmpower 性能测试
+
+```powershell
+# Hardware
+CPU: 28 HT Cores Intel(R) Xeon(R) Gold 5120 CPU @ 2.20GHz
+Mem: 32GB RAM
+OS : Ubuntu 18.04.3 4.15.0-88-generic #88-Ubuntu
+Net: Switched 10-gigabit ethernet
+Go : go1.14 linux/amd64
+```
+
+![All language](https://raw.githubusercontent.com/panjf2000/illustrations/master/benchmark/techempower-all.jpg)
+
+这是包含全部编程语言框架的性能排名前 50 的结果（总计 386 个框架）。
+
+
+![Golang](https://raw.githubusercontent.com/panjf2000/illustrations/master/benchmark/techempower-go.png)
+
+这是 Go 语言分类下的全部排名。
+
+完整的排行可以通过 [Full ranking list of Plaintext](https://www.techempower.com/benchmarks/#section=test&runid=71407829-eaa7-4b5d-a6a2-54b8ba3b2d3f&hw=ph&test=plaintext) 查看.
+
 ## 同类型的网络库性能对比
 
 ## Linux (epoll)
