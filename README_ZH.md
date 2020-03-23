@@ -937,7 +937,7 @@ Go : go1.14 linux/amd64
 
 这是 Go 语言分类下的全部排名。
 
-完整的排行可以通过 [Full ranking list of Plaintext](https://www.techempower.com/benchmarks/#section=test&runid=71407829-eaa7-4b5d-a6a2-54b8ba3b2d3f&hw=ph&test=plaintext) 查看.
+完整的排行可以通过 [Full ranking list of Plaintext](https://www.techempower.com/benchmarks/#section=test&runid=b24568ff-8eb3-4e5a-816f-8284bd5ec89c&hw=ph&test=plaintext) 查看.
 
 ## 同类型的网络库性能对比
 

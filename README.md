@@ -82,7 +82,7 @@ and it works as the following sequence diagram:
 
 `gnet` implements the networking model:『multiple reactors with thread/goroutine pool』by the aid of a high-performance goroutine pool called [ants](https://github.com/panjf2000/ants) that allows you to manage and recycle a massive number of goroutines in your concurrent programs, the full features and usages in `ants` are documented [here](https://gowalker.org/github.com/panjf2000/ants?lang=en-US).
 
-`gnet` integrates `ants` and provides the `pool.goroutine.Default()` method that you can invoke to instantiate a `ants` pool where you are able to put your blocking code logic and invoke the function `gnet.Conn.AsyncWrite([]byte)` to send out data asynchronously after you finish the blocking process and get the output data, which makes the goroutine of event-loop non-blocking.
+`gnet` integrates `ants` and provides the `pool.goroutine.Default()` method that you can call to instantiate a `ants` pool where you are able to put your blocking code logic and call the function `gnet.Conn.AsyncWrite([]byte)` to send out data asynchronously after you finish the blocking process and get the output data, which makes the goroutine of event-loop non-blocking.
 
 The details about integrating `gnet`  with `ants` are shown [here](#echo-server-with-blocking-logic).
 
@@ -174,7 +174,7 @@ func main() {
 }
 ```
 
-As you can see, this example of echo server only sets up the `EventHandler.React` function where you commonly write your main business code and it will be invoked once the server receives input data from a client. What you should know is that the input parameter: `frame` is a complete packet which has been decoded by the codec, as a general rule, you should implement the `gnet` [codec interface](https://github.com/panjf2000/gnet/blob/master/codec.go#L18-L24) as the business codec to packet and unpacket TCP stream, but if you don't, your `gnet` server is going to work with the [default codec](https://github.com/panjf2000/gnet/blob/master/codec.go#L53-L63) under the acquiescence, which means all data inculding latest data and previous data in buffer will be stored in the input parameter: `frame` when `EventHandler.React` is being triggered. The output data will be then encoded and sent back to that client by assigning the `out` variable and returning it after your business code finish processing data(in this case, it just echo the data back).
+As you can see, this example of echo server only sets up the `EventHandler.React` function where you commonly write your main business code and it will be called once the server receives input data from a client. What you should know is that the input parameter: `frame` is a complete packet which has been decoded by the codec, as a general rule, you should implement the `gnet` [codec interface](https://github.com/panjf2000/gnet/blob/master/codec.go#L18-L24) as the business codec to packet and unpacket TCP stream, but if you don't, your `gnet` server is going to work with the [default codec](https://github.com/panjf2000/gnet/blob/master/codec.go#L53-L63) under the acquiescence, which means all data inculding latest data and previous data in buffer will be stored in the input parameter: `frame` when `EventHandler.React` is being triggered. The output data will be then encoded and sent back to that client by assigning the `out` variable and returning it after your business code finish processing data(in this case, it just echo the data back).
 
 ### Echo server with blocking logic
 
@@ -938,7 +938,7 @@ This is the top 50 on the framework ranking of all programming languages (386 fr
 
 This is the full framework ranking of Golang.
 
-To see the full ranking list, visit [Full ranking list of Plaintext](https://www.techempower.com/benchmarks/#section=test&runid=71407829-eaa7-4b5d-a6a2-54b8ba3b2d3f&hw=ph&test=plaintext).
+To see the full ranking list, visit [Full ranking list of Plaintext](https://www.techempower.com/benchmarks/#section=test&runid=b24568ff-8eb3-4e5a-816f-8284bd5ec89c&hw=ph&test=plaintext).
 
 ## Contrasts to the similar networking libraries
 
