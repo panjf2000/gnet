@@ -78,8 +78,7 @@
 <p align="center">
 <img alt="multi-reactors" src="https://raw.githubusercontent.com/panjf2000/illustrations/master/go/multi-reactors%2Bthread-pool-sequence-diagram.png">
 </p>
-
-`gnet` 通过利用 [ants](https://github.com/panjf2000/ants) goroutine 池（一个基于 Go 开发的高性能的 goroutine 池 ，实现了对大规模 goroutines 的调度管理、goroutines 复用）来实现『主从多 Reactors + 线程/Go程池』网络模型。关于 `ants` 的全部功能和使用，可以在 [ants 文档](https://gowalker.org/github.com/panjf2000/ants?lang=zh-CN) 里找到。
+`gnet` 通过利用 [ants](https://github.com/panjf2000/ants) goroutine 池（一个基于 Go 开发的高性能的 goroutine 池 ，实现了对大规模 goroutines 的调度管理、goroutines 复用）来实现『主从多 Reactors + 线程/Go程池』网络模型。关于 `ants` 的全部功能和使用，可以在 [ants 文档](https://pkg.go.dev/github.com/panjf2000/ants/v2?tab=doc) 里找到。
 
 `gnet` 内部集成了 `ants` 以及提供了 `pool.goroutine.Default()` 方法来初始化一个 `ants` goroutine 池，然后你可以把 `EventHandler.React` 中阻塞的业务逻辑提交到 goroutine 池里执行，最后在 goroutine 池里的代码调用 `gnet.Conn.AsyncWrite([]byte)` 方法把处理完阻塞逻辑之后得到的输出数据异步写回客户端，这样就可以避免阻塞 event-loop 线程。
 
@@ -112,7 +111,7 @@ go get -u github.com/panjf2000/gnet
 
 ## 使用示例
 
-**详细的文档在这里: [gnet 接口文档](https://gowalker.org/github.com/panjf2000/gnet?lang=zh-CN)，不过下面我们先来了解下使用 `gnet` 的简略方法。**
+**详细的文档在这里: [gnet 接口文档](https://pkg.go.dev/github.com/panjf2000/gnet?tab=doc)，不过下面我们先来了解下使用 `gnet` 的简略方法。**
 
 用 `gnet` 来构建网络服务器是非常简单的，只需要实现 `gnet.EventHandler`接口然后把你关心的事件函数注册到里面，最后把它连同监听地址一起传递给 `gnet.Serve` 函数就完成了。在服务器开始工作之后，每一条到来的网络连接会在各个事件之间传递，如果你想在某个事件中关闭某条连接或者关掉整个服务器的话，直接在事件函数里把 `gnet.Action` 设置成 `Cosed` 或者 `Shutdown`就行了。
 

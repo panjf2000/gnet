@@ -79,8 +79,7 @@ and it works as the following sequence diagram:
 <p align="center">
 <img alt="multi-reactors" src="https://raw.githubusercontent.com/panjf2000/illustrations/master/go/multi-reactors%2Bthread-pool-sequence-diagram.png">
 </p>
-
-`gnet` implements the networking model:『multiple reactors with thread/goroutine pool』by the aid of a high-performance goroutine pool called [ants](https://github.com/panjf2000/ants) that allows you to manage and recycle a massive number of goroutines in your concurrent programs, the full features and usages in `ants` are documented [here](https://gowalker.org/github.com/panjf2000/ants?lang=en-US).
+`gnet` implements the networking model:『multiple reactors with thread/goroutine pool』by the aid of a high-performance goroutine pool called [ants](https://github.com/panjf2000/ants) that allows you to manage and recycle a massive number of goroutines in your concurrent programs, the full features and usages in `ants` are documented [here](https://pkg.go.dev/github.com/panjf2000/ants/v2?tab=doc).
 
 `gnet` integrates `ants` and provides the `pool.goroutine.Default()` method that you can call to instantiate a `ants` pool where you are able to put your blocking code logic and call the function `gnet.Conn.AsyncWrite([]byte)` to send out data asynchronously after you finish the blocking process and get the output data, which makes the goroutine of event-loop non-blocking.
 
@@ -113,7 +112,7 @@ go get -u github.com/panjf2000/gnet
 
 ## Usage Examples
 
-**The detailed documentation is located in here: [docs of gnet](https://gowalker.org/github.com/panjf2000/gnet?lang=en-US), but let's pass through the brief instructions first.**
+**The detailed documentation is located in here: [docs of gnet](https://pkg.go.dev/github.com/panjf2000/gnet?tab=doc), but let's pass through the brief instructions first.**
 
 It is easy to create a network server with `gnet`. All you have to do is just to make your implementation of `gnet.EventHandler` interface and register your event-handler functions to it, then pass it to the `gnet.Serve` function along with the binding address(es). Each connection is represented as a `gnet.Conn` interface that is passed to various events to differentiate the clients. At any point you can close a connection or shutdown the server by return a `Close` or `Shutdown` action from an event function.
 
