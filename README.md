@@ -926,19 +926,19 @@ CPU: 28 HT Cores Intel(R) Xeon(R) Gold 5120 CPU @ 2.20GHz
 Mem: 32GB RAM
 OS : Ubuntu 18.04.3 4.15.0-88-generic #88-Ubuntu
 Net: Switched 10-gigabit ethernet
-Go : go1.14 linux/amd64
+Go : go1.14.x linux/amd64
 ```
 
 ![All language](https://raw.githubusercontent.com/panjf2000/illustrations/master/benchmark/techempower-all.jpg)
 
-This is the top 50 on the framework ranking of all programming languages (386 frameworks in total).
+This is the top 50 on the framework ranking of all programming languages (376 frameworks in total).
 
 
 ![Golang](https://raw.githubusercontent.com/panjf2000/illustrations/master/benchmark/techempower-go.png)
 
 This is the full framework ranking of Golang.
 
-To see the full ranking list, visit [Full ranking list of Plaintext](https://www.techempower.com/benchmarks/#section=test&runid=b24568ff-8eb3-4e5a-816f-8284bd5ec89c&hw=ph&test=plaintext).
+To see the full ranking list, visit [Full ranking list of Plaintext](https://www.techempower.com/benchmarks/#section=test&runid=02692910-4c3f-4c56-a9dc-f0167a4280a4&hw=ph&test=plaintext).
 
 ## Contrasts to the similar networking libraries
 
