@@ -186,7 +186,7 @@ func (c *stdConn) Wake() error {
 
 func (c *stdConn) Close() error {
 	c.loop.ch <- func() error {
-		return c.loop.loopClose(c)
+		return c.loop.loopCloseConn(c)
 	}
 	return nil
 }

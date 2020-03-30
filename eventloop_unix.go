@@ -9,6 +9,7 @@ package gnet
 
 import (
 	"net"
+	"sync/atomic"
 	"time"
 
 	"github.com/panjf2000/gnet/internal/netpoll"
@@ -21,8 +22,21 @@ type eventloop struct {
 	codec        ICodec          // codec for TCP
 	packet       []byte          // read packet buffer
 	poller       *netpoll.Poller // epoll or kqueue
+	connCount    int32           // number of active connections in event-loop
 	connections  map[int]*conn   // loop connections fd -> conn
 	eventHandler EventHandler    // user eventHandler
+}
+
+func (el *eventloop) plusConnCount() {
+	atomic.AddInt32(&el.connCount, 1)
+}
+
+func (el *eventloop) minusConnCount() {
+	atomic.AddInt32(&el.connCount, -1)
+}
+
+func (el *eventloop) loadConnCount() int32 {
+	return atomic.LoadInt32(&el.connCount)
 }
 
 func (el *eventloop) loopRun() {
@@ -155,6 +169,7 @@ func (el *eventloop) loopCloseConn(c *conn, err error) error {
 	err0, err1 := el.poller.Delete(c.fd), unix.Close(c.fd)
 	if err0 == nil && err1 == nil {
 		delete(el.connections, c.fd)
+		el.minusConnCount()
 		switch el.eventHandler.OnClosed(c, err) {
 		case Shutdown:
 			return ErrServerShutdown

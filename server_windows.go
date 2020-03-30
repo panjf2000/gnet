@@ -75,7 +75,7 @@ func (svr *server) startLoops(numEventLoop int) {
 			idx:          i,
 			svr:          svr,
 			codec:        svr.codec,
-			connections:  make(map[*stdConn]bool),
+			connections:  make(map[*stdConn]struct{}),
 			eventHandler: svr.eventHandler,
 		}
 		svr.subLoopGroup.register(el)
@@ -129,7 +129,14 @@ func serve(eventHandler EventHandler, listener *listener, options *Options) (err
 	svr.opts = options
 	svr.eventHandler = eventHandler
 	svr.ln = listener
-	svr.subLoopGroup = new(eventLoopGroup)
+
+	switch options.LB {
+	case RoundRobin:
+		svr.subLoopGroup = new(roundRobinEventLoopGroup)
+	case LeastConnections:
+		svr.subLoopGroup = new(leastConnectionsEventLoopGroup)
+	}
+
 	svr.ticktock = make(chan time.Duration, 1)
 	svr.cond = sync.NewCond(&sync.Mutex{})
 	svr.logger = func() Logger {
