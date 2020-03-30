@@ -20,6 +20,7 @@ type eventloop struct {
 	svr          *server         // server in loop
 	codec        ICodec          // codec for TCP
 	packet       []byte          // read packet buffer
+	priority     int64           // priority, Number of runs
 	poller       *netpoll.Poller // epoll or kqueue
 	connections  map[int]*conn   // loop connections fd -> conn
 	eventHandler EventHandler    // user eventHandler
@@ -39,8 +40,11 @@ func (el *eventloop) loopRun() {
 
 	el.svr.logger.Printf("event-loop:%d exits with error: %v\n", el.idx, el.poller.Polling(el.handleEvent))
 }
-
+func (el *eventloop) changePriority(p int64) {
+	el.priority += p
+}
 func (el *eventloop) loopAccept(fd int) error {
+
 	if fd == el.svr.ln.fd {
 		if el.svr.ln.pconn != nil {
 			return el.loopReadUDP(fd)
@@ -66,6 +70,7 @@ func (el *eventloop) loopAccept(fd int) error {
 }
 
 func (el *eventloop) loopOpen(c *conn) error {
+	el.changePriority(acceptWeight)
 	c.opened = true
 	c.localAddr = el.svr.ln.lnaddr
 	c.remoteAddr = netpoll.SockaddrToTCPOrUnixAddr(c.sa)
@@ -87,6 +92,7 @@ func (el *eventloop) loopOpen(c *conn) error {
 }
 
 func (el *eventloop) loopRead(c *conn) error {
+	el.changePriority(readWeight)
 	n, err := unix.Read(c.fd, el.packet)
 	if n == 0 || err != nil {
 		if err == unix.EAGAIN {
@@ -122,6 +128,7 @@ func (el *eventloop) loopRead(c *conn) error {
 }
 
 func (el *eventloop) loopWrite(c *conn) error {
+	el.changePriority(writeWeight)
 	el.eventHandler.PreWrite()
 
 	head, tail := c.outboundBuffer.LazyReadAll()
@@ -202,6 +209,7 @@ func (el *eventloop) loopTicker() {
 		})
 		if err != nil {
 			el.svr.logger.Printf("failed to awake poller with error:%v, stopping ticker\n", err)
+			el.changePriority(tickWeight)
 			break
 		}
 		if delay, open = <-el.svr.ticktock; open {
@@ -228,6 +236,7 @@ func (el *eventloop) handleAction(c *conn, action Action) error {
 }
 
 func (el *eventloop) loopReadUDP(fd int) error {
+	el.changePriority(readWeight)
 	n, sa, err := unix.Recvfrom(fd, el.packet, 0)
 	if err != nil || n == 0 {
 		if err != nil && err != unix.EAGAIN {
@@ -240,6 +249,7 @@ func (el *eventloop) loopReadUDP(fd int) error {
 	if out != nil {
 		el.eventHandler.PreWrite()
 		_ = c.sendTo(out)
+		el.changePriority(writeWeight)
 	}
 	switch action {
 	case Shutdown:
