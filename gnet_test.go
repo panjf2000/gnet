@@ -395,6 +395,7 @@ func TestServe(t *testing.T) {
 
 type testServer struct {
 	*EventServer
+	svr          Server
 	network      string
 	addr         string
 	multicore    bool
@@ -406,6 +407,11 @@ type testServer struct {
 	disconnected int32
 	workerPool   *goroutine.Pool
 	bytesList    []*bytebufferpool.ByteBuffer
+}
+
+func (s *testServer) OnInitComplete(svr Server) (action Action) {
+	s.svr = svr
+	return
 }
 
 func (s *testServer) OnOpened(c Conn) (out []byte, action Action) {
@@ -478,6 +484,7 @@ func (s *testServer) Tick() (delay time.Duration, action Action) {
 		}
 		atomic.StoreInt32(&s.started, 1)
 	}
+	fmt.Printf("active connections: %d\n", s.svr.CountConnections())
 	if s.network == "udp" && atomic.LoadInt32(&s.clientActive) == 0 {
 		action = Shutdown
 		return

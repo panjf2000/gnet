@@ -224,6 +224,7 @@ func serve(eventHandler EventHandler, listener *listener, options *Options) erro
 	}()
 
 	server := Server{
+		svr:          svr,
 		Multicore:    options.Multicore,
 		Addr:         listener.lnaddr,
 		NumEventLoop: numEventLoop,
