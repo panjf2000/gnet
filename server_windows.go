@@ -135,6 +135,8 @@ func serve(eventHandler EventHandler, listener *listener, options *Options) (err
 		svr.subLoopGroup = new(roundRobinEventLoopGroup)
 	case LeastConnections:
 		svr.subLoopGroup = new(leastConnectionsEventLoopGroup)
+	case SourceAddrHash:
+		svr.subLoopGroup = new(sourceAddrHashEventLoopGroup)
 	}
 
 	svr.ticktock = make(chan time.Duration, 1)

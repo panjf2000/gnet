@@ -204,6 +204,8 @@ func serve(eventHandler EventHandler, listener *listener, options *Options) erro
 		svr.subLoopGroup = new(roundRobinEventLoopGroup)
 	case LeastConnections:
 		svr.subLoopGroup = new(leastConnectionsEventLoopGroup)
+	case SourceAddrHash:
+		svr.subLoopGroup = new(sourceAddrHashEventLoopGroup)
 	}
 
 	svr.cond = sync.NewCond(&sync.Mutex{})
