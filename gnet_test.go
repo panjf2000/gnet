@@ -293,50 +293,50 @@ func TestServe(t *testing.T) {
 	t.Run("poll", func(t *testing.T) {
 		t.Run("tcp", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe("tcp", ":9991", false, false, false, 10)
+				testServe("tcp", ":9991", false, false, false, 10, RoundRobin)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("tcp", ":9992", false, true, false, 10)
+				testServe("tcp", ":9992", false, true, false, 10, LeastConnections)
 			})
 		})
 		t.Run("tcp-async", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe("tcp", ":9991", false, false, true, 10)
+				testServe("tcp", ":9991", false, false, true, 10, RoundRobin)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("tcp", ":9992", false, true, true, 10)
+				testServe("tcp", ":9992", false, true, true, 10, LeastConnections)
 			})
 		})
 		t.Run("udp", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe("udp", ":9991", false, false, false, 10)
+				testServe("udp", ":9991", false, false, false, 10, RoundRobin)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("udp", ":9992", false, true, false, 10)
+				testServe("udp", ":9992", false, true, false, 10, LeastConnections)
 			})
 		})
 		t.Run("udp-async", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe("udp", ":9991", false, false, true, 10)
+				testServe("udp", ":9991", false, false, true, 10, RoundRobin)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("udp", ":9992", false, true, true, 10)
+				testServe("udp", ":9992", false, true, true, 10, LeastConnections)
 			})
 		})
 		t.Run("unix", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe("unix", "gnet1.sock", false, false, false, 10)
+				testServe("unix", "gnet1.sock", false, false, false, 10, RoundRobin)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("unix", "gnet2.sock", false, true, false, 10)
+				testServe("unix", "gnet2.sock", false, true, false, 10, SourceAddrHash)
 			})
 		})
 		t.Run("unix-async", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe("unix", "gnet1.sock", false, false, true, 10)
+				testServe("unix", "gnet1.sock", false, false, true, 10, RoundRobin)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("unix", "gnet2.sock", false, true, true, 10)
+				testServe("unix", "gnet2.sock", false, true, true, 10, SourceAddrHash)
 			})
 		})
 	})
@@ -344,50 +344,50 @@ func TestServe(t *testing.T) {
 	t.Run("poll-reuseport", func(t *testing.T) {
 		t.Run("tcp", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe("tcp", ":9991", true, false, false, 10)
+				testServe("tcp", ":9991", true, false, false, 10, RoundRobin)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("tcp", ":9992", true, true, false, 10)
+				testServe("tcp", ":9992", true, true, false, 10, LeastConnections)
 			})
 		})
 		t.Run("tcp-async", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe("tcp", ":9991", true, false, true, 10)
+				testServe("tcp", ":9991", true, false, true, 10, RoundRobin)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("tcp", ":9992", true, true, false, 10)
+				testServe("tcp", ":9992", true, true, false, 10, LeastConnections)
 			})
 		})
 		t.Run("udp", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe("udp", ":9991", true, false, false, 10)
+				testServe("udp", ":9991", true, false, false, 10, RoundRobin)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("udp", ":9992", true, true, false, 10)
+				testServe("udp", ":9992", true, true, false, 10, LeastConnections)
 			})
 		})
 		t.Run("udp-async", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe("udp", ":9991", true, false, false, 10)
+				testServe("udp", ":9991", true, false, false, 10, RoundRobin)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("udp", ":9992", true, true, true, 10)
+				testServe("udp", ":9992", true, true, true, 10, LeastConnections)
 			})
 		})
 		t.Run("unix", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe("unix", "gnet1.sock", true, false, false, 10)
+				testServe("unix", "gnet1.sock", true, false, false, 10, RoundRobin)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("unix", "gnet2.sock", true, true, false, 10)
+				testServe("unix", "gnet2.sock", true, true, false, 10, LeastConnections)
 			})
 		})
 		t.Run("unix-async", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe("unix", "gnet1.sock", true, false, true, 10)
+				testServe("unix", "gnet1.sock", true, false, true, 10, RoundRobin)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("unix", "gnet2.sock", true, true, true, 10)
+				testServe("unix", "gnet2.sock", true, true, true, 10, LeastConnections)
 			})
 		})
 	})
@@ -395,6 +395,7 @@ func TestServe(t *testing.T) {
 
 type testServer struct {
 	*EventServer
+	svr          Server
 	network      string
 	addr         string
 	multicore    bool
@@ -406,6 +407,11 @@ type testServer struct {
 	disconnected int32
 	workerPool   *goroutine.Pool
 	bytesList    []*bytebufferpool.ByteBuffer
+}
+
+func (s *testServer) OnInitComplete(svr Server) (action Action) {
+	s.svr = svr
+	return
 }
 
 func (s *testServer) OnOpened(c Conn) (out []byte, action Action) {
@@ -478,6 +484,7 @@ func (s *testServer) Tick() (delay time.Duration, action Action) {
 		}
 		atomic.StoreInt32(&s.started, 1)
 	}
+	fmt.Printf("active connections: %d\n", s.svr.CountConnections())
 	if s.network == "udp" && atomic.LoadInt32(&s.clientActive) == 0 {
 		action = Shutdown
 		return
@@ -486,9 +493,16 @@ func (s *testServer) Tick() (delay time.Duration, action Action) {
 	return
 }
 
-func testServe(network, addr string, reuseport, multicore, async bool, nclients int) {
-	ts := &testServer{network: network, addr: addr, multicore: multicore, async: async, nclients: nclients, workerPool: goroutine.Default()}
-	must(Serve(ts, network+"://"+addr, WithMulticore(multicore), WithReusePort(reuseport), WithTicker(true), WithTCPKeepAlive(time.Minute*5)))
+func testServe(network, addr string, reuseport, multicore, async bool, nclients int, lb LoadBalancing) {
+	ts := &testServer{
+		network:    network,
+		addr:       addr,
+		multicore:  multicore,
+		async:      async,
+		nclients:   nclients,
+		workerPool: goroutine.Default()}
+	must(Serve(ts, network+"://"+addr, WithMulticore(multicore), WithReusePort(reuseport), WithTicker(true),
+		WithTCPKeepAlive(time.Minute*1), WithLoadBalancing(lb)))
 }
 
 func startClient(network, addr string, multicore, async bool) {

@@ -41,6 +41,8 @@ type Logger interface {
 // Server represents a server context which provides information about the
 // running server and has control functions for managing state.
 type Server struct {
+	// svr is the internal server struct.
+	svr *server
 	// Multicore indicates whether the server will be effectively created with multi-cores, if so,
 	// then you must take care of synchronizing the shared data between all event callbacks, otherwise,
 	// it will run the server with single thread. The number of threads in the server will be automatically
@@ -59,6 +61,15 @@ type Server struct {
 
 	// TCPKeepAlive (SO_KEEPALIVE) socket option.
 	TCPKeepAlive time.Duration
+}
+
+// CountConnections counts the number of currently active connections and returns it.
+func (s Server) CountConnections() (count int) {
+	s.svr.subLoopGroup.iterate(func(i int, el *eventloop) bool {
+		count += int(el.loadConnCount())
+		return true
+	})
+	return
 }
 
 // Conn is a interface of gnet connection.
