@@ -66,9 +66,9 @@ func (r *RingBuffer) LazyRead(len int) (head []byte, tail []byte) {
 		head = r.buf[r.r : r.r+n]
 	} else {
 		c1 := r.size - r.r
-		head = r.buf[r.r:r.size]
+		head = r.buf[r.r:]
 		c2 := n - c1
-		tail = r.buf[0:c2]
+		tail = r.buf[:c2]
 	}
 
 	return
@@ -85,9 +85,9 @@ func (r *RingBuffer) LazyReadAll() (head []byte, tail []byte) {
 		return
 	}
 
-	head = r.buf[r.r:r.size]
+	head = r.buf[r.r:]
 	if r.w != 0 {
-		tail = r.buf[0:r.w]
+		tail = r.buf[:r.w]
 	}
 
 	return
@@ -147,9 +147,9 @@ func (r *RingBuffer) Read(p []byte) (n int, err error) {
 		copy(p, r.buf[r.r:r.r+n])
 	} else {
 		c1 := r.size - r.r
-		copy(p, r.buf[r.r:r.size])
+		copy(p, r.buf[r.r:])
 		c2 := n - c1
-		copy(p[c1:], r.buf[0:c2])
+		copy(p[c1:], r.buf[:c2])
 	}
 	r.r = (r.r + n) & r.mask
 	if r.r == r.w {
@@ -199,7 +199,7 @@ func (r *RingBuffer) Write(p []byte) (n int, err error) {
 		} else {
 			copy(r.buf[r.w:], p[:c1])
 			c2 := n - c1
-			copy(r.buf[0:], p[c1:])
+			copy(r.buf, p[c1:])
 			r.w = c2
 		}
 	} else {
@@ -299,7 +299,7 @@ func (r *RingBuffer) ByteBuffer() *bytebuffer.ByteBuffer {
 		return bb
 	}
 
-	_, _ = bb.Write(r.buf[r.r:r.size])
+	_, _ = bb.Write(r.buf[r.r:])
 
 	if r.w != 0 {
 		_, _ = bb.Write(r.buf[:r.w])
@@ -327,7 +327,7 @@ func (r *RingBuffer) WithByteBuffer(b []byte) *bytebuffer.ByteBuffer {
 		return bb
 	}
 
-	_, _ = bb.Write(r.buf[r.r:r.size])
+	_, _ = bb.Write(r.buf[r.r:])
 
 	if r.w != 0 {
 		_, _ = bb.Write(r.buf[:r.w])
