@@ -25,6 +25,9 @@ type Options struct {
 	// assigned to the value of runtime.NumCPU().
 	Multicore bool
 
+	// LB represents the load-balancing algorithm used when assigning new connections.
+	LB LoadBalancing
+
 	// NumEventLoop is set up to start the given number of event-loop goroutine.
 	// Note: Setting up NumEventLoop will override Multicore.
 	NumEventLoop int
@@ -56,6 +59,13 @@ func WithOptions(options Options) Option {
 func WithMulticore(multicore bool) Option {
 	return func(opts *Options) {
 		opts.Multicore = multicore
+	}
+}
+
+// WithLoadBalancing sets up the load-balancing algorithm in gnet server.
+func WithLoadBalancing(lb LoadBalancing) Option {
+	return func(opts *Options) {
+		opts.LB = lb
 	}
 }
 

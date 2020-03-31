@@ -198,7 +198,14 @@ func serve(eventHandler EventHandler, listener *listener, options *Options) erro
 	svr.opts = options
 	svr.eventHandler = eventHandler
 	svr.ln = listener
-	svr.subLoopGroup = new(eventLoopGroup)
+
+	switch options.LB {
+	case RoundRobin:
+		svr.subLoopGroup = new(roundRobinEventLoopGroup)
+	case LeastConnections:
+		svr.subLoopGroup = new(leastConnectionsEventLoopGroup)
+	}
+
 	svr.cond = sync.NewCond(&sync.Mutex{})
 	svr.ticktock = make(chan time.Duration, 1)
 	svr.logger = func() Logger {

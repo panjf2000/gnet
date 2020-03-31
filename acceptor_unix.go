@@ -26,6 +26,7 @@ func (svr *server) acceptNewConnection(fd int) error {
 			return
 		}
 		el.connections[nfd] = c
+		el.plusConnCount()
 		err = el.loopOpen(c)
 		return
 	})
