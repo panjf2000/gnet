@@ -41,7 +41,10 @@ func (el *eventloop) loopRun() {
 	el.svr.logger.Printf("event-loop:%d exits with error: %v\n", el.idx, el.poller.Polling(el.handleEvent))
 }
 func (el *eventloop) changePriority(p int64) {
-	el.priority += p
+	// el.priority > 0 == use priority LoadBalance
+	if el.priority > 0 {
+		el.priority += p
+	}
 }
 func (el *eventloop) loopAccept(fd int) error {
 
@@ -107,6 +110,7 @@ func (el *eventloop) loopRead(c *conn) error {
 		if out != nil {
 			outFrame, _ := el.codec.Encode(c, out)
 			el.eventHandler.PreWrite()
+			el.changePriority(writeWeight)
 			c.write(outFrame)
 		}
 		switch action {
@@ -161,6 +165,7 @@ func (el *eventloop) loopWrite(c *conn) error {
 func (el *eventloop) loopCloseConn(c *conn, err error) error {
 	err0, err1 := el.poller.Delete(c.fd), unix.Close(c.fd)
 	if err0 == nil && err1 == nil {
+		el.changePriority(closeWeight)
 		delete(el.connections, c.fd)
 		switch el.eventHandler.OnClosed(c, err) {
 		case Shutdown:
@@ -186,6 +191,7 @@ func (el *eventloop) loopWake(c *conn) error {
 	if out != nil {
 		frame, _ := el.codec.Encode(c, out)
 		c.write(frame)
+		el.changePriority(writeWeight)
 	}
 	return el.handleAction(c, action)
 }
@@ -200,6 +206,7 @@ func (el *eventloop) loopTicker() {
 		err = el.poller.Trigger(func() (err error) {
 			delay, action := el.eventHandler.Tick()
 			el.svr.ticktock <- delay
+			el.changePriority(tickWeight)
 			switch action {
 			case None:
 			case Shutdown:
@@ -209,7 +216,6 @@ func (el *eventloop) loopTicker() {
 		})
 		if err != nil {
 			el.svr.logger.Printf("failed to awake poller with error:%v, stopping ticker\n", err)
-			el.changePriority(tickWeight)
 			break
 		}
 		if delay, open = <-el.svr.ticktock; open {
@@ -236,7 +242,6 @@ func (el *eventloop) handleAction(c *conn, action Action) error {
 }
 
 func (el *eventloop) loopReadUDP(fd int) error {
-	el.changePriority(readWeight)
 	n, sa, err := unix.Recvfrom(fd, el.packet, 0)
 	if err != nil || n == 0 {
 		if err != nil && err != unix.EAGAIN {
@@ -249,7 +254,6 @@ func (el *eventloop) loopReadUDP(fd int) error {
 	if out != nil {
 		el.eventHandler.PreWrite()
 		_ = c.sendTo(out)
-		el.changePriority(writeWeight)
 	}
 	switch action {
 	case Shutdown:

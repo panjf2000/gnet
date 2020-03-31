@@ -198,7 +198,15 @@ func serve(eventHandler EventHandler, listener *listener, options *Options) erro
 	svr.opts = options
 	svr.eventHandler = eventHandler
 	svr.ln = listener
-	svr.subLoopGroup = new(eventLoopGroup)
+	switch svr.opts.LoadBalance {
+	case Priority:
+		if svr.opts.ReusePort || svr.ln.pconn != nil {
+			return ErrLoadBalanceProtocolNotSupported
+		}
+		svr.subLoopGroup = new(eventLoopPriorityGroup)
+	default:
+		svr.subLoopGroup = new(eventLoopGroup)
+	}
 	svr.cond = sync.NewCond(&sync.Mutex{})
 	svr.ticktock = make(chan time.Duration, 1)
 	svr.logger = func() Logger {

@@ -15,42 +15,40 @@ import (
 func (svr *server) activateMainReactor() {
 	defer svr.signalShutdown()
 	switch svr.opts.LoadBalance {
-	case Default:
-		svr.logger.Printf("main reactor exits with error:%v\n", svr.mainLoop.poller.Polling(func(fd int, ev uint32) error {
-			return svr.acceptNewConnection(fd)
-		}))
 	case Priority:
 		go func() {
 			ticker := time.NewTicker(time.Second)
+			var (
+				count = 0
+			)
 			defer ticker.Stop()
 			for {
 				<-ticker.C
-				var flag = false
-				svr.subLoopGroup.iterate(func(i int, e *eventloop) bool {
-					if e.priority > upperBound {
-						flag = true
-					}
-					return true
-				})
-				if flag {
+				if count > 4 {
+					count = 0
+					svr.subLoopGroup.iterate(func(i int, e *eventloop) bool {
+						atomic.StoreInt64(&e.priority, 1)
+						return true
+					})
+				} else {
 					svr.subLoopGroup.iterate(func(i int, e *eventloop) bool {
 						var p = atomic.LoadInt64(&e.priority)
 						p >>= 2
-						if p < 0 {
-							p = 0
+						if p < 1 {
+							p = 1
 						}
 						atomic.StoreInt64(&e.priority, p)
 						return true
 					})
 				}
+				count++
 			}
 		}()
-		svr.logger.Printf("main reactor exits with error:%v\n", svr.mainLoop.poller.Polling(func(fd int, ev uint32) error {
-			return svr.acceptNewPriConnection(fd)
-		}))
-
+	default:
 	}
-
+	svr.logger.Printf("main reactor exits with error:%v\n", svr.mainLoop.poller.Polling(func(fd int, ev uint32) error {
+		return svr.acceptNewConnection(fd)
+	}))
 }
 
 func (svr *server) activateSubReactor(el *eventloop) {

@@ -340,7 +340,16 @@ func TestServe(t *testing.T) {
 			})
 		})
 	})
-
+	t.Run("load-balance", func(t *testing.T) {
+		t.Run("tcp", func(t *testing.T) {
+			t.Run("priority", func(t *testing.T) {
+				testLoadBalanceServe("tcp", ":9991", true, false, 100, Priority)
+			})
+			t.Run("priority", func(t *testing.T) {
+				testLoadBalanceServe("tcp", ":9991", true, true, 100, Priority)
+			})
+		})
+	})
 	t.Run("poll-reuseport", func(t *testing.T) {
 		t.Run("tcp", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
@@ -490,7 +499,10 @@ func testServe(network, addr string, reuseport, multicore, async bool, nclients 
 	ts := &testServer{network: network, addr: addr, multicore: multicore, async: async, nclients: nclients, workerPool: goroutine.Default()}
 	must(Serve(ts, network+"://"+addr, WithMulticore(multicore), WithReusePort(reuseport), WithTicker(true), WithTCPKeepAlive(time.Minute*5)))
 }
-
+func testLoadBalanceServe(network, addr string, multicore, async bool, nclients int, balance LoadBalance) {
+	ts := &testServer{network: network, addr: addr, multicore: multicore, async: async, nclients: nclients, workerPool: goroutine.Default()}
+	must(Serve(ts, network+"://"+addr, WithMulticore(multicore), WithLoadBalance(Priority), WithTicker(true), WithTCPKeepAlive(time.Minute*5)))
+}
 func startClient(network, addr string, multicore, async bool) {
 	rand.Seed(time.Now().UnixNano())
 	c, err := net.Dial(network, addr)

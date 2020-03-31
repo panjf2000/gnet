@@ -32,7 +32,41 @@ type (
 		eventLoops    []*eventloop
 		size          int
 	}
+
+	eventLoopPriorityGroup struct {
+		eventLoops []*eventloop
+		size       int
+	}
 )
+
+func (g *eventLoopPriorityGroup) register(el *eventloop) {
+	g.eventLoops = append(g.eventLoops, el)
+	g.size++
+}
+
+// 常量级循环
+func (g *eventLoopPriorityGroup) next() (el *eventloop) {
+	var (
+		minIdx = 0
+	)
+	for i := 1; i < g.size; i++ {
+		if g.eventLoops[i].priority < g.eventLoops[minIdx].priority {
+			minIdx = i
+		}
+	}
+	g.eventLoops[minIdx].priority++
+	return g.eventLoops[minIdx]
+}
+func (g *eventLoopPriorityGroup) iterate(f func(int, *eventloop) bool) {
+	for i, el := range g.eventLoops {
+		if !f(i, el) {
+			break
+		}
+	}
+}
+func (g *eventLoopPriorityGroup) len() int {
+	return g.size
+}
 
 func (g *eventLoopGroup) register(el *eventloop) {
 	g.eventLoops = append(g.eventLoops, el)

@@ -33,7 +33,8 @@ type Options struct {
 	ReusePort bool
 
 	// Ticker indicates whether the ticker has been set up.
-	Ticker      bool
+	Ticker bool
+	// LoadBalance option
 	LoadBalance LoadBalance
 	// TCPKeepAlive (SO_KEEPALIVE) socket option.
 	TCPKeepAlive time.Duration
