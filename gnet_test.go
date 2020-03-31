@@ -328,7 +328,7 @@ func TestServe(t *testing.T) {
 				testServe("unix", "gnet1.sock", false, false, false, 10, RoundRobin)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("unix", "gnet2.sock", false, true, false, 10, LeastConnections)
+				testServe("unix", "gnet2.sock", false, true, false, 10, SourceAddrHash)
 			})
 		})
 		t.Run("unix-async", func(t *testing.T) {
@@ -336,7 +336,7 @@ func TestServe(t *testing.T) {
 				testServe("unix", "gnet1.sock", false, false, true, 10, RoundRobin)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe("unix", "gnet2.sock", false, true, true, 10, LeastConnections)
+				testServe("unix", "gnet2.sock", false, true, true, 10, SourceAddrHash)
 			})
 		})
 	})

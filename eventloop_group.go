@@ -14,13 +14,16 @@ const (
 	// LeastConnections assigns the next accepted connection to the event-loop that is
 	// serving the least number of active connections at the current time.
 	LeastConnections
+
+	// SourceAddrHash assignes the next accepted connection to the event-loop by hashing socket fd.
+	SourceAddrHash
 )
 
 // IEventLoopGroup represents a set of event-loops.
 type (
 	IEventLoopGroup interface {
 		register(*eventloop)
-		next() *eventloop
+		next(int) *eventloop
 		iterate(func(int, *eventloop) bool)
 		len() int
 	}
@@ -34,6 +37,12 @@ type (
 
 	// leastConnectionsEventLoopGroup with Least-Connections algorithm.
 	leastConnectionsEventLoopGroup []*eventloop
+
+	// sourceAddrHashEventLoopGroup with Hash algorithm.
+	sourceAddrHashEventLoopGroup struct {
+		eventLoops []*eventloop
+		size       int
+	}
 )
 
 func (g *roundRobinEventLoopGroup) register(el *eventloop) {
@@ -42,7 +51,7 @@ func (g *roundRobinEventLoopGroup) register(el *eventloop) {
 }
 
 // next returns the eligible event-loop based on Round-Robin algorithm.
-func (g *roundRobinEventLoopGroup) next() (el *eventloop) {
+func (g *roundRobinEventLoopGroup) next(_ int) (el *eventloop) {
 	el = g.eventLoops[g.nextLoopIndex]
 	if g.nextLoopIndex++; g.nextLoopIndex >= g.size {
 		g.nextLoopIndex = 0
@@ -67,7 +76,7 @@ func (g *leastConnectionsEventLoopGroup) register(el *eventloop) {
 }
 
 // next returns the eligible event-loop based on least-connections algorithm.
-func (g *leastConnectionsEventLoopGroup) next() (el *eventloop) {
+func (g *leastConnectionsEventLoopGroup) next(_ int) (el *eventloop) {
 	eventLoops := *g
 	el = eventLoops[0]
 	leastConnCount := el.loadConnCount()
@@ -95,4 +104,26 @@ func (g *leastConnectionsEventLoopGroup) iterate(f func(int, *eventloop) bool) {
 
 func (g *leastConnectionsEventLoopGroup) len() int {
 	return len(*g)
+}
+
+func (g *sourceAddrHashEventLoopGroup) register(el *eventloop) {
+	g.eventLoops = append(g.eventLoops, el)
+	g.size++
+}
+
+// next returns the eligible event-loop by taking the remainder of a given fd as the index of event-loop list.
+func (g *sourceAddrHashEventLoopGroup) next(hashCode int) *eventloop {
+	return g.eventLoops[hashCode%g.size]
+}
+
+func (g *sourceAddrHashEventLoopGroup) iterate(f func(int, *eventloop) bool) {
+	for i, el := range g.eventLoops {
+		if !f(i, el) {
+			break
+		}
+	}
+}
+
+func (g *sourceAddrHashEventLoopGroup) len() int {
+	return g.size
 }
