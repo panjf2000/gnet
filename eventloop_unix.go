@@ -23,8 +23,28 @@ type eventloop struct {
 	packet       []byte          // read packet buffer
 	priority     int64           // priority, Number of runs
 	poller       *netpoll.Poller // epoll or kqueue
+	connCount    int32           // number of active connections in event-loop
 	connections  map[int]*conn   // loop connections fd -> conn
 	eventHandler EventHandler    // user eventHandler
+}
+
+func (el *eventloop) plusConnCount() {
+	atomic.AddInt32(&el.connCount, 1)
+}
+
+func (el *eventloop) minusConnCount() {
+	atomic.AddInt32(&el.connCount, -1)
+}
+
+func (el *eventloop) loadConnCount() int32 {
+	return atomic.LoadInt32(&el.connCount)
+}
+
+func (el *eventloop) changePriority(p int64) {
+	// el.priority > 0 == use priority LoadBalance
+	if atomic.LoadInt64(&el.priority) > 0 {
+		atomic.AddInt64(&el.priority, p)
+	}
 }
 
 func (el *eventloop) loopRun() {
@@ -41,12 +61,7 @@ func (el *eventloop) loopRun() {
 
 	el.svr.logger.Printf("event-loop:%d exits with error: %v\n", el.idx, el.poller.Polling(el.handleEvent))
 }
-func (el *eventloop) changePriority(p int64) {
-	// el.priority > 0 == use priority LoadBalance
-	if atomic.LoadInt64(&el.priority) > 0 {
-		atomic.AddInt64(&el.priority, p)
-	}
-}
+
 func (el *eventloop) loopAccept(fd int) error {
 
 	if fd == el.svr.ln.fd {
@@ -66,6 +81,7 @@ func (el *eventloop) loopAccept(fd int) error {
 		c := newTCPConn(nfd, el, sa)
 		if err = el.poller.AddRead(c.fd); err == nil {
 			el.connections[c.fd] = c
+			el.plusConnCount()
 			return el.loopOpen(c)
 		}
 		return err
@@ -168,6 +184,7 @@ func (el *eventloop) loopCloseConn(c *conn, err error) error {
 	if err0 == nil && err1 == nil {
 		el.changePriority(closeWeight)
 		delete(el.connections, c.fd)
+		el.minusConnCount()
 		switch el.eventHandler.OnClosed(c, err) {
 		case Shutdown:
 			return ErrServerShutdown

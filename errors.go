@@ -19,6 +19,6 @@ var (
 	ErrUnsupportedLength = errors.New("unsupported lengthFieldLength. (expected: 1, 2, 3, 4, or 8)")
 	// ErrTooLessLength occurs when adjusted frame length is less than zero.
 	ErrTooLessLength = errors.New("adjusted frame length is less than zero")
-
+	// ErrLoadBalanceProtocolNotSupported Protocols not supported by load balancing
 	ErrLoadBalanceProtocolNotSupported = errors.New("not supported protocol on this load balancing algorithm")
 )

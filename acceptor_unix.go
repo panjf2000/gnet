@@ -10,22 +10,6 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// define weight
-const (
-	readWeight   = 3
-	writeWeight  = 3
-	acceptWeight = 4
-	closeWeight  = -10
-	tickWeight   = 1
-)
-
-type LoadBalance int
-
-const (
-	Default LoadBalance = iota
-	Priority
-)
-
 func (svr *server) acceptNewConnection(fd int) error {
 	nfd, sa, err := unix.Accept(fd)
 	if err != nil {
@@ -37,13 +21,14 @@ func (svr *server) acceptNewConnection(fd int) error {
 	if err := unix.SetNonblock(nfd, true); err != nil {
 		return err
 	}
-	el := svr.subLoopGroup.next()
+	el := svr.subLoopGroup.next(nfd)
 	c := newTCPConn(nfd, el, sa)
 	_ = el.poller.Trigger(func() (err error) {
 		if err = el.poller.AddRead(nfd); err != nil {
 			return
 		}
 		el.connections[nfd] = c
+		el.plusConnCount()
 		err = el.loopOpen(c)
 		return
 	})

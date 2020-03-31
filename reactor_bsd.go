@@ -11,6 +11,39 @@ import "github.com/panjf2000/gnet/internal/netpoll"
 func (svr *server) activateMainReactor() {
 	defer svr.signalShutdown()
 
+	switch svr.opts.LB {
+	case Priority:
+		go func() {
+			ticker := time.NewTicker(time.Second)
+			var (
+				count = 0
+			)
+			defer ticker.Stop()
+			for {
+				<-ticker.C
+				if count > 4 {
+					count = 0
+					svr.subLoopGroup.iterate(func(i int, e *eventloop) bool {
+						atomic.StoreInt64(&e.priority, 1)
+						return true
+					})
+				} else {
+					svr.subLoopGroup.iterate(func(i int, e *eventloop) bool {
+						var p = atomic.LoadInt64(&e.priority)
+						p >>= 2
+						if p < 1 {
+							p = 1
+						}
+						atomic.StoreInt64(&e.priority, p)
+						return true
+					})
+				}
+				count++
+			}
+		}()
+	default:
+	}
+
 	svr.logger.Printf("main reactor exits with error:%v\n", svr.mainLoop.poller.Polling(func(fd int, filter int16) error {
 		return svr.acceptNewConnection(fd)
 	}))

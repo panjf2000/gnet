@@ -198,15 +198,21 @@ func serve(eventHandler EventHandler, listener *listener, options *Options) erro
 	svr.opts = options
 	svr.eventHandler = eventHandler
 	svr.ln = listener
-	switch svr.opts.LoadBalance {
+
+	switch options.LB {
+	case RoundRobin:
+		svr.subLoopGroup = new(roundRobinEventLoopGroup)
+	case LeastConnections:
+		svr.subLoopGroup = new(leastConnectionsEventLoopGroup)
+	case SourceAddrHash:
+		svr.subLoopGroup = new(sourceAddrHashEventLoopGroup)
 	case Priority:
 		if svr.opts.ReusePort || svr.ln.pconn != nil {
 			return ErrLoadBalanceProtocolNotSupported
 		}
-		svr.subLoopGroup = new(eventLoopPriorityGroup)
-	default:
-		svr.subLoopGroup = new(eventLoopGroup)
+		svr.subLoopGroup = new(priorityEventLoopGroup)
 	}
+
 	svr.cond = sync.NewCond(&sync.Mutex{})
 	svr.ticktock = make(chan time.Duration, 1)
 	svr.logger = func() Logger {
@@ -223,6 +229,7 @@ func serve(eventHandler EventHandler, listener *listener, options *Options) erro
 	}()
 
 	server := Server{
+		svr:          svr,
 		Multicore:    options.Multicore,
 		Addr:         listener.lnaddr,
 		NumEventLoop: numEventLoop,

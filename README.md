@@ -20,7 +20,7 @@ English | [🇨🇳中文](README_ZH.md)
 
 `gnet` is an event-driven networking framework that is fast and lightweight. It makes direct [epoll](https://en.wikipedia.org/wiki/Epoll) and [kqueue](https://en.wikipedia.org/wiki/Kqueue) syscalls rather than using the standard Go [net](https://golang.org/pkg/net/) package, and works in a similar manner as [netty](https://github.com/netty/netty) and [libuv](https://github.com/libuv/libuv).
 
-The goal of this project is to create a server framework for Go that performs on par with [Redis](http://redis.io) and [Haproxy](http://www.haproxy.org) for packet handling.
+`gnet` is not designed to displace the standard Go [net](https://golang.org/pkg/net/) package, but to create a networking server framework for Go that performs on par with [Redis](http://redis.io) and [Haproxy](http://www.haproxy.org) for networking packets handling.
 
 `gnet` sells itself as a high-performance, lightweight, non-blocking, event-driven networking framework written in pure Go which works on transport layer with TCP/UDP protocols and Unix Domain Socket , so it allows developers to implement their own protocols(HTTP, RPC, WebSocket, Redis, etc.) of application layer upon `gnet` for building  diversified network applications, for instance, you get an HTTP Server or Web Framework if you implement HTTP protocol upon `gnet` while you have a Redis Server done with the implementation of Redis protocol upon `gnet` and so on.
 
@@ -29,20 +29,18 @@ The goal of this project is to create a server framework for Go that performs on
 # 🚀 Features
 
 - [x] [High-performance](#-performance) event-loop under networking model of multiple threads/goroutines
-- [x] Built-in load balancing algorithm: Round-Robin
 - [x] Built-in goroutine pool powered by the library [ants](https://github.com/panjf2000/ants)
 - [x] Built-in memory pool with bytes powered by the library [bytebufferpool](https://github.com/valyala/bytebufferpool)
 - [x] Concise APIs
 - [x] Efficient memory usage: Ring-Buffer
 - [x] Supporting multiple protocols/IPC mechanism: TCP, UDP and Unix Domain Socket
+- [x] Supporting multiple load-balancing algorithms: Round-Robin, Source Addr Hash and Least-Connections
 - [x] Supporting two event-driven mechanisms: epoll on Linux and kqueue on FreeBSD
 - [x] Supporting asynchronous write operation
 - [x] Flexible ticker event
 - [x] SO_REUSEPORT socket option
 - [x] Built-in multiple codecs to encode/decode network frames into/from TCP stream: LineBasedFrameCodec, DelimiterBasedFrameCodec, FixedLengthFrameCodec and LengthFieldBasedFrameCodec, referencing [netty codec](https://netty.io/4.1/api/io/netty/handler/codec/package-summary.html), also supporting customized codecs
 - [x] Supporting Windows platform with ~~event-driven mechanism of IOCP~~ Go stdlib: net
-- [ ] Additional load-balancing algorithms: Random, Least-Connections, Consistent-hashing and so on
-- [ ] TLS support
 - [ ] Implementation of `gnet` Client
 
 # 💡 Key Designs
@@ -79,8 +77,7 @@ and it works as the following sequence diagram:
 <p align="center">
 <img alt="multi-reactors" src="https://raw.githubusercontent.com/panjf2000/illustrations/master/go/multi-reactors%2Bthread-pool-sequence-diagram.png">
 </p>
-
-`gnet` implements the networking model:『multiple reactors with thread/goroutine pool』by the aid of a high-performance goroutine pool called [ants](https://github.com/panjf2000/ants) that allows you to manage and recycle a massive number of goroutines in your concurrent programs, the full features and usages in `ants` are documented [here](https://gowalker.org/github.com/panjf2000/ants?lang=en-US).
+`gnet` implements the networking model:『multiple reactors with thread/goroutine pool』by the aid of a high-performance goroutine pool called [ants](https://github.com/panjf2000/ants) that allows you to manage and recycle a massive number of goroutines in your concurrent programs, the full features and usages in `ants` are documented [here](https://pkg.go.dev/github.com/panjf2000/ants/v2?tab=doc).
 
 `gnet` integrates `ants` and provides the `pool.goroutine.Default()` method that you can call to instantiate a `ants` pool where you are able to put your blocking code logic and call the function `gnet.Conn.AsyncWrite([]byte)` to send out data asynchronously after you finish the blocking process and get the output data, which makes the goroutine of event-loop non-blocking.
 
@@ -113,7 +110,7 @@ go get -u github.com/panjf2000/gnet
 
 ## Usage Examples
 
-**The detailed documentation is located in here: [docs of gnet](https://gowalker.org/github.com/panjf2000/gnet?lang=en-US), but let's pass through the brief instructions first.**
+**The detailed documentation is located in here: [docs of gnet](https://pkg.go.dev/github.com/panjf2000/gnet?tab=doc), but let's pass through the brief instructions first.**
 
 It is easy to create a network server with `gnet`. All you have to do is just to make your implementation of `gnet.EventHandler` interface and register your event-handler functions to it, then pass it to the `gnet.Serve` function along with the binding address(es). Each connection is represented as a `gnet.Conn` interface that is passed to various events to differentiate the clients. At any point you can close a connection or shutdown the server by return a `Close` or `Shutdown` action from an event function.
 
@@ -931,7 +928,7 @@ Go : go1.14.x linux/amd64
 
 ![All language](https://raw.githubusercontent.com/panjf2000/illustrations/master/benchmark/techempower-all.jpg)
 
-This is the top 50 on the framework ranking of all programming languages (376 frameworks in total).
+This is the top 50 on the framework ranking of all programming languages consists of a total of 376 frameworks from all over the world.
 
 
 ![Golang](https://raw.githubusercontent.com/panjf2000/illustrations/master/benchmark/techempower-go.png)

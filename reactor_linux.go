@@ -14,7 +14,8 @@ import (
 
 func (svr *server) activateMainReactor() {
 	defer svr.signalShutdown()
-	switch svr.opts.LoadBalance {
+
+	switch svr.opts.LB {
 	case Priority:
 		go func() {
 			ticker := time.NewTicker(time.Second)
@@ -46,6 +47,7 @@ func (svr *server) activateMainReactor() {
 		}()
 	default:
 	}
+
 	svr.logger.Printf("main reactor exits with error:%v\n", svr.mainLoop.poller.Polling(func(fd int, ev uint32) error {
 		return svr.acceptNewConnection(fd)
 	}))

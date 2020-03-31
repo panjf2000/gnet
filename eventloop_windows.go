@@ -17,12 +17,25 @@ import (
 )
 
 type eventloop struct {
-	ch           chan interface{}  // command channel
-	idx          int               // loop index
-	svr          *server           // server in loop
-	codec        ICodec            // codec for TCP
-	connections  map[*stdConn]bool // track all the sockets bound to this loop
-	eventHandler EventHandler      // user eventHandler
+	ch           chan interface{}      // command channel
+	idx          int                   // loop index
+	svr          *server               // server in loop
+	codec        ICodec                // codec for TCP
+	connCount    int32                 // number of active connections in event-loop
+	connections  map[*stdConn]struct{} // track all the sockets bound to this loop
+	eventHandler EventHandler          // user eventHandler
+}
+
+func (el *eventloop) plusConnCount() {
+	atomic.AddInt32(&el.connCount, 1)
+}
+
+func (el *eventloop) minusConnCount() {
+	atomic.AddInt32(&el.connCount, -1)
+}
+
+func (el *eventloop) loadConnCount() int32 {
+	return atomic.LoadInt32(&el.connCount)
 }
 
 func (el *eventloop) loopRun() {
@@ -64,10 +77,11 @@ func (el *eventloop) loopRun() {
 }
 
 func (el *eventloop) loopAccept(c *stdConn) error {
-	el.connections[c] = true
+	el.connections[c] = struct{}{}
 	c.localAddr = el.svr.ln.lnaddr
 	c.remoteAddr = c.conn.RemoteAddr()
-
+	el.plusConnCount()
+	el.changePriority(acceptWeight)
 	out, action := el.eventHandler.OnOpened(c)
 	if out != nil {
 		el.eventHandler.PreWrite()
@@ -85,9 +99,10 @@ func (el *eventloop) loopAccept(c *stdConn) error {
 func (el *eventloop) loopRead(ti *tcpIn) (err error) {
 	c := ti.c
 	c.buffer = ti.in
-
+	el.changePriority(readWeight)
 	for inFrame, _ := c.read(); inFrame != nil; inFrame, _ = c.read() {
 		out, action := el.eventHandler.React(inFrame, c)
+		el.changePriority(writeWeight)
 		if out != nil {
 			outFrame, _ := el.codec.Encode(c, out)
 			el.eventHandler.PreWrite()
@@ -96,7 +111,7 @@ func (el *eventloop) loopRead(ti *tcpIn) (err error) {
 		switch action {
 		case None:
 		case Close:
-			return el.loopClose(c)
+			return el.loopCloseConn(c)
 		case Shutdown:
 			return ErrServerShutdown
 		}
@@ -110,8 +125,9 @@ func (el *eventloop) loopRead(ti *tcpIn) (err error) {
 	return nil
 }
 
-func (el *eventloop) loopClose(c *stdConn) error {
+func (el *eventloop) loopCloseConn(c *stdConn) error {
 	atomic.StoreInt32(&c.done, 1)
+	el.changePriority(closeWeight)
 	return c.conn.SetReadDeadline(time.Now())
 }
 
@@ -123,7 +139,7 @@ func (el *eventloop) loopEgress() {
 			if v == errCloseConns {
 				closed = true
 				for c := range el.connections {
-					_ = el.loopClose(c)
+					_ = el.loopCloseConn(c)
 				}
 			}
 		case *stderr:
@@ -141,6 +157,7 @@ func (el *eventloop) loopTicker() {
 		open  bool
 	)
 	for {
+		el.changePriority(tickWeight)
 		el.ch <- func() (err error) {
 			delay, action := el.eventHandler.Tick()
 			el.svr.ticktock <- delay
@@ -161,6 +178,7 @@ func (el *eventloop) loopTicker() {
 func (el *eventloop) loopError(c *stdConn, err error) (e error) {
 	if e = c.conn.Close(); e == nil {
 		delete(el.connections, c)
+		el.minusConnCount()
 		switch atomic.LoadInt32(&c.done) {
 		case 0: // read error
 			if err != io.EOF {
@@ -186,6 +204,7 @@ func (el *eventloop) loopWake(c *stdConn) error {
 	//}
 	out, action := el.eventHandler.React(nil, c)
 	if out != nil {
+		el.changePriority(writeWeight)
 		frame, _ := el.codec.Encode(c, out)
 		_, _ = c.conn.Write(frame)
 	}
@@ -197,7 +216,7 @@ func (el *eventloop) handleAction(c *stdConn, action Action) error {
 	case None:
 		return nil
 	case Close:
-		return el.loopClose(c)
+		return el.loopCloseConn(c)
 	case Shutdown:
 		return ErrServerShutdown
 	default:
