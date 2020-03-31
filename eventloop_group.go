@@ -4,6 +4,8 @@
 
 package gnet
 
+import "sync/atomic"
+
 // LoadBalance sets the load balancing method.
 //type LoadBalance int
 //
@@ -50,11 +52,12 @@ func (g *eventLoopPriorityGroup) next() (el *eventloop) {
 		minIdx = 0
 	)
 	for i := 1; i < g.size; i++ {
-		if g.eventLoops[i].priority < g.eventLoops[minIdx].priority {
+		if atomic.LoadInt64(&g.eventLoops[i].priority) < atomic.LoadInt64(&g.eventLoops[minIdx].priority) {
 			minIdx = i
 		}
 	}
-	g.eventLoops[minIdx].priority++
+	atomic.AddInt64(&g.eventLoops[minIdx].priority, 1)
+	//g.eventLoops[minIdx].priority++
 	return g.eventLoops[minIdx]
 }
 func (g *eventLoopPriorityGroup) iterate(f func(int, *eventloop) bool) {

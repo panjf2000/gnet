@@ -9,6 +9,7 @@ package gnet
 
 import (
 	"net"
+	"sync/atomic"
 	"time"
 
 	"github.com/panjf2000/gnet/internal/netpoll"
@@ -42,8 +43,8 @@ func (el *eventloop) loopRun() {
 }
 func (el *eventloop) changePriority(p int64) {
 	// el.priority > 0 == use priority LoadBalance
-	if el.priority > 0 {
-		el.priority += p
+	if atomic.LoadInt64(&el.priority) > 0 {
+		atomic.AddInt64(&el.priority, p)
 	}
 }
 func (el *eventloop) loopAccept(fd int) error {
