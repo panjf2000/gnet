@@ -288,7 +288,8 @@ func (r *RingBuffer) ByteBuffer() *bytebuffer.ByteBuffer {
 		return nil
 	} else if r.w == r.r {
 		bb := bytebuffer.Get()
-		_, _ = bb.Write(r.buf)
+		_, _ = bb.Write(r.buf[r.r:])
+		_, _ = bb.Write(r.buf[:r.w])
 		return bb
 	}
 
@@ -313,7 +314,8 @@ func (r *RingBuffer) WithByteBuffer(b []byte) *bytebuffer.ByteBuffer {
 		return &bytebuffer.ByteBuffer{B: b}
 	} else if r.w == r.r {
 		bb := bytebuffer.Get()
-		_, _ = bb.Write(r.buf)
+		_, _ = bb.Write(r.buf[r.r:])
+		_, _ = bb.Write(r.buf[:r.w])
 		_, _ = bb.Write(b)
 		return bb
 	}
