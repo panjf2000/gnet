@@ -23,6 +23,7 @@ before_install:
 go_import_path: github.com/panjf2000/gnet
 
 script:
+  - go test -v ./...
   - go test -v -coverprofile=coverage.txt -covermode=count -timeout 60s
 
 after_success:

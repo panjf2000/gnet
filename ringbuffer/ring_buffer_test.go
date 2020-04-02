@@ -41,7 +41,7 @@ func TestRingBuffer_Write(t *testing.T) {
 	if rb.Free() != 48 {
 		t.Fatalf("expect free 48 bytes but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
 	}
-	if bytes.Compare(rb.ByteBuffer().Bytes(), []byte(strings.Repeat("abcd", 4))) != 0 {
+	if !bytes.Equal(rb.ByteBuffer().Bytes(), []byte(strings.Repeat("abcd", 4))) {
 		t.Fatalf("expect 4 abcd but got %s. r.w=%d, r.r=%d", rb.ByteBuffer().Bytes(), rb.w, rb.r)
 	}
 
@@ -67,7 +67,7 @@ func TestRingBuffer_Write(t *testing.T) {
 	if rb.w != 0 {
 		t.Fatalf("expect r.w=0 but got %d. r.r=%d", rb.w, rb.r)
 	}
-	if bytes.Compare(rb.ByteBuffer().Bytes(), []byte(strings.Repeat("abcd", 16))) != 0 {
+	if !bytes.Equal(rb.ByteBuffer().Bytes(), []byte(strings.Repeat("abcd", 16))) {
 		t.Fatalf("expect 16 abcd but got %s. r.w=%d, r.r=%d", rb.ByteBuffer().Bytes(), rb.w, rb.r)
 	}
 
@@ -124,7 +124,7 @@ func TestRingBuffer_Write(t *testing.T) {
 		t.Fatalf("expect IsFull is false but got true")
 	}
 
-	if bytes.Compare(rb.ByteBuffer().Bytes(), []byte(strings.Repeat("abcd", 20))) != 0 {
+	if !bytes.Equal(rb.ByteBuffer().Bytes(), []byte(strings.Repeat("abcd", 20))) {
 		t.Fatalf("expect 16 abcd but got %s. r.w=%d, r.r=%d", rb.ByteBuffer().Bytes(), rb.w, rb.r)
 	}
 
@@ -147,7 +147,7 @@ func TestRingBuffer_Write(t *testing.T) {
 	}
 	_, _ = rb.Write([]byte(strings.Repeat("abcd", 15)))
 
-	if bytes.Compare(rb.ByteBuffer().Bytes(), []byte("bcd"+strings.Repeat("abcd", 15))) != 0 {
+	if !bytes.Equal(rb.ByteBuffer().Bytes(), []byte("bcd"+strings.Repeat("abcd", 15))) {
 		t.Fatalf("expect 63 ... but got %s. r.w=%d, r.r=%d", rb.ByteBuffer().Bytes(), rb.w, rb.r)
 	}
 
@@ -250,6 +250,56 @@ func TestRingBuffer_Read(t *testing.T) {
 		t.Fatalf("expect r.r=80 but got %d. r.w=%d", rb.r, rb.w)
 	}
 
+	rb.Reset()
+	rb.Write([]byte(strings.Repeat("1234", 32)))
+	if !rb.IsFull() {
+		t.Fatal("ring buffer should be full")
+	}
+	if rb.Free() != 0 {
+		t.Fatalf("expect free 0 bytes but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
+	}
+	if rb.w != 0 {
+		t.Fatalf("expect r.2=0 but got %d. r.r=%d", rb.w, rb.r)
+	}
+	head, tail := rb.LazyRead(64)
+	if !(len(head) == 64 && tail == nil) {
+		t.Fatalf("expect len(head)=64 and tail=nil, yet len(head)=%d and tail != nil", len(head))
+	}
+	if rb.r != 0 {
+		t.Fatalf("expect r.r=0 but got %d", rb.r)
+	}
+	if !bytes.Equal(head, []byte(strings.Repeat("1234", 16))) {
+		t.Fatal("should be equal")
+	}
+	rb.Shift(64)
+	if rb.r != 64 {
+		t.Fatalf("expect r.r=64 but got %d", rb.r)
+	}
+	rb.Write([]byte(strings.Repeat("1234", 4)))
+	if rb.w != 16 {
+		t.Fatalf("expect r.w=16 but got %d", rb.w)
+	}
+	head, tail = rb.LazyRead(128)
+	if !(len(head) == 64 && len(tail) == 16) {
+		t.Fatalf("expect len(head)=64 and len(tail)=16, yet len(head)=%d and len(tail)=%d", len(head), len(tail))
+	}
+	if !(bytes.Equal(head, []byte(strings.Repeat("1234", 16))) && bytes.Equal(tail, []byte(strings.Repeat("1234", 4)))) {
+		t.Fatalf("head: %s, tail: %s", string(head), string(tail))
+	}
+
+	head, tail = rb.LazyReadAll()
+	if !(len(head) == 64 && len(tail) == 16) {
+		t.Fatalf("expect len(head)=64 and len(tail)=16, yet len(head)=%d and len(tail)=%d", len(head), len(tail))
+	}
+	if !(bytes.Equal(head, []byte(strings.Repeat("1234", 16))) && bytes.Equal(tail, []byte(strings.Repeat("1234", 4)))) {
+		t.Fatalf("head: %s, tail: %s", string(head), string(tail))
+	}
+
+	rb.Shift(64)
+	rb.Shift(16)
+	if !rb.isEmpty {
+		t.Fatal("should be empty")
+	}
 }
 
 func TestRingBuffer_ByteInterface(t *testing.T) {
@@ -263,7 +313,7 @@ func TestRingBuffer_ByteInterface(t *testing.T) {
 	if rb.Free() != 1 {
 		t.Fatalf("expect free 1 byte but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
 	}
-	if bytes.Compare(rb.ByteBuffer().Bytes(), []byte{'a'}) != 0 {
+	if !bytes.Equal(rb.ByteBuffer().Bytes(), []byte{'a'}) {
 		t.Fatalf("expect a but got %s. r.w=%d, r.r=%d", rb.ByteBuffer().Bytes(), rb.w, rb.r)
 	}
 	// check empty or full
@@ -282,7 +332,7 @@ func TestRingBuffer_ByteInterface(t *testing.T) {
 	if rb.Free() != 0 {
 		t.Fatalf("expect free 0 byte but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
 	}
-	if bytes.Compare(rb.ByteBuffer().Bytes(), []byte{'a', 'b'}) != 0 {
+	if !bytes.Equal(rb.ByteBuffer().Bytes(), []byte{'a', 'b'}) {
 		t.Fatalf("expect a but got %s. r.w=%d, r.r=%d", rb.ByteBuffer().Bytes(), rb.w, rb.r)
 	}
 	// check empty or full
@@ -301,7 +351,7 @@ func TestRingBuffer_ByteInterface(t *testing.T) {
 	if rb.Free() != 1 {
 		t.Fatalf("expect free 1 byte but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
 	}
-	if bytes.Compare(rb.ByteBuffer().Bytes(), []byte{'a', 'b', 'c'}) != 0 {
+	if !bytes.Equal(rb.ByteBuffer().Bytes(), []byte{'a', 'b', 'c'}) {
 		t.Fatalf("expect a but got %s. r.w=%d, r.r=%d", rb.ByteBuffer().Bytes(), rb.w, rb.r)
 	}
 	// check empty or full
@@ -326,7 +376,7 @@ func TestRingBuffer_ByteInterface(t *testing.T) {
 	if rb.Free() != 2 {
 		t.Fatalf("expect free 2 byte but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
 	}
-	if bytes.Compare(rb.ByteBuffer().Bytes(), []byte{'b', 'c'}) != 0 {
+	if !bytes.Equal(rb.ByteBuffer().Bytes(), []byte{'b', 'c'}) {
 		t.Fatalf("expect a but got %s. r.w=%d, r.r=%d", rb.ByteBuffer().Bytes(), rb.w, rb.r)
 	}
 	// check empty or full
