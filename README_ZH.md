@@ -76,6 +76,7 @@
 <p align="center">
 <img alt="multi-reactors" src="https://raw.githubusercontent.com/panjf2000/illustrations/master/go/multi-reactors%2Bthread-pool-sequence-diagram.png">
 </p>
+
 `gnet` 通过利用 [ants](https://github.com/panjf2000/ants) goroutine 池（一个基于 Go 开发的高性能的 goroutine 池 ，实现了对大规模 goroutines 的调度管理、goroutines 复用）来实现『主从多 Reactors + 线程/Go程池』网络模型。关于 `ants` 的全部功能和使用，可以在 [ants 文档](https://pkg.go.dev/github.com/panjf2000/ants/v2?tab=doc) 里找到。
 
 `gnet` 内部集成了 `ants` 以及提供了 `pool.goroutine.Default()` 方法来初始化一个 `ants` goroutine 池，然后你可以把 `EventHandler.React` 中阻塞的业务逻辑提交到 goroutine 池里执行，最后在 goroutine 池里的代码调用 `gnet.Conn.AsyncWrite([]byte)` 方法把处理完阻塞逻辑之后得到的输出数据异步写回客户端，这样就可以避免阻塞 event-loop 线程。
@@ -927,14 +928,14 @@ Go : go1.14.x linux/amd64
 
 ![All language](https://raw.githubusercontent.com/panjf2000/illustrations/master/benchmark/techempower-all.jpg)
 
-这是包含全部编程语言框架的性能排名前 50 的结果，总榜单包含了全世界共计 376 个框架。
+这是包含全部编程语言框架的性能排名前 50 的结果，总榜单包含了全世界共计 382 个框架。
 
 
 ![Golang](https://raw.githubusercontent.com/panjf2000/illustrations/master/benchmark/techempower-go.png)
 
 这是 Go 语言分类下的全部排名。
 
-完整的排行可以通过 [Full ranking list of Plaintext](https://www.techempower.com/benchmarks/#section=test&runid=02692910-4c3f-4c56-a9dc-f0167a4280a4&hw=ph&test=plaintext) 查看.
+完整的排行可以通过 [Full ranking list of Plaintext](https://www.techempower.com/benchmarks/#section=test&runid=c7152e8f-5b33-4ae7-9e89-630af44bc8de&hw=ph&test=plaintext) 查看.
 
 ## 同类型的网络库性能对比
 
