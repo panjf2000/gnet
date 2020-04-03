@@ -29,6 +29,9 @@ type RingBuffer struct {
 
 // New returns a new RingBuffer whose buffer has the given size.
 func New(size int) *RingBuffer {
+	if size == 0 {
+		return &RingBuffer{isEmpty: true}
+	}
 	size = internal.CeilToPowerOfTwo(size)
 	return &RingBuffer{
 		buf:     make([]byte, size),

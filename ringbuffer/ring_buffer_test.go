@@ -173,6 +173,40 @@ func TestRingBuffer_Write(t *testing.T) {
 	}
 }
 
+func TestZeroRingBuffer(t *testing.T) {
+	rb := New(0)
+	head, tail := rb.LazyRead(1)
+	if !(head == nil && tail == nil) {
+		t.Fatal("expect head and tail are all nil")
+	}
+	head, tail = rb.LazyReadAll()
+	if !(head == nil && tail == nil) {
+		t.Fatal("expect head and tail are all nil")
+	}
+	if rb.Length() != 0 {
+		t.Fatal("expect length is 0")
+	}
+	if rb.Free() != 0 {
+		t.Fatal("expect free is 0")
+	}
+	buf := []byte(strings.Repeat("1234", 12))
+	rb.Write(buf)
+	if !(rb.Len() == 64 && rb.Cap() == 64) {
+		t.Fatalf("expect rb.Len()=64 and rb.Cap=64, but got rb.Len()=%d and rb.Cap()=%d", rb.Len(), rb.Cap())
+	}
+	if !(rb.r == 0 && rb.w == 48 && rb.size == 64 && rb.mask == 63) {
+		t.Fatalf("expect rb.r=0, rb.w=48, rb.size=64, rb.mask=63, but got rb.r=%d, rb.w=%d, rb.size=%d, rb.mask=%d",
+			rb.r, rb.w, rb.size, rb.mask)
+	}
+	if !bytes.Equal(rb.ByteBuffer().Bytes(), buf) {
+		t.Fatal("expect it is equal")
+	}
+	rb.Shift(48)
+	if !(rb.IsEmpty() && rb.r == 0 && rb.w == 0) {
+		t.Fatalf("expect rb is empty and rb.r=rb.w=0, but got rb.r=%d and rb.w=%d", rb.r, rb.w)
+	}
+}
+
 func TestRingBuffer_Read(t *testing.T) {
 	rb := New(64)
 
