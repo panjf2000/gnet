@@ -777,6 +777,7 @@ type testShutdownActionErrorServer struct {
 }
 
 func (t *testShutdownActionErrorServer) React(frame []byte, c Conn) (out []byte, action Action) {
+	c.ReadN(-1) // just for test
 	out = frame
 	action = Shutdown
 	return

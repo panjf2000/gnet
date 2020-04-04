@@ -134,8 +134,8 @@ func (c *conn) ResetBuffer() {
 func (c *conn) ReadN(n int) (size int, buf []byte) {
 	inBufferLen := c.inboundBuffer.Length()
 	tempBufferLen := len(c.buffer)
-	if inBufferLen+tempBufferLen < n || n <= 0 {
-		return
+	if totalLen := inBufferLen + tempBufferLen; totalLen < n || n <= 0 {
+		n = totalLen
 	}
 	size = n
 	if c.inboundBuffer.IsEmpty() {
