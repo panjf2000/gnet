@@ -34,8 +34,8 @@
 - [x] 简洁的 APIs
 - [x] 基于 Ring-Buffer 的高效内存利用
 - [x] 支持多种网络协议/IPC 机制：TCP、UDP 和 Unix Domain Socket
-- [x] 支持多种负载均衡算法：Round-Robin(轮询)、Source Addr Hash(源地址哈希)和 Least-Connections(最小连接数)
-- [x] 支持两种事件驱动机制：Linux 里的 epoll 以及 FreeBSD 里的 kqueue
+- [x] 支持多种负载均衡算法：`Round-Robin(轮询)`、`Source Addr Hash(源地址哈希)` 和 `Least-Connections(最少连接数)`
+- [x] 支持两种事件驱动机制：Linux 里的 `epoll` 以及 FreeBSD 里的 `kqueue`
 - [x] 支持异步写操作
 - [x] 灵活的事件定时器
 - [x] SO_REUSEPORT 端口重用
@@ -891,7 +891,9 @@ events.Tick = func() (delay time.Duration, action Action){
 
 ## 负载均衡
 
-`gnet` 目前内置的负载均衡算法是轮询调度 Round-Robin，暂时不支持自定制。
+`gnet` 目前支持三种负载均衡算法：`Round-Robin(轮询)`、`Source Addr Hash(源地址哈希)` 和 `Least-Connections(最少连接数)`，你可以通过传递 functional option 的 `LB` (RoundRobin/LeastConnections/SourceAddrHash) 的值给 `gnet.Serve` 来指定要使用的负载均衡算法。
+
+如果没有显示地指定，那么 `gnet` 将会使用 `Round-Robin` 作为默认的负载均衡算法。
 
 ## SO_REUSEPORT 端口复用
 

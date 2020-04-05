@@ -33,9 +33,9 @@ English | [🇨🇳中文](README_ZH.md)
 - [x] Built-in memory pool with bytes powered by the library [bytebufferpool](https://github.com/valyala/bytebufferpool)
 - [x] Concise APIs
 - [x] Efficient memory usage: Ring-Buffer
-- [x] Supporting multiple protocols/IPC mechanism: TCP, UDP and Unix Domain Socket
-- [x] Supporting multiple load-balancing algorithms: Round-Robin, Source Addr Hash and Least-Connections
-- [x] Supporting two event-driven mechanisms: epoll on Linux and kqueue on FreeBSD
+- [x] Supporting multiple protocols/IPC mechanism: `TCP,` `UDP` and `Unix Domain Socket`
+- [x] Supporting multiple load-balancing algorithms: `Round-Robin`, `Source Addr Hash` and `Least-Connections`
+- [x] Supporting two event-driven mechanisms: `epoll` on Linux and `kqueue` on FreeBSD
 - [x] Supporting asynchronous write operation
 - [x] Flexible ticker event
 - [x] SO_REUSEPORT socket option
@@ -892,7 +892,9 @@ The `gnet.WithMulticore(true)` indicates whether the server will be effectively 
 
 ## Load Balancing
 
-The current built-in load balancing algorithm in `gnet` is Round-Robin.
+`gnet` currently supports three load balancing algorithms: `Round-Robin`, `Source Addr Hash` and `Least-Connections`, you are able to decide which algorithm to use by passing the functional option `LB` (RoundRobin/LeastConnections/SourceAddrHash) to `gnet.Serve`.
+
+If the load balancing algorithm is not specified explicitly, `gnet` will use `Round-Robin` by default.
 
 ## SO_REUSEPORT
 
