@@ -247,7 +247,7 @@ func (el *eventloop) loopReadUDP(fd int) error {
 	n, sa, err := unix.Recvfrom(fd, el.packet, 0)
 	if err != nil || n == 0 {
 		if err != nil && err != unix.EAGAIN {
-			el.svr.logger.Printf("failed to read UPD packet from fd:%d, error:%v\n", fd, err)
+			el.svr.logger.Printf("failed to read UDP packet from fd:%d, error:%v\n", fd, err)
 		}
 		return nil
 	}
