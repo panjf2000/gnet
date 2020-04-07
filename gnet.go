@@ -160,7 +160,8 @@ type (
 	}
 
 	// EventServer is a built-in implementation of EventHandler which sets up each method with a default implementation,
-	// you can compose it with your own implementation of EventHandler when you don't want to implement all methods in EventHandler.
+	// you can compose it with your own implementation of EventHandler when you don't want to implement all methods
+	// in EventHandler.
 	EventServer struct {
 	}
 )

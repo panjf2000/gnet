@@ -185,7 +185,7 @@ func (s *testCodecServer) React(frame []byte, c Conn) (out []byte, action Action
 		if frame != nil {
 			data := append([]byte{}, frame...)
 			_ = s.workerPool.Submit(func() {
-				c.AsyncWrite(data)
+				_ = c.AsyncWrite(data)
 			})
 		}
 		return
@@ -234,7 +234,8 @@ func testCodecServe(network, addr string, multicore, async bool, nclients int, r
 	if n > 4 {
 		n = 0
 	}
-	ts := &testCodecServer{network: network, addr: addr, multicore: multicore, async: async, nclients: nclients, codec: codec, workerPool: goroutine.Default()}
+	ts := &testCodecServer{network: network, addr: addr, multicore: multicore, async: async, nclients: nclients,
+		codec: codec, workerPool: goroutine.Default()}
 	if reuseport {
 		err = Serve(ts, network+"://"+addr, WithMulticore(multicore), WithTicker(true),
 			WithTCPKeepAlive(time.Minute*5), WithCodec(codec), WithReusePort(true))
@@ -277,7 +278,8 @@ func startCodecClient(network, addr string, multicore, async bool, codec ICodec)
 			panic(err)
 		}
 		if string(encodedData) != string(data2) && !async {
-			//panic(fmt.Sprintf("mismatch %s/multi-core:%t: %d vs %d bytes, %s:%s", network, multicore, len(encodedData), len(data2), string(encodedData), string(data2)))
+			//panic(fmt.Sprintf("mismatch %s/multi-core:%t: %d vs %d bytes, %s:%s", network, multicore,
+			//	len(encodedData), len(data2), string(encodedData), string(data2)))
 			panic(fmt.Sprintf("mismatch %s/multi-core:%t: %d vs %d bytes", network, multicore, len(encodedData), len(data2)))
 		}
 	}
@@ -457,14 +459,14 @@ func (s *testServer) React(frame []byte, c Conn) (out []byte, action Action) {
 			c.ShiftN(1)
 			_ = s.workerPool.Submit(
 				func() {
-					c.AsyncWrite(buf.Bytes())
+					_ = c.AsyncWrite(buf.Bytes())
 				})
 			return
 		}
 		if s.network == "udp" {
 			_ = s.workerPool.Submit(
 				func() {
-					c.SendTo(frame)
+					_ = c.SendTo(frame)
 				})
 			return
 		}
@@ -643,7 +645,8 @@ func (t *testWakeConnServer) Tick() (delay time.Duration, action Action) {
 
 func testWakeConn(network, addr string) {
 	svr := &testWakeConnServer{network: network, addr: addr}
-	must(Serve(svr, network+"://"+addr, WithTicker(true), WithNumEventLoop(2*runtime.NumCPU()), WithLogger(log.New(os.Stderr, "", log.LstdFlags))))
+	must(Serve(svr, network+"://"+addr, WithTicker(true), WithNumEventLoop(2*runtime.NumCPU()),
+		WithLogger(log.New(os.Stderr, "", log.LstdFlags))))
 }
 
 func TestShutdown(t *testing.T) {
