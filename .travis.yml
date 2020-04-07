@@ -1,30 +1,36 @@
 language: go
-
 env:
+  global:
   - GO111MODULE=on
-
+  - secure: IZaEAuG1caQRBXf68hJDWNEveWc+Zk/Sf887DvMkpfWxCM43JqNPF6w0NEfFIyhtOeiVUPRiayn8Z8CjNr5xA/xvK4n31j8G5adYdOB0bR6pM0RoJ7p/Ji0Jni+8R5+IeDO+hORwA215TXPpjjmKeLgMdCXFZqZ1mlOLjBJlBu6sqZzfJe1k873fWJD+xGj5h9GdQveiWbEBtewUWoQeajtq+XHMzjwZxZwhOGUiQhkO9GIYih+oBQlggTf6VzT6FSN1/OTShC2yC6wtsJmqbD4GgGX2Ig8h9n9s/ZMJOFBpWdZMMIL6KJ4cWgANoH5AiBqjXglns8KB8iu7vh9zP4YckSO/s3ufb/w/VnqhZ8F5lWiD4pNyDdWxPKFLT5eO1aTlGmJYvHezZNVx3D6ASRryoH7pI9cduPbcLuA7+d3+FZ7lO/a30TRBHyW6vcDx7vjbTe1M462WGrHKNA6pzpWo3W5rjefo4Msg/wsh6+aD0XmIZ41lxXf/W/IpZ5RyR7R9q3sszdKxG+bkwIgNu0dUwMuenupsP9D+MBVURSY5Jgi1S6xz6R/MZnpN/wlLbI9t4FOcmkd5qj31XB8PDbcH4S+u27+iys9y7rdHwAbhF5qeGNeBwaAQaaXO/AAplJntXsph/7vPCTyHvQrH/shUBG6I2VkQpOJEmQyc1rE=
 dist: bionic
-
 os:
-  - linux
-  - osx
-  - windows
-
+- linux
+- osx
+- windows
 go:
-  - 1.11.x
-  - 1.12.x
-  - 1.13.x
-  - 1.14.x
-#  - master
-
+- 1.11.x
+- 1.12.x
+- 1.13.x
+- 1.14.x
 before_install:
-  - if [[ "${GO111MODULE}" = "on" ]]; then mkdir "${HOME}/go"; export GOPATH="${HOME}/go"; fi
-
+- if [[ "${GO111MODULE}" = "on" ]]; then mkdir "${HOME}/go"; export GOPATH="${HOME}/go";
+  export PATH="$GOPATH/bin:$PATH"; fi
+install:
+- go get -u golang.org/x/lint/golint
+- curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh
+  | sh -s -- -b $(go env GOPATH)/bin v1.24.0
+- mkdir -p ~/bin/ && export PATH="~/bin/:$PATH"
+- curl -sfL https://raw.githubusercontent.com/reviewdog/reviewdog/master/install.sh|
+  sh -s -- -b ~/bin
 go_import_path: github.com/panjf2000/gnet
-
 script:
-  - go test -v ./...
-  - go test -v -coverprofile=coverage.txt -covermode=count -timeout 60s
-
+- golint ./... | reviewdog -f=golint -reporter=github-pr-review
+- golangci-lint run --out-format=line-number -E golint -E misspell -E lll -E gofmt
+  | reviewdog -f=golangci-lint -reporter=github-pr-review
+- go test -v ./...
+- go test -v -coverprofile=coverage.txt -covermode=count -timeout 60s
 after_success:
-  - if [[ "$TRAVIS_OS_NAME" == "windows" ]]; then curl -s https://codecov.io/bash > .codecov && chmod +x .codecov && ./.codecov; else bash <(curl -s https://codecov.io/bash); fi
+- if [[ "$TRAVIS_OS_NAME" == "windows" ]]; then curl -s https://codecov.io/bash >
+  .codecov && chmod +x .codecov && ./.codecov; else bash <(curl -s https://codecov.io/bash);
+  fi
