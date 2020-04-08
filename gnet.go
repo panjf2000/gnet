@@ -4,6 +4,7 @@
 // license that can be found in the LICENSE file.
 
 package gnet
+
 import (
 	"log"
 	"net"
@@ -29,7 +30,7 @@ const (
 	Shutdown
 )
 
-var defaultLogger = Logger(log.New(os.Stderr, "", log.LstdFlags))
+var defaultLogger= Logger(log.New(os.Stderr, "", log.LstdFlags))
 
 // Logger is used for logging formatted messages.
 type Logger interface {
