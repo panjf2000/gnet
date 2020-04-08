@@ -16,7 +16,7 @@ func (el *eventloop) handleEvent(fd int, filter int16) error {
 		switch c.outboundBuffer.IsEmpty() {
 		// Don't change the ordering of processing EVFILT_WRITE | EVFILT_READ | EV_ERROR/EV_EOF unless you're 100%
 		// sure what you're doing!
-		// Re-ordering can easily introduce bugs and bad side-effects, as I found out painfully in the past.
+		// Re-ordering can easily introduce bugs and bad side-effects, as I found out painfully in the past.dddddddddddddddddddddddd
 		case false:
 			if filter == netpoll.EVFilterWrite {
 				return el.loopWrite(c)
