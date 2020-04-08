@@ -25,6 +25,9 @@ install:
   sh -s -- -b ~/bin
 go_import_path: github.com/panjf2000/gnet
 script:
+- golint ./... | reviewdog -f=golint -reporter=github-check
+- golangci-lint run --out-format=line-number -E golint -E misspell -E lll -E gofmt
+  | reviewdog -f=golangci-lint -reporter=github-check
 - golint ./... | reviewdog -f=golint -reporter=github-pr-review
 - golangci-lint run --out-format=line-number -E golint -E misspell -E lll -E gofmt
   | reviewdog -f=golangci-lint -reporter=github-pr-review
