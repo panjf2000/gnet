@@ -10,26 +10,19 @@ package gnet
 import (
 	"net"
 	"os"
+	"sync"
 
 	"golang.org/x/sys/unix"
 )
 
-func (ln *listener) close() {
-	ln.once.Do(
-		func() {
-			if ln.f != nil {
-				sniffError(ln.f.Close())
-			}
-			if ln.ln != nil {
-				sniffError(ln.ln.Close())
-			}
-			if ln.pconn != nil {
-				sniffError(ln.pconn.Close())
-			}
-			if ln.network == "unix" {
-				sniffError(os.RemoveAll(ln.addr))
-			}
-		})
+type listener struct {
+	f             *os.File
+	fd            int
+	ln            net.Listener
+	once          sync.Once
+	pconn         net.PacketConn
+	lnaddr        net.Addr
+	addr, network string
 }
 
 // system takes the net listener and detaches it from it's parent
@@ -53,4 +46,22 @@ func (ln *listener) system() error {
 	}
 	ln.fd = int(ln.f.Fd())
 	return unix.SetNonblock(ln.fd, true)
+}
+
+func (ln *listener) close() {
+	ln.once.Do(
+		func() {
+			if ln.f != nil {
+				sniffError(ln.f.Close())
+			}
+			if ln.ln != nil {
+				sniffError(ln.ln.Close())
+			}
+			if ln.pconn != nil {
+				sniffError(ln.pconn.Close())
+			}
+			if ln.network == "unix" {
+				sniffError(os.RemoveAll(ln.addr))
+			}
+		})
 }

@@ -7,7 +7,23 @@
 
 package gnet
 
-import "os"
+import (
+	"net"
+	"os"
+	"sync"
+)
+
+type listener struct {
+	ln            net.Listener
+	once          sync.Once
+	pconn         net.PacketConn
+	lnaddr        net.Addr
+	addr, network string
+}
+
+func (ln *listener) system() error {
+	return nil
+}
 
 func (ln *listener) close() {
 	ln.once.Do(func() {
@@ -21,8 +37,4 @@ func (ln *listener) close() {
 			sniffError(os.RemoveAll(ln.addr))
 		}
 	})
-}
-
-func (ln *listener) system() error {
-	return nil
 }

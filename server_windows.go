@@ -111,7 +111,6 @@ func (svr *server) stop() {
 		return true
 	})
 	svr.loopWG.Wait()
-	return
 }
 
 func serve(eventHandler EventHandler, listener *listener, options *Options) (err error) {
