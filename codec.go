@@ -44,7 +44,6 @@ type (
 	// LengthFieldBasedFrameCodec is the refactoring from
 	// https://github.com/smallnest/goframe/blob/master/length_field_based_frameconn.go, licensed by Apache License 2.0.
 	// It encodes/decodes frames into/from TCP stream with value of the length field in the message.
-	// Original implementation: https://github.com/netty/netty/blob/4.1/codec/src/main/java/io/netty/handler/codec/LengthFieldBasedFrameDecoder.java
 	LengthFieldBasedFrameCodec struct {
 		encoderConfig EncoderConfig
 		decoderConfig DecoderConfig
@@ -126,8 +125,8 @@ func (cc *FixedLengthFrameCodec) Decode(c Conn) ([]byte, error) {
 // NewLengthFieldBasedFrameCodec instantiates and returns a codec based on the length field.
 // It is the go implementation of netty LengthFieldBasedFrameecoder and LengthFieldPrepender.
 // you can see javadoc of them to learn more details.
-func NewLengthFieldBasedFrameCodec(encoderConfig EncoderConfig, decoderConfig DecoderConfig) *LengthFieldBasedFrameCodec {
-	return &LengthFieldBasedFrameCodec{encoderConfig, decoderConfig}
+func NewLengthFieldBasedFrameCodec(ec EncoderConfig, dc DecoderConfig) *LengthFieldBasedFrameCodec {
+	return &LengthFieldBasedFrameCodec{encoderConfig: ec, decoderConfig: dc}
 }
 
 // EncoderConfig config for encoder.

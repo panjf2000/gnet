@@ -31,7 +31,6 @@ type server struct {
 	serr             error              // signal error
 	once             sync.Once          // make sure only signalShutdown once
 	codec            ICodec             // codec for TCP stream
-	loops            []*eventloop       // all the loops
 	loopWG           sync.WaitGroup     // loop close WaitGroup
 	logger           Logger             // customized logger for logging info
 	ticktock         chan time.Duration // ticker channel
