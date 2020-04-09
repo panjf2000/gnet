@@ -87,24 +87,22 @@ type Conn interface {
 	RemoteAddr() (addr net.Addr)
 
 	// Read reads all data from inbound ring-buffer and event-loop-buffer without moving "read" pointer, which means
-	// it does not evict the data from ring-buffer actually and those data will present in ring-buffer until the
+	// it does not evict the data from buffers actually and those data will present in buffers until the
 	// ResetBuffer method is invoked.
 	Read() (buf []byte)
 
-	// ResetBuffer resets the inbound ring-buffer, which means all data in the inbound ring-buffer has been evicted.
+	// ResetBuffer resets the buffers, which means all data in inbound ring-buffer and event-loop-buffer
+	// will be evicted.
 	ResetBuffer()
 
 	// ReadN reads bytes with the given length from inbound ring-buffer and event-loop-buffer without moving
-	// "read" pointer, which means it will not evict the data from buffer until the ShiftN method is invoked,
-	// it reads data from the inbound ring-buffer and event-loop-buffer when the length of the available data is equal
-	// to the given "n", otherwise, it will not read any data from the inbound ring-buffer.
-	//
-	// So you should use this method only if you know exactly the length of subsequent TCP stream based on the protocol,
-	// like the Content-Length attribute in an HTTP request which indicates you how much data you should read
-	// from inbound ring-buffer.
+	// "read" pointer, which means it will not evict the data from buffers until the ShiftN method is invoked,
+	// it reads data from the inbound ring-buffer and event-loop-buffer and returns the size of bytes.
+	// If the length of the available data is less than the given "n", ReadN will returns all available data, so you
+	// should make use of the variable "size" returned by it to be aware of the exact length of the returned data.
 	ReadN(n int) (size int, buf []byte)
 
-	// ShiftN shifts "read" pointer in buffer with the given length.
+	// ShiftN shifts "read" pointer in buffers with the given length.
 	ShiftN(n int) (size int)
 
 	// BufferLength returns the length of available data in the inbound ring-buffer.
@@ -203,9 +201,9 @@ func (es *EventServer) Tick() (delay time.Duration, action Action) {
 	return
 }
 
-// Serve starts handling events for the specified addresses.
+// Serve starts handling events for the specified address.
 //
-// Addresses should use a scheme prefix and be formatted
+// Address should use a scheme prefix and be formatted
 // like `tcp://192.168.0.10:9851` or `unix://socket`.
 // Valid network schemes:
 //  tcp   - bind to both IPv4 and IPv6
