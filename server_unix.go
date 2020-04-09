@@ -154,7 +154,7 @@ func (svr *server) stop() {
 
 	// Notify all loops to close by closing all listeners
 	svr.subLoopGroup.iterate(func(i int, el *eventloop) bool {
-		sniffError(el.poller.Trigger(func() error {
+		sniffErrorAndLog(el.poller.Trigger(func() error {
 			return ErrServerShutdown
 		}))
 		return true
@@ -162,7 +162,7 @@ func (svr *server) stop() {
 
 	if svr.mainLoop != nil {
 		svr.ln.close()
-		sniffError(svr.mainLoop.poller.Trigger(func() error {
+		sniffErrorAndLog(svr.mainLoop.poller.Trigger(func() error {
 			return ErrServerShutdown
 		}))
 	}
@@ -173,14 +173,14 @@ func (svr *server) stop() {
 	// Close loops and all outstanding connections
 	svr.subLoopGroup.iterate(func(i int, el *eventloop) bool {
 		for _, c := range el.connections {
-			sniffError(el.loopCloseConn(c, nil))
+			sniffErrorAndLog(el.loopCloseConn(c, nil))
 		}
 		return true
 	})
 	svr.closeLoops()
 
 	if svr.mainLoop != nil {
-		sniffError(svr.mainLoop.poller.Close())
+		sniffErrorAndLog(svr.mainLoop.poller.Close())
 	}
 }
 

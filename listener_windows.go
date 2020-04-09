@@ -28,13 +28,13 @@ func (ln *listener) system() error {
 func (ln *listener) close() {
 	ln.once.Do(func() {
 		if ln.ln != nil {
-			sniffError(ln.ln.Close())
+			sniffErrorAndLog(ln.ln.Close())
 		}
 		if ln.pconn != nil {
-			sniffError(ln.pconn.Close())
+			sniffErrorAndLog(ln.pconn.Close())
 		}
 		if ln.network == "unix" {
-			sniffError(os.RemoveAll(ln.addr))
+			sniffErrorAndLog(os.RemoveAll(ln.addr))
 		}
 	})
 }

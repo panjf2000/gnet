@@ -52,16 +52,16 @@ func (ln *listener) close() {
 	ln.once.Do(
 		func() {
 			if ln.f != nil {
-				sniffError(ln.f.Close())
+				sniffErrorAndLog(ln.f.Close())
 			}
 			if ln.ln != nil {
-				sniffError(ln.ln.Close())
+				sniffErrorAndLog(ln.ln.Close())
 			}
 			if ln.pconn != nil {
-				sniffError(ln.pconn.Close())
+				sniffErrorAndLog(ln.pconn.Close())
 			}
 			if ln.network == "unix" {
-				sniffError(os.RemoveAll(ln.addr))
+				sniffErrorAndLog(os.RemoveAll(ln.addr))
 			}
 		})
 }

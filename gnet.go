@@ -220,15 +220,19 @@ func Serve(eventHandler EventHandler, addr string, opts ...Option) error {
 	defer func() {
 		ln.close()
 		if ln.network == "unix" {
-			sniffError(os.RemoveAll(ln.addr))
+			sniffErrorAndLog(os.RemoveAll(ln.addr))
 		}
 	}()
 
 	options := loadOptions(opts...)
 
+	if options.Logger != nil {
+		defaultLogger = options.Logger
+	}
+
 	ln.network, ln.addr = parseAddr(addr)
 	if ln.network == "unix" {
-		sniffError(os.RemoveAll(ln.addr))
+		sniffErrorAndLog(os.RemoveAll(ln.addr))
 		if runtime.GOOS == "windows" {
 			return ErrProtocolNotSupported
 		}
@@ -272,8 +276,8 @@ func parseAddr(addr string) (network, address string) {
 	return
 }
 
-func sniffError(err error) {
+func sniffErrorAndLog(err error) {
 	if err != nil {
-		log.Println(err)
+		defaultLogger.Printf(err.Error())
 	}
 }
