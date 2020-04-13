@@ -30,7 +30,7 @@ func OpenPoller() (poller *Poller, err error) {
 		poller = nil
 		return
 	}
-	if poller.wfd, err = unix.Eventfd(0, unix.O_NONBLOCK|unix.O_CLOEXEC); err != nil {
+	if poller.wfd, err = unix.Eventfd(0, unix.EFD_NONBLOCK|unix.EFD_CLOEXEC); err != nil {
 		_ = poller.Close()
 		poller = nil
 		return
