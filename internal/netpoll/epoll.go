@@ -24,33 +24,33 @@ type Poller struct {
 }
 
 // OpenPoller instantiates a poller.
-func OpenPoller() (*Poller, error) {
-	poller := new(Poller)
-	epollFD, err := unix.EpollCreate1(unix.EPOLL_CLOEXEC)
-	if err != nil {
-		return nil, err
+func OpenPoller() (poller *Poller, err error) {
+	poller = new(Poller)
+	if poller.fd, err = unix.EpollCreate1(unix.EPOLL_CLOEXEC); err != nil {
+		poller = nil
+		return
 	}
-	poller.fd = epollFD
-	r0, _, errno := unix.Syscall(unix.SYS_EVENTFD2, unix.O_CLOEXEC, unix.O_NONBLOCK, 0)
-	if errno != 0 {
-		_ = unix.Close(epollFD)
-		return nil, errno
+	if poller.wfd, err = unix.Eventfd(0, unix.O_NONBLOCK|unix.O_CLOEXEC); err != nil {
+		_ = poller.Close()
+		poller = nil
+		return
 	}
-	poller.wfd = int(r0)
 	poller.wfdBuf = make([]byte, 8)
 	if err = poller.AddRead(poller.wfd); err != nil {
-		return nil, err
+		_ = poller.Close()
+		poller = nil
+		return
 	}
 	poller.asyncJobQueue = internal.NewAsyncJobQueue()
-	return poller, nil
+	return
 }
 
 // Close closes the poller.
 func (p *Poller) Close() error {
-	if err := unix.Close(p.wfd); err != nil {
+	if err := unix.Close(p.fd); err != nil {
 		return err
 	}
-	return unix.Close(p.fd)
+	return unix.Close(p.wfd)
 }
 
 // Make the endianness of bytes compatible with more linux OSs under different processor-architectures,

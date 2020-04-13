@@ -21,23 +21,23 @@ type Poller struct {
 }
 
 // OpenPoller instantiates a poller.
-func OpenPoller() (*Poller, error) {
-	poller := new(Poller)
-	kfd, err := unix.Kqueue()
-	if err != nil {
-		return nil, err
+func OpenPoller() (poller *Poller, err error) {
+	poller = new(Poller)
+	if poller.fd, err = unix.Kqueue(); err != nil {
+		poller = nil
+		return
 	}
-	poller.fd = kfd
-	_, err = unix.Kevent(poller.fd, []unix.Kevent_t{{
+	if _, err = unix.Kevent(poller.fd, []unix.Kevent_t{{
 		Ident:  0,
 		Filter: unix.EVFILT_USER,
 		Flags:  unix.EV_ADD | unix.EV_CLEAR,
-	}}, nil, nil)
-	if err != nil {
-		return nil, err
+	}}, nil, nil); err != nil {
+		_ = poller.Close()
+		poller = nil
+		return
 	}
 	poller.asyncJobQueue = internal.NewAsyncJobQueue()
-	return poller, nil
+	return
 }
 
 // Close closes the poller.
