@@ -9,7 +9,7 @@ package gnet
 import "github.com/panjf2000/gnet/internal/netpoll"
 
 func (el *eventloop) handleEvent(fd int, filter int16) error {
-	if c, ok := el.connections[fd]; ok {
+	if c := el.getConn(fd); c != nil {
 		if filter == netpoll.EVFilterSock {
 			return el.loopCloseConn(c, nil)
 		}

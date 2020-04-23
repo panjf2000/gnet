@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/panjf2000/gnet/internal"
 	"github.com/panjf2000/gnet/internal/netpoll"
 	"golang.org/x/sys/unix"
 )
@@ -23,8 +24,40 @@ type eventloop struct {
 	packet       []byte          // read packet buffer
 	poller       *netpoll.Poller // epoll or kqueue
 	connCount    int32           // number of active connections in event-loop
-	connections  map[int]*conn   // loop connections fd -> conn
+	connections  []*conn         // loop connections fd -> conn
 	eventHandler EventHandler    // user eventHandler
+}
+
+func (el *eventloop) addConn(fd int, c *conn) {
+	if fd + 1 > len(el.connections) {
+		size := internal.CeilToPowerOfTwo(fd)
+		conns := make([]*conn, size)
+		copy(conns, el.connections)
+		el.connections = conns
+	}
+	el.connections[fd] = c
+}
+
+func (el *eventloop) getConn(fd int) *conn {
+	if fd + 1 > len(el.connections) {
+		return nil
+	}
+	return el.connections[fd]
+}
+
+func (el *eventloop) delConn(fd int) {
+	if fd + 1 > len(el.connections) {
+		return
+	}
+	el.connections[fd] = nil
+}
+
+func (el *eventloop) iterateConns(f func(int, *conn)) {
+	for fd, c := range el.connections {
+		if c != nil {
+			f(fd, c)
+		}
+	}
 }
 
 func (el *eventloop) plusConnCount() {
@@ -71,7 +104,7 @@ func (el *eventloop) loopAccept(fd int) error {
 		}
 		c := newTCPConn(nfd, el, sa)
 		if err = el.poller.AddRead(c.fd); err == nil {
-			el.connections[c.fd] = c
+			el.addConn(c.fd, c)
 			el.plusConnCount()
 			return el.loopOpen(c)
 		}
@@ -169,7 +202,7 @@ func (el *eventloop) loopWrite(c *conn) error {
 func (el *eventloop) loopCloseConn(c *conn, err error) error {
 	err0, err1 := el.poller.Delete(c.fd), unix.Close(c.fd)
 	if err0 == nil && err1 == nil {
-		delete(el.connections, c.fd)
+		el.delConn(c.fd)
 		el.minusConnCount()
 		switch el.eventHandler.OnClosed(c, err) {
 		case Shutdown:

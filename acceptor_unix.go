@@ -25,7 +25,7 @@ func (svr *server) acceptNewConnection(fd int) error {
 		if err = el.poller.AddRead(nfd); err != nil {
 			return
 		}
-		el.connections[nfd] = c
+		el.addConn(nfd, c)
 		el.plusConnCount()
 		err = el.loopOpen(c)
 		return

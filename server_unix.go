@@ -85,7 +85,7 @@ func (svr *server) activateLoops(numEventLoop int) error {
 				codec:        svr.codec,
 				poller:       p,
 				packet:       make([]byte, 0x10000),
-				connections:  make(map[int]*conn),
+				connections:  make([]*conn, 128),
 				eventHandler: svr.eventHandler,
 			}
 			_ = el.poller.AddRead(svr.ln.fd)
@@ -109,7 +109,7 @@ func (svr *server) activateReactors(numEventLoop int) error {
 				codec:        svr.codec,
 				poller:       p,
 				packet:       make([]byte, 0x10000),
-				connections:  make(map[int]*conn),
+				connections:  make([]*conn, 128),
 				eventHandler: svr.eventHandler,
 			}
 			svr.subLoopGroup.register(el)
@@ -172,9 +172,9 @@ func (svr *server) stop() {
 
 	// Close loops and all outstanding connections
 	svr.subLoopGroup.iterate(func(i int, el *eventloop) bool {
-		for _, c := range el.connections {
+		el.iterateConns(func(fd int, c *conn) {
 			sniffErrorAndLog(el.loopCloseConn(c, nil))
-		}
+		})
 		return true
 	})
 	svr.closeLoops()
