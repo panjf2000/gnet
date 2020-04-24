@@ -42,7 +42,8 @@ func (el *eventloop) getConn(fd int) (*conn, bool) {
 	if fd > len(el.connections)-1 {
 		return nil, false
 	}
-	return el.connections[fd], el.connections[fd] != nil
+	c := el.connections[fd]
+	return c, c != nil
 }
 
 func (el *eventloop) delConn(fd int) {
