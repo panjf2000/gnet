@@ -9,7 +9,7 @@ package gnet
 import "github.com/panjf2000/gnet/internal/netpoll"
 
 func (el *eventloop) handleEvent(fd int, ev uint32) error {
-	if c := el.getConn(fd); c != nil {
+	if c, ok := el.getConn(fd); ok {
 		switch c.outboundBuffer.IsEmpty() {
 		// Don't change the ordering of processing EPOLLOUT | EPOLLRDHUP / EPOLLIN unless you're 100%
 		// sure what you're doing!

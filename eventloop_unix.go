@@ -29,8 +29,8 @@ type eventloop struct {
 }
 
 func (el *eventloop) addConn(fd int, c *conn) {
-	if fd + 1 > len(el.connections) {
-		size := internal.CeilToPowerOfTwo(fd)
+	if fd > len(el.connections)-1 {
+		size := internal.CeilToPowerOfTwo(fd + 1)
 		conns := make([]*conn, size)
 		copy(conns, el.connections)
 		el.connections = conns
@@ -38,15 +38,15 @@ func (el *eventloop) addConn(fd int, c *conn) {
 	el.connections[fd] = c
 }
 
-func (el *eventloop) getConn(fd int) *conn {
-	if fd + 1 > len(el.connections) {
-		return nil
+func (el *eventloop) getConn(fd int) (*conn, bool) {
+	if fd > len(el.connections)-1 {
+		return nil, false
 	}
-	return el.connections[fd]
+	return el.connections[fd], el.connections[fd] != nil
 }
 
 func (el *eventloop) delConn(fd int) {
-	if fd + 1 > len(el.connections) {
+	if fd > len(el.connections)-1 {
 		return
 	}
 	el.connections[fd] = nil

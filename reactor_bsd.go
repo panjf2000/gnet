@@ -24,7 +24,7 @@ func (svr *server) activateSubReactor(el *eventloop) {
 	}
 
 	svr.logger.Printf("event-loop:%d exits with error:%v\n", el.idx, el.poller.Polling(func(fd int, filter int16) error {
-		if c := el.getConn(fd); c != nil {
+		if c, ok := el.getConn(fd); ok {
 			if filter == netpoll.EVFilterSock {
 				return el.loopCloseConn(c, nil)
 			}
