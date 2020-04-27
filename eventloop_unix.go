@@ -70,10 +70,12 @@ func (el *eventloop) loopAccept(fd int) error {
 			return err
 		}
 		c := newTCPConn(nfd, el, sa)
+		el.connections[c.fd] = c
 		if err = el.poller.AddRead(c.fd); err == nil {
-			el.connections[c.fd] = c
 			el.plusConnCount()
 			return el.loopOpen(c)
+		} else {
+			delete(el.connections, c.fd)
 		}
 		return err
 	}
