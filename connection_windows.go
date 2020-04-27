@@ -89,9 +89,6 @@ func (c *stdConn) read() ([]byte, error) {
 
 func (c *stdConn) Read() []byte {
 	if c.inboundBuffer.IsEmpty() {
-		if c.buffer.Len() == 0 {
-			return nil
-		}
 		return c.buffer.Bytes()
 	}
 	c.byteBuffer = c.inboundBuffer.WithByteBuffer(c.buffer.Bytes())

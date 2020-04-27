@@ -111,7 +111,7 @@ func (el *eventloop) loopRead(c *conn) error {
 	}
 	c.buffer = el.packet[:n]
 
-	for inFrame, _ := c.read(); inFrame != nil; inFrame, _ = c.read() {
+	for inFrame, _ := c.read(); len(inFrame) != 0; inFrame, _ = c.read() {
 		out, action := el.eventHandler.React(inFrame, c)
 		if out != nil {
 			outFrame, _ := el.codec.Encode(c, out)
