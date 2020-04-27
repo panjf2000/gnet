@@ -125,7 +125,7 @@ func (c *conn) Read() []byte {
 }
 
 func (c *conn) ResetBuffer() {
-	c.buffer = c.buffer[:0]
+	c.buffer = nil
 	c.inboundBuffer.Reset()
 	bytebuffer.Put(c.byteBuffer)
 	c.byteBuffer = nil
