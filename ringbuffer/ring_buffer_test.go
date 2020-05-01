@@ -192,10 +192,10 @@ func TestZeroRingBuffer(t *testing.T) {
 	}
 	buf := []byte(strings.Repeat("1234", 12))
 	_, _ = rb.Write(buf)
-	if !(rb.Len() == 64 && rb.Cap() == 64) {
+	if !(rb.Len() == initSize && rb.Cap() == initSize) {
 		t.Fatalf("expect rb.Len()=64 and rb.Cap=64, but got rb.Len()=%d and rb.Cap()=%d", rb.Len(), rb.Cap())
 	}
-	if !(rb.r == 0 && rb.w == 48 && rb.size == 64 && rb.mask == 63) {
+	if !(rb.r == 0 && rb.w == 48 && rb.size == initSize && rb.mask == initSize-1) {
 		t.Fatalf("expect rb.r=0, rb.w=48, rb.size=64, rb.mask=63, but got rb.r=%d, rb.w=%d, rb.size=%d, rb.mask=%d",
 			rb.r, rb.w, rb.size, rb.mask)
 	}

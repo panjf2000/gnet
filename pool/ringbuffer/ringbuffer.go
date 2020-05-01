@@ -44,10 +44,6 @@ type Pool struct {
 
 var defaultPool Pool
 
-//func init() {
-//	defaultPool.defaultSize = 1 << 12
-//}
-
 // Get returns an empty byte buffer from the pool.
 //
 // Got byte buffer may be returned to the pool via Put call.
