@@ -8,7 +8,6 @@
 package gnet
 
 import (
-	"io"
 	"net"
 	"sync/atomic"
 	"time"
@@ -125,7 +124,6 @@ func (el *eventloop) loopRead(ti *tcpIn) (err error) {
 }
 
 func (el *eventloop) loopCloseConn(c *stdConn) error {
-	atomic.StoreInt32(&c.done, 1)
 	return c.conn.SetReadDeadline(time.Now())
 }
 
@@ -134,7 +132,7 @@ func (el *eventloop) loopEgress() {
 	for v := range el.ch {
 		switch v := v.(type) {
 		case error:
-			if v == errCloseConns {
+			if v == ErrCloseConns {
 				closed = true
 				for c := range el.connections {
 					_ = el.loopCloseConn(c)
@@ -160,7 +158,7 @@ func (el *eventloop) loopTicker() {
 			el.svr.ticktock <- delay
 			switch action {
 			case Shutdown:
-				err = errClosing
+				err = ErrServerShutdown
 			}
 			return
 		}
@@ -176,17 +174,9 @@ func (el *eventloop) loopError(c *stdConn, err error) (e error) {
 	if e = c.conn.Close(); e == nil {
 		delete(el.connections, c)
 		el.minusConnCount()
-		switch atomic.LoadInt32(&c.done) {
-		case 0: // read error
-			if err != io.EOF {
-				el.svr.logger.Printf("socket: %s with err: %v\n", c.remoteAddr.String(), err)
-			}
-		case 1: // closed
-			el.svr.logger.Printf("socket: %s has been closed by client\n", c.remoteAddr.String())
-		}
 		switch el.eventHandler.OnClosed(c, err) {
 		case Shutdown:
-			return errClosing
+			return ErrServerShutdown
 		}
 		c.releaseTCP()
 	} else {
@@ -228,7 +218,7 @@ func (el *eventloop) loopReadUDP(c *stdConn) error {
 	}
 	switch action {
 	case Shutdown:
-		return errClosing
+		return ErrServerShutdown
 	}
 	c.releaseUDP()
 	return nil

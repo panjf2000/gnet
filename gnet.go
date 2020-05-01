@@ -134,6 +134,10 @@ type (
 		// The server parameter has information and various utilities.
 		OnInitComplete(server Server) (action Action)
 
+		// OnShutdown fires when the server is being shut down, it is called right after
+		// all event-loops and connections are closed.
+		OnShutdown(server Server)
+
 		// OnOpened fires when a new connection has been opened.
 		// The info parameter has information about the connection such as
 		// it's local and remote address.
@@ -168,6 +172,11 @@ type (
 // The server parameter has information and various utilities.
 func (es *EventServer) OnInitComplete(svr Server) (action Action) {
 	return
+}
+
+// OnShutdown fires when the server is being shut down, it is called right after
+// all event-loops and connections are closed.
+func (es *EventServer) OnShutdown(svr Server) {
 }
 
 // OnOpened fires when a new connection has been opened.

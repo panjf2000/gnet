@@ -37,7 +37,6 @@ type stdConn struct {
 	ctx           interface{}            // user-defined context
 	conn          net.Conn               // original connection
 	loop          *eventloop             // owner event-loop
-	done          int32                  // 0: attached, 1: closed
 	buffer        *bytebuffer.ByteBuffer // reuse memory of inbound data as a temporary buffer
 	codec         ICodec                 // codec for TCP
 	localAddr     net.Addr               // local server addr

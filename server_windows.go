@@ -9,19 +9,17 @@ package gnet
 
 import (
 	"errors"
+	"os"
+	"os/signal"
 	"runtime"
 	"sync"
+	"syscall"
 	"time"
 )
 
 // commandBufferSize represents the buffer size of event-loop command channel on Windows.
 const (
 	commandBufferSize = 512
-)
-
-var (
-	errClosing    = errors.New("closing")
-	errCloseConns = errors.New("close conns")
 )
 
 type server struct {
@@ -97,7 +95,7 @@ func (svr *server) stop() {
 
 	// Notify all loops to close.
 	svr.subLoopGroup.iterate(func(i int, el *eventloop) bool {
-		el.ch <- errClosing
+		el.ch <- ErrServerShutdown
 		return true
 	})
 
@@ -107,7 +105,7 @@ func (svr *server) stop() {
 	// Close all connections.
 	svr.loopWG.Add(svr.subLoopGroupSize)
 	svr.subLoopGroup.iterate(func(i int, el *eventloop) bool {
-		el.ch <- errCloseConns
+		el.ch <- ErrCloseConns
 		return true
 	})
 	svr.loopWG.Wait()
@@ -165,6 +163,18 @@ func serve(eventHandler EventHandler, listener *listener, options *Options) (err
 	case Shutdown:
 		return
 	}
+	defer svr.eventHandler.OnShutdown(server)
+
+	shutdown := make(chan os.Signal, 1)
+	signal.Notify(shutdown, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+	defer close(shutdown)
+
+	go func() {
+		if <-shutdown == nil {
+			return
+		}
+		svr.signalShutdown(errors.New("caught OS signal"))
+	}()
 
 	// Start all loops.
 	svr.startLoops(numEventLoop)

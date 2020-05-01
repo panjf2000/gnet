@@ -39,8 +39,16 @@ func (el *eventloop) loadConnCount() int32 {
 	return atomic.LoadInt32(&el.connCount)
 }
 
+func (el *eventloop) closeAllConns() {
+	// Close loops and all outstanding connections
+	for _, c := range el.connections {
+		_ = el.loopCloseConn(c, nil)
+	}
+}
+
 func (el *eventloop) loopRun() {
 	defer func() {
+		el.closeAllConns()
 		if el.idx == 0 && el.svr.opts.Ticker {
 			close(el.svr.ticktock)
 		}
@@ -121,10 +129,8 @@ func (el *eventloop) loopRead(c *conn) error {
 		switch action {
 		case None:
 		case Close:
-			_ = el.loopWrite(c)
 			return el.loopCloseConn(c, nil)
 		case Shutdown:
-			_ = el.loopWrite(c)
 			return ErrServerShutdown
 		}
 		if !c.opened {
@@ -167,6 +173,9 @@ func (el *eventloop) loopWrite(c *conn) error {
 }
 
 func (el *eventloop) loopCloseConn(c *conn, err error) error {
+	if !c.outboundBuffer.IsEmpty() && err == nil {
+		_ = el.loopWrite(c)
+	}
 	err0, err1 := el.poller.Delete(c.fd), unix.Close(c.fd)
 	if err0 == nil && err1 == nil {
 		delete(el.connections, c.fd)
@@ -233,10 +242,8 @@ func (el *eventloop) handleAction(c *conn, action Action) error {
 	case None:
 		return nil
 	case Close:
-		_ = el.loopWrite(c)
 		return el.loopCloseConn(c, nil)
 	case Shutdown:
-		_ = el.loopWrite(c)
 		return ErrServerShutdown
 	default:
 		return nil

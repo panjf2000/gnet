@@ -7,6 +7,8 @@ var (
 	ErrProtocolNotSupported = errors.New("not supported protocol on this platform")
 	// ErrServerShutdown occurs when server is closing.
 	ErrServerShutdown = errors.New("server is going to be shutdown")
+	// ErrCloseConns is used to close all connections.
+	ErrCloseConns = errors.New("close all connections")
 	// ErrInvalidFixedLength occurs when the output data have invalid fixed length.
 	ErrInvalidFixedLength = errors.New("invalid fixed length of bytes")
 	// ErrUnexpectedEOF occurs when no enough data to read by codec.

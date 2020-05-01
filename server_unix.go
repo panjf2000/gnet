@@ -8,8 +8,11 @@
 package gnet
 
 import (
+	"os"
+	"os/signal"
 	"runtime"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/panjf2000/gnet/internal/netpoll"
@@ -170,13 +173,6 @@ func (svr *server) stop() {
 	// Wait on all loops to complete reading events
 	svr.wg.Wait()
 
-	// Close loops and all outstanding connections
-	svr.subLoopGroup.iterate(func(i int, el *eventloop) bool {
-		for _, c := range el.connections {
-			sniffErrorAndLog(el.loopCloseConn(c, nil))
-		}
-		return true
-	})
 	svr.closeLoops()
 
 	if svr.mainLoop != nil {
@@ -236,6 +232,18 @@ func serve(eventHandler EventHandler, listener *listener, options *Options) erro
 	case Shutdown:
 		return nil
 	}
+	defer svr.eventHandler.OnShutdown(server)
+
+	shutdown := make(chan os.Signal, 1)
+	signal.Notify(shutdown, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+	defer close(shutdown)
+
+	go func() {
+		if <-shutdown == nil {
+			return
+		}
+		svr.signalShutdown()
+	}()
 
 	if err := svr.start(numEventLoop); err != nil {
 		svr.closeLoops()

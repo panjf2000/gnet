@@ -17,7 +17,13 @@ func (svr *server) activateMainReactor() {
 }
 
 func (svr *server) activateSubReactor(el *eventloop) {
-	defer svr.signalShutdown()
+	defer func() {
+		el.closeAllConns()
+		if el.idx == 0 && svr.opts.Ticker {
+			close(svr.ticktock)
+		}
+		svr.signalShutdown()
+	}()
 
 	if el.idx == 0 && svr.opts.Ticker {
 		go el.loopTicker()
