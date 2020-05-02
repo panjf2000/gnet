@@ -120,7 +120,7 @@ func (el *eventloop) loopRead(ti *tcpIn) (err error) {
 	_, _ = c.inboundBuffer.Write(c.buffer.Bytes())
 	bytebuffer.Put(c.buffer)
 	c.buffer = nil
-	return nil
+	return
 }
 
 func (el *eventloop) loopCloseConn(c *stdConn) error {
