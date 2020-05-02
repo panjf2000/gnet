@@ -35,7 +35,6 @@ type server struct {
 	listenerWG       sync.WaitGroup     // listener close WaitGroup
 	eventHandler     EventHandler       // user eventHandler
 	subLoopGroup     IEventLoopGroup    // loops for handling events
-	subLoopGroupSize int                // number of loops
 }
 
 // waitForShutdown waits for a signal to shutdown.
@@ -77,8 +76,7 @@ func (svr *server) startLoops(numEventLoop int) {
 		}
 		svr.subLoopGroup.register(el)
 	}
-	svr.subLoopGroupSize = svr.subLoopGroup.len()
-	svr.loopWG.Add(svr.subLoopGroupSize)
+	svr.loopWG.Add(svr.subLoopGroup.len())
 	svr.subLoopGroup.iterate(func(i int, el *eventloop) bool {
 		go el.loopRun()
 		return true
@@ -103,7 +101,7 @@ func (svr *server) stop() {
 	svr.loopWG.Wait()
 
 	// Close all connections.
-	svr.loopWG.Add(svr.subLoopGroupSize)
+	svr.loopWG.Add(svr.subLoopGroup.len())
 	svr.subLoopGroup.iterate(func(i int, el *eventloop) bool {
 		el.ch <- ErrCloseConns
 		return true

@@ -30,7 +30,6 @@ type server struct {
 	mainLoop         *eventloop         // main loop for accepting connections
 	eventHandler     EventHandler       // user eventHandler
 	subLoopGroup     IEventLoopGroup    // loops for handling events
-	subLoopGroupSize int                // number of loops
 }
 
 // waitForShutdown waits for a signal to shutdown
@@ -97,7 +96,6 @@ func (svr *server) activateLoops(numEventLoop int) error {
 			return err
 		}
 	}
-	svr.subLoopGroupSize = svr.subLoopGroup.len()
 	// Start loops in background
 	svr.startLoops()
 	return nil
@@ -120,7 +118,6 @@ func (svr *server) activateReactors(numEventLoop int) error {
 			return err
 		}
 	}
-	svr.subLoopGroupSize = svr.subLoopGroup.len()
 	// Start sub reactors.
 	svr.startReactors()
 
