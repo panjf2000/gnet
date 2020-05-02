@@ -96,7 +96,7 @@ func (cc *DelimiterBasedFrameCodec) Decode(c Conn) ([]byte, error) {
 	buf := c.Read()
 	idx := bytes.IndexByte(buf, cc.delimiter)
 	if idx == -1 {
-		return nil, ErrDelimiterNotFound
+		return nil, errDelimiterNotFound
 	}
 	c.ShiftN(idx + 1)
 	return buf[:idx], nil
@@ -110,7 +110,7 @@ func NewFixedLengthFrameCodec(frameLength int) *FixedLengthFrameCodec {
 // Encode ...
 func (cc *FixedLengthFrameCodec) Encode(c Conn, buf []byte) ([]byte, error) {
 	if len(buf)%cc.frameLength != 0 {
-		return nil, ErrInvalidFixedLength
+		return nil, errInvalidFixedLength
 	}
 	return buf, nil
 }
@@ -119,7 +119,7 @@ func (cc *FixedLengthFrameCodec) Encode(c Conn, buf []byte) ([]byte, error) {
 func (cc *FixedLengthFrameCodec) Decode(c Conn) ([]byte, error) {
 	size, buf := c.ReadN(cc.frameLength)
 	if size == 0 {
-		return nil, ErrUnexpectedEOF
+		return nil, errUnexpectedEOF
 	}
 	c.ShiftN(size)
 	return buf, nil
@@ -167,7 +167,7 @@ func (cc *LengthFieldBasedFrameCodec) Encode(c Conn, buf []byte) (out []byte, er
 	}
 
 	if length < 0 {
-		return nil, ErrTooLessLength
+		return nil, errTooLessLength
 	}
 
 	switch cc.encoderConfig.LengthFieldLength {
@@ -194,7 +194,7 @@ func (cc *LengthFieldBasedFrameCodec) Encode(c Conn, buf []byte) (out []byte, er
 		out = make([]byte, 8)
 		cc.encoderConfig.ByteOrder.PutUint64(out, uint64(length))
 	default:
-		return nil, ErrUnsupportedLength
+		return nil, errUnsupportedLength
 	}
 
 	out = append(out, buf...)
@@ -225,7 +225,7 @@ func (cc *LengthFieldBasedFrameCodec) Decode(c Conn) ([]byte, error) {
 	if cc.decoderConfig.LengthFieldOffset > 0 { //discard header(offset)
 		header, err = in.readN(cc.decoderConfig.LengthFieldOffset)
 		if err != nil {
-			return nil, ErrUnexpectedEOF
+			return nil, errUnexpectedEOF
 		}
 	}
 
@@ -238,7 +238,7 @@ func (cc *LengthFieldBasedFrameCodec) Decode(c Conn) ([]byte, error) {
 	msgLength := int(frameLength) + cc.decoderConfig.LengthAdjustment
 	msg, err := in.readN(msgLength)
 	if err != nil {
-		return nil, ErrUnexpectedEOF
+		return nil, errUnexpectedEOF
 	}
 
 	fullMessage := make([]byte, len(header)+len(lenBuf)+msgLength)
@@ -254,35 +254,35 @@ func (cc *LengthFieldBasedFrameCodec) getUnadjustedFrameLength(in *innerBuffer) 
 	case 1:
 		b, err := in.readN(1)
 		if err != nil {
-			return nil, 0, ErrUnexpectedEOF
+			return nil, 0, errUnexpectedEOF
 		}
 		return b, uint64(b[0]), nil
 	case 2:
 		lenBuf, err := in.readN(2)
 		if err != nil {
-			return nil, 0, ErrUnexpectedEOF
+			return nil, 0, errUnexpectedEOF
 		}
 		return lenBuf, uint64(cc.decoderConfig.ByteOrder.Uint16(lenBuf)), nil
 	case 3:
 		lenBuf, err := in.readN(3)
 		if err != nil {
-			return nil, 0, ErrUnexpectedEOF
+			return nil, 0, errUnexpectedEOF
 		}
 		return lenBuf, readUint24(cc.decoderConfig.ByteOrder, lenBuf), nil
 	case 4:
 		lenBuf, err := in.readN(4)
 		if err != nil {
-			return nil, 0, ErrUnexpectedEOF
+			return nil, 0, errUnexpectedEOF
 		}
 		return lenBuf, uint64(cc.decoderConfig.ByteOrder.Uint32(lenBuf)), nil
 	case 8:
 		lenBuf, err := in.readN(8)
 		if err != nil {
-			return nil, 0, ErrUnexpectedEOF
+			return nil, 0, errUnexpectedEOF
 		}
 		return lenBuf, cc.decoderConfig.ByteOrder.Uint64(lenBuf), nil
 	default:
-		return nil, 0, ErrUnsupportedLength
+		return nil, 0, errUnsupportedLength
 	}
 }
 

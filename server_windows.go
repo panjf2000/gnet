@@ -23,18 +23,18 @@ const (
 )
 
 type server struct {
-	ln               *listener          // all the listeners
-	cond             *sync.Cond         // shutdown signaler
-	opts             *Options           // options with server
-	serr             error              // signal error
-	once             sync.Once          // make sure only signalShutdown once
-	codec            ICodec             // codec for TCP stream
-	loopWG           sync.WaitGroup     // loop close WaitGroup
-	logger           Logger             // customized logger for logging info
-	ticktock         chan time.Duration // ticker channel
-	listenerWG       sync.WaitGroup     // listener close WaitGroup
-	eventHandler     EventHandler       // user eventHandler
-	subLoopGroup     IEventLoopGroup    // loops for handling events
+	ln           *listener          // all the listeners
+	cond         *sync.Cond         // shutdown signaler
+	opts         *Options           // options with server
+	serr         error              // signal error
+	once         sync.Once          // make sure only signalShutdown once
+	codec        ICodec             // codec for TCP stream
+	loopWG       sync.WaitGroup     // loop close WaitGroup
+	logger       Logger             // customized logger for logging info
+	ticktock     chan time.Duration // ticker channel
+	listenerWG   sync.WaitGroup     // listener close WaitGroup
+	eventHandler EventHandler       // user eventHandler
+	subLoopGroup IEventLoopGroup    // loops for handling events
 }
 
 // waitForShutdown waits for a signal to shutdown.
@@ -93,7 +93,7 @@ func (svr *server) stop() {
 
 	// Notify all loops to close.
 	svr.subLoopGroup.iterate(func(i int, el *eventloop) bool {
-		el.ch <- ErrServerShutdown
+		el.ch <- errServerShutdown
 		return true
 	})
 
@@ -103,7 +103,7 @@ func (svr *server) stop() {
 	// Close all connections.
 	svr.loopWG.Add(svr.subLoopGroup.len())
 	svr.subLoopGroup.iterate(func(i int, el *eventloop) bool {
-		el.ch <- ErrCloseConns
+		el.ch <- errServerShutdown
 		return true
 	})
 	svr.loopWG.Wait()

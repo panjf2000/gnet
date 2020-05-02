@@ -19,17 +19,17 @@ import (
 )
 
 type server struct {
-	ln               *listener          // all the listeners
-	wg               sync.WaitGroup     // event-loop close WaitGroup
-	opts             *Options           // options with server
-	once             sync.Once          // make sure only signalShutdown once
-	cond             *sync.Cond         // shutdown signaler
-	codec            ICodec             // codec for TCP stream
-	logger           Logger             // customized logger for logging info
-	ticktock         chan time.Duration // ticker channel
-	mainLoop         *eventloop         // main loop for accepting connections
-	eventHandler     EventHandler       // user eventHandler
-	subLoopGroup     IEventLoopGroup    // loops for handling events
+	ln           *listener          // all the listeners
+	wg           sync.WaitGroup     // event-loop close WaitGroup
+	opts         *Options           // options with server
+	once         sync.Once          // make sure only signalShutdown once
+	cond         *sync.Cond         // shutdown signaler
+	codec        ICodec             // codec for TCP stream
+	logger       Logger             // customized logger for logging info
+	ticktock     chan time.Duration // ticker channel
+	mainLoop     *eventloop         // main loop for accepting connections
+	eventHandler EventHandler       // user eventHandler
+	subLoopGroup IEventLoopGroup    // loops for handling events
 }
 
 // waitForShutdown waits for a signal to shutdown
@@ -155,7 +155,7 @@ func (svr *server) stop() {
 	// Notify all loops to close by closing all listeners
 	svr.subLoopGroup.iterate(func(i int, el *eventloop) bool {
 		sniffErrorAndLog(el.poller.Trigger(func() error {
-			return ErrServerShutdown
+			return errServerShutdown
 		}))
 		return true
 	})
@@ -163,7 +163,7 @@ func (svr *server) stop() {
 	if svr.mainLoop != nil {
 		svr.ln.close()
 		sniffErrorAndLog(svr.mainLoop.poller.Trigger(func() error {
-			return ErrServerShutdown
+			return errServerShutdown
 		}))
 	}
 

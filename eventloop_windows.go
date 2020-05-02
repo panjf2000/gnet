@@ -111,7 +111,7 @@ func (el *eventloop) loopRead(ti *tcpIn) (err error) {
 		case Close:
 			return el.loopCloseConn(c)
 		case Shutdown:
-			return ErrServerShutdown
+			return errServerShutdown
 		}
 		if err != nil {
 			return el.loopError(c, err)
@@ -132,7 +132,7 @@ func (el *eventloop) loopEgress() {
 	for v := range el.ch {
 		switch v := v.(type) {
 		case error:
-			if v == ErrCloseConns {
+			if v == errServerShutdown {
 				closed = true
 				for c := range el.connections {
 					_ = el.loopCloseConn(c)
@@ -141,7 +141,7 @@ func (el *eventloop) loopEgress() {
 		case *stderr:
 			_ = el.loopError(v.c, v.err)
 		}
-		if len(el.connections) == 0 && closed {
+		if closed && len(el.connections) == 0 {
 			break
 		}
 	}
@@ -158,7 +158,7 @@ func (el *eventloop) loopTicker() {
 			el.svr.ticktock <- delay
 			switch action {
 			case Shutdown:
-				err = ErrServerShutdown
+				err = errServerShutdown
 			}
 			return
 		}
@@ -176,7 +176,7 @@ func (el *eventloop) loopError(c *stdConn, err error) (e error) {
 		el.minusConnCount()
 		switch el.eventHandler.OnClosed(c, err) {
 		case Shutdown:
-			return ErrServerShutdown
+			return errServerShutdown
 		}
 		c.releaseTCP()
 	} else {
@@ -204,7 +204,7 @@ func (el *eventloop) handleAction(c *stdConn, action Action) error {
 	case Close:
 		return el.loopCloseConn(c)
 	case Shutdown:
-		return ErrServerShutdown
+		return errServerShutdown
 	default:
 		return nil
 	}
@@ -218,7 +218,7 @@ func (el *eventloop) loopReadUDP(c *stdConn) error {
 	}
 	switch action {
 	case Shutdown:
-		return ErrServerShutdown
+		return errServerShutdown
 	}
 	c.releaseUDP()
 	return nil

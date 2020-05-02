@@ -131,7 +131,7 @@ func (el *eventloop) loopRead(c *conn) error {
 		case Close:
 			return el.loopCloseConn(c, nil)
 		case Shutdown:
-			return ErrServerShutdown
+			return errServerShutdown
 		}
 		if !c.opened {
 			return nil
@@ -182,7 +182,7 @@ func (el *eventloop) loopCloseConn(c *conn, err error) error {
 		el.minusConnCount()
 		switch el.eventHandler.OnClosed(c, err) {
 		case Shutdown:
-			return ErrServerShutdown
+			return errServerShutdown
 		}
 		c.releaseTCP()
 	} else {
@@ -221,7 +221,7 @@ func (el *eventloop) loopTicker() {
 			switch action {
 			case None:
 			case Shutdown:
-				err = ErrServerShutdown
+				err = errServerShutdown
 			}
 			return
 		})
@@ -244,7 +244,7 @@ func (el *eventloop) handleAction(c *conn, action Action) error {
 	case Close:
 		return el.loopCloseConn(c, nil)
 	case Shutdown:
-		return ErrServerShutdown
+		return errServerShutdown
 	default:
 		return nil
 	}
@@ -266,7 +266,7 @@ func (el *eventloop) loopReadUDP(fd int) error {
 	}
 	switch action {
 	case Shutdown:
-		return ErrServerShutdown
+		return errServerShutdown
 	}
 	c.releaseUDP()
 	return nil

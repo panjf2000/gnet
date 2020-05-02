@@ -207,7 +207,7 @@ func TestLengthFieldBasedFrameCodecWith8(t *testing.T) {
 
 func TestFixedLengthFrameCodec_Encode(t *testing.T) {
 	codec := NewFixedLengthFrameCodec(8)
-	if data, err := codec.Encode(nil, make([]byte, 15)); data != nil || err != ErrInvalidFixedLength {
+	if data, err := codec.Encode(nil, make([]byte, 15)); data != nil || err != errInvalidFixedLength {
 		panic("should have a error of invalid fixed length")
 	}
 }
