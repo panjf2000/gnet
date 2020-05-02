@@ -119,7 +119,8 @@ func (el *eventloop) loopRead(c *conn) error {
 	}
 	c.buffer = el.packet[:n]
 
-	for inFrame, _ := c.read(); inFrame != nil; inFrame, _ = c.read() {
+	var inFrame []byte
+	for inFrame, err = c.read(); inFrame != nil; inFrame, err = c.read() {
 		out, action := el.eventHandler.React(inFrame, c)
 		if out != nil {
 			outFrame, _ := el.codec.Encode(c, out)
@@ -139,7 +140,7 @@ func (el *eventloop) loopRead(c *conn) error {
 	}
 	_, _ = c.inboundBuffer.Write(c.buffer)
 
-	return nil
+	return err
 }
 
 func (el *eventloop) loopWrite(c *conn) error {
