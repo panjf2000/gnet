@@ -99,8 +99,7 @@ func (el *eventloop) loopRead(ti *tcpIn) (err error) {
 	c := ti.c
 	c.buffer = ti.in
 
-	var inFrame []byte
-	for inFrame, err = c.read(); inFrame != nil; inFrame, err = c.read() {
+	for inFrame, _ := c.read(); inFrame != nil; inFrame, _ = c.read() {
 		out, action := el.eventHandler.React(inFrame, c)
 		if out != nil {
 			outFrame, _ := el.codec.Encode(c, out)
@@ -121,7 +120,7 @@ func (el *eventloop) loopRead(ti *tcpIn) (err error) {
 	_, _ = c.inboundBuffer.Write(c.buffer.Bytes())
 	bytebuffer.Put(c.buffer)
 	c.buffer = nil
-	return
+	return nil
 }
 
 func (el *eventloop) loopCloseConn(c *stdConn) error {
