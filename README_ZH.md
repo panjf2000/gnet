@@ -1004,6 +1004,7 @@ GOMAXPROCS=4
 - [ants](https://github.com/panjf2000/ants)
 - [bytebufferpool](https://github.com/valyala/bytebufferpool)
 - [goframe](https://github.com/smallnest/goframe)
+- [ringbuffer](https://github.com/smallnest/ringbuffer)
 
 # 📚 相关文章
 

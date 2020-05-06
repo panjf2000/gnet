@@ -1005,6 +1005,7 @@ Please read our [Contributing Guidelines](CONTRIBUTING.md) before opening a PR a
 - [ants](https://github.com/panjf2000/ants)
 - [bytebufferpool](https://github.com/valyala/bytebufferpool)
 - [goframe](https://github.com/smallnest/goframe)
+- [ringbuffer](https://github.com/smallnest/ringbuffer)
 
 # 📚 Relevant Articles
 
