@@ -928,7 +928,7 @@ func (cc *CustomLengthFieldProtocol) Decode(c gnet.Conn) ([]byte, error) {
 ```
 
 **Client/Server:**
-to check out the source code.
+[to check out the source code.](https://github.com/panjf2000/gnet/tree/master/examples/custom_codec).
 </details>
 
 **更详细的代码在这里: [gnet 示例](https://github.com/panjf2000/gnet/tree/master/examples)。**
