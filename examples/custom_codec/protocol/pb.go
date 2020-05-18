@@ -86,10 +86,9 @@ func (cc *CustomLengthFieldProtocol) Decode(c gnet.Conn) ([]byte, error) {
 		//log.Println("not enough payload data:", dataLen, protocolLen, dataSize)
 		return nil, errors.New("not enough payload data")
 
-	} else {
-		//log.Println("not enough header data:", size)
-		return nil, errors.New("not enough header data")
 	}
+	//log.Println("not enough header data:", size)
+	return nil, errors.New("not enough header data")
 }
 
 // default custom protocol const
