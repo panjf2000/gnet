@@ -57,8 +57,8 @@ func (cc *CustomLengthFieldProtocol) Encode(c gnet.Conn, buf []byte) ([]byte, er
 
 // Decode ...
 func (cc *CustomLengthFieldProtocol) Decode(c gnet.Conn) ([]byte, error) {
-	//parse header
-	headerLen := DefaultHeadLength //uint16+uint16+uint32
+	// parse header
+	headerLen := DefaultHeadLength // uint16+uint16+uint32
 	if size, header := c.ReadN(headerLen); size == headerLen {
 		byteBuffer := bytes.NewBuffer(header)
 		var pbVersion, actionType uint16
@@ -66,28 +66,28 @@ func (cc *CustomLengthFieldProtocol) Decode(c gnet.Conn) ([]byte, error) {
 		binary.Read(byteBuffer, binary.BigEndian, &pbVersion)
 		binary.Read(byteBuffer, binary.BigEndian, &actionType)
 		binary.Read(byteBuffer, binary.BigEndian, &dataLength)
-		//to check the protocol version and actionType,
-		//reset buffer if the version or actionType is not correct
+		// to check the protocol version and actionType,
+		// reset buffer if the version or actionType is not correct
 		if pbVersion != DefaultProtocolVersion || isCorrectAction(actionType) == false {
 			c.ResetBuffer()
 			log.Println("not normal protocol:", pbVersion, DefaultProtocolVersion, actionType, dataLength)
 			return nil, errors.New("not normal protocol")
 		}
-		//parse payload
+		// parse payload
 		dataLen := int(dataLength) //max int32 can contain 210MB payload
 		protocolLen := headerLen + dataLen
 		if dataSize, data := c.ReadN(protocolLen); dataSize == protocolLen {
 			c.ShiftN(protocolLen)
-			//log.Println("parse success:", data, dataSize)
+			// log.Println("parse success:", data, dataSize)
 
 			// return the payload of the data
 			return data[headerLen:], nil
 		}
-		//log.Println("not enough payload data:", dataLen, protocolLen, dataSize)
+		// log.Println("not enough payload data:", dataLen, protocolLen, dataSize)
 		return nil, errors.New("not enough payload data")
 
 	}
-	//log.Println("not enough header data:", size)
+	// log.Println("not enough header data:", size)
 	return nil, errors.New("not enough header data")
 }
 
@@ -95,7 +95,7 @@ func (cc *CustomLengthFieldProtocol) Decode(c gnet.Conn) ([]byte, error) {
 const (
 	DefaultHeadLength = 8
 
-	DefaultProtocolVersion = 0x8001 //test protocol version
+	DefaultProtocolVersion = 0x8001 // test protocol version
 
 	ActionPing = 0x0001 // ping
 	ActionPong = 0x0002 // pong

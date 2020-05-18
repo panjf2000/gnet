@@ -38,7 +38,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	//log.Println("pbdata：",pbdata)
+	// log.Println("pbdata：",pbdata)
 	conn.Write(pbdata)
 
 	data = []byte("world")
@@ -63,7 +63,7 @@ func ClientDecode(rawConn net.Conn) (*protocol.CustomLengthFieldProtocol, error)
 		return nil, err
 	}
 
-	//parse protocol header
+	// parse protocol header
 	bytesBuffer := bytes.NewBuffer(headData)
 	binary.Read(bytesBuffer, binary.BigEndian, &newPackage.Version)
 	binary.Read(bytesBuffer, binary.BigEndian, &newPackage.ActionType)
