@@ -34,7 +34,7 @@ func main() {
 	}()
 
 	data := []byte("hello")
-	pbdata, err := protocol.Pack(protocol.PROTOCAL_VERSION, protocol.ACTION_DATA, data)
+	pbdata, err := protocol.Pack(protocol.DefaultProtocolVersion, protocol.ActionData, data)
 	if err != nil {
 		panic(err)
 	}
@@ -42,7 +42,7 @@ func main() {
 	conn.Write(pbdata)
 
 	data = []byte("world")
-	pbdata, err = protocol.Pack(protocol.PROTOCAL_VERSION, protocol.ACTION_DATA, data)
+	pbdata, err = protocol.Pack(protocol.DefaultProtocolVersion, protocol.ActionData, data)
 	if err != nil {
 		panic(err)
 	}
@@ -76,7 +76,8 @@ func ClientDecode(rawConn net.Conn) (*protocol.CustomLengthFieldProtocol, error)
 	data := make([]byte, newPackage.DataLength)
 	dataNum, err2 := io.ReadFull(rawConn, data)
 	if uint32(dataNum) != newPackage.DataLength {
-		return nil, errors.New(fmt.Sprintf("read data error, %v", err2))
+		s := fmt.Sprintf("read data error, %v", err2)
+		return nil, errors.New(s)
 	}
 
 	newPackage.Data = data

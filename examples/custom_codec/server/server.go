@@ -27,7 +27,7 @@ func (cs *customCodecServer) OnInitComplete(srv gnet.Server) (action gnet.Action
 
 func (cs *customCodecServer) React(frame []byte, c gnet.Conn) (out []byte, action gnet.Action) {
 	fmt.Println("frame:", string(frame))
-	packFrame, _ := protocol.Pack(protocol.PROTOCAL_VERSION, protocol.ACTION_DATA, frame)
+	packFrame, _ := protocol.Pack(protocol.DefaultProtocolVersion, protocol.ActionData, frame)
 	if cs.async {
 		data := append([]byte{}, packFrame...)
 		_ = cs.workerPool.Submit(func() {

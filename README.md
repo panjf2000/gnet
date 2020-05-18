@@ -853,7 +853,7 @@ func main() {
 
 ```go
 // CustomLengthFieldProtocol : custom protocol
-// custom protocol header contains Version,ActionType and DataLength fields
+// custom protocol header contains Version, ActionType and DataLength fields
 // its payload is Data field
 type CustomLengthFieldProtocol struct {
 	Version    uint16
@@ -864,7 +864,7 @@ type CustomLengthFieldProtocol struct {
 
 // Pack :
 // Before sending to the peer, wrap the binary payload using this Pack function.
-// return []byte contains the version,actionType,dataLength and data 
+// return []byte contains the version, actionType, dataLength and data 
 func Pack(pbVersion, actionType uint16, data []byte) ([]byte, error) {
 	result := make([]byte, 0)
 
@@ -898,7 +898,7 @@ func (cc *CustomLengthFieldProtocol) Encode(c gnet.Conn, buf []byte) ([]byte, er
 // Decode ...
 func (cc *CustomLengthFieldProtocol) Decode(c gnet.Conn) ([]byte, error) {
 	//parse header
-	headerLen := DefaultHeadLength //uint16+uint16+uint32 equals 8 bytes
+	headerLen := DefaultHeadLength //uint16 + uint16 + uint32 equals 8 bytes
 	if size, header := c.ReadN(headerLen); size == headerLen {
 		byteBuffer := bytes.NewBuffer(header)
 		var pbVersion, actionType uint16
@@ -906,11 +906,11 @@ func (cc *CustomLengthFieldProtocol) Decode(c gnet.Conn) ([]byte, error) {
 		binary.Read(byteBuffer, binary.BigEndian, &pbVersion)
 		binary.Read(byteBuffer, binary.BigEndian, &actionType)
 		binary.Read(byteBuffer, binary.BigEndian, &dataLength)
-		//to check the protocol version and actionType,
+		//to check the protocol version and actionType, 
 		//reset buffer if the version or actionType is not correct
-		if pbVersion != PROTOCAL_VERSION || isCorrectAction(actionType) == false {
+		if pbVersion != DefaultProtocolVersion || isCorrectAction(actionType) == false {
 			c.ResetBuffer()
-			log.Println("not normal protocol:", pbVersion, PROTOCAL_VERSION, actionType, dataLength)
+			log.Println("not normal protocol:", pbVersion, DefaultProtocolVersion, actionType, dataLength)
 			return nil, errors.New("not normal protocol")
 		}
 		//parse payload
@@ -931,7 +931,7 @@ func (cc *CustomLengthFieldProtocol) Decode(c gnet.Conn) ([]byte, error) {
 ```
 
 **Client/Server:**
-to check out the source code.
+[to check out the source code.](https://github.com/panjf2000/gnet/tree/master/examples/custom_codec).
 </details>
 
 **For more details, check out here: [examples of gnet](https://github.com/panjf2000/gnet/tree/master/examples).**

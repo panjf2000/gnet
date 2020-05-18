@@ -849,10 +849,10 @@ func main() {
 **protocol intro:**
 
 ```go
-// CustomLengthFieldProtocol : 
-// 测试用的协议，由以下字段构成，
+// CustomLengthFieldProtocol 
+// 测试用的协议，由以下字段构成:
 // version+actionType+dataLength+data
-// 其中version+actionType+dataLength为header，data为payload。
+// 其中 version+actionType+dataLength 为 header，data 为 payload
 type CustomLengthFieldProtocol struct {
 	Version    uint16
 	ActionType uint16
@@ -861,7 +861,7 @@ type CustomLengthFieldProtocol struct {
 }
 
 // Pack :
-// 发到对端前，需要使用该函数包装下。将返回自己定义的CustomLengthFieldProtocol，用于发送
+// 发到对端前，需要使用该函数包装下。将返回自己定义的 CustomLengthFieldProtocol ，用于发送
 func Pack(pbVersion, actionType uint16, data []byte) ([]byte, error) {
 	result := make([]byte, 0)
 
@@ -905,9 +905,9 @@ func (cc *CustomLengthFieldProtocol) Decode(c gnet.Conn) ([]byte, error) {
 		binary.Read(byteBuffer, binary.BigEndian, &dataLength)
 		//to check the protocol version and actionType,
 		//reset buffer if the version or actionType is not correct
-		if pbVersion != PROTOCAL_VERSION || isCorrectAction(actionType) == false {
+		if pbVersion != DefaultProtocolVersion || isCorrectAction(actionType) == false {
 			c.ResetBuffer()
-			log.Println("not normal protocol:", pbVersion, PROTOCAL_VERSION, actionType, dataLength)
+			log.Println("not normal protocol:", pbVersion, DefaultProtocolVersion, actionType, dataLength)
 			return nil, errors.New("not normal protocol")
 		}
 		//parse payload

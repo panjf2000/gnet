@@ -27,19 +27,23 @@ func Pack(pbVersion, actionType uint16, data []byte) ([]byte, error) {
 	buffer := bytes.NewBuffer(result)
 
 	if err := binary.Write(buffer, binary.BigEndian, pbVersion); err != nil {
-		return nil, errors.New(fmt.Sprintf("Pack version error , %v", err))
+		s := fmt.Sprintf("Pack version error , %v", err)
+		return nil, errors.New(s)
 	}
 
 	if err := binary.Write(buffer, binary.BigEndian, actionType); err != nil {
-		return nil, errors.New(fmt.Sprintf("Pack type error , %v", err))
+		s := fmt.Sprintf("Pack type error , %v", err)
+		return nil, errors.New(s)
 	}
 	dataLen := uint32(len(data))
 	if err := binary.Write(buffer, binary.BigEndian, dataLen); err != nil {
-		return nil, errors.New(fmt.Sprintf("Pack datalength error , %v", err))
+		s := fmt.Sprintf("Pack datalength error , %v", err)
+		return nil, errors.New(s)
 	}
 	if dataLen > 0 {
 		if err := binary.Write(buffer, binary.BigEndian, data); err != nil {
-			return nil, errors.New(fmt.Sprintf("Pack data error , %v", err))
+			s := fmt.Sprintf("Pack data error , %v", err)
+			return nil, errors.New(s)
 		}
 	}
 
@@ -64,9 +68,9 @@ func (cc *CustomLengthFieldProtocol) Decode(c gnet.Conn) ([]byte, error) {
 		binary.Read(byteBuffer, binary.BigEndian, &dataLength)
 		//to check the protocol version and actionType,
 		//reset buffer if the version or actionType is not correct
-		if pbVersion != PROTOCAL_VERSION || isCorrectAction(actionType) == false {
+		if pbVersion != DefaultProtocolVersion || isCorrectAction(actionType) == false {
 			c.ResetBuffer()
-			log.Println("not normal protocol:", pbVersion, PROTOCAL_VERSION, actionType, dataLength)
+			log.Println("not normal protocol:", pbVersion, DefaultProtocolVersion, actionType, dataLength)
 			return nil, errors.New("not normal protocol")
 		}
 		//parse payload
@@ -78,10 +82,9 @@ func (cc *CustomLengthFieldProtocol) Decode(c gnet.Conn) ([]byte, error) {
 
 			// return the payload of the data
 			return data[headerLen:], nil
-		} else {
-			//log.Println("not enough payload data:", dataLen, protocolLen, dataSize)
-			return nil, errors.New("not enough payload data")
 		}
+		//log.Println("not enough payload data:", dataLen, protocolLen, dataSize)
+		return nil, errors.New("not enough payload data")
 
 	} else {
 		//log.Println("not enough header data:", size)
@@ -89,20 +92,20 @@ func (cc *CustomLengthFieldProtocol) Decode(c gnet.Conn) ([]byte, error) {
 	}
 }
 
+// default custom protocol const
 const (
 	DefaultHeadLength = 8
 
-	PROTOCAL_VERSION = 0x8001 //test protocol version
+	DefaultProtocolVersion = 0x8001 //test protocol version
 
-	//test protocol action type
-	ACTION_PING = 0x0001 // ping
-	ACTION_PONG = 0x0002 // pong
-	ACTION_DATA = 0x00F0 // business
+	ActionPing = 0x0001 // ping
+	ActionPong = 0x0002 // pong
+	ActionData = 0x00F0 // business
 )
 
 func isCorrectAction(actionType uint16) bool {
 	switch actionType {
-	case ACTION_PING, ACTION_PONG, ACTION_DATA:
+	case ActionPing, ActionPong, ActionData:
 		return true
 	default:
 		return false
