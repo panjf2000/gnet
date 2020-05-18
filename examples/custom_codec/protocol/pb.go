@@ -19,40 +19,37 @@ type CustomLengthFieldProtocol struct {
 	Data       []byte
 }
 
-// Pack :
-// Before sending to the peer, wrap the data using this Pack function.
-func Pack(pbVersion, actionType uint16, data []byte) ([]byte, error) {
+// Encode ...
+func (cc *CustomLengthFieldProtocol) Encode(c gnet.Conn, buf []byte) ([]byte, error) {
 	result := make([]byte, 0)
 
 	buffer := bytes.NewBuffer(result)
 
-	if err := binary.Write(buffer, binary.BigEndian, pbVersion); err != nil {
+	// take out the param
+	item := c.Context().(CustomLengthFieldProtocol)
+
+	if err := binary.Write(buffer, binary.BigEndian, item.ActionType); err != nil {
 		s := fmt.Sprintf("Pack version error , %v", err)
 		return nil, errors.New(s)
 	}
 
-	if err := binary.Write(buffer, binary.BigEndian, actionType); err != nil {
+	if err := binary.Write(buffer, binary.BigEndian, item.ActionType); err != nil {
 		s := fmt.Sprintf("Pack type error , %v", err)
 		return nil, errors.New(s)
 	}
-	dataLen := uint32(len(data))
+	dataLen := uint32(len(buf))
 	if err := binary.Write(buffer, binary.BigEndian, dataLen); err != nil {
 		s := fmt.Sprintf("Pack datalength error , %v", err)
 		return nil, errors.New(s)
 	}
 	if dataLen > 0 {
-		if err := binary.Write(buffer, binary.BigEndian, data); err != nil {
+		if err := binary.Write(buffer, binary.BigEndian, buf); err != nil {
 			s := fmt.Sprintf("Pack data error , %v", err)
 			return nil, errors.New(s)
 		}
 	}
 
 	return buffer.Bytes(), nil
-}
-
-// Encode ...
-func (cc *CustomLengthFieldProtocol) Encode(c gnet.Conn, buf []byte) ([]byte, error) {
-	return buf, nil
 }
 
 // Decode ...

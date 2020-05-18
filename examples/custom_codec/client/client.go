@@ -34,15 +34,14 @@ func main() {
 	}()
 
 	data := []byte("hello")
-	pbdata, err := protocol.Pack(protocol.DefaultProtocolVersion, protocol.ActionData, data)
+	pbdata, err := ClientEncode(protocol.DefaultProtocolVersion, protocol.ActionData, data)
 	if err != nil {
 		panic(err)
 	}
-	// log.Println("pbdata：",pbdata)
 	conn.Write(pbdata)
 
 	data = []byte("world")
-	pbdata, err = protocol.Pack(protocol.DefaultProtocolVersion, protocol.ActionData, data)
+	pbdata, err = ClientEncode(protocol.DefaultProtocolVersion, protocol.ActionData, data)
 	if err != nil {
 		panic(err)
 	}
@@ -50,6 +49,36 @@ func main() {
 
 	select {}
 
+}
+
+// ClientEncode :
+func ClientEncode(pbVersion, actionType uint16, data []byte) ([]byte, error) {
+	result := make([]byte, 0)
+
+	buffer := bytes.NewBuffer(result)
+
+	if err := binary.Write(buffer, binary.BigEndian, pbVersion); err != nil {
+		s := fmt.Sprintf("Pack version error , %v", err)
+		return nil, errors.New(s)
+	}
+
+	if err := binary.Write(buffer, binary.BigEndian, actionType); err != nil {
+		s := fmt.Sprintf("Pack type error , %v", err)
+		return nil, errors.New(s)
+	}
+	dataLen := uint32(len(data))
+	if err := binary.Write(buffer, binary.BigEndian, dataLen); err != nil {
+		s := fmt.Sprintf("Pack datalength error , %v", err)
+		return nil, errors.New(s)
+	}
+	if dataLen > 0 {
+		if err := binary.Write(buffer, binary.BigEndian, data); err != nil {
+			s := fmt.Sprintf("Pack data error , %v", err)
+			return nil, errors.New(s)
+		}
+	}
+
+	return buffer.Bytes(), nil
 }
 
 // ClientDecode :

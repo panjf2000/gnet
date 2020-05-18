@@ -27,15 +27,19 @@ func (cs *customCodecServer) OnInitComplete(srv gnet.Server) (action gnet.Action
 
 func (cs *customCodecServer) React(frame []byte, c gnet.Conn) (out []byte, action gnet.Action) {
 	fmt.Println("frame:", string(frame))
-	packFrame, _ := protocol.Pack(protocol.DefaultProtocolVersion, protocol.ActionData, frame)
+
+	// store customize protocol header param using `c.SetContext()`
+	item := protocol.CustomLengthFieldProtocol{Version: protocol.DefaultProtocolVersion, ActionType: protocol.ActionData}
+	c.SetContext(item)
+
 	if cs.async {
-		data := append([]byte{}, packFrame...)
+		data := append([]byte{}, frame...)
 		_ = cs.workerPool.Submit(func() {
 			c.AsyncWrite(data)
 		})
 		return
 	}
-	out = packFrame
+	out = frame
 	return
 }
 
