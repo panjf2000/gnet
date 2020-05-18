@@ -843,6 +843,96 @@ func main() {
 ```
 </details>
 
+<details>
+	<summary> Custom Codec Demo with Client/Server </summary>
+
+**protocol intro:**
+
+```go
+// CustomLengthFieldProtocol 
+// 测试用的协议，由以下字段构成:
+// version+actionType+dataLength+data
+// 其中 version+actionType+dataLength 为 header，data 为 payload
+type CustomLengthFieldProtocol struct {
+	Version    uint16
+	ActionType uint16
+	DataLength uint32
+	Data       []byte
+}
+
+
+// Encode ...
+func (cc *CustomLengthFieldProtocol) Encode(c gnet.Conn, buf []byte) ([]byte, error) {
+	result := make([]byte, 0)
+
+	buffer := bytes.NewBuffer(result)
+
+	// 取出`React()`时存入的参数
+	item :=c.Context().(CustomLengthFieldProtocol)
+
+
+	if err := binary.Write(buffer, binary.BigEndian, item.ActionType); err != nil {
+		s := fmt.Sprintf("Pack version error , %v", err)
+		return nil, errors.New(s)
+	}
+
+	if err := binary.Write(buffer, binary.BigEndian, item.ActionType); err != nil {
+		s := fmt.Sprintf("Pack type error , %v", err)
+		return nil, errors.New(s)
+	}
+	dataLen := uint32(len(buf))
+	if err := binary.Write(buffer, binary.BigEndian, dataLen); err != nil {
+		s := fmt.Sprintf("Pack datalength error , %v", err)
+		return nil, errors.New(s)
+	}
+	if dataLen > 0 {
+		if err := binary.Write(buffer, binary.BigEndian, buf); err != nil {
+			s := fmt.Sprintf("Pack data error , %v", err)
+			return nil, errors.New(s)
+		}
+	}
+
+	return buffer.Bytes(), nil
+}
+
+// Decode ...
+func (cc *CustomLengthFieldProtocol) Decode(c gnet.Conn) ([]byte, error) {
+	// parse header
+	headerLen := DefaultHeadLength // uint16+uint16+uint32
+	if size, header := c.ReadN(headerLen); size == headerLen {
+		byteBuffer := bytes.NewBuffer(header)
+		var pbVersion, actionType uint16
+		var dataLength uint32
+		binary.Read(byteBuffer, binary.BigEndian, &pbVersion)
+		binary.Read(byteBuffer, binary.BigEndian, &actionType)
+		binary.Read(byteBuffer, binary.BigEndian, &dataLength)
+		// to check the protocol version and actionType,
+		// reset buffer if the version or actionType is not correct
+		if pbVersion != DefaultProtocolVersion || isCorrectAction(actionType) == false {
+			c.ResetBuffer()
+			log.Println("not normal protocol:", pbVersion, DefaultProtocolVersion, actionType, dataLength)
+			return nil, errors.New("not normal protocol")
+		}
+		// parse payload
+		dataLen := int(dataLength) //max int32 can contain 210MB payload
+		protocolLen := headerLen + dataLen
+		if dataSize, data := c.ReadN(protocolLen); dataSize == protocolLen {
+			c.ShiftN(protocolLen)
+
+			// return the payload of the data
+			return data[headerLen:], nil
+		}
+		return nil, errors.New("not enough payload data")
+
+	}
+	return nil, errors.New("not enough header data")
+}
+```
+
+**Client/Server:**
+[to check out the source code.](https://github.com/panjf2000/gnet/tree/master/examples/custom_codec).
+</details>
+
 **更详细的代码在这里: [gnet 示例](https://github.com/panjf2000/gnet/tree/master/examples)。**
 
 ## I/O 事件
