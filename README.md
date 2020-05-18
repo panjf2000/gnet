@@ -845,6 +845,95 @@ func main() {
 ```
 </details>
 
+
+<details>
+	<summary> Custom Codec Demo with Client/Server </summary>
+
+**protocol intro:**
+
+```go
+// CustomLengthFieldProtocol : custom protocol
+// custom protocol header contains Version,ActionType and DataLength fields
+// its payload is Data field
+type CustomLengthFieldProtocol struct {
+	Version    uint16
+	ActionType uint16
+	DataLength uint32
+	Data       []byte
+}
+
+// Pack :
+// Before sending to the peer, wrap the binary payload using this Pack function.
+// return []byte contains the version,actionType,dataLength and data 
+func Pack(pbVersion, actionType uint16, data []byte) ([]byte, error) {
+	result := make([]byte, 0)
+
+	buffer := bytes.NewBuffer(result)
+
+	if err := binary.Write(buffer, binary.BigEndian, pbVersion); err != nil {
+		return nil, errors.New(fmt.Sprintf("Pack version error , %v", err))
+	}
+
+	if err := binary.Write(buffer, binary.BigEndian, actionType); err != nil {
+		return nil, errors.New(fmt.Sprintf("Pack type error , %v", err))
+	}
+	dataLen := uint32(len(data))
+	if err := binary.Write(buffer, binary.BigEndian, dataLen); err != nil {
+		return nil, errors.New(fmt.Sprintf("Pack datalength error , %v", err))
+	}
+	if dataLen > 0 {
+		if err := binary.Write(buffer, binary.BigEndian, data); err != nil {
+			return nil, errors.New(fmt.Sprintf("Pack data error , %v", err))
+		}
+	}
+
+	return buffer.Bytes(), nil
+}
+
+// Encode ...
+func (cc *CustomLengthFieldProtocol) Encode(c gnet.Conn, buf []byte) ([]byte, error) {
+	return buf, nil
+}
+
+// Decode ...
+func (cc *CustomLengthFieldProtocol) Decode(c gnet.Conn) ([]byte, error) {
+	//parse header
+	headerLen := DefaultHeadLength //uint16+uint16+uint32 equals 8 bytes
+	if size, header := c.ReadN(headerLen); size == headerLen {
+		byteBuffer := bytes.NewBuffer(header)
+		var pbVersion, actionType uint16
+		var dataLength uint32
+		binary.Read(byteBuffer, binary.BigEndian, &pbVersion)
+		binary.Read(byteBuffer, binary.BigEndian, &actionType)
+		binary.Read(byteBuffer, binary.BigEndian, &dataLength)
+		//to check the protocol version and actionType,
+		//reset buffer if the version or actionType is not correct
+		if pbVersion != PROTOCAL_VERSION || isCorrectAction(actionType) == false {
+			c.ResetBuffer()
+			log.Println("not normal protocol:", pbVersion, PROTOCAL_VERSION, actionType, dataLength)
+			return nil, errors.New("not normal protocol")
+		}
+		//parse payload
+		dataLen := int(dataLength) //max int32 can contain 210MB payload
+		protocolLen := headerLen + dataLen
+		if dataSize, data := c.ReadN(protocolLen); dataSize == protocolLen {
+			c.ShiftN(protocolLen)
+			// return the payload of the data
+			return data[headerLen:], nil
+		} else {
+			return nil, errors.New("not enough payload data")
+		}
+
+	} else {
+		return nil, errors.New("not enough header data")
+	}
+}
+```
+
+**Client/Server:**
+to check out the source code.
+</details>
+
 **For more details, check out here: [examples of gnet](https://github.com/panjf2000/gnet/tree/master/examples).**
 
 ## I/O Events
