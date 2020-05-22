@@ -33,7 +33,7 @@
 - [x] 整个生命周期是无锁的
 - [x] 简洁的 APIs
 - [x] 基于 Ring-Buffer 的高效内存利用
-- [x] 支持多种网络协议/IPC 机制：TCP、UDP 和 Unix Domain Socket
+- [x] 支持多种网络协议/IPC 机制：`TCP`、`UDP` 和 `Unix Domain Socket`
 - [x] 支持多种负载均衡算法：`Round-Robin(轮询)`、`Source Addr Hash(源地址哈希)` 和 `Least-Connections(最少连接数)`
 - [x] 支持两种事件驱动机制：**Linux** 里的 `epoll` 以及 **FreeBSD/Darwin** 里的 `kqueue`
 - [x] 支持异步写操作
@@ -868,7 +868,7 @@ func (cc *CustomLengthFieldProtocol) Encode(c gnet.Conn, buf []byte) ([]byte, er
 	buffer := bytes.NewBuffer(result)
 
 	// 取出`React()`时存入的参数
-	item :=c.Context().(CustomLengthFieldProtocol)
+	item := c.Context().(CustomLengthFieldProtocol)
 
 
 	if err := binary.Write(buffer, binary.BigEndian, item.ActionType); err != nil {
@@ -930,7 +930,7 @@ func (cc *CustomLengthFieldProtocol) Decode(c gnet.Conn) ([]byte, error) {
 ```
 
 **Client/Server:**
-[to check out the source code.](https://github.com/panjf2000/gnet/tree/master/examples/custom_codec).
+[Check out the source code](https://github.com/panjf2000/gnet/tree/master/examples/custom_codec).
 </details>
 
 **更详细的代码在这里: [gnet 示例](https://github.com/panjf2000/gnet/tree/master/examples)。**

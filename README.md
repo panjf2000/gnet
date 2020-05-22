@@ -33,7 +33,7 @@ English | [🇨🇳中文](README_ZH.md)
 - [x] Lock-free during the entire life cycle
 - [x] Concise APIs
 - [x] Efficient memory usage: Ring-Buffer
-- [x] Supporting multiple protocols/IPC mechanism: `TCP,` `UDP` and `Unix Domain Socket`
+- [x] Supporting multiple protocols/IPC mechanism: `TCP`, `UDP` and `Unix Domain Socket`
 - [x] Supporting multiple load-balancing algorithms: `Round-Robin`, `Source Addr Hash` and `Least-Connections`
 - [x] Supporting two event-driven mechanisms: `epoll` on **Linux** and `kqueue` on **FreeBSD/Darwin**
 - [x] Supporting asynchronous write operation
@@ -59,7 +59,7 @@ and it works as the following sequence diagram:
 <img alt="reactor" src="https://raw.githubusercontent.com/panjf2000/illustrations/master/go/multi-reactors-sequence-diagram.png">
 </p>
 
-### Multiple Reactors + Goroutine-Pool
+### Multiple Reactors + Goroutine Pool
 
 You may ask me a question: what if my business logic in `EventHandler.React`  contains some blocking code which leads to blocking in event-loop of `gnet`, what is the solution for this kind of situation？
 
@@ -255,7 +255,7 @@ func main() {
 }
 ```
 
-Like I said in the 『Multiple Reactors + Goroutine-Pool』section, if there are blocking code in your business logic, then you ought to turn them into non-blocking code in any way, for instance you can wrap them into a goroutine, but it will result in a massive amount of goroutines if massive traffic is passing through your server so I would suggest you utilize a goroutine pool like [ants](https://github.com/panjf2000/ants) to manage those goroutines and reduce the cost of system resources.
+Like I said in the 『Multiple Reactors + Goroutine Pool』section, if there are blocking code in your business logic, then you ought to turn them into non-blocking code in any way, for instance, you can wrap them into a goroutine, but it will result in a massive amount of goroutines if massive traffic is passing through your server so I would suggest you utilize a goroutine pool like [ants](https://github.com/panjf2000/ants) to manage those goroutines and reduce the cost of system resources.
 
 **All gnet examples:**
 
@@ -870,7 +870,7 @@ func (cc *CustomLengthFieldProtocol) Encode(c gnet.Conn, buf []byte) ([]byte, er
 	buffer := bytes.NewBuffer(result)
 
 	// take out the param that `React()` event saved.
-	item :=c.Context().(CustomLengthFieldProtocol)
+	item := c.Context().(CustomLengthFieldProtocol)
 
 
 	if err := binary.Write(buffer, binary.BigEndian, item.ActionType); err != nil {
@@ -935,7 +935,7 @@ func (cc *CustomLengthFieldProtocol) Decode(c gnet.Conn) ([]byte, error) {
 ```
 
 **Client/Server:**
-[to check out the source code.](https://github.com/panjf2000/gnet/tree/master/examples/custom_codec).
+[Check out the source code](https://github.com/panjf2000/gnet/tree/master/examples/custom_codec).
 </details>
 
 **For more details, check out here: [examples of gnet](https://github.com/panjf2000/gnet/tree/master/examples).**
@@ -1087,7 +1087,7 @@ Source code in `gnet` is available under the MIT [License](/LICENSE).
 
 # 👏 Contributors
 
-Please read our [Contributing Guidelines](CONTRIBUTING.md) before opening a PR and thank you to all the developers who already made contributions to `gnet`!
+Please read the [Contributing Guidelines](CONTRIBUTING.md) before opening a PR and thank you to all the developers who already made contributions to `gnet`!
 
 [![](https://opencollective.com/gnet/contributors.svg?width=890&button=false)](https://github.com/panjf2000/gnet/graphs/contributors)
 
