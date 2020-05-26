@@ -871,7 +871,7 @@ func (cc *CustomLengthFieldProtocol) Encode(c gnet.Conn, buf []byte) ([]byte, er
 	item := c.Context().(CustomLengthFieldProtocol)
 
 
-	if err := binary.Write(buffer, binary.BigEndian, item.ActionType); err != nil {
+	if err := binary.Write(buffer, binary.BigEndian, item.Version); err != nil {
 		s := fmt.Sprintf("Pack version error , %v", err)
 		return nil, errors.New(s)
 	}

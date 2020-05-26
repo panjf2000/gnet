@@ -5,12 +5,13 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/panjf2000/gnet"
 	"log"
+
+	"github.com/panjf2000/gnet"
 )
 
 // CustomLengthFieldProtocol : custom protocol
-// custom protocol header contains Version,ActionType and DataLength fields
+// custom protocol header contains Version, ActionType and DataLength fields
 // its payload is Data field
 type CustomLengthFieldProtocol struct {
 	Version    uint16
@@ -28,7 +29,7 @@ func (cc *CustomLengthFieldProtocol) Encode(c gnet.Conn, buf []byte) ([]byte, er
 	// take out the param
 	item := c.Context().(CustomLengthFieldProtocol)
 
-	if err := binary.Write(buffer, binary.BigEndian, item.ActionType); err != nil {
+	if err := binary.Write(buffer, binary.BigEndian, item.Version); err != nil {
 		s := fmt.Sprintf("Pack version error , %v", err)
 		return nil, errors.New(s)
 	}
@@ -60,9 +61,9 @@ func (cc *CustomLengthFieldProtocol) Decode(c gnet.Conn) ([]byte, error) {
 		byteBuffer := bytes.NewBuffer(header)
 		var pbVersion, actionType uint16
 		var dataLength uint32
-		binary.Read(byteBuffer, binary.BigEndian, &pbVersion)
-		binary.Read(byteBuffer, binary.BigEndian, &actionType)
-		binary.Read(byteBuffer, binary.BigEndian, &dataLength)
+		_ = binary.Read(byteBuffer, binary.BigEndian, &pbVersion)
+		_ = binary.Read(byteBuffer, binary.BigEndian, &actionType)
+		_ = binary.Read(byteBuffer, binary.BigEndian, &dataLength)
 		// to check the protocol version and actionType,
 		// reset buffer if the version or actionType is not correct
 		if pbVersion != DefaultProtocolVersion || isCorrectAction(actionType) == false {

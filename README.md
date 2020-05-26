@@ -853,7 +853,7 @@ func main() {
 
 ```go
 // CustomLengthFieldProtocol : custom protocol
-// custom protocol header contains Version,ActionType and DataLength fields
+// custom protocol header contains Version, ActionType and DataLength fields
 // its payload is Data field
 type CustomLengthFieldProtocol struct {
 	Version    uint16
@@ -873,7 +873,7 @@ func (cc *CustomLengthFieldProtocol) Encode(c gnet.Conn, buf []byte) ([]byte, er
 	item := c.Context().(CustomLengthFieldProtocol)
 
 
-	if err := binary.Write(buffer, binary.BigEndian, item.ActionType); err != nil {
+	if err := binary.Write(buffer, binary.BigEndian, item.Version); err != nil {
 		s := fmt.Sprintf("Pack version error , %v", err)
 		return nil, errors.New(s)
 	}
