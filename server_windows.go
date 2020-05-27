@@ -22,6 +22,8 @@ const (
 	commandBufferSize = 512
 )
 
+var errCloseAllConns = errors.New("close all connections in event-loop")
+
 type server struct {
 	ln           *listener          // all the listeners
 	cond         *sync.Cond         // shutdown signaler
@@ -103,7 +105,7 @@ func (svr *server) stop() {
 	// Close all connections.
 	svr.loopWG.Add(svr.subLoopGroup.len())
 	svr.subLoopGroup.iterate(func(i int, el *eventloop) bool {
-		el.ch <- errServerShutdown
+		el.ch <- errCloseAllConns
 		return true
 	})
 	svr.loopWG.Wait()

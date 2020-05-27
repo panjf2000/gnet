@@ -132,7 +132,7 @@ func (el *eventloop) loopEgress() {
 	for v := range el.ch {
 		switch v := v.(type) {
 		case error:
-			if v == errServerShutdown {
+			if v == errCloseAllConns {
 				closed = true
 				for c := range el.connections {
 					_ = el.loopCloseConn(c)
