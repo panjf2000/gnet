@@ -75,7 +75,7 @@ func (cc *LineBasedFrameCodec) Decode(c Conn) ([]byte, error) {
 	buf := c.Read()
 	idx := bytes.IndexByte(buf, CRLFByte)
 	if idx == -1 {
-		return nil, ErrCRLFNotFound
+		return nil, errCRLFNotFound
 	}
 	c.ShiftN(idx + 1)
 	return buf[:idx], nil

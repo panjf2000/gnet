@@ -14,8 +14,8 @@ var (
 	errUnexpectedEOF = errors.New("there is no enough data")
 	// errDelimiterNotFound occurs when no such a delimiter is in input data.
 	errDelimiterNotFound = errors.New("there is no such a delimiter")
-	// ErrCRLFNotFound occurs when a CRLF is not found by codec.
-	ErrCRLFNotFound = errors.New("there is no CRLF")
+	// errCRLFNotFound occurs when a CRLF is not found by codec.
+	errCRLFNotFound = errors.New("there is no CRLF")
 	// errUnsupportedLength occurs when unsupported lengthFieldLength is from input data.
 	errUnsupportedLength = errors.New("unsupported lengthFieldLength. (expected: 1, 2, 3, 4, or 8)")
 	// errTooLessLength occurs when adjusted frame length is less than zero.
