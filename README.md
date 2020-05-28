@@ -1107,8 +1107,18 @@ Please read the [Contributing Guidelines](CONTRIBUTING.md) before opening a PR a
 - [Go netpoll I/O 多路复用构建原生网络模型之源码深度解析](https://taohuawu.club/go-netpoll-io-multiplexing-reactor)
 - [gnet: 一个轻量级且高性能的 Golang 网络库](https://taohuawu.club/go-event-loop-networking-library-gnet)
 - [最快的 Go 网络框架 gnet 来啦！](https://taohuawu.club/releasing-gnet-v1-with-techempower)
+- [字节跳动在 Go 网络库上的实践](https://taohuawu.club/bytedance-network-library-practices)
 
-## JetBrains OS licenses
+# 🖥 User cases
+
+Please feel free to add your projects here~~
+
+<!--
+<a href="https://github.com/panjf2000/gnet" target="_blank"><img src="https://raw.githubusercontent.com/panjf2000/logos/master/gnet/logo.png" width="150" align="middle"/></a>&nbsp;&nbsp;
+<a href="https://www.tencent.com"><img src="https://www.tencent.com/img/index/tencent_logo.png" width="250" align="middle"/></a>&nbsp;&nbsp;
+-->
+
+# 🔋 JetBrains OS licenses
 
 `gnet` had been being developed with `GoLand` IDE under the **free JetBrains Open Source license(s)** granted by JetBrains s.r.o., hence I would like to express my thanks here.
 
