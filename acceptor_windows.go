@@ -38,7 +38,7 @@ func (svr *server) listenerRun() {
 			buf := bytebuffer.Get()
 			_, _ = buf.Write(packet[:n])
 
-			el := svr.subLoopGroup.next(hashCode(addr.String()))
+			el := svr.subEventLoopSet.next(hashCode(addr.String()))
 			el.ch <- &udpIn{newUDPConn(el, svr.ln.lnaddr, addr, buf)}
 		} else {
 			// Accept TCP socket.
@@ -47,7 +47,7 @@ func (svr *server) listenerRun() {
 				err = e
 				return
 			}
-			el := svr.subLoopGroup.next(hashCode(conn.RemoteAddr().String()))
+			el := svr.subEventLoopSet.next(hashCode(conn.RemoteAddr().String()))
 			c := newTCPConn(conn, el)
 			el.ch <- c
 			go func() {

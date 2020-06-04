@@ -25,18 +25,18 @@ const (
 var errCloseAllConns = errors.New("close all connections in event-loop")
 
 type server struct {
-	ln           *listener          // all the listeners
-	cond         *sync.Cond         // shutdown signaler
-	opts         *Options           // options with server
-	serr         error              // signal error
-	once         sync.Once          // make sure only signalShutdown once
-	codec        ICodec             // codec for TCP stream
-	loopWG       sync.WaitGroup     // loop close WaitGroup
-	logger       Logger             // customized logger for logging info
-	ticktock     chan time.Duration // ticker channel
-	listenerWG   sync.WaitGroup     // listener close WaitGroup
-	eventHandler EventHandler       // user eventHandler
-	subLoopGroup IEventLoopGroup    // loops for handling events
+	ln              *listener          // all the listeners
+	cond            *sync.Cond         // shutdown signaler
+	opts            *Options           // options with server
+	serr            error              // signal error
+	once            sync.Once          // make sure only signalShutdown once
+	codec           ICodec             // codec for TCP stream
+	loopWG          sync.WaitGroup     // loop close WaitGroup
+	logger          Logger             // customized logger for logging info
+	ticktock        chan time.Duration // ticker channel
+	listenerWG      sync.WaitGroup     // listener close WaitGroup
+	eventHandler    EventHandler       // user eventHandler
+	subEventLoopSet loadBalancer       // event-loops for handling events
 }
 
 // waitForShutdown waits for a signal to shutdown.
@@ -69,17 +69,18 @@ func (svr *server) startListener() {
 func (svr *server) startLoops(numEventLoop int) {
 	for i := 0; i < numEventLoop; i++ {
 		el := &eventloop{
-			ch:           make(chan interface{}, commandBufferSize),
-			idx:          i,
-			svr:          svr,
-			codec:        svr.codec,
-			connections:  make(map[*stdConn]struct{}),
-			eventHandler: svr.eventHandler,
+			ch:                make(chan interface{}, commandBufferSize),
+			svr:               svr,
+			codec:             svr.codec,
+			connections:       make(map[*stdConn]struct{}),
+			eventHandler:      svr.eventHandler,
+			calibrateCallback: svr.subEventLoopSet.calibrate,
 		}
-		svr.subLoopGroup.register(el)
+		svr.subEventLoopSet.register(el)
 	}
-	svr.loopWG.Add(svr.subLoopGroup.len())
-	svr.subLoopGroup.iterate(func(i int, el *eventloop) bool {
+
+	svr.loopWG.Add(svr.subEventLoopSet.len())
+	svr.subEventLoopSet.iterate(func(i int, el *eventloop) bool {
 		go el.loopRun()
 		return true
 	})
@@ -94,7 +95,7 @@ func (svr *server) stop() {
 	svr.listenerWG.Wait()
 
 	// Notify all loops to close.
-	svr.subLoopGroup.iterate(func(i int, el *eventloop) bool {
+	svr.subEventLoopSet.iterate(func(i int, el *eventloop) bool {
 		el.ch <- errServerShutdown
 		return true
 	})
@@ -103,8 +104,8 @@ func (svr *server) stop() {
 	svr.loopWG.Wait()
 
 	// Close all connections.
-	svr.loopWG.Add(svr.subLoopGroup.len())
-	svr.subLoopGroup.iterate(func(i int, el *eventloop) bool {
+	svr.loopWG.Add(svr.subEventLoopSet.len())
+	svr.subEventLoopSet.iterate(func(i int, el *eventloop) bool {
 		el.ch <- errCloseAllConns
 		return true
 	})
@@ -128,11 +129,11 @@ func serve(eventHandler EventHandler, listener *listener, options *Options) (err
 
 	switch options.LB {
 	case RoundRobin:
-		svr.subLoopGroup = new(roundRobinEventLoopGroup)
+		svr.subEventLoopSet = new(roundRobinEventLoopSet)
 	case LeastConnections:
-		svr.subLoopGroup = new(leastConnectionsEventLoopGroup)
+		svr.subEventLoopSet = new(leastConnectionsEventLoopSet)
 	case SourceAddrHash:
-		svr.subLoopGroup = new(sourceAddrHashEventLoopGroup)
+		svr.subEventLoopSet = new(sourceAddrHashEventLoopSet)
 	}
 
 	svr.ticktock = make(chan time.Duration, 1)
