@@ -4,6 +4,11 @@
 
 package gnet
 
+import (
+	"container/heap"
+	"sync"
+)
+
 // LoadBalancing represents the the type of load-balancing algorithm.
 type LoadBalancing int
 
@@ -19,111 +24,170 @@ const (
 	SourceAddrHash
 )
 
-// IEventLoopGroup represents a set of event-loops.
 type (
-	IEventLoopGroup interface {
+	// loadBalancer is a interface which manipulates the event-loops group.
+	loadBalancer interface {
 		register(*eventloop)
 		next(int) *eventloop
 		iterate(func(int, *eventloop) bool)
 		len() int
+		calibrate(*eventloop, int32)
 	}
 
-	// roundRobinEventLoopGroup with RoundRobin algorithm.
-	roundRobinEventLoopGroup struct {
+	// roundRobinEventLoopSet with Round-Robin algorithm.
+	roundRobinEventLoopSet struct {
 		nextLoopIndex int
 		eventLoops    []*eventloop
 		size          int
 	}
 
-	// leastConnectionsEventLoopGroup with Least-Connections algorithm.
-	leastConnectionsEventLoopGroup []*eventloop
+	// leastConnectionsEventLoopSet with Least-Connections algorithm.
+	leastConnectionsEventLoopSet struct {
+		sync.RWMutex
+		minHeap minEventLoopHeap
+	}
 
-	// sourceAddrHashEventLoopGroup with Hash algorithm.
-	sourceAddrHashEventLoopGroup struct {
+	// sourceAddrHashEventLoopSet with Hash algorithm.
+	sourceAddrHashEventLoopSet struct {
 		eventLoops []*eventloop
 		size       int
 	}
 )
 
-func (g *roundRobinEventLoopGroup) register(el *eventloop) {
-	g.eventLoops = append(g.eventLoops, el)
-	g.size++
+// ==================================== Implementation of Round-Robin load-balancer ====================================
+
+func (set *roundRobinEventLoopSet) register(el *eventloop) {
+	el.idx = set.size
+	set.eventLoops = append(set.eventLoops, el)
+	set.size++
 }
 
 // next returns the eligible event-loop based on Round-Robin algorithm.
-func (g *roundRobinEventLoopGroup) next(_ int) (el *eventloop) {
-	el = g.eventLoops[g.nextLoopIndex]
-	if g.nextLoopIndex++; g.nextLoopIndex >= g.size {
-		g.nextLoopIndex = 0
+func (set *roundRobinEventLoopSet) next(_ int) (el *eventloop) {
+	el = set.eventLoops[set.nextLoopIndex]
+	if set.nextLoopIndex++; set.nextLoopIndex >= set.size {
+		set.nextLoopIndex = 0
 	}
 	return
 }
 
-func (g *roundRobinEventLoopGroup) iterate(f func(int, *eventloop) bool) {
-	for i, el := range g.eventLoops {
+func (set *roundRobinEventLoopSet) iterate(f func(int, *eventloop) bool) {
+	for i, el := range set.eventLoops {
 		if !f(i, el) {
 			break
 		}
 	}
 }
 
-func (g *roundRobinEventLoopGroup) len() int {
-	return g.size
+func (set *roundRobinEventLoopSet) len() int {
+	return set.size
 }
 
-func (g *leastConnectionsEventLoopGroup) register(el *eventloop) {
-	*g = append(*g, el)
+func (set *roundRobinEventLoopSet) calibrate(el *eventloop, delta int32) {
+	el.adjustConnCount(delta)
 }
 
-// next returns the eligible event-loop based on least-connections algorithm.
-func (g *leastConnectionsEventLoopGroup) next(_ int) (el *eventloop) {
-	eventLoops := *g
-	el = eventLoops[0]
-	leastConnCount := el.loadConnCount()
-	var (
-		curEventLoop *eventloop
-		curConnCount int32
-	)
-	for _, curEventLoop = range eventLoops[1:] {
-		if curConnCount = curEventLoop.loadConnCount(); curConnCount < leastConnCount {
-			leastConnCount = curConnCount
-			el = curEventLoop
-		}
-	}
+// ================================= Implementation of Least-Connections load-balancer =================================
+
+// Leverage min-heap to optimize Least-Connections load-balancing
+type minEventLoopHeap []*eventloop
+
+// Implement heap.Interface: Len, Less, Swap, Push, Pop.
+func (h minEventLoopHeap) Len() int {
+	return len(h)
+}
+
+func (h minEventLoopHeap) Less(i, j int) bool {
+	//return (*h)[i].loadConnCount() < (*h)[j].loadConnCount()
+	return h[i].connCount < h[j].connCount
+}
+
+func (h minEventLoopHeap) Swap(i, j int) {
+	h[i], h[j] = h[j], h[i]
+	h[i].idx, h[j].idx = i, j
+}
+
+func (h *minEventLoopHeap) Push(x interface{}) {
+	el := x.(*eventloop)
+	el.idx = len(*h)
+	*h = append(*h, el)
+}
+
+func (h *minEventLoopHeap) Pop() interface{} {
+	old := *h
+	i := len(old) - 1
+	x := old[i]
+	old[i] = nil // avoid memory leak
+	x.idx = -1   // for safety
+	*h = old[:i]
+	return x
+}
+
+func (set *leastConnectionsEventLoopSet) register(el *eventloop) {
+	set.Lock()
+	heap.Push(&set.minHeap, el)
+	set.Unlock()
+}
+
+// next returns the eligible event-loop by taking the root node from minimum heap based on least-connections algorithm.
+func (set *leastConnectionsEventLoopSet) next(_ int) (el *eventloop) {
+	set.RLock()
+	//el = heap.Pop(&set.minHeap).(*eventloop)
+	el = set.minHeap[0]
+	set.RUnlock()
 	return
 }
 
-func (g *leastConnectionsEventLoopGroup) iterate(f func(int, *eventloop) bool) {
-	eventLoops := *g
-	for i, el := range eventLoops {
+func (set *leastConnectionsEventLoopSet) iterate(f func(int, *eventloop) bool) {
+	set.RLock()
+	for i, el := range set.minHeap {
 		if !f(i, el) {
 			break
 		}
 	}
+	set.RUnlock()
 }
 
-func (g *leastConnectionsEventLoopGroup) len() int {
-	return len(*g)
+func (set *leastConnectionsEventLoopSet) len() (size int) {
+	set.RLock()
+	size = set.minHeap.Len()
+	set.RUnlock()
+	return
 }
 
-func (g *sourceAddrHashEventLoopGroup) register(el *eventloop) {
-	g.eventLoops = append(g.eventLoops, el)
-	g.size++
+func (set *leastConnectionsEventLoopSet) calibrate(el *eventloop, delta int32) {
+	//el.adjustConnCount(delta)
+	set.Lock()
+	el.connCount += delta
+	heap.Fix(&set.minHeap, el.idx)
+	set.Unlock()
+}
+
+// ======================================= Implementation of Hash load-balancer ========================================
+
+func (set *sourceAddrHashEventLoopSet) register(el *eventloop) {
+	el.idx = set.size
+	set.eventLoops = append(set.eventLoops, el)
+	set.size++
 }
 
 // next returns the eligible event-loop by taking the remainder of a given fd as the index of event-loop list.
-func (g *sourceAddrHashEventLoopGroup) next(hashCode int) *eventloop {
-	return g.eventLoops[hashCode%g.size]
+func (set *sourceAddrHashEventLoopSet) next(hashCode int) *eventloop {
+	return set.eventLoops[hashCode%set.size]
 }
 
-func (g *sourceAddrHashEventLoopGroup) iterate(f func(int, *eventloop) bool) {
-	for i, el := range g.eventLoops {
+func (set *sourceAddrHashEventLoopSet) iterate(f func(int, *eventloop) bool) {
+	for i, el := range set.eventLoops {
 		if !f(i, el) {
 			break
 		}
 	}
 }
 
-func (g *sourceAddrHashEventLoopGroup) len() int {
-	return g.size
+func (set *sourceAddrHashEventLoopSet) len() int {
+	return set.size
+}
+
+func (set *sourceAddrHashEventLoopSet) calibrate(el *eventloop, delta int32) {
+	el.adjustConnCount(delta)
 }

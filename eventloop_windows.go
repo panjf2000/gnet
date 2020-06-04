@@ -16,21 +16,18 @@ import (
 )
 
 type eventloop struct {
-	ch           chan interface{}      // command channel
-	idx          int                   // loop index
-	svr          *server               // server in loop
-	codec        ICodec                // codec for TCP
-	connCount    int32                 // number of active connections in event-loop
-	connections  map[*stdConn]struct{} // track all the sockets bound to this loop
-	eventHandler EventHandler          // user eventHandler
+	ch                chan interface{}        // command channel
+	idx               int                     // loop index
+	svr               *server                 // server in loop
+	codec             ICodec                  // codec for TCP
+	connCount         int32                   // number of active connections in event-loop
+	connections       map[*stdConn]struct{}   // track all the sockets bound to this loop
+	eventHandler      EventHandler            // user eventHandler
+	calibrateCallback func(*eventloop, int32) // callback func for re-adjusting connCount
 }
 
-func (el *eventloop) plusConnCount() {
-	atomic.AddInt32(&el.connCount, 1)
-}
-
-func (el *eventloop) minusConnCount() {
-	atomic.AddInt32(&el.connCount, -1)
+func (el *eventloop) adjustConnCount(delta int32) {
+	atomic.AddInt32(&el.connCount, delta)
 }
 
 func (el *eventloop) loadConnCount() int32 {
@@ -79,7 +76,7 @@ func (el *eventloop) loopAccept(c *stdConn) error {
 	el.connections[c] = struct{}{}
 	c.localAddr = el.svr.ln.lnaddr
 	c.remoteAddr = c.conn.RemoteAddr()
-	el.plusConnCount()
+	el.calibrateCallback(el, 1)
 
 	out, action := el.eventHandler.OnOpened(c)
 	if out != nil {
@@ -173,7 +170,7 @@ func (el *eventloop) loopTicker() {
 func (el *eventloop) loopError(c *stdConn, err error) (e error) {
 	if e = c.conn.Close(); e == nil {
 		delete(el.connections, c)
-		el.minusConnCount()
+		el.calibrateCallback(el, -1)
 		switch el.eventHandler.OnClosed(c, err) {
 		case Shutdown:
 			return errServerShutdown

@@ -17,22 +17,19 @@ import (
 )
 
 type eventloop struct {
-	idx          int             // loop index in the server loops list
-	svr          *server         // server in loop
-	codec        ICodec          // codec for TCP
-	packet       []byte          // read packet buffer
-	poller       *netpoll.Poller // epoll or kqueue
-	connCount    int32           // number of active connections in event-loop
-	connections  map[int]*conn   // loop connections fd -> conn
-	eventHandler EventHandler    // user eventHandler
+	idx               int                     // loop index in the server loops list
+	svr               *server                 // server in loop
+	codec             ICodec                  // codec for TCP
+	packet            []byte                  // read packet buffer
+	poller            *netpoll.Poller         // epoll or kqueue
+	connCount         int32                   // number of active connections in event-loop
+	connections       map[int]*conn           // loop connections fd -> conn
+	eventHandler      EventHandler            // user eventHandler
+	calibrateCallback func(*eventloop, int32) // callback func for re-adjusting connCount
 }
 
-func (el *eventloop) plusConnCount() {
-	atomic.AddInt32(&el.connCount, 1)
-}
-
-func (el *eventloop) minusConnCount() {
-	atomic.AddInt32(&el.connCount, -1)
+func (el *eventloop) adjustConnCount(delta int32) {
+	atomic.AddInt32(&el.connCount, delta)
 }
 
 func (el *eventloop) loadConnCount() int32 {
@@ -80,7 +77,7 @@ func (el *eventloop) loopAccept(fd int) error {
 		c := newTCPConn(nfd, el, sa)
 		if err = el.poller.AddRead(c.fd); err == nil {
 			el.connections[c.fd] = c
-			el.plusConnCount()
+			el.calibrateCallback(el, 1)
 			return el.loopOpen(c)
 		}
 		return err
@@ -179,7 +176,7 @@ func (el *eventloop) loopCloseConn(c *conn, err error) error {
 	err0, err1 := el.poller.Delete(c.fd), unix.Close(c.fd)
 	if err0 == nil && err1 == nil {
 		delete(el.connections, c.fd)
-		el.minusConnCount()
+		el.calibrateCallback(el, -1)
 		switch el.eventHandler.OnClosed(c, err) {
 		case Shutdown:
 			return errServerShutdown
