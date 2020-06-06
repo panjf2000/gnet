@@ -21,7 +21,7 @@ type listener struct {
 	addr, network string
 }
 
-func (ln *listener) system() error {
+func (ln *listener) renormalize() error {
 	return nil
 }
 
