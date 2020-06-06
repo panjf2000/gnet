@@ -251,7 +251,7 @@ func Serve(eventHandler EventHandler, addr string, opts ...Option) (err error) {
 		sniffErrorAndLog(os.RemoveAll(ln.addr))
 		if runtime.GOOS == "windows" {
 			err = ErrProtocolNotSupported
-			return
+			break
 		}
 		fallthrough
 	case "tcp":
