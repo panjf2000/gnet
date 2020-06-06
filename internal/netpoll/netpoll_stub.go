@@ -3,7 +3,7 @@
 // Use of this source code is governed by an MIT-style
 // license that can be found in the LICENSE file.
 
-// +build !linux,!darwin,!dragonfly,!freebsd,!netbsd
+// +build !linux,!darwin,!dragonfly,!freebsd,!netbsd,!windows
 
 package netpoll
 
@@ -20,10 +20,10 @@ func SetKeepAlive(fd, secs int) error {
 
 // ReusePortListenPacket returns a net.PacketConn for UDP.
 func ReusePortListenPacket(proto, addr string) (net.PacketConn, error) {
-	return nil, errors.New("reuseport is not available")
+	return nil, errors.New("SO_REUSEPORT/SO_REUSEADDR is not supported on this platform")
 }
 
 // ReusePortListen returns a net.Listener for TCP.
 func ReusePortListen(proto, addr string) (net.Listener, error) {
-	return nil, errors.New("reuseport is not available")
+	return nil, errors.New("SO_REUSEPORT/SO_REUSEADDR is not supported on this platform")
 }
