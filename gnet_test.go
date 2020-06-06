@@ -567,7 +567,7 @@ func TestDefaultGnetServer(t *testing.T) {
 }
 
 func TestTick(t *testing.T) {
-	testTick("tcp", ":9991", t)
+	testTick("tcp4", ":9991", t)
 }
 
 type testTickServer struct {
@@ -885,7 +885,7 @@ func testShutdownActionOnOpen(network, addr string) {
 }
 
 func TestUDPShutdown(t *testing.T) {
-	testUDPShutdown("udp", ":9000")
+	testUDPShutdown("udp4", ":9000")
 }
 
 type testUDPShutdownServer struct {

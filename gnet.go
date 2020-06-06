@@ -241,7 +241,7 @@ func Serve(eventHandler EventHandler, addr string, opts ...Option) (err error) {
 
 	ln.network, ln.addr = parseAddr(addr)
 	switch ln.network {
-	case "udp":
+	case "udp", "udp4", "udp6":
 		if options.ReusePort {
 			ln.pconn, err = netpoll.ReusePortListenPacket(ln.network, ln.addr)
 		} else {
@@ -254,7 +254,7 @@ func Serve(eventHandler EventHandler, addr string, opts ...Option) (err error) {
 			break
 		}
 		fallthrough
-	case "tcp":
+	case "tcp", "tcp4", "tcp6":
 		if options.ReusePort {
 			ln.ln, err = netpoll.ReusePortListen(ln.network, ln.addr)
 		} else {
@@ -282,7 +282,7 @@ func Serve(eventHandler EventHandler, addr string, opts ...Option) (err error) {
 
 func parseAddr(addr string) (network, address string) {
 	network = "tcp"
-	address = addr
+	address = strings.ToLower(addr)
 	if strings.Contains(address, "://") {
 		pair := strings.Split(address, "://")
 		network = pair[0]
