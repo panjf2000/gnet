@@ -9,7 +9,6 @@ package gnet
 
 import (
 	"net"
-	"sync/atomic"
 	"time"
 
 	"github.com/panjf2000/gnet/pool/bytebuffer"
@@ -24,14 +23,6 @@ type eventloop struct {
 	connections       map[*stdConn]struct{}   // track all the sockets bound to this loop
 	eventHandler      EventHandler            // user eventHandler
 	calibrateCallback func(*eventloop, int32) // callback func for re-adjusting connCount
-}
-
-func (el *eventloop) adjustConnCount(delta int32) {
-	atomic.AddInt32(&el.connCount, delta)
-}
-
-func (el *eventloop) loadConnCount() int32 {
-	return atomic.LoadInt32(&el.connCount)
 }
 
 func (el *eventloop) loopRun() {
