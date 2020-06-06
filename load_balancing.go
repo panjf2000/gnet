@@ -7,6 +7,7 @@ package gnet
 import (
 	"container/heap"
 	"sync"
+	"sync/atomic"
 )
 
 // LoadBalancing represents the the type of load-balancing algorithm.
@@ -44,7 +45,10 @@ type (
 	// leastConnectionsEventLoopSet with Least-Connections algorithm.
 	leastConnectionsEventLoopSet struct {
 		sync.RWMutex
-		minHeap minEventLoopHeap
+		minHeap                 minEventLoopHeap
+		cachedRoot              *eventloop
+		threshold               int32
+		calibrateConnsThreshold int32
 	}
 
 	// sourceAddrHashEventLoopSet with Hash algorithm.
@@ -84,12 +88,12 @@ func (set *roundRobinEventLoopSet) len() int {
 }
 
 func (set *roundRobinEventLoopSet) calibrate(el *eventloop, delta int32) {
-	el.adjustConnCount(delta)
+	atomic.AddInt32(&el.connCount, delta)
 }
 
 // ================================= Implementation of Least-Connections load-balancer =================================
 
-// Leverage min-heap to optimize Least-Connections load-balancing
+// Leverage min-heap to optimize Least-Connections load-balancing.
 type minEventLoopHeap []*eventloop
 
 // Implement heap.Interface: Len, Less, Swap, Push, Pop.
@@ -126,16 +130,30 @@ func (h *minEventLoopHeap) Pop() interface{} {
 func (set *leastConnectionsEventLoopSet) register(el *eventloop) {
 	set.Lock()
 	heap.Push(&set.minHeap, el)
+	if el.idx == 0 {
+		set.cachedRoot = el
+	}
+	set.calibrateConnsThreshold = int32(set.minHeap.Len())
 	set.Unlock()
 }
 
 // next returns the eligible event-loop by taking the root node from minimum heap based on Least-Connections algorithm.
 func (set *leastConnectionsEventLoopSet) next(_ int) (el *eventloop) {
-	set.RLock()
-	//el = heap.Pop(&set.minHeap).(*eventloop)
-	el = set.minHeap[0]
-	set.RUnlock()
-	return
+	//set.RLock()
+	//el = set.minHeap[0]
+	//set.RUnlock()
+	//return
+
+	// In most cases, `next` method returns the cached event-loop immediately and it only
+	// reconstruct the min-heap every `calibrateConnsThreshold` times to reduce calls to global mutex.
+	if atomic.LoadInt32(&set.threshold) >= set.calibrateConnsThreshold {
+		set.Lock()
+		atomic.StoreInt32(&set.threshold, 0)
+		heap.Init(&set.minHeap)
+		set.cachedRoot = set.minHeap[0]
+		set.Unlock()
+	}
+	return set.cachedRoot
 }
 
 func (set *leastConnectionsEventLoopSet) iterate(f func(int, *eventloop) bool) {
@@ -156,11 +174,14 @@ func (set *leastConnectionsEventLoopSet) len() (size int) {
 }
 
 func (set *leastConnectionsEventLoopSet) calibrate(el *eventloop, delta int32) {
-	//el.adjustConnCount(delta)
-	set.Lock()
-	el.connCount += delta
-	heap.Fix(&set.minHeap, el.idx)
-	set.Unlock()
+	//set.Lock()
+	//el.connCount += delta
+	//heap.Fix(&set.minHeap, el.idx)
+	//set.Unlock()
+	set.RLock()
+	atomic.AddInt32(&el.connCount, delta)
+	atomic.AddInt32(&set.threshold, 1)
+	set.RUnlock()
 }
 
 // ======================================= Implementation of Hash load-balancer ========================================
@@ -189,5 +210,5 @@ func (set *sourceAddrHashEventLoopSet) len() int {
 }
 
 func (set *sourceAddrHashEventLoopSet) calibrate(el *eventloop, delta int32) {
-	el.adjustConnCount(delta)
+	atomic.AddInt32(&el.connCount, delta)
 }
