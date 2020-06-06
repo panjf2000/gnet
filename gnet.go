@@ -224,7 +224,7 @@ func (es *EventServer) Tick() (delay time.Duration, action Action) {
 //  unix  - Unix Domain Socket
 //
 // The "tcp" network scheme is assumed when one is not specified.
-func Serve(eventHandler EventHandler, addr string, opts ...Option) error {
+func Serve(eventHandler EventHandler, addr string, opts ...Option) (err error) {
 	var ln listener
 	defer func() {
 		ln.close()
@@ -240,37 +240,43 @@ func Serve(eventHandler EventHandler, addr string, opts ...Option) error {
 	}
 
 	ln.network, ln.addr = parseAddr(addr)
-	if ln.network == "unix" {
-		sniffErrorAndLog(os.RemoveAll(ln.addr))
-		if runtime.GOOS == "windows" {
-			return ErrProtocolNotSupported
-		}
-	}
-	var err error
-	if ln.network == "udp" {
-		if options.ReusePort && runtime.GOOS != "windows" {
+	switch ln.network {
+	case "udp":
+		if options.ReusePort {
 			ln.pconn, err = netpoll.ReusePortListenPacket(ln.network, ln.addr)
 		} else {
 			ln.pconn, err = net.ListenPacket(ln.network, ln.addr)
 		}
-	} else {
-		if options.ReusePort && runtime.GOOS != "windows" {
+	case "unix":
+		sniffErrorAndLog(os.RemoveAll(ln.addr))
+		if runtime.GOOS == "windows" {
+			err = ErrProtocolNotSupported
+			return
+		}
+		fallthrough
+	case "tcp":
+		if options.ReusePort {
 			ln.ln, err = netpoll.ReusePortListen(ln.network, ln.addr)
 		} else {
 			ln.ln, err = net.Listen(ln.network, ln.addr)
 		}
+	default:
+		err = ErrProtocolNotSupported
 	}
 	if err != nil {
-		return err
+		return
 	}
+
 	if ln.pconn != nil {
 		ln.lnaddr = ln.pconn.LocalAddr()
 	} else {
 		ln.lnaddr = ln.ln.Addr()
 	}
-	if err := ln.system(); err != nil {
-		return err
+
+	if err = ln.renormalize(); err != nil {
+		return
 	}
+
 	return serve(eventHandler, &ln, options)
 }
 

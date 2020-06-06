@@ -25,7 +25,7 @@ const (
 )
 
 type (
-	// loadBalancer is a interface which manipulates the event-loops group.
+	// loadBalancer is a interface which manipulates the event-loop set.
 	loadBalancer interface {
 		register(*eventloop)
 		next(int) *eventloop
@@ -129,7 +129,7 @@ func (set *leastConnectionsEventLoopSet) register(el *eventloop) {
 	set.Unlock()
 }
 
-// next returns the eligible event-loop by taking the root node from minimum heap based on least-connections algorithm.
+// next returns the eligible event-loop by taking the root node from minimum heap based on Least-Connections algorithm.
 func (set *leastConnectionsEventLoopSet) next(_ int) (el *eventloop) {
 	set.RLock()
 	//el = heap.Pop(&set.minHeap).(*eventloop)

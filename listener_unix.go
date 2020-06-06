@@ -25,9 +25,9 @@ type listener struct {
 	addr, network string
 }
 
-// system takes the net listener and detaches it from it's parent
+// renormalize takes the net listener and detaches it from it's parent
 // event loop, grabs the file descriptor, and makes it non-blocking.
-func (ln *listener) system() error {
+func (ln *listener) renormalize() error {
 	var err error
 	switch netln := ln.ln.(type) {
 	case nil:
