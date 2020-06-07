@@ -551,7 +551,7 @@ func startClient(network, addr string, multicore, async bool) {
 }
 
 func must(err error) {
-	if err != nil && err != ErrProtocolNotSupported {
+	if err != nil && err != ErrUnsupportedProtocol {
 		panic(err)
 	}
 }

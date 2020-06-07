@@ -3,8 +3,10 @@ package gnet
 import "errors"
 
 var (
-	// ErrProtocolNotSupported occurs when trying to use protocol that is not supported.
-	ErrProtocolNotSupported = errors.New("not supported protocol on this platform")
+	// ErrUnsupportedProtocol occurs when trying to use protocol that is not supported.
+	ErrUnsupportedProtocol = errors.New("unsupported protocol on this platform")
+	// ErrUnsupportedPlatform occurs when running gnet on an unsupported platform.
+	ErrUnsupportedPlatform = errors.New("unsupported platform in gnet")
 
 	// errServerShutdown occurs when server is closing.
 	errServerShutdown = errors.New("server is going to be shutdown")

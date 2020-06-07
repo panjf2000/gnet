@@ -251,7 +251,7 @@ func Serve(eventHandler EventHandler, addr string, opts ...Option) (err error) {
 	case "unix":
 		sniffErrorAndLog(os.RemoveAll(ln.addr))
 		if runtime.GOOS == "windows" {
-			err = ErrProtocolNotSupported
+			err = ErrUnsupportedProtocol
 			break
 		}
 		fallthrough
@@ -262,7 +262,7 @@ func Serve(eventHandler EventHandler, addr string, opts ...Option) (err error) {
 			ln.ln, err = net.Listen(ln.network, ln.addr)
 		}
 	default:
-		err = ErrProtocolNotSupported
+		err = ErrUnsupportedProtocol
 	}
 	if err != nil {
 		return

@@ -7,27 +7,30 @@
 
 package gnet
 
-import (
-	"errors"
-	"os"
-)
+import "net"
 
-func (ln *listener) close() {
-	if ln.ln != nil {
-		ln.ln.Close()
-	}
-	if ln.pconn != nil {
-		ln.pconn.Close()
-	}
-	if ln.network == "unix" {
-		os.RemoveAll(ln.addr)
-	}
+type server struct {
+	subEventLoopSet loadBalancer // event-loops for handling events
 }
 
-func (ln *listener) system() error {
+type eventloop struct {
+	connCount int32 // number of active connections in event-loop
+}
+
+type listener struct {
+	ln            net.Listener
+	pconn         net.PacketConn
+	lnaddr        net.Addr
+	addr, network string
+}
+
+func (ln *listener) renormalize() error {
 	return nil
 }
 
-func serve(eventHandler EventHandler, listeners []*listener) error {
-	return errors.New("Unsupported platform in gnet")
+func (ln *listener) close() {
+}
+
+func serve(eventHandler EventHandler, listeners *listener, options *Options) error {
+	return ErrUnsupportedPlatform
 }
