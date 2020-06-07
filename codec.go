@@ -58,10 +58,10 @@ func (cc *BuiltInFrameCodec) Encode(c Conn, buf []byte) ([]byte, error) {
 // Decode ...
 func (cc *BuiltInFrameCodec) Decode(c Conn) ([]byte, error) {
 	buf := c.Read()
-	c.ResetBuffer()
 	if len(buf) == 0 {
-		buf = nil
+		return nil, nil
 	}
+	c.ResetBuffer()
 	return buf, nil
 }
 
