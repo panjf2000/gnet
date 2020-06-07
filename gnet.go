@@ -89,24 +89,23 @@ type Conn interface {
 
 	// Read reads all data from inbound ring-buffer and event-loop-buffer without moving "read" pointer, which means
 	// it does not evict the data from buffers actually and those data will present in buffers until the
-	// ResetBuffer method is invoked.
+	// ResetBuffer method is called.
 	Read() (buf []byte)
 
-	// ResetBuffer resets the buffers, which means all data in inbound ring-buffer and event-loop-buffer
-	// will be evicted.
+	// ResetBuffer resets the buffers, which means all data in inbound ring-buffer and event-loop-buffer will be evicted.
 	ResetBuffer()
 
 	// ReadN reads bytes with the given length from inbound ring-buffer and event-loop-buffer without moving
-	// "read" pointer, which means it will not evict the data from buffers until the ShiftN method is invoked,
-	// it reads data from the inbound ring-buffer and event-loop-buffer and returns the size of bytes.
-	// If the length of the available data is less than the given "n", ReadN will returns all available data, so you
+	// "read" pointer, which means it will not evict the data from buffers until the ShiftN method is called,
+	// it reads data from the inbound ring-buffer and event-loop-buffer and returns both bytes and the size of it.
+	// If the length of the available data is less than the given "n", ReadN will return all available data, so you
 	// should make use of the variable "size" returned by it to be aware of the exact length of the returned data.
 	ReadN(n int) (size int, buf []byte)
 
-	// ShiftN shifts "read" pointer in buffers with the given length.
+	// ShiftN shifts "read" pointer in the internal buffers with the given length.
 	ShiftN(n int) (size int)
 
-	// BufferLength returns the length of available data in the inbound ring-buffer.
+	// BufferLength returns the length of available data in the internal buffers.
 	BufferLength() (size int)
 
 	// InboundBuffer returns the inbound ring-buffer.
@@ -115,7 +114,7 @@ type Conn interface {
 	// SendTo writes data for UDP sockets, it allows you to send data back to UDP socket in individual goroutines.
 	SendTo(buf []byte) error
 
-	// AsyncWrite writes data to client/connection asynchronously, usually you would invoke it in individual goroutines
+	// AsyncWrite writes data to client/connection asynchronously, usually you would call it in individual goroutines
 	// instead of the event-loop goroutines.
 	AsyncWrite(buf []byte) error
 
@@ -132,7 +131,7 @@ type (
 	// of the connection and server.
 	EventHandler interface {
 		// OnInitComplete fires when the server is ready for accepting connections.
-		// The server parameter has information and various utilities.
+		// The parameter:server has information and various utilities.
 		OnInitComplete(server Server) (action Action)
 
 		// OnShutdown fires when the server is being shut down, it is called right after
@@ -140,21 +139,21 @@ type (
 		OnShutdown(server Server)
 
 		// OnOpened fires when a new connection has been opened.
-		// The info parameter has information about the connection such as
-		// it's local and remote address.
-		// Use the out return value to write data to the connection.
+		// The parameter:c has information about the connection such as it's local and remote address.
+		// Parameter:out is the return value which is going to be sent back to the client.
 		OnOpened(c Conn) (out []byte, action Action)
 
 		// OnClosed fires when a connection has been closed.
-		// The err parameter is the last known connection error.
+		// The parameter:err is the last known connection error.
 		OnClosed(c Conn, err error) (action Action)
 
-		// PreWrite fires just before any data is written to any client socket.
+		// PreWrite fires just before any data is written to any client socket, this event function is usually used to
+		// put some code of logging/counting/reporting or any prepositive operations before writing data to client.
 		PreWrite()
 
 		// React fires when a connection sends the server data.
-		// Invoke c.Read() or c.ReadN(n) within the parameter c to read incoming data from client/connection.
-		// Use the out return value to write data to the client/connection.
+		// Call c.Read() or c.ReadN(n) within the parameter:c to read incoming data from client.
+		// Parameter:out is the return value which is going to be sent back to the client.
 		React(frame []byte, c Conn) (out []byte, action Action)
 
 		// Tick fires immediately after the server starts and will fire again
@@ -170,7 +169,7 @@ type (
 )
 
 // OnInitComplete fires when the server is ready for accepting connections.
-// The server parameter has information and various utilities.
+// The parameter:server has information and various utilities.
 func (es *EventServer) OnInitComplete(svr Server) (action Action) {
 	return
 }
@@ -181,26 +180,26 @@ func (es *EventServer) OnShutdown(svr Server) {
 }
 
 // OnOpened fires when a new connection has been opened.
-// The info parameter has information about the connection such as
-// it's local and remote address.
-// Use the out return value to write data to the connection.
+// The parameter:c has information about the connection such as it's local and remote address.
+// Parameter:out is the return value which is going to be sent back to the client.
 func (es *EventServer) OnOpened(c Conn) (out []byte, action Action) {
 	return
 }
 
 // OnClosed fires when a connection has been closed.
-// The err parameter is the last known connection error.
+// The parameter:err is the last known connection error.
 func (es *EventServer) OnClosed(c Conn, err error) (action Action) {
 	return
 }
 
-// PreWrite fires just before any data is written to any client socket.
+// PreWrite fires just before any data is written to any client socket, this event function is usually used to
+// put some code of logging/counting/reporting or any prepositive operations before writing data to client.
 func (es *EventServer) PreWrite() {
 }
 
 // React fires when a connection sends the server data.
-// Invoke c.Read() or c.ReadN(n) within the parameter c to read incoming data from client/connection.
-// Use the out return value to write data to the client/connection.
+// Call c.Read() or c.ReadN(n) within the parameter:c to read incoming data from client.
+// Parameter:out is the return value which is going to be sent back to the client.
 func (es *EventServer) React(frame []byte, c Conn) (out []byte, action Action) {
 	return
 }

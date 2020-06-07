@@ -38,7 +38,7 @@ type Options struct {
 	// Ticker indicates whether the ticker has been set up.
 	Ticker bool
 
-	// TCPKeepAlive (SO_KEEPALIVE) socket option.
+	// TCPKeepAlive sets up a duration for (SO_KEEPALIVE) socket option.
 	TCPKeepAlive time.Duration
 
 	// ICodec encodes and decodes TCP stream.

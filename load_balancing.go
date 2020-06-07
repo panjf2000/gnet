@@ -144,13 +144,13 @@ func (set *leastConnectionsEventLoopSet) next(_ int) (el *eventloop) {
 	//set.RUnlock()
 	//return
 
-	// In most cases, `next` method returns the cached event-loop immediately and it only
-	// reconstruct the min-heap every `calibrateConnsThreshold` times to reduce calls to global mutex.
+	// In most cases, `next` method returns the cached event-loop immediately and it only reconstructs the minimum heap
+	// every `calibrateConnsThreshold` times for reducing locks to global mutex.
 	if atomic.LoadInt32(&set.threshold) >= set.calibrateConnsThreshold {
 		set.Lock()
-		atomic.StoreInt32(&set.threshold, 0)
 		heap.Init(&set.minHeap)
 		set.cachedRoot = set.minHeap[0]
+		atomic.StoreInt32(&set.threshold, 0)
 		set.Unlock()
 	}
 	return set.cachedRoot
