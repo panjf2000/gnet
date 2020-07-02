@@ -77,11 +77,20 @@ func (svr *server) startReactors() {
 	})
 }
 
-func (svr *server) activateLoops(numEventLoop int) error {
+func (svr *server) activateLoops(numEventLoop int) (err error) {
 	// Create loops locally and bind the listeners.
 	for i := 0; i < numEventLoop; i++ {
-		if p, err := netpoll.OpenPoller(); err == nil {
+		l := svr.ln
+		if i > 0 && svr.opts.ReusePort {
+			if l, err = initListener(svr.ln.network, svr.ln.addr, svr.ln.reusePort); err != nil {
+				return
+			}
+		}
+
+		var p *netpoll.Poller
+		if p, err = netpoll.OpenPoller(); err == nil {
 			el := &eventloop{
+				ln:                l,
 				svr:               svr,
 				codec:             svr.codec,
 				poller:            p,
@@ -90,21 +99,22 @@ func (svr *server) activateLoops(numEventLoop int) error {
 				eventHandler:      svr.eventHandler,
 				calibrateCallback: svr.subEventLoopSet.calibrate,
 			}
-			_ = el.poller.AddRead(svr.ln.fd)
+			_ = el.poller.AddRead(el.ln.fd)
 			svr.subEventLoopSet.register(el)
 		} else {
-			return err
+			return
 		}
 	}
 	// Start loops in background
 	svr.startLoops()
-	return nil
+	return
 }
 
 func (svr *server) activateReactors(numEventLoop int) error {
 	for i := 0; i < numEventLoop; i++ {
 		if p, err := netpoll.OpenPoller(); err == nil {
 			el := &eventloop{
+				ln:                svr.ln,
 				svr:               svr,
 				codec:             svr.codec,
 				poller:            p,
@@ -124,11 +134,12 @@ func (svr *server) activateReactors(numEventLoop int) error {
 
 	if p, err := netpoll.OpenPoller(); err == nil {
 		el := &eventloop{
+			ln:     svr.ln,
 			idx:    -1,
 			poller: p,
 			svr:    svr,
 		}
-		_ = el.poller.AddRead(svr.ln.fd)
+		_ = el.poller.AddRead(el.ln.fd)
 		svr.mainLoop = el
 		// Start main reactor.
 		svr.wg.Add(1)
@@ -143,7 +154,7 @@ func (svr *server) activateReactors(numEventLoop int) error {
 }
 
 func (svr *server) start(numEventLoop int) error {
-	if svr.opts.ReusePort || svr.ln.pconn != nil {
+	if svr.opts.ReusePort || svr.ln.network == "udp" {
 		return svr.activateLoops(numEventLoop)
 	}
 	return svr.activateReactors(numEventLoop)

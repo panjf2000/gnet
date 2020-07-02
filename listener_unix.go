@@ -12,56 +12,53 @@ import (
 	"os"
 	"sync"
 
+	"github.com/panjf2000/gnet/internal/reuseport"
 	"golang.org/x/sys/unix"
 )
 
 type listener struct {
-	f             *os.File
-	fd            int
-	ln            net.Listener
 	once          sync.Once
-	pconn         net.PacketConn
+	fd            int
 	lnaddr        net.Addr
+	reusePort     bool
 	addr, network string
 }
 
-// renormalize takes the net listener and detaches it from it's parent
-// event loop, grabs the file descriptor, and makes it non-blocking.
-func (ln *listener) renormalize() error {
-	var err error
-	switch netln := ln.ln.(type) {
-	case nil:
-		switch pconn := ln.pconn.(type) {
-		case *net.UDPConn:
-			ln.f, err = pconn.File()
-		}
-	case *net.TCPListener:
-		ln.f, err = netln.File()
-	case *net.UnixListener:
-		ln.f, err = netln.File()
+func (ln *listener) normalize() (err error) {
+	switch ln.network {
+	case "tcp", "tcp4", "tcp6":
+		ln.fd, ln.lnaddr, err = reuseport.TCPSocket(ln.network, ln.addr, ln.reusePort)
+		ln.network = "tcp"
+	case "udp", "udp4", "udp6":
+		ln.fd, ln.lnaddr, err = reuseport.UDPSocket(ln.network, ln.addr, ln.reusePort)
+		ln.network = "udp"
+	case "unix":
+		_ = os.RemoveAll(ln.addr)
+		ln.fd, ln.lnaddr, err = reuseport.UnixSocket(ln.network, ln.addr, ln.reusePort)
+	default:
+		err = ErrUnsupportedProtocol
 	}
 	if err != nil {
-		ln.close()
-		return err
+		return
 	}
-	ln.fd = int(ln.f.Fd())
-	return unix.SetNonblock(ln.fd, true)
+
+	return
 }
 
 func (ln *listener) close() {
 	ln.once.Do(
 		func() {
-			if ln.f != nil {
-				sniffErrorAndLog(ln.f.Close())
-			}
-			if ln.ln != nil {
-				sniffErrorAndLog(ln.ln.Close())
-			}
-			if ln.pconn != nil {
-				sniffErrorAndLog(ln.pconn.Close())
+			if ln.fd > 0 {
+				sniffErrorAndLog(unix.Close(ln.fd))
 			}
 			if ln.network == "unix" {
 				sniffErrorAndLog(os.RemoveAll(ln.addr))
 			}
 		})
+}
+
+func initListener(network, addr string, reusePort bool) (l *listener, err error) {
+	l = &listener{network: network, addr: addr, reusePort: reusePort}
+	err = l.normalize()
+	return
 }

@@ -62,7 +62,7 @@ func newUDPConn(fd int, el *eventloop, sa unix.Sockaddr) *conn {
 	return &conn{
 		fd:         fd,
 		sa:         sa,
-		localAddr:  el.svr.ln.lnaddr,
+		localAddr:  el.ln.lnaddr,
 		remoteAddr: netpoll.SockaddrToUDPAddr(sa),
 	}
 }

@@ -2,8 +2,6 @@
 // Use of this source code is governed by an MIT-style
 // license that can be found in the LICENSE file.
 
-// +build linux
-
 package gnet
 
 import "github.com/panjf2000/gnet/internal/netpoll"

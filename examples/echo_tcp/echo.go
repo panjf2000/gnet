@@ -35,12 +35,13 @@ func (es *echoServer) React(frame []byte, c gnet.Conn) (out []byte, action gnet.
 
 func main() {
 	var port int
-	var multicore bool
+	var multicore, reuseport bool
 
-	// Example command: go run echo.go --port 9000 --multicore=true
+	// Example command: go run echo.go --port 9000 --multicore=true --reuseport=true
 	flag.IntVar(&port, "port", 9000, "--port 9000")
 	flag.BoolVar(&multicore, "multicore", false, "--multicore true")
+	flag.BoolVar(&reuseport, "reuseport", false, "--reuseport true")
 	flag.Parse()
 	echo := new(echoServer)
-	log.Fatal(gnet.Serve(echo, fmt.Sprintf("tcp://:%d", port), gnet.WithMulticore(multicore)))
+	log.Fatal(gnet.Serve(echo, fmt.Sprintf("tcp://:%d", port), gnet.WithMulticore(multicore), gnet.WithReusePort(reuseport)))
 }

@@ -170,7 +170,7 @@ func main() {
 }
 ```
 
-正如你所见，上面的例子里 `gnet` 实例只注册了一个 `EventHandler.React` 事件。一般来说，主要的业务逻辑代码会写在这个事件方法里，这个方法会在服务器接收到客户端写过来的数据之时被调用，此时的输入参数: `frame` 已经是解码过后的一个完整的网络数据包，一般来说你需要实现 `gnet` 的[codec 接口](https://github.com/panjf2000/gnet/blob/master/codec.go#L18-L24)作为你自己的业务编解码器来处理 TCP 组包和分包的问题，如果你不实现那个接口的话，那么 `gnet` 将会使用[默认的 codec](https://github.com/panjf2000/gnet/blob/master/codec.go#L53-L63)，这意味着在 `EventHandler.React` 被触发调用之时输入参数: `frame` 里存储的是所有网络数据：包括最新的以及还在 buffer 里的旧数据，然后处理输入数据（这里只是把数据 echo 回去）并且在处理完之后把需要输出的数据赋值给 `out` 变量并返回，接着输出的数据会经过编码，最后被写回客户端。
+正如你所见，上面的例子里 `gnet` 实例只注册了一个 `EventHandler.React` 事件。一般来说，主要的业务逻辑代码会写在这个事件方法里，这个方法会在服务器接收到客户端写过来的数据之时被调用，此时的输入参数: `frame` 已经是解码过后的一个完整的网络数据包，一般来说你需要实现 `gnet` 的 [codec 接口](https://github.com/panjf2000/gnet/blob/master/codec.go#L18-L24)作为你自己的业务编解码器来处理 TCP 组包和分包的问题，如果你不实现那个接口的话，那么 `gnet` 将会使用[默认的 codec](https://github.com/panjf2000/gnet/blob/master/codec.go#L53-L63)，这意味着在 `EventHandler.React` 被触发调用之时输入参数: `frame` 里存储的是所有网络数据：包括最新的以及还在 buffer 里的旧数据，然后处理输入数据（这里只是把数据 echo 回去）并且在处理完之后把需要输出的数据赋值给 `out` 变量并返回，接着输出的数据会经过编码，最后被写回客户端。
 
 ### 带阻塞逻辑的 echo 服务器
 
@@ -298,14 +298,15 @@ func (es *echoServer) React(frame []byte, c gnet.Conn) (out []byte, action gnet.
 
 func main() {
 	var port int
-	var multicore bool
+	var multicore, reuseport bool
 
-	// Example command: go run echo.go --port 9000 --multicore=true
+	// Example command: go run echo.go --port 9000 --multicore=true --reuseport=true
 	flag.IntVar(&port, "port", 9000, "--port 9000")
 	flag.BoolVar(&multicore, "multicore", false, "--multicore true")
+	flag.BoolVar(&reuseport, "reuseport", false, "--reuseport true")
 	flag.Parse()
 	echo := new(echoServer)
-	log.Fatal(gnet.Serve(echo, fmt.Sprintf("tcp://:%d", port), gnet.WithMulticore(multicore)))
+	log.Fatal(gnet.Serve(echo, fmt.Sprintf("tcp://:%d", port), gnet.WithMulticore(multicore), gnet.WithReusePort(reuseport)))
 }
 ```
 </details>
@@ -989,7 +990,7 @@ events.Tick = func() (delay time.Duration, action Action){
 
 服务器支持 [SO_REUSEPORT](https://lwn.net/Articles/542629/) 端口复用特性，允许多个 sockets 监听同一个端口，然后内核会帮你做好负载均衡，每次只唤醒一个 socket 来处理 `connect` 请求，避免惊群效应。
 
-默认情况下，`gnet` 也不会有惊群效应，因为 `gnet` 默认的网络模型是主从多 Reactors，只会有一个主 reactor 在监听端口以及接受新连接。所以，开不开启 `SO_REUSEPORT` 选项是无关紧要的，只是开启了这个选项之后 `gnet` 的网络模型将会切换成 `evio` 的旧网络模型，这一点需要注意一下。
+默认情况下，`gnet` 不会有惊群效应，因为 `gnet` 默认的网络模型是主从多 Reactors，只会有一个主 reactor 在监听端口以及接收新连接。所以，开不开启 `SO_REUSEPORT` 选项是无关紧要的，只是开启了这个选项之后 `gnet` 的网络模型将会切换成 `evio` 的旧网络模型，这一点需要注意一下。
 
 开启这个功能也很简单，使用 functional options 设置一下即可：
 
@@ -1092,6 +1093,7 @@ GOMAXPROCS=4
 - [evio](https://github.com/tidwall/evio)
 - [netty](https://github.com/netty/netty)
 - [ants](https://github.com/panjf2000/ants)
+- [go_reuseport](https://github.com/kavu/go_reuseport)
 - [bytebufferpool](https://github.com/valyala/bytebufferpool)
 - [goframe](https://github.com/smallnest/goframe)
 - [ringbuffer](https://github.com/smallnest/ringbuffer)

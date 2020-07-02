@@ -8,7 +8,6 @@
 package gnet
 
 import (
-	"net"
 	"time"
 
 	"github.com/panjf2000/gnet/internal/netpoll"
@@ -16,6 +15,7 @@ import (
 )
 
 type eventloop struct {
+	ln                *listener               // listener
 	idx               int                     // loop index in the server loops list
 	svr               *server                 // server in loop
 	codec             ICodec                  // codec for TCP
@@ -37,6 +37,7 @@ func (el *eventloop) closeAllConns() {
 func (el *eventloop) loopRun() {
 	defer func() {
 		el.closeAllConns()
+		el.ln.close()
 		if el.idx == 0 && el.svr.opts.Ticker {
 			close(el.svr.ticktock)
 		}
@@ -51,8 +52,8 @@ func (el *eventloop) loopRun() {
 }
 
 func (el *eventloop) loopAccept(fd int) error {
-	if fd == el.svr.ln.fd {
-		if el.svr.ln.pconn != nil {
+	if fd == el.ln.fd {
+		if el.ln.network == "udp" {
 			return el.loopReadUDP(fd)
 		}
 		nfd, sa, err := unix.Accept(fd)
@@ -78,11 +79,11 @@ func (el *eventloop) loopAccept(fd int) error {
 
 func (el *eventloop) loopOpen(c *conn) error {
 	c.opened = true
-	c.localAddr = el.svr.ln.lnaddr
+	c.localAddr = el.ln.lnaddr
 	c.remoteAddr = netpoll.SockaddrToTCPOrUnixAddr(c.sa)
 	out, action := el.eventHandler.OnOpened(c)
 	if el.svr.opts.TCPKeepAlive > 0 {
-		if _, ok := el.svr.ln.ln.(*net.TCPListener); ok {
+		if proto := el.ln.network; proto == "tcp" || proto == "unix" {
 			_ = netpoll.SetKeepAlive(c.fd, int(el.svr.opts.TCPKeepAlive/time.Second))
 		}
 	}

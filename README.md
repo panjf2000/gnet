@@ -300,14 +300,15 @@ func (es *echoServer) React(frame []byte, c gnet.Conn) (out []byte, action gnet.
 
 func main() {
 	var port int
-	var multicore bool
+	var multicore, reuseport bool
 
-	// Example command: go run echo.go --port 9000 --multicore=true
+	// Example command: go run echo.go --port 9000 --multicore=true --reuseport=true
 	flag.IntVar(&port, "port", 9000, "--port 9000")
 	flag.BoolVar(&multicore, "multicore", false, "--multicore true")
+	flag.BoolVar(&reuseport, "reuseport", false, "--reuseport true")
 	flag.Parse()
 	echo := new(echoServer)
-	log.Fatal(gnet.Serve(echo, fmt.Sprintf("tcp://:%d", port), gnet.WithMulticore(multicore)))
+	log.Fatal(gnet.Serve(echo, fmt.Sprintf("tcp://:%d", port), gnet.WithMulticore(multicore), gnet.WithReusePort(reuseport)))
 }
 ```
 </details>
@@ -1096,6 +1097,7 @@ Please read the [Contributing Guidelines](CONTRIBUTING.md) before opening a PR a
 - [evio](https://github.com/tidwall/evio)
 - [netty](https://github.com/netty/netty)
 - [ants](https://github.com/panjf2000/ants)
+- [go_reuseport](https://github.com/kavu/go_reuseport)
 - [bytebufferpool](https://github.com/valyala/bytebufferpool)
 - [goframe](https://github.com/smallnest/goframe)
 - [ringbuffer](https://github.com/smallnest/ringbuffer)

@@ -30,7 +30,7 @@ func SockaddrToTCPOrUnixAddr(sa unix.Sockaddr) net.Addr {
 
 // SockaddrToUDPAddr converts a Sockaddr to a net.UDPAddr
 // Returns nil if conversion fails.
-func SockaddrToUDPAddr(sa unix.Sockaddr) *net.UDPAddr {
+func SockaddrToUDPAddr(sa unix.Sockaddr) net.Addr {
 	switch sa := sa.(type) {
 	case *unix.SockaddrInet4:
 		ip := sockaddrInet4ToIP(sa)

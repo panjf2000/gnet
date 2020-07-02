@@ -9,12 +9,9 @@ import (
 	"log"
 	"net"
 	"os"
-	"runtime"
 	"strings"
 	"sync/atomic"
 	"time"
-
-	"github.com/panjf2000/gnet/internal/netpoll"
 )
 
 // Action is an action that occurs after the completion of an event.
@@ -224,63 +221,25 @@ func (es *EventServer) Tick() (delay time.Duration, action Action) {
 //  unix  - Unix Domain Socket
 //
 // The "tcp" network scheme is assumed when one is not specified.
-func Serve(eventHandler EventHandler, addr string, opts ...Option) (err error) {
-	var ln listener
-	defer func() {
-		ln.close()
-		if ln.network == "unix" {
-			sniffErrorAndLog(os.RemoveAll(ln.addr))
-		}
-	}()
-
+func Serve(eventHandler EventHandler, protoAddr string, opts ...Option) (err error) {
 	options := loadOptions(opts...)
 
 	if options.Logger != nil {
 		defaultLogger = options.Logger
 	}
 
-	ln.network, ln.addr = parseAddr(addr)
-	switch ln.network {
-	case "udp", "udp4", "udp6":
-		if options.ReusePort {
-			ln.pconn, err = netpoll.ReusePortListenPacket(ln.network, ln.addr)
-		} else {
-			ln.pconn, err = net.ListenPacket(ln.network, ln.addr)
-		}
-	case "unix":
-		sniffErrorAndLog(os.RemoveAll(ln.addr))
-		if runtime.GOOS == "windows" {
-			err = ErrUnsupportedProtocol
-			break
-		}
-		fallthrough
-	case "tcp", "tcp4", "tcp6":
-		if options.ReusePort {
-			ln.ln, err = netpoll.ReusePortListen(ln.network, ln.addr)
-		} else {
-			ln.ln, err = net.Listen(ln.network, ln.addr)
-		}
-	default:
-		err = ErrUnsupportedProtocol
-	}
-	if err != nil {
+	network, addr := parseProtoAddr(protoAddr)
+
+	var ln *listener
+	if ln, err = initListener(network, addr, options.ReusePort); err != nil {
 		return
 	}
+	defer ln.close()
 
-	if ln.pconn != nil {
-		ln.lnaddr = ln.pconn.LocalAddr()
-	} else {
-		ln.lnaddr = ln.ln.Addr()
-	}
-
-	if err = ln.renormalize(); err != nil {
-		return
-	}
-
-	return serve(eventHandler, &ln, options)
+	return serve(eventHandler, ln, options)
 }
 
-func parseAddr(addr string) (network, address string) {
+func parseProtoAddr(addr string) (network, address string) {
 	network = "tcp"
 	address = strings.ToLower(addr)
 	if strings.Contains(address, "://") {

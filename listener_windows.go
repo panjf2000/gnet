@@ -14,15 +14,32 @@ import (
 )
 
 type listener struct {
-	ln            net.Listener
 	once          sync.Once
+	ln            net.Listener
 	pconn         net.PacketConn
 	lnaddr        net.Addr
 	addr, network string
 }
 
-func (ln *listener) renormalize() error {
-	return nil
+func (ln *listener) normalize() (err error) {
+	switch ln.network {
+	case "unix":
+		sniffErrorAndLog(os.RemoveAll(ln.addr))
+		fallthrough
+	case "tcp", "tcp4", "tcp6":
+		if ln.ln, err = net.Listen(ln.network, ln.addr); err != nil {
+			return
+		}
+		ln.lnaddr = ln.ln.Addr()
+	case "udp", "udp4", "udp6":
+		if ln.pconn, err = net.ListenPacket(ln.network, ln.addr); err != nil {
+			return
+		}
+		ln.lnaddr = ln.pconn.LocalAddr()
+	default:
+		err = ErrUnsupportedProtocol
+	}
+	return
 }
 
 func (ln *listener) close() {
@@ -37,4 +54,10 @@ func (ln *listener) close() {
 			sniffErrorAndLog(os.RemoveAll(ln.addr))
 		}
 	})
+}
+
+func initListener(network, addr string, _ bool) (l *listener, err error) {
+	l = &listener{network: network, addr: addr}
+	err = l.normalize()
+	return
 }
