@@ -3,11 +3,9 @@
 // Use of this source code is governed by an MIT-style
 // license that can be found in the LICENSE file.
 
-// +build !darwin,!netbsd,!freebsd,!openbsd,!dragonfly,!linux,!windows
+// +build !linux,!freebsd,!dragonfly,!darwin,!windows
 
 package gnet
-
-import "net"
 
 type server struct {
 	subEventLoopSet loadBalancer // event-loops for handling events
@@ -18,19 +16,23 @@ type eventloop struct {
 }
 
 type listener struct {
-	ln            net.Listener
-	pconn         net.PacketConn
-	lnaddr        net.Addr
+	reusePort     bool
 	addr, network string
 }
 
-func (ln *listener) renormalize() error {
+func (ln *listener) normalize() error {
 	return nil
 }
 
 func (ln *listener) close() {
 }
 
-func serve(eventHandler EventHandler, listeners *listener, options *Options) error {
+func initListener(network, addr string, reusePort bool) (l *listener, err error) {
+	l = &listener{network: network, addr: addr, reusePort: reusePort}
+	err = l.normalize()
+	return
+}
+
+func serve(_ EventHandler, _ *listener, _ *Options) error {
 	return ErrUnsupportedPlatform
 }

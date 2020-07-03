@@ -17,7 +17,7 @@
 // Package reuseport provides a function that returns fd and net.Listener powered
 // by a net.FileListener with a SO_REUSEPORT option set to the socket.
 
-// +build linux darwin netbsd freebsd openbsd dragonfly
+// +build linux freebsd dragonfly darwin
 
 package reuseport
 

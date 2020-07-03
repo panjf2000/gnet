@@ -14,7 +14,7 @@
 // TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-// +build darwin netbsd freebsd openbsd dragonfly
+// +build freebsd dragonfly darwin
 
 package reuseport
 
@@ -34,10 +34,6 @@ func maxListenerBacklog() int {
 		n, err = unix.SysctlUint32("kern.ipc.somaxconn")
 	case "freebsd":
 		n, err = unix.SysctlUint32("kern.ipc.soacceptqueue")
-	case "netbsd":
-		// NOTE: NetBSD has no somaxconn-like kernel state so far
-	case "openbsd":
-		n, err = unix.SysctlUint32("kern.somaxconn")
 	}
 	if n == 0 || err != nil {
 		return unix.SOMAXCONN
