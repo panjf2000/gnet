@@ -49,7 +49,7 @@ func (ln *listener) close() {
 	ln.once.Do(
 		func() {
 			if ln.fd > 0 {
-				sniffErrorAndLog(unix.Close(ln.fd))
+				sniffErrorAndLog(os.NewSyscallError("close", unix.Close(ln.fd)))
 			}
 			if ln.network == "unix" {
 				sniffErrorAndLog(os.RemoveAll(ln.addr))

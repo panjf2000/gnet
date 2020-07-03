@@ -9,6 +9,7 @@ package gnet
 
 import (
 	"net"
+	"os"
 
 	"github.com/panjf2000/gnet/internal/netpoll"
 	"github.com/panjf2000/gnet/pool/bytebuffer"
@@ -101,7 +102,7 @@ func (c *conn) write(buf []byte) {
 			_ = c.loop.poller.ModReadWrite(c.fd)
 			return
 		}
-		_ = c.loop.loopCloseConn(c, err)
+		_ = c.loop.loopCloseConn(c, os.NewSyscallError("write", err))
 		return
 	}
 	if n < len(buf) {

@@ -6,7 +6,11 @@
 
 package gnet
 
-import "golang.org/x/sys/unix"
+import (
+	"os"
+
+	"golang.org/x/sys/unix"
+)
 
 func (svr *server) acceptNewConnection(fd int) error {
 	nfd, sa, err := unix.Accept(fd)
@@ -14,10 +18,10 @@ func (svr *server) acceptNewConnection(fd int) error {
 		if err == unix.EAGAIN {
 			return nil
 		}
-		return err
+		return os.NewSyscallError("accept", err)
 	}
 	if err := unix.SetNonblock(nfd, true); err != nil {
-		return err
+		return os.NewSyscallError("fcntl nonblock", err)
 	}
 	el := svr.subEventLoopSet.next(nfd)
 	c := newTCPConn(nfd, el, sa)

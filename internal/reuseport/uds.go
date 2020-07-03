@@ -20,6 +20,7 @@ package reuseport
 import (
 	"errors"
 	"net"
+	"os"
 
 	"golang.org/x/sys/unix"
 )
@@ -55,6 +56,7 @@ func udsReusablePort(proto, addr string, reusePort bool) (fd int, netAddr net.Ad
 	}
 
 	if fd, err = sysSocket(family, unix.SOCK_STREAM, 0); err != nil {
+		err = os.NewSyscallError("socket", err)
 		return
 	}
 	defer func() {
@@ -64,21 +66,24 @@ func udsReusablePort(proto, addr string, reusePort bool) (fd int, netAddr net.Ad
 	}()
 
 	if err = unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_REUSEADDR, 1); err != nil {
+		err = os.NewSyscallError("setsockopt", err)
 		return
 	}
 
 	if reusePort {
 		if err = unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_REUSEPORT, 1); err != nil {
+			err = os.NewSyscallError("setsockopt", err)
 			return
 		}
 	}
 
 	if err = unix.Bind(fd, sockaddr); err != nil {
+		err = os.NewSyscallError("bind", err)
 		return
 	}
 
 	// Set backlog size to the maximum.
-	err = unix.Listen(fd, listenerBacklogMaxSize)
+	err = os.NewSyscallError("listen", unix.Listen(fd, listenerBacklogMaxSize))
 
 	return
 }

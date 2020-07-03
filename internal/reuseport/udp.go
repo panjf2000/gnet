@@ -21,6 +21,7 @@ package reuseport
 import (
 	"errors"
 	"net"
+	"os"
 
 	"golang.org/x/sys/unix"
 )
@@ -114,6 +115,7 @@ func udpReusablePort(proto, addr string, reusePort bool) (fd int, netAddr net.Ad
 	}
 
 	if fd, err = sysSocket(family, unix.SOCK_DGRAM, unix.IPPROTO_UDP); err != nil {
+		err = os.NewSyscallError("socket", err)
 		return
 	}
 	defer func() {
@@ -124,20 +126,23 @@ func udpReusablePort(proto, addr string, reusePort bool) (fd int, netAddr net.Ad
 
 	// Allow broadcast.
 	if err = unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_BROADCAST, 1); err != nil {
+		err = os.NewSyscallError("setsockopt", err)
 		return
 	}
 
 	if err = unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_REUSEADDR, 1); err != nil {
+		err = os.NewSyscallError("setsockopt", err)
 		return
 	}
 
 	if reusePort {
 		if err = unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_REUSEPORT, 1); err != nil {
+			err = os.NewSyscallError("setsockopt", err)
 			return
 		}
 	}
 
-	err = unix.Bind(fd, sockaddr)
+	err = os.NewSyscallError("bind", unix.Bind(fd, sockaddr))
 
 	return
 }

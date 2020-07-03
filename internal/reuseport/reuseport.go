@@ -1,4 +1,4 @@
-// copyright (c) 2020 andy pan
+// copyright (c) 2020 Andy Pan
 // Copyright (C) 2017 Max Riveiro
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated

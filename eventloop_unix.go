@@ -8,6 +8,7 @@
 package gnet
 
 import (
+	"os"
 	"time"
 
 	"github.com/panjf2000/gnet/internal/netpoll"
@@ -61,10 +62,10 @@ func (el *eventloop) loopAccept(fd int) error {
 			if err == unix.EAGAIN {
 				return nil
 			}
-			return err
+			return os.NewSyscallError("accept", err)
 		}
 		if err = unix.SetNonblock(nfd, true); err != nil {
-			return err
+			return os.NewSyscallError("fcntl nonblock", err)
 		}
 		c := newTCPConn(nfd, el, sa)
 		if err = el.poller.AddRead(c.fd); err == nil {
@@ -104,7 +105,7 @@ func (el *eventloop) loopRead(c *conn) error {
 		if err == unix.EAGAIN {
 			return nil
 		}
-		return el.loopCloseConn(c, err)
+		return el.loopCloseConn(c, os.NewSyscallError("read", err))
 	}
 	c.buffer = el.packet[:n]
 
@@ -140,7 +141,7 @@ func (el *eventloop) loopWrite(c *conn) error {
 		if err == unix.EAGAIN {
 			return nil
 		}
-		return el.loopCloseConn(c, err)
+		return el.loopCloseConn(c, os.NewSyscallError("write", err))
 	}
 	c.outboundBuffer.Shift(n)
 
@@ -150,7 +151,7 @@ func (el *eventloop) loopWrite(c *conn) error {
 			if err == unix.EAGAIN {
 				return nil
 			}
-			return el.loopCloseConn(c, err)
+			return el.loopCloseConn(c, os.NewSyscallError("write", err))
 		}
 		c.outboundBuffer.Shift(n)
 	}
@@ -179,7 +180,7 @@ func (el *eventloop) loopCloseConn(c *conn, err error) error {
 			el.svr.logger.Printf("failed to delete fd:%d from poller, error:%v\n", c.fd, err0)
 		}
 		if err1 != nil {
-			el.svr.logger.Printf("failed to close fd:%d, error:%v\n", c.fd, err1)
+			el.svr.logger.Printf("failed to close fd:%d, error:%v\n", c.fd, os.NewSyscallError("close", err1))
 		}
 	}
 	return nil
@@ -243,7 +244,7 @@ func (el *eventloop) loopReadUDP(fd int) error {
 	n, sa, err := unix.Recvfrom(fd, el.packet, 0)
 	if err != nil || n == 0 {
 		if err != nil && err != unix.EAGAIN {
-			el.svr.logger.Printf("failed to read UDP packet from fd:%d, error:%v\n", fd, err)
+			el.svr.logger.Printf("failed to read UDP packet from fd:%d, error:%v\n", fd, os.NewSyscallError("recvfrom", err))
 		}
 		return nil
 	}

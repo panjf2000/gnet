@@ -9,6 +9,7 @@ package netpoll
 
 import (
 	"log"
+	"os"
 
 	"github.com/panjf2000/gnet/internal"
 	"golang.org/x/sys/unix"
@@ -25,6 +26,7 @@ func OpenPoller() (poller *Poller, err error) {
 	poller = new(Poller)
 	if poller.fd, err = unix.Kqueue(); err != nil {
 		poller = nil
+		err = os.NewSyscallError("kqueue", err)
 		return
 	}
 	if _, err = unix.Kevent(poller.fd, []unix.Kevent_t{{
@@ -34,6 +36,7 @@ func OpenPoller() (poller *Poller, err error) {
 	}}, nil, nil); err != nil {
 		_ = poller.Close()
 		poller = nil
+		err = os.NewSyscallError("kevent add|clear", err)
 		return
 	}
 	poller.asyncJobQueue = internal.NewAsyncJobQueue()
@@ -42,7 +45,7 @@ func OpenPoller() (poller *Poller, err error) {
 
 // Close closes the poller.
 func (p *Poller) Close() error {
-	return unix.Close(p.fd)
+	return os.NewSyscallError("close", unix.Close(p.fd))
 }
 
 var wakeChanges = []unix.Kevent_t{{
@@ -52,12 +55,11 @@ var wakeChanges = []unix.Kevent_t{{
 }}
 
 // Trigger wakes up the poller blocked in waiting for network-events and runs jobs in asyncJobQueue.
-func (p *Poller) Trigger(job internal.Job) error {
+func (p *Poller) Trigger(job internal.Job) (err error) {
 	if p.asyncJobQueue.Push(job) == 1 {
-		_, err := unix.Kevent(p.fd, wakeChanges, nil, nil)
-		return err
+		_, err = unix.Kevent(p.fd, wakeChanges, nil, nil)
 	}
-	return nil
+	return os.NewSyscallError("kevent trigger", err)
 }
 
 // Polling blocks the current goroutine, waiting for network-events.
@@ -67,7 +69,7 @@ func (p *Poller) Polling(callback func(fd int, filter int16) error) (err error) 
 	for {
 		n, err0 := unix.Kevent(p.fd, nil, el.events, nil)
 		if err0 != nil && err0 != unix.EINTR {
-			log.Println(err0)
+			log.Println(os.NewSyscallError("kevent wait", err0))
 			continue
 		}
 		var evFilter int16
@@ -98,49 +100,38 @@ func (p *Poller) Polling(callback func(fd int, filter int16) error) (err error) 
 
 // AddReadWrite registers the given file-descriptor with readable and writable events to the poller.
 func (p *Poller) AddReadWrite(fd int) error {
-	if _, err := unix.Kevent(p.fd, []unix.Kevent_t{
+	_, err := unix.Kevent(p.fd, []unix.Kevent_t{
 		{Ident: uint64(fd), Flags: unix.EV_ADD, Filter: unix.EVFILT_READ},
-		{Ident: uint64(fd), Flags: unix.EV_ADD, Filter: unix.EVFILT_WRITE},
-	}, nil, nil); err != nil {
-		return err
-	}
-	return nil
+		{Ident: uint64(fd), Flags: unix.EV_ADD, Filter: unix.EVFILT_WRITE}}, nil, nil)
+	return os.NewSyscallError("kevent add", err)
 }
 
 // AddRead registers the given file-descriptor with readable event to the poller.
 func (p *Poller) AddRead(fd int) error {
-	if _, err := unix.Kevent(p.fd, []unix.Kevent_t{
-		{Ident: uint64(fd), Flags: unix.EV_ADD, Filter: unix.EVFILT_READ}}, nil, nil); err != nil {
-		return err
-	}
-	return nil
+	_, err := unix.Kevent(p.fd, []unix.Kevent_t{
+		{Ident: uint64(fd), Flags: unix.EV_ADD, Filter: unix.EVFILT_READ}}, nil, nil)
+	return os.NewSyscallError("kevent add", err)
 }
 
 // AddWrite registers the given file-descriptor with writable event to the poller.
 func (p *Poller) AddWrite(fd int) error {
-	if _, err := unix.Kevent(p.fd, []unix.Kevent_t{
-		{Ident: uint64(fd), Flags: unix.EV_ADD, Filter: unix.EVFILT_WRITE}}, nil, nil); err != nil {
-		return err
-	}
-	return nil
+	_, err := unix.Kevent(p.fd, []unix.Kevent_t{
+		{Ident: uint64(fd), Flags: unix.EV_ADD, Filter: unix.EVFILT_WRITE}}, nil, nil)
+	return os.NewSyscallError("kevent add", err)
 }
 
 // ModRead renews the given file-descriptor with readable event in the poller.
 func (p *Poller) ModRead(fd int) error {
-	if _, err := unix.Kevent(p.fd, []unix.Kevent_t{
-		{Ident: uint64(fd), Flags: unix.EV_DELETE, Filter: unix.EVFILT_WRITE}}, nil, nil); err != nil {
-		return err
-	}
-	return nil
+	_, err := unix.Kevent(p.fd, []unix.Kevent_t{
+		{Ident: uint64(fd), Flags: unix.EV_DELETE, Filter: unix.EVFILT_WRITE}}, nil, nil)
+	return os.NewSyscallError("kevent delete", err)
 }
 
 // ModReadWrite renews the given file-descriptor with readable and writable events in the poller.
 func (p *Poller) ModReadWrite(fd int) error {
-	if _, err := unix.Kevent(p.fd, []unix.Kevent_t{
-		{Ident: uint64(fd), Flags: unix.EV_ADD, Filter: unix.EVFILT_WRITE}}, nil, nil); err != nil {
-		return err
-	}
-	return nil
+	_, err := unix.Kevent(p.fd, []unix.Kevent_t{
+		{Ident: uint64(fd), Flags: unix.EV_ADD, Filter: unix.EVFILT_WRITE}}, nil, nil)
+	return os.NewSyscallError("kevent add", err)
 }
 
 // Delete removes the given file-descriptor from the poller.
