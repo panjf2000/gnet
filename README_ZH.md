@@ -280,6 +280,7 @@ func (es *echoServer) OnInitComplete(srv gnet.Server) (action gnet.Action) {
 		srv.Addr.String(), srv.Multicore, srv.NumEventLoop)
 	return
 }
+
 func (es *echoServer) React(frame []byte, c gnet.Conn) (out []byte, action gnet.Action) {
 	// Echo synchronously.
 	out = frame
@@ -334,6 +335,7 @@ func (es *echoServer) OnInitComplete(srv gnet.Server) (action gnet.Action) {
 		srv.Addr.String(), srv.Multicore, srv.NumEventLoop)
 	return
 }
+
 func (es *echoServer) React(frame []byte, c gnet.Conn) (out []byte, action gnet.Action) {
 	// Echo synchronously.
 	out = frame
@@ -388,6 +390,7 @@ func (es *echoServer) OnInitComplete(srv gnet.Server) (action gnet.Action) {
 		srv.Addr.String(), srv.Multicore, srv.NumEventLoop)
 	return
 }
+
 func (es *echoServer) React(frame []byte, c gnet.Conn) (out []byte, action gnet.Action) {
 	// Echo synchronously.
 	out = frame
@@ -450,8 +453,10 @@ type httpServer struct {
 	*gnet.EventServer
 }
 
-var errMsg = "Internal Server Error"
-var errMsgBytes = []byte(errMsg)
+var (
+	errMsg      = "Internal Server Error"
+	errMsgBytes = []byte(errMsg)
+)
 
 type httpCodec struct {
 	req request
@@ -564,7 +569,7 @@ func parseReq(data []byte, req *request) (leftover []byte, err error) {
 	var i, s int
 	var head string
 	var clen int
-	var q = -1
+	q := -1
 	// method, path, proto line
 	for ; i < len(sdata); i++ {
 		if sdata[i] == ' ' {
@@ -653,16 +658,19 @@ func (ps *pushServer) OnInitComplete(srv gnet.Server) (action gnet.Action) {
 		"pushing data every %s ...\n", srv.Addr.String(), srv.Multicore, srv.NumEventLoop, ps.tick.String())
 	return
 }
+
 func (ps *pushServer) OnOpened(c gnet.Conn) (out []byte, action gnet.Action) {
 	log.Printf("Socket with addr: %s has been opened...\n", c.RemoteAddr().String())
 	ps.connectedSockets.Store(c.RemoteAddr().String(), c)
 	return
 }
+
 func (ps *pushServer) OnClosed(c gnet.Conn, err error) (action gnet.Action) {
 	log.Printf("Socket with addr: %s is closing...\n", c.RemoteAddr().String())
 	ps.connectedSockets.Delete(c.RemoteAddr().String())
 	return
 }
+
 func (ps *pushServer) Tick() (delay time.Duration, action gnet.Action) {
 	log.Println("It's time to push data to clients!!!")
 	ps.connectedSockets.Range(func(key, value interface{}) bool {
@@ -674,6 +682,7 @@ func (ps *pushServer) Tick() (delay time.Duration, action gnet.Action) {
 	delay = ps.tick
 	return
 }
+
 func (ps *pushServer) React(frame []byte, c gnet.Conn) (out []byte, action gnet.Action) {
 	out = frame
 	return
@@ -915,7 +924,7 @@ func (cc *CustomLengthFieldProtocol) Decode(c gnet.Conn) ([]byte, error) {
 			return nil, errors.New("not normal protocol")
 		}
 		// parse payload
-		dataLen := int(dataLength) //max int32 can contain 210MB payload
+		dataLen := int(dataLength) // max int32 can contain 210MB payload
 		protocolLen := headerLen + dataLen
 		if dataSize, data := c.ReadN(protocolLen); dataSize == protocolLen {
 			c.ShiftN(protocolLen)
@@ -931,10 +940,10 @@ func (cc *CustomLengthFieldProtocol) Decode(c gnet.Conn) ([]byte, error) {
 ```
 
 **Client/Server:**
-[Check out the source code](https://github.com/panjf2000/gnet/tree/master/examples/custom_codec).
+[查看源码](https://github.com/gnet-io/gnet-examples/tree/master/examples/custom_codec).
 </details>
 
-**更详细的代码在这里: [gnet 示例](https://github.com/panjf2000/gnet/tree/master/examples)。**
+**更详细的代码在这里: [全部 gnet 示例](https://github.com/gnet-io/gnet-examples)。**
 
 ## I/O 事件
 
