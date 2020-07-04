@@ -51,9 +51,11 @@ func (el *eventloop) loopRun() {
 		el.loopEgress()
 		el.svr.loopWG.Done()
 	}()
+
 	if el.idx == 0 && el.svr.opts.Ticker {
 		go el.loopTicker()
 	}
+
 	for v := range el.ch {
 		switch v := v.(type) {
 		case error:
@@ -72,7 +74,7 @@ func (el *eventloop) loopRun() {
 			err = v()
 		}
 		if err != nil {
-			el.svr.logger.Fatalf("Event-loop(%d) is exiting due to an unexpected error: %v", el.idx, err)
+			el.svr.logger.Infof("Event-loop(%d) is exiting due to an unexpected error: %v", el.idx, err)
 			break
 		}
 	}
@@ -83,18 +85,19 @@ func (el *eventloop) loopAccept(c *stdConn) error {
 	c.localAddr = el.svr.ln.lnaddr
 	c.remoteAddr = c.conn.RemoteAddr()
 	el.calibrateCallback(el, 1)
-
-	out, action := el.eventHandler.OnOpened(c)
-	if out != nil {
-		el.eventHandler.PreWrite()
-		_, _ = c.conn.Write(out)
-	}
 	if el.svr.opts.TCPKeepAlive > 0 {
 		if c, ok := c.conn.(*net.TCPConn); ok {
 			_ = c.SetKeepAlive(true)
 			_ = c.SetKeepAlivePeriod(el.svr.opts.TCPKeepAlive)
 		}
 	}
+
+	out, action := el.eventHandler.OnOpened(c)
+	if out != nil {
+		el.eventHandler.PreWrite()
+		_, _ = c.conn.Write(out)
+	}
+
 	return el.handleAction(c, action)
 }
 
@@ -123,6 +126,7 @@ func (el *eventloop) loopRead(ti *tcpIn) (err error) {
 	_, _ = c.inboundBuffer.Write(c.buffer.Bytes())
 	bytebuffer.Put(c.buffer)
 	c.buffer = nil
+
 	return
 }
 
@@ -185,6 +189,7 @@ func (el *eventloop) loopError(c *stdConn, err error) (e error) {
 	} else {
 		el.svr.logger.Warnf("Failed to close connection(%s), error: %v", c.remoteAddr.String(), e)
 	}
+
 	return
 }
 
@@ -197,6 +202,7 @@ func (el *eventloop) loopWake(c *stdConn) error {
 		frame, _ := el.codec.Encode(c, out)
 		_, _ = c.conn.Write(frame)
 	}
+
 	return el.handleAction(c, action)
 }
 
@@ -224,5 +230,6 @@ func (el *eventloop) loopReadUDP(c *stdConn) error {
 		return errors.ErrServerShutdown
 	}
 	c.releaseUDP()
+
 	return nil
 }

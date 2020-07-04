@@ -65,11 +65,12 @@ func (el *eventloop) loopRun() {
 	if el.idx == 0 && el.svr.opts.Ticker {
 		go el.loopTicker()
 	}
+
 	switch err := el.poller.Polling(el.handleEvent); err {
 	case errors.ErrServerShutdown:
 		el.svr.logger.Infof("Event-loop(%d) is exiting normally on the signal error: %v", el.idx, err)
 	default:
-		el.svr.logger.Fatalf("Event-loop(%d) is exiting due to an unexpected error: %v", el.idx, err)
+		el.svr.logger.Errorf("Event-loop(%d) is exiting due to an unexpected error: %v", el.idx, err)
 
 	}
 }
@@ -79,6 +80,7 @@ func (el *eventloop) loopAccept(fd int) error {
 		if el.ln.network == "udp" {
 			return el.loopReadUDP(fd)
 		}
+
 		nfd, sa, err := unix.Accept(fd)
 		if err != nil {
 			if err == unix.EAGAIN {
@@ -97,6 +99,7 @@ func (el *eventloop) loopAccept(fd int) error {
 		}
 		return err
 	}
+
 	return nil
 }
 
@@ -104,12 +107,13 @@ func (el *eventloop) loopOpen(c *conn) error {
 	c.opened = true
 	c.localAddr = el.ln.lnaddr
 	c.remoteAddr = netpoll.SockaddrToTCPOrUnixAddr(c.sa)
-	out, action := el.eventHandler.OnOpened(c)
 	if el.svr.opts.TCPKeepAlive > 0 {
 		if proto := el.ln.network; proto == "tcp" || proto == "unix" {
 			_ = netpoll.SetKeepAlive(c.fd, int(el.svr.opts.TCPKeepAlive/time.Second))
 		}
 	}
+
+	out, action := el.eventHandler.OnOpened(c)
 	if out != nil {
 		c.open(out)
 	}
@@ -181,6 +185,7 @@ func (el *eventloop) loopWrite(c *conn) error {
 	if c.outboundBuffer.IsEmpty() {
 		_ = el.poller.ModRead(c.fd)
 	}
+
 	return nil
 }
 
@@ -188,6 +193,12 @@ func (el *eventloop) loopCloseConn(c *conn, err error) error {
 	if !c.outboundBuffer.IsEmpty() && err == nil {
 		_ = el.loopWrite(c)
 	}
+
+	if !c.opened {
+		el.svr.logger.Debugf("The fd=%d in event-loop(%d) is already closed, skipping it", c.fd, el.idx)
+		return nil
+	}
+
 	err0, err1 := el.poller.Delete(c.fd), unix.Close(c.fd)
 	if err0 == nil && err1 == nil {
 		delete(el.connections, c.fd)
@@ -205,6 +216,7 @@ func (el *eventloop) loopCloseConn(c *conn, err error) error {
 				c.fd, el.idx, os.NewSyscallError("close", err1))
 		}
 	}
+
 	return nil
 }
 
@@ -217,6 +229,7 @@ func (el *eventloop) loopWake(c *conn) error {
 		frame, _ := el.codec.Encode(c, out)
 		c.write(frame)
 	}
+
 	return el.handleAction(c, action)
 }
 
@@ -271,6 +284,7 @@ func (el *eventloop) loopReadUDP(fd int) error {
 		}
 		return nil
 	}
+
 	c := newUDPConn(fd, el, sa)
 	out, action := el.eventHandler.React(el.packet[:n], c)
 	if out != nil {
@@ -281,5 +295,6 @@ func (el *eventloop) loopReadUDP(fd int) error {
 		return errors.ErrServerShutdown
 	}
 	c.releaseUDP()
+
 	return nil
 }

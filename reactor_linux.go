@@ -31,7 +31,7 @@ func (svr *server) activateMainReactor() {
 	case errors.ErrServerShutdown:
 		svr.logger.Infof("Main reactor is exiting normally on the signal error: %v", err)
 	default:
-		svr.logger.Fatalf("Main reactor is exiting due to an unexpected error: %v", err)
+		svr.logger.Errorf("Main reactor is exiting due to an unexpected error: %v", err)
 	}
 }
 
@@ -70,6 +70,6 @@ func (svr *server) activateSubReactor(el *eventloop) {
 	case errors.ErrServerShutdown:
 		svr.logger.Infof("Event-loop(%d) is exiting normally on the signal error: %v", el.idx, err)
 	default:
-		svr.logger.Fatalf("Event-loop(%d) is exiting due to an unexpected error: %v", el.idx, err)
+		svr.logger.Errorf("Event-loop(%d) is exiting due to an unexpected error: %v", el.idx, err)
 	}
 }
