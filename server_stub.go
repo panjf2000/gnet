@@ -23,6 +23,8 @@
 
 package gnet
 
+import "github.com/panjf2000/gnet/errors"
+
 type server struct {
 	subEventLoopSet loadBalancer // event-loops for handling events
 }
@@ -50,5 +52,5 @@ func initListener(network, addr string, reusePort bool) (l *listener, err error)
 }
 
 func serve(_ EventHandler, _ *listener, _ *Options) error {
-	return ErrUnsupportedPlatform
+	return errors.ErrUnsupportedPlatform
 }

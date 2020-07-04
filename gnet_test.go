@@ -33,6 +33,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/panjf2000/gnet/errors"
 	"github.com/panjf2000/gnet/pool/bytebuffer"
 	"github.com/panjf2000/gnet/pool/goroutine"
 	"github.com/valyala/bytebufferpool"
@@ -575,7 +576,7 @@ func startClient(network, addr string, multicore, async bool) {
 }
 
 func must(err error) {
-	if err != nil && err != ErrUnsupportedProtocol {
+	if err != nil && err != errors.ErrUnsupportedProtocol {
 		panic(err)
 	}
 }

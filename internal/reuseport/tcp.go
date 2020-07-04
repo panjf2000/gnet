@@ -24,17 +24,14 @@
 package reuseport
 
 import (
-	"errors"
 	"net"
 	"os"
 
+	"github.com/panjf2000/gnet/errors"
 	"golang.org/x/sys/unix"
 )
 
-var (
-	listenerBacklogMaxSize    = maxListenerBacklog()
-	errUnsupportedTCPProtocol = errors.New("only tcp/tcp4/tcp6 are supported")
-)
+var listenerBacklogMaxSize = maxListenerBacklog()
 
 func getTCPSockaddr(proto, addr string) (sa unix.Sockaddr, family int, tcpAddr *net.TCPAddr, err error) {
 	var tcpVersion string
@@ -83,7 +80,7 @@ func getTCPSockaddr(proto, addr string) (sa unix.Sockaddr, family int, tcpAddr *
 
 		sa, family = sa6, unix.AF_INET6
 	default:
-		err = errUnsupportedProtocol
+		err = errors.ErrUnsupportedProtocol
 	}
 
 	return
@@ -107,7 +104,7 @@ func determineTCPProto(proto string, addr *net.TCPAddr) (string, error) {
 		return proto, nil
 	}
 
-	return "", errUnsupportedTCPProtocol
+	return "", errors.ErrUnsupportedTCPProtocol
 }
 
 // tcpReusablePort creates an endpoint for communication and returns a file descriptor that refers to that endpoint.

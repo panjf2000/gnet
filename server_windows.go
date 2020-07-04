@@ -30,6 +30,7 @@ import (
 	"syscall"
 	"time"
 
+	errors2 "github.com/panjf2000/gnet/errors"
 	"github.com/panjf2000/gnet/logging"
 )
 
@@ -112,7 +113,7 @@ func (svr *server) stop() {
 
 	// Notify all loops to close.
 	svr.subEventLoopSet.iterate(func(i int, el *eventloop) bool {
-		el.ch <- errServerShutdown
+		el.ch <- errors2.ErrServerShutdown
 		return true
 	})
 

@@ -25,6 +25,8 @@ import (
 	"net"
 	"os"
 	"sync"
+
+	"github.com/panjf2000/gnet/errors"
 )
 
 type listener struct {
@@ -51,7 +53,7 @@ func (ln *listener) normalize() (err error) {
 		}
 		ln.lnaddr = ln.pconn.LocalAddr()
 	default:
-		err = ErrUnsupportedProtocol
+		err = errors.ErrUnsupportedProtocol
 	}
 	return
 }

@@ -28,6 +28,7 @@ import (
 	"os"
 	"sync"
 
+	"github.com/panjf2000/gnet/errors"
 	"github.com/panjf2000/gnet/internal/reuseport"
 	"golang.org/x/sys/unix"
 )
@@ -52,7 +53,7 @@ func (ln *listener) normalize() (err error) {
 		_ = os.RemoveAll(ln.addr)
 		ln.fd, ln.lnaddr, err = reuseport.UnixSocket(ln.network, ln.addr, ln.reusePort)
 	default:
-		err = ErrUnsupportedProtocol
+		err = errors.ErrUnsupportedProtocol
 	}
 	if err != nil {
 		return

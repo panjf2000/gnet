@@ -27,6 +27,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/panjf2000/gnet/errors"
 	"github.com/panjf2000/gnet/internal/netpoll"
 	"golang.org/x/sys/unix"
 )
@@ -65,7 +66,7 @@ func (el *eventloop) loopRun() {
 		go el.loopTicker()
 	}
 	switch err := el.poller.Polling(el.handleEvent); err {
-	case errServerShutdown:
+	case errors.ErrServerShutdown:
 		el.svr.logger.Infof("Event-loop(%d) is exiting normally on the signal error: %v", el.idx, err)
 	default:
 		el.svr.logger.Fatalf("Event-loop(%d) is exiting due to an unexpected error: %v", el.idx, err)
@@ -142,7 +143,7 @@ func (el *eventloop) loopRead(c *conn) error {
 		case Close:
 			return el.loopCloseConn(c, nil)
 		case Shutdown:
-			return errServerShutdown
+			return errors.ErrServerShutdown
 		}
 		if !c.opened {
 			return nil
@@ -192,7 +193,7 @@ func (el *eventloop) loopCloseConn(c *conn, err error) error {
 		delete(el.connections, c.fd)
 		el.calibrateCallback(el, -1)
 		if el.eventHandler.OnClosed(c, err) == Shutdown {
-			return errServerShutdown
+			return errors.ErrServerShutdown
 		}
 		c.releaseTCP()
 	} else {
@@ -232,7 +233,7 @@ func (el *eventloop) loopTicker() {
 			switch action {
 			case None:
 			case Shutdown:
-				err = errServerShutdown
+				err = errors.ErrServerShutdown
 			}
 			return
 		})
@@ -255,7 +256,7 @@ func (el *eventloop) handleAction(c *conn, action Action) error {
 	case Close:
 		return el.loopCloseConn(c, nil)
 	case Shutdown:
-		return errServerShutdown
+		return errors.ErrServerShutdown
 	default:
 		return nil
 	}
@@ -277,7 +278,7 @@ func (el *eventloop) loopReadUDP(fd int) error {
 		_ = c.sendTo(out)
 	}
 	if action == Shutdown {
-		return errServerShutdown
+		return errors.ErrServerShutdown
 	}
 	c.releaseUDP()
 	return nil

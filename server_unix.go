@@ -31,6 +31,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/panjf2000/gnet/errors"
 	"github.com/panjf2000/gnet/internal/netpoll"
 	"github.com/panjf2000/gnet/logging"
 )
@@ -184,7 +185,7 @@ func (svr *server) stop() {
 	// Notify all loops to close by closing all listeners
 	svr.subEventLoopSet.iterate(func(i int, el *eventloop) bool {
 		sniffErrorAndLog(el.poller.Trigger(func() error {
-			return errServerShutdown
+			return errors.ErrServerShutdown
 		}))
 		return true
 	})
@@ -192,7 +193,7 @@ func (svr *server) stop() {
 	if svr.mainLoop != nil {
 		svr.ln.close()
 		sniffErrorAndLog(svr.mainLoop.poller.Trigger(func() error {
-			return errServerShutdown
+			return errors.ErrServerShutdown
 		}))
 	}
 

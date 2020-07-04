@@ -27,11 +27,8 @@
 package reuseport
 
 import (
-	"errors"
 	"net"
 )
-
-var errUnsupportedProtocol = errors.New("only unix, tcp/tcp4/tcp6, udp/udp4/udp6 are supported")
 
 // TCPSocket calls tcpReusablePort.
 func TCPSocket(proto, addr string, reusePort bool) (int, net.Addr, error) {

@@ -22,12 +22,15 @@
 
 package gnet
 
-import "github.com/panjf2000/gnet/internal/netpoll"
+import (
+	"github.com/panjf2000/gnet/errors"
+	"github.com/panjf2000/gnet/internal/netpoll"
+)
 
 func (svr *server) activateMainReactor() {
 	defer svr.signalShutdown()
 	switch err := svr.mainLoop.poller.Polling(func(fd int, filter int16) error { return svr.acceptNewConnection(fd) }); err {
-	case errServerShutdown:
+	case errors.ErrServerShutdown:
 		svr.logger.Infof("Main reactor is exiting normally on the signal error: %v", err)
 	default:
 		svr.logger.Fatalf("Main reactor is exiting due to an unexpected error: %v", err)
@@ -70,7 +73,7 @@ func (svr *server) activateSubReactor(el *eventloop) {
 		}
 		return nil
 	}); err {
-	case errServerShutdown:
+	case errors.ErrServerShutdown:
 		svr.logger.Infof("Event-loop(%d) is exiting normally on the signal error: %v", el.idx, err)
 	default:
 		svr.logger.Fatalf("Event-loop(%d) is exiting due to an unexpected error: %v", el.idx, err)

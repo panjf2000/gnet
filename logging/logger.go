@@ -33,7 +33,7 @@ func init() {
 	DefaultLogger = zapLogger.Sugar()
 }
 
-// Cleanup do something windup for logger, like closing, flushing, etc.
+// Cleanup does something windup for logger, like closing, flushing, etc.
 func Cleanup() {
 	_ = zapLogger.Sync()
 }

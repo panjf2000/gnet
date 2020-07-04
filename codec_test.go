@@ -24,6 +24,8 @@ import (
 	"encoding/binary"
 	"math/rand"
 	"testing"
+
+	"github.com/panjf2000/gnet/errors"
 )
 
 func TestLengthFieldBasedFrameCodecWith1(t *testing.T) {
@@ -227,7 +229,7 @@ func TestLengthFieldBasedFrameCodecWith8(t *testing.T) {
 
 func TestFixedLengthFrameCodec_Encode(t *testing.T) {
 	codec := NewFixedLengthFrameCodec(8)
-	if data, err := codec.Encode(nil, make([]byte, 15)); data != nil || err != errInvalidFixedLength {
+	if data, err := codec.Encode(nil, make([]byte, 15)); data != nil || err != errors.ErrInvalidFixedLength {
 		panic("should have a error of invalid fixed length")
 	}
 }

@@ -23,14 +23,12 @@
 package reuseport
 
 import (
-	"errors"
 	"net"
 	"os"
 
+	"github.com/panjf2000/gnet/errors"
 	"golang.org/x/sys/unix"
 )
-
-var errUnsupportedUDSProtocol = errors.New("only unix is supported")
 
 func getUnixSockaddr(proto, addr string) (sa unix.Sockaddr, family int, unixAddr *net.UnixAddr, err error) {
 	unixAddr, err = net.ResolveUnixAddr(proto, addr)
@@ -42,7 +40,7 @@ func getUnixSockaddr(proto, addr string) (sa unix.Sockaddr, family int, unixAddr
 	case "unix":
 		sa, family = &unix.SockaddrUnix{Name: unixAddr.Name}, unix.AF_UNIX
 	default:
-		err = errUnsupportedUDSProtocol
+		err = errors.ErrUnsupportedUDSProtocol
 	}
 
 	return

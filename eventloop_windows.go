@@ -25,6 +25,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/panjf2000/gnet/errors"
 	"github.com/panjf2000/gnet/pool/bytebuffer"
 )
 
@@ -113,7 +114,7 @@ func (el *eventloop) loopRead(ti *tcpIn) (err error) {
 		case Close:
 			return el.loopCloseConn(c)
 		case Shutdown:
-			return errServerShutdown
+			return errors.ErrServerShutdown
 		}
 		if err != nil {
 			return el.loopError(c, err)
@@ -160,7 +161,7 @@ func (el *eventloop) loopTicker() {
 			el.svr.ticktock <- delay
 			switch action {
 			case Shutdown:
-				err = errServerShutdown
+				err = errors.ErrServerShutdown
 			}
 			return
 		}
@@ -178,7 +179,7 @@ func (el *eventloop) loopError(c *stdConn, err error) (e error) {
 		el.calibrateCallback(el, -1)
 		switch el.eventHandler.OnClosed(c, err) {
 		case Shutdown:
-			return errServerShutdown
+			return errors.ErrServerShutdown
 		}
 		c.releaseTCP()
 	} else {
@@ -206,7 +207,7 @@ func (el *eventloop) handleAction(c *stdConn, action Action) error {
 	case Close:
 		return el.loopCloseConn(c)
 	case Shutdown:
-		return errServerShutdown
+		return errors.ErrServerShutdown
 	default:
 		return nil
 	}
@@ -220,7 +221,7 @@ func (el *eventloop) loopReadUDP(c *stdConn) error {
 	}
 	switch action {
 	case Shutdown:
-		return errServerShutdown
+		return errors.ErrServerShutdown
 	}
 	c.releaseUDP()
 	return nil

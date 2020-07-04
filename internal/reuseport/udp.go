@@ -24,14 +24,12 @@
 package reuseport
 
 import (
-	"errors"
 	"net"
 	"os"
 
+	"github.com/panjf2000/gnet/errors"
 	"golang.org/x/sys/unix"
 )
-
-var errUnsupportedUDPProtocol = errors.New("only udp/udp4/udp6 are supported")
 
 func getUDPSockaddr(proto, addr string) (sa unix.Sockaddr, family int, udpAddr *net.UDPAddr, err error) {
 	var udpVersion string
@@ -80,7 +78,7 @@ func getUDPSockaddr(proto, addr string) (sa unix.Sockaddr, family int, udpAddr *
 
 		sa, family = sa6, unix.AF_INET6
 	default:
-		err = errUnsupportedProtocol
+		err = errors.ErrUnsupportedProtocol
 	}
 
 	return
@@ -104,7 +102,7 @@ func determineUDPProto(proto string, addr *net.UDPAddr) (string, error) {
 		return proto, nil
 	}
 
-	return "", errUnsupportedUDPProtocol
+	return "", errors.ErrUnsupportedUDPProtocol
 }
 
 // udpReusablePort creates an endpoint for communication and returns a file descriptor that refers to that endpoint.
