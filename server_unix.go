@@ -32,6 +32,7 @@ import (
 	"time"
 
 	"github.com/panjf2000/gnet/internal/netpoll"
+	"github.com/panjf2000/gnet/logging"
 )
 
 type server struct {
@@ -41,7 +42,7 @@ type server struct {
 	once            sync.Once          // make sure only signalShutdown once
 	cond            *sync.Cond         // shutdown signaler
 	codec           ICodec             // codec for TCP stream
-	logger          Logger             // customized logger for logging info
+	logger          logging.Logger     // customized logger for logging info
 	ticktock        chan time.Duration // ticker channel
 	mainLoop        *eventloop         // main loop for accepting connections
 	eventHandler    EventHandler       // user eventHandler
@@ -231,12 +232,7 @@ func serve(eventHandler EventHandler, listener *listener, options *Options) erro
 
 	svr.cond = sync.NewCond(&sync.Mutex{})
 	svr.ticktock = make(chan time.Duration, 1)
-	svr.logger = func() Logger {
-		if options.Logger == nil {
-			return defaultLogger
-		}
-		return options.Logger
-	}()
+	svr.logger = logging.DefaultLogger
 	svr.codec = func() ICodec {
 		if options.Codec == nil {
 			return new(BuiltInFrameCodec)
@@ -272,7 +268,7 @@ func serve(eventHandler EventHandler, listener *listener, options *Options) erro
 
 	if err := svr.start(numEventLoop); err != nil {
 		svr.closeLoops()
-		svr.logger.Printf("gnet server is stoping with error: %v\n", err)
+		svr.logger.Errorf("gnet server is stopping with error: %v", err)
 		return err
 	}
 	defer svr.stop()

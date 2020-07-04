@@ -71,7 +71,7 @@ func (el *eventloop) loopRun() {
 			err = v()
 		}
 		if err != nil {
-			el.svr.logger.Printf("event-loop:%d exits with error:%v\n", el.idx, err)
+			el.svr.logger.Fatalf("Event-loop(%d) is exiting due to an unexpected error: %v", el.idx, err)
 			break
 		}
 	}
@@ -182,7 +182,7 @@ func (el *eventloop) loopError(c *stdConn, err error) (e error) {
 		}
 		c.releaseTCP()
 	} else {
-		el.svr.logger.Printf("failed to close connection:%s, error:%v\n", c.remoteAddr.String(), e)
+		el.svr.logger.Warnf("Failed to close connection(%s), error: %v", c.remoteAddr.String(), e)
 	}
 	return
 }

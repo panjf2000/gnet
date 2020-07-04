@@ -20,7 +20,11 @@
 
 package gnet
 
-import "time"
+import (
+	"time"
+
+	"github.com/panjf2000/gnet/logging"
+)
 
 // Option is a function that will set up option.
 type Option func(opts *Options)
@@ -61,8 +65,8 @@ type Options struct {
 	Codec ICodec
 
 	// Logger is the customized logger for logging info, if it is not set,
-	// default standard logger from log package is used.
-	Logger Logger
+	// then gnet will use the default logger powered by go.uber.org/zap.
+	Logger logging.Logger
 }
 
 // WithOptions sets up all options.
@@ -122,7 +126,7 @@ func WithCodec(codec ICodec) Option {
 }
 
 // WithLogger sets up a customized logger.
-func WithLogger(logger Logger) Option {
+func WithLogger(logger logging.Logger) Option {
 	return func(opts *Options) {
 		opts.Logger = logger
 	}

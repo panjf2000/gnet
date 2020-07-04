@@ -26,10 +26,13 @@ import "github.com/panjf2000/gnet/internal/netpoll"
 
 func (svr *server) activateMainReactor() {
 	defer svr.signalShutdown()
+	switch err := svr.mainLoop.poller.Polling(func(fd int, filter int16) error { return svr.acceptNewConnection(fd) }); err {
+	case errServerShutdown:
+		svr.logger.Infof("Main reactor is exiting normally on the signal error: %v", err)
+	default:
+		svr.logger.Fatalf("Main reactor is exiting due to an unexpected error: %v", err)
 
-	svr.logger.Printf("main reactor exits with error:%v\n", svr.mainLoop.poller.Polling(func(fd int, filter int16) error {
-		return svr.acceptNewConnection(fd)
-	}))
+	}
 }
 
 func (svr *server) activateSubReactor(el *eventloop) {
@@ -44,8 +47,7 @@ func (svr *server) activateSubReactor(el *eventloop) {
 	if el.idx == 0 && svr.opts.Ticker {
 		go el.loopTicker()
 	}
-
-	svr.logger.Printf("event-loop:%d exits with error:%v\n", el.idx, el.poller.Polling(func(fd int, filter int16) error {
+	switch err := el.poller.Polling(func(fd int, filter int16) error {
 		if c, ack := el.connections[fd]; ack {
 			if filter == netpoll.EVFilterSock {
 				return el.loopCloseConn(c, nil)
@@ -67,5 +69,10 @@ func (svr *server) activateSubReactor(el *eventloop) {
 			}
 		}
 		return nil
-	}))
+	}); err {
+	case errServerShutdown:
+		svr.logger.Infof("Event-loop(%d) is exiting normally on the signal error: %v", el.idx, err)
+	default:
+		svr.logger.Fatalf("Event-loop(%d) is exiting due to an unexpected error: %v", el.idx, err)
+	}
 }

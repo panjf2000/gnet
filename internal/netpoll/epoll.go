@@ -24,11 +24,11 @@
 package netpoll
 
 import (
-	"log"
 	"os"
 	"unsafe"
 
 	"github.com/panjf2000/gnet/internal"
+	"github.com/panjf2000/gnet/logging"
 	"golang.org/x/sys/unix"
 )
 
@@ -94,7 +94,7 @@ func (p *Poller) Polling(callback func(fd int, ev uint32) error) (err error) {
 	for {
 		n, err0 := unix.EpollWait(p.fd, el.events, -1)
 		if err0 != nil && err0 != unix.EINTR {
-			log.Println(os.NewSyscallError("epoll_wait", err0))
+			logging.DefaultLogger.Warnf("Error occurs in epoll, %v", os.NewSyscallError("epoll_wait", err0))
 			continue
 		}
 		for i := 0; i < n; i++ {

@@ -29,6 +29,8 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/panjf2000/gnet/logging"
 )
 
 // commandBufferSize represents the buffer size of event-loop command channel on Windows.
@@ -46,7 +48,7 @@ type server struct {
 	once            sync.Once          // make sure only signalShutdown once
 	codec           ICodec             // codec for TCP stream
 	loopWG          sync.WaitGroup     // loop close WaitGroup
-	logger          Logger             // customized logger for logging info
+	logger          logging.Logger     // customized logger for logging info
 	ticktock        chan time.Duration // ticker channel
 	listenerWG      sync.WaitGroup     // listener close WaitGroup
 	eventHandler    EventHandler       // user eventHandler
@@ -102,7 +104,7 @@ func (svr *server) startLoops(numEventLoop int) {
 
 func (svr *server) stop() {
 	// Wait on a signal for shutdown.
-	svr.logger.Printf("server is being shutdown with err: %v\n", svr.waitForShutdown())
+	svr.logger.Infof("Server is being shutdown on the signal error: %v", svr.waitForShutdown())
 
 	// Close listener.
 	svr.ln.close()
@@ -152,12 +154,7 @@ func serve(eventHandler EventHandler, listener *listener, options *Options) (err
 
 	svr.ticktock = make(chan time.Duration, 1)
 	svr.cond = sync.NewCond(&sync.Mutex{})
-	svr.logger = func() Logger {
-		if options.Logger == nil {
-			return defaultLogger
-		}
-		return options.Logger
-	}()
+	svr.logger = logging.DefaultLogger
 	svr.codec = func() ICodec {
 		if options.Codec == nil {
 			return new(BuiltInFrameCodec)

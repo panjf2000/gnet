@@ -26,10 +26,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"log"
 	"math/rand"
 	"net"
-	"os"
 	"runtime"
 	"sync/atomic"
 	"testing"
@@ -38,6 +36,7 @@ import (
 	"github.com/panjf2000/gnet/pool/bytebuffer"
 	"github.com/panjf2000/gnet/pool/goroutine"
 	"github.com/valyala/bytebufferpool"
+	"go.uber.org/zap"
 )
 
 func TestCodecServe(t *testing.T) {
@@ -661,8 +660,10 @@ func (t *testWakeConnServer) Tick() (delay time.Duration, action Action) {
 
 func testWakeConn(network, addr string) {
 	svr := &testWakeConnServer{network: network, addr: addr}
+	logger := zap.NewExample()
+	defer logger.Sync()
 	must(Serve(svr, network+"://"+addr, WithTicker(true), WithNumEventLoop(2*runtime.NumCPU()),
-		WithLogger(log.New(os.Stderr, "", log.LstdFlags))))
+		WithLogger(logger.Sugar())))
 }
 
 func TestShutdown(t *testing.T) {

@@ -26,6 +26,8 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
+
+	"github.com/panjf2000/gnet/logging"
 )
 
 // Action is an action that occurs after the completion of an event.
@@ -231,8 +233,9 @@ func Serve(eventHandler EventHandler, protoAddr string, opts ...Option) (err err
 	options := loadOptions(opts...)
 
 	if options.Logger != nil {
-		defaultLogger = options.Logger
+		logging.DefaultLogger = options.Logger
 	}
+	defer logging.Cleanup()
 
 	network, addr := parseProtoAddr(protoAddr)
 
@@ -258,6 +261,6 @@ func parseProtoAddr(addr string) (network, address string) {
 
 func sniffErrorAndLog(err error) {
 	if err != nil {
-		defaultLogger.Printf(err.Error())
+		logging.DefaultLogger.Errorf(err.Error())
 	}
 }

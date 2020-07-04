@@ -64,8 +64,13 @@ func (el *eventloop) loopRun() {
 	if el.idx == 0 && el.svr.opts.Ticker {
 		go el.loopTicker()
 	}
+	switch err := el.poller.Polling(el.handleEvent); err {
+	case errServerShutdown:
+		el.svr.logger.Infof("Event-loop(%d) is exiting normally on the signal error: %v", el.idx, err)
+	default:
+		el.svr.logger.Fatalf("Event-loop(%d) is exiting due to an unexpected error: %v", el.idx, err)
 
-	el.svr.logger.Printf("event-loop:%d exits with error: %v\n", el.idx, el.poller.Polling(el.handleEvent))
+	}
 }
 
 func (el *eventloop) loopAccept(fd int) error {
@@ -193,10 +198,11 @@ func (el *eventloop) loopCloseConn(c *conn, err error) error {
 		c.releaseTCP()
 	} else {
 		if err0 != nil {
-			el.svr.logger.Printf("failed to delete fd:%d from poller, error:%v\n", c.fd, err0)
+			el.svr.logger.Warnf("Failed to delete fd=%d from poller in event-loop(%d), %v", c.fd, el.idx, err0)
 		}
 		if err1 != nil {
-			el.svr.logger.Printf("failed to close fd:%d, error:%v\n", c.fd, os.NewSyscallError("close", err1))
+			el.svr.logger.Warnf("Failed to close fd=%d in event-loop(%d), %v",
+				c.fd, el.idx, os.NewSyscallError("close", err1))
 		}
 	}
 	return nil
@@ -232,7 +238,7 @@ func (el *eventloop) loopTicker() {
 			return
 		})
 		if err != nil {
-			el.svr.logger.Printf("failed to awake poller with error:%v, stopping ticker\n", err)
+			el.svr.logger.Errorf("Failed to awake poller in event-loop(%d), error:%v, stopping ticker", el.idx, err)
 			break
 		}
 		if delay, open = <-el.svr.ticktock; open {
@@ -260,7 +266,8 @@ func (el *eventloop) loopReadUDP(fd int) error {
 	n, sa, err := unix.Recvfrom(fd, el.packet, 0)
 	if err != nil || n == 0 {
 		if err != nil && err != unix.EAGAIN {
-			el.svr.logger.Printf("failed to read UDP packet from fd:%d, error:%v\n", fd, os.NewSyscallError("recvfrom", err))
+			el.svr.logger.Warnf("Failed to read UDP packet from fd=%d in event-loop(%d), %v",
+				fd, el.idx, os.NewSyscallError("recvfrom", err))
 		}
 		return nil
 	}
