@@ -17,6 +17,7 @@ func (es *echoServer) OnInitComplete(srv gnet.Server) (action gnet.Action) {
 		srv.Addr.String(), srv.Multicore, srv.NumEventLoop)
 	return
 }
+
 func (es *echoServer) React(frame []byte, c gnet.Conn) (out []byte, action gnet.Action) {
 	// Echo synchronously.
 	out = frame

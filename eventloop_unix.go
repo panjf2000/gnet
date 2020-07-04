@@ -191,8 +191,7 @@ func (el *eventloop) loopCloseConn(c *conn, err error) error {
 	if err0 == nil && err1 == nil {
 		delete(el.connections, c.fd)
 		el.calibrateCallback(el, -1)
-		switch el.eventHandler.OnClosed(c, err) {
-		case Shutdown:
+		if el.eventHandler.OnClosed(c, err) == Shutdown {
 			return errServerShutdown
 		}
 		c.releaseTCP()
@@ -277,8 +276,7 @@ func (el *eventloop) loopReadUDP(fd int) error {
 		el.eventHandler.PreWrite()
 		_ = c.sendTo(out)
 	}
-	switch action {
-	case Shutdown:
+	if action == Shutdown {
 		return errServerShutdown
 	}
 	c.releaseUDP()

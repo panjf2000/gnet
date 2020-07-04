@@ -153,7 +153,7 @@ func (r *RingBuffer) Read(p []byte) (n int, err error) {
 			n = len(p)
 		}
 		copy(p, r.buf[r.r:r.r+n])
-		r.r = r.r + n
+		r.r += n
 		if r.r == r.w {
 			r.isEmpty = true
 		}
@@ -240,7 +240,7 @@ func (r *RingBuffer) Write(p []byte) (n int, err error) {
 	return n, err
 }
 
-// WriteByte writes one byte into buffer
+// WriteByte writes one byte into buffer.
 func (r *RingBuffer) WriteByte(c byte) error {
 	if r.Free() < 1 {
 		r.malloc(1)

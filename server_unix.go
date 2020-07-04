@@ -49,14 +49,14 @@ type server struct {
 	subEventLoopSet loadBalancer       // event-loops for handling events
 }
 
-// waitForShutdown waits for a signal to shutdown
+// waitForShutdown waits for a signal to shutdown.
 func (svr *server) waitForShutdown() {
 	svr.cond.L.Lock()
 	svr.cond.Wait()
 	svr.cond.L.Unlock()
 }
 
-// signalShutdown signals a shutdown an begins server closing
+// signalShutdown signals the server to shut down.
 func (svr *server) signalShutdown() {
 	svr.once.Do(func() {
 		svr.cond.L.Lock()

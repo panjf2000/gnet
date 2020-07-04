@@ -238,7 +238,7 @@ func (cc *LengthFieldBasedFrameCodec) Decode(c Conn) ([]byte, error) {
 		err    error
 	)
 	in = c.Read()
-	if cc.decoderConfig.LengthFieldOffset > 0 { //discard header(offset)
+	if cc.decoderConfig.LengthFieldOffset > 0 { // discard header(offset)
 		header, err = in.readN(cc.decoderConfig.LengthFieldOffset)
 		if err != nil {
 			return nil, errUnexpectedEOF

@@ -21,16 +21,19 @@ func (ps *pushServer) OnInitComplete(srv gnet.Server) (action gnet.Action) {
 		"pushing data every %s ...\n", srv.Addr.String(), srv.Multicore, srv.NumEventLoop, ps.tick.String())
 	return
 }
+
 func (ps *pushServer) OnOpened(c gnet.Conn) (out []byte, action gnet.Action) {
 	log.Printf("Socket with addr: %s has been opened...\n", c.RemoteAddr().String())
 	ps.connectedSockets.Store(c.RemoteAddr().String(), c)
 	return
 }
+
 func (ps *pushServer) OnClosed(c gnet.Conn, err error) (action gnet.Action) {
 	log.Printf("Socket with addr: %s is closing...\n", c.RemoteAddr().String())
 	ps.connectedSockets.Delete(c.RemoteAddr().String())
 	return
 }
+
 func (ps *pushServer) Tick() (delay time.Duration, action gnet.Action) {
 	log.Println("It's time to push data to clients!!!")
 	ps.connectedSockets.Range(func(key, value interface{}) bool {
@@ -42,6 +45,7 @@ func (ps *pushServer) Tick() (delay time.Duration, action gnet.Action) {
 	delay = ps.tick
 	return
 }
+
 func (ps *pushServer) React(frame []byte, c gnet.Conn) (out []byte, action gnet.Action) {
 	out = frame
 	return

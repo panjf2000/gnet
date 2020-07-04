@@ -29,7 +29,7 @@ before_install:
 
 install:
   - go get -u golang.org/x/lint/golint
-  - curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.24.0
+  - curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.27.0
   - curl -sfL https://raw.githubusercontent.com/reviewdog/reviewdog/master/install.sh | sh -s -- -b ~/bin
 
 script:
@@ -37,9 +37,9 @@ script:
     case $TRAVIS_OS_NAME in
       linux|osx)
         golint ./... | reviewdog -f=golint -reporter=github-check
-        golangci-lint run --out-format=line-number -E gofmt -E golint -E misspell -E lll | reviewdog -f=golangci-lint -reporter=github-check
+        golangci-lint run --out-format=line-number -E goimports -E gocritic -E misspell -E godot | reviewdog -f=golangci-lint -reporter=github-check
         golint ./... | reviewdog -f=golint -reporter=github-pr-review
-        golangci-lint run --out-format=line-number -E gofmt -E golint -E misspell -E lll | reviewdog -f=golangci-lint -reporter=github-pr-review
+        golangci-lint run --out-format=line-number -E goimports -E gocritic -E misspell -E godot | reviewdog -f=golangci-lint -reporter=github-pr-review
         ;;
     esac
   - go test -v ./...

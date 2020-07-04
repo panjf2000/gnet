@@ -114,7 +114,7 @@ type Conn interface {
 	BufferLength() (size int)
 
 	// InboundBuffer returns the inbound ring-buffer.
-	//InboundBuffer() *ringbuffer.RingBuffer
+	// InboundBuffer() *ringbuffer.RingBuffer
 
 	// SendTo writes data for UDP sockets, it allows you to send data back to UDP socket in individual goroutines.
 	SendTo(buf []byte) error

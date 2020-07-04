@@ -3,11 +3,12 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
+	"time"
+
 	"github.com/panjf2000/gnet"
 	"github.com/panjf2000/gnet/examples/custom_codec/protocol"
 	"github.com/panjf2000/gnet/pool/goroutine"
-	"log"
-	"time"
 )
 
 type customCodecServer struct {

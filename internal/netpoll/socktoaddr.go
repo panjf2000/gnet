@@ -78,7 +78,7 @@ func sockaddrInet6ToIPAndZone(sa *unix.SockaddrInet6) (net.IP, string) {
 }
 
 // ip6ZoneToString converts an IP6 Zone unix int to a net string
-// returns "" if zone is 0
+// returns "" if zone is 0.
 func ip6ZoneToString(zone int) string {
 	if zone == 0 {
 		return ""

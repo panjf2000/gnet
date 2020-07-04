@@ -72,7 +72,7 @@ func (cc *CustomLengthFieldProtocol) Decode(c gnet.Conn) ([]byte, error) {
 			return nil, errors.New("not normal protocol")
 		}
 		// parse payload
-		dataLen := int(dataLength) //max int32 can contain 210MB payload
+		dataLen := int(dataLength) // max int32 can contain 210MB payload
 		protocolLen := headerLen + dataLen
 		if dataSize, data := c.ReadN(protocolLen); dataSize == protocolLen {
 			c.ShiftN(protocolLen)

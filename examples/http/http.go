@@ -30,8 +30,10 @@ type httpServer struct {
 	*gnet.EventServer
 }
 
-var errMsg = "Internal Server Error"
-var errMsgBytes = []byte(errMsg)
+var (
+	errMsg      = "Internal Server Error"
+	errMsgBytes = []byte(errMsg)
+)
 
 type httpCodec struct {
 	req request
@@ -144,7 +146,7 @@ func parseReq(data []byte, req *request) (leftover []byte, err error) {
 	var i, s int
 	var head string
 	var clen int
-	var q = -1
+	q := -1
 	// method, path, proto line
 	for ; i < len(sdata); i++ {
 		if sdata[i] == ' ' {

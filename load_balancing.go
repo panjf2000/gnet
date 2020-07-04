@@ -118,7 +118,7 @@ func (h minEventLoopHeap) Len() int {
 }
 
 func (h minEventLoopHeap) Less(i, j int) bool {
-	//return (*h)[i].loadConnCount() < (*h)[j].loadConnCount()
+	// return (*h)[i].loadConnCount() < (*h)[j].loadConnCount()
 	return h[i].connCount < h[j].connCount
 }
 
@@ -155,10 +155,10 @@ func (set *leastConnectionsEventLoopSet) register(el *eventloop) {
 
 // next returns the eligible event-loop by taking the root node from minimum heap based on Least-Connections algorithm.
 func (set *leastConnectionsEventLoopSet) next(_ int) (el *eventloop) {
-	//set.RLock()
-	//el = set.minHeap[0]
-	//set.RUnlock()
-	//return
+	// set.RLock()
+	// el = set.minHeap[0]
+	// set.RUnlock()
+	// return
 
 	// In most cases, `next` method returns the cached event-loop immediately and it only reconstructs the minimum heap
 	// every `calibrateConnsThreshold` times for reducing locks to global mutex.
@@ -190,10 +190,10 @@ func (set *leastConnectionsEventLoopSet) len() (size int) {
 }
 
 func (set *leastConnectionsEventLoopSet) calibrate(el *eventloop, delta int32) {
-	//set.Lock()
-	//el.connCount += delta
-	//heap.Fix(&set.minHeap, el.idx)
-	//set.Unlock()
+	// set.Lock()
+	// el.connCount += delta
+	// heap.Fix(&set.minHeap, el.idx)
+	// set.Unlock()
 	set.RLock()
 	atomic.AddInt32(&el.connCount, delta)
 	atomic.AddInt32(&set.threshold, 1)

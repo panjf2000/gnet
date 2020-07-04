@@ -5,10 +5,11 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/panjf2000/gnet/examples/custom_codec/protocol"
 	"io"
 	"log"
 	"net"
+
+	"github.com/panjf2000/gnet/examples/custom_codec/protocol"
 )
 
 // Example command: go run client.go
@@ -23,7 +24,6 @@ func main() {
 		for {
 
 			response, err := ClientDecode(conn)
-
 			if err != nil {
 				log.Printf("ClientDecode error, %v\n", err)
 			}
@@ -48,7 +48,6 @@ func main() {
 	conn.Write(pbdata)
 
 	select {}
-
 }
 
 // ClientEncode :
@@ -83,7 +82,6 @@ func ClientEncode(pbVersion, actionType uint16, data []byte) ([]byte, error) {
 
 // ClientDecode :
 func ClientDecode(rawConn net.Conn) (*protocol.CustomLengthFieldProtocol, error) {
-
 	newPackage := protocol.CustomLengthFieldProtocol{}
 
 	headData := make([]byte, protocol.DefaultHeadLength)

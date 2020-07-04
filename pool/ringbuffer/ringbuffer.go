@@ -37,13 +37,13 @@ const (
 	steps      = 20
 
 	minSize = 1 << minBitSize
-	//maxSize = 1 << (minBitSize + steps - 1)
+	// maxSize = 1 << (minBitSize + steps - 1)
 
 	calibrateCallsThreshold = 42000
 	maxPercentile           = 0.95
 )
 
-// RingBuffer is the alias of ringbuffer.RingBuffer
+// RingBuffer is the alias of ringbuffer.RingBuffer.
 type RingBuffer = ringbuffer.RingBuffer
 
 // Pool represents byte buffer pool.
