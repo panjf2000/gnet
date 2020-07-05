@@ -27,7 +27,7 @@ import (
 	"os"
 
 	"github.com/panjf2000/gnet/internal"
-	"github.com/panjf2000/gnet/logging"
+	"github.com/panjf2000/gnet/internal/logging"
 	"golang.org/x/sys/unix"
 )
 

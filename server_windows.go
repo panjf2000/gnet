@@ -31,7 +31,7 @@ import (
 	"time"
 
 	errors2 "github.com/panjf2000/gnet/errors"
-	"github.com/panjf2000/gnet/logging"
+	"github.com/panjf2000/gnet/internal/logging"
 )
 
 // commandBufferSize represents the buffer size of event-loop command channel on Windows.

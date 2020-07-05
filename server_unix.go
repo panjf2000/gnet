@@ -32,8 +32,8 @@ import (
 	"time"
 
 	"github.com/panjf2000/gnet/errors"
+	"github.com/panjf2000/gnet/internal/logging"
 	"github.com/panjf2000/gnet/internal/netpoll"
-	"github.com/panjf2000/gnet/logging"
 )
 
 type server struct {
