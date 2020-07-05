@@ -45,7 +45,7 @@ type server struct {
 	codec           ICodec             // codec for TCP stream
 	logger          logging.Logger     // customized logger for logging info
 	ticktock        chan time.Duration // ticker channel
-	mainLoop        *eventloop         // main loop for accepting connections
+	mainLoop        *eventloop         // main event-loop for accepting connections
 	eventHandler    EventHandler       // user eventHandler
 	subEventLoopSet loadBalancer       // event-loops for handling events
 }
@@ -66,7 +66,7 @@ func (svr *server) signalShutdown() {
 	})
 }
 
-func (svr *server) startLoops() {
+func (svr *server) startEventLoops() {
 	svr.subEventLoopSet.iterate(func(i int, el *eventloop) bool {
 		svr.wg.Add(1)
 		go func() {
@@ -77,14 +77,14 @@ func (svr *server) startLoops() {
 	})
 }
 
-func (svr *server) closeLoops() {
+func (svr *server) closeEventLoops() {
 	svr.subEventLoopSet.iterate(func(i int, el *eventloop) bool {
 		_ = el.poller.Close()
 		return true
 	})
 }
 
-func (svr *server) startReactors() {
+func (svr *server) startSubReactors() {
 	svr.subEventLoopSet.iterate(func(i int, el *eventloop) bool {
 		svr.wg.Add(1)
 		go func() {
@@ -95,7 +95,7 @@ func (svr *server) startReactors() {
 	})
 }
 
-func (svr *server) activateLoops(numEventLoop int) (err error) {
+func (svr *server) activateEventLoops(numEventLoop int) (err error) {
 	// Create loops locally and bind the listeners.
 	for i := 0; i < numEventLoop; i++ {
 		l := svr.ln
@@ -123,8 +123,10 @@ func (svr *server) activateLoops(numEventLoop int) (err error) {
 			return
 		}
 	}
-	// Start loops in background
-	svr.startLoops()
+
+	// Start event-loops in background.
+	svr.startEventLoops()
+
 	return
 }
 
@@ -147,8 +149,8 @@ func (svr *server) activateReactors(numEventLoop int) error {
 		}
 	}
 
-	// Start sub reactors.
-	svr.startReactors()
+	// Start sub reactors in background.
+	svr.startSubReactors()
 
 	if p, err := netpoll.OpenPoller(); err == nil {
 		el := &eventloop{
@@ -159,7 +161,8 @@ func (svr *server) activateReactors(numEventLoop int) error {
 		}
 		_ = el.poller.AddRead(el.ln.fd)
 		svr.mainLoop = el
-		// Start main reactor.
+
+		// Start main reactor in background.
 		svr.wg.Add(1)
 		go func() {
 			svr.activateMainReactor()
@@ -168,13 +171,15 @@ func (svr *server) activateReactors(numEventLoop int) error {
 	} else {
 		return err
 	}
+
 	return nil
 }
 
 func (svr *server) start(numEventLoop int) error {
 	if svr.opts.ReusePort || svr.ln.network == "udp" {
-		return svr.activateLoops(numEventLoop)
+		return svr.activateEventLoops(numEventLoop)
 	}
+
 	return svr.activateReactors(numEventLoop)
 }
 
@@ -200,7 +205,7 @@ func (svr *server) stop() {
 	// Wait on all loops to complete reading events
 	svr.wg.Wait()
 
-	svr.closeLoops()
+	svr.closeEventLoops()
 
 	if svr.mainLoop != nil {
 		sniffErrorAndLog(svr.mainLoop.poller.Close())
@@ -268,7 +273,7 @@ func serve(eventHandler EventHandler, listener *listener, options *Options) erro
 	}()
 
 	if err := svr.start(numEventLoop); err != nil {
-		svr.closeLoops()
+		svr.closeEventLoops()
 		svr.logger.Errorf("gnet server is stopping with error: %v", err)
 		return err
 	}

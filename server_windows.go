@@ -83,7 +83,7 @@ func (svr *server) startListener() {
 	}()
 }
 
-func (svr *server) startLoops(numEventLoop int) {
+func (svr *server) startEventLoops(numEventLoop int) {
 	for i := 0; i < numEventLoop; i++ {
 		el := &eventloop{
 			ch:                make(chan interface{}, commandBufferSize),
@@ -189,10 +189,12 @@ func serve(eventHandler EventHandler, listener *listener, options *Options) (err
 		svr.signalShutdown(errors.New("caught OS signal"))
 	}()
 
-	// Start all loops.
-	svr.startLoops(numEventLoop)
-	// Start listener.
+	// Start all event-loops in background.
+	svr.startEventLoops(numEventLoop)
+
+	// Start listener in background.
 	svr.startListener()
+
 	defer svr.stop()
 
 	return
