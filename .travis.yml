@@ -7,18 +7,52 @@ env:
 
 dist: bionic
 
-os:
-  - linux
-  - osx
-  - windows
+#os:
+#  - linux
+#  - osx
+#  - windows
 
-go:
+#go:
 #  - 1.9.x
 #  - 1.10.x
 #  - 1.11.x
 #  - 1.12.x
-  - 1.13.x
-  - 1.14.x
+#  - 1.13.x
+#  - 1.14.x
+#  - master
+
+matrix:
+  allow_failures:
+    - go: master
+  fast_finish: true
+  include:
+    - os: linux
+      go: 1.13.x
+      env: GNET_LOGGING_MODE=prod
+    - os: linux
+      go: 1.14.x
+      env: GNET_LOGGING_MODE=prod
+    - os: linux
+      go: master
+      env: GNET_LOGGING_MODE=prod
+    - os: osx
+      go: 1.13.x
+      env: GNET_LOGGING_MODE=dev
+    - os: osx
+      go: 1.14.x
+      env: GNET_LOGGING_MODE=dev
+    - os: osx
+      go: master
+      env: GNET_LOGGING_MODE=dev
+    - os: windows
+      go: 1.13.x
+      env: GNET_LOGGING_MODE=test
+    - os: windows
+      go: 1.14.x
+      env: GNET_LOGGING_MODE=test
+    - os: windows
+      go: master
+      env: GNET_LOGGING_MODE=test
 
 go_import_path: github.com/panjf2000/gnet
 

@@ -19,8 +19,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-// Package reuseport provides a function that returns fd and net.Listener powered
-// by a net.FileListener with a SO_REUSEPORT option set to the socket.
+// Package reuseport provides functions that return fd and net.Addr based on
+// given the protocol and address with a SO_REUSEPORT option set to the socket.
 
 // +build linux freebsd dragonfly darwin
 

@@ -18,9 +18,31 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+// package logging provides logging functionality for gnet server,
+// it sets up a default logger (powered by go.uber.org/zap)
+// which is about to be used by gnet server, it also allows users
+// to replace the default logger with their customized logger by just
+// implementing the `Logger` interface and assign it to the functional option `Options.Logger`,
+// pass it to `gnet.Serve` method.
+//
+// There are two logging modes in zap, instantiated by either NewProduction() or NewDevelopment(),
+// the former builds a sensible production Logger that writes InfoLevel and above logs to standard error as JSON,
+// it's a shortcut for NewProductionConfig().Build(...Option); the latter builds a development Logger
+// that writes DebugLevel and above logs to standard error in a human-friendly format,
+// it's a shortcut for NewDevelopmentConfig().Build(...Option).
+//
+// The environment variable `GNET_LOGGING_MODE` determines which zap logger type will be created for logging,
+// "prod" (case-insensitive) means production logger while other values except "prod" including "dev" (case-insensitive)
+// represent development logger.
+
 package logging
 
-import "go.uber.org/zap"
+import (
+	"os"
+	"strings"
+
+	"go.uber.org/zap"
+)
 
 var (
 	// DefaultLogger is the default logger inside the gnet server.
@@ -29,7 +51,13 @@ var (
 )
 
 func init() {
-	zapLogger, _ = zap.NewDevelopment()
+	switch strings.ToLower(os.Getenv("GNET_LOGGING_MODE")) {
+	case "prod":
+		zapLogger, _ = zap.NewProduction()
+	default:
+		// Other values except "Prod" create the development logger for gnet server.
+		zapLogger, _ = zap.NewDevelopment()
+	}
 	DefaultLogger = zapLogger.Sugar()
 }
 
