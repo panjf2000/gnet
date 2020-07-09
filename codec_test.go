@@ -21,12 +21,24 @@
 package gnet
 
 import (
+	"bytes"
 	"encoding/binary"
 	"math/rand"
 	"testing"
 
 	"github.com/panjf2000/gnet/errors"
 )
+
+type mockConn struct {
+	Conn
+	buf []byte
+}
+
+func (c *mockConn) Read() []byte {
+	return c.buf
+}
+
+func (c *mockConn) ShiftN(_ int) int { return 0 }
 
 func TestLengthFieldBasedFrameCodecWith1(t *testing.T) {
 	encoderConfig := EncoderConfig{
@@ -47,31 +59,43 @@ func TestLengthFieldBasedFrameCodecWith1(t *testing.T) {
 	sz := 256
 	data := make([]byte, sz)
 	if _, err := rand.Read(data); err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	if _, err := codec.Encode(nil, data); err == nil {
-		panic("should have a error of exceeding bytes.")
+		t.Fatal("should have a error of exceeding bytes")
 	}
 
 	sz = 255
 	data = make([]byte, sz)
 	if _, err := rand.Read(data); err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	out, _ := codec.Encode(nil, data)
-	if string(out[1:]) != string(data) {
-		t.Fatalf("data don't match with big endian, raw data: %s, encoded data: %s\n", string(data), string(out))
+	if !bytes.Equal(out[1:], data) {
+		t.Fatalf("encoded data(%s) shoule be equal to the original data(%s)\n", string(out[1:]), string(data))
+	}
+	c := &mockConn{buf: out}
+	if res, err := codec.Decode(c); err != nil {
+		t.Fatalf("decode data with error: %v\n", err)
+	} else if !bytes.Equal(res, data) {
+		t.Fatalf("decoded data(%s) shoule be equal to the original data(%s)\n", string(res), string(data))
 	}
 
 	encoderConfig.ByteOrder = binary.LittleEndian
 	decoderConfig.ByteOrder = binary.LittleEndian
 	codec = NewLengthFieldBasedFrameCodec(encoderConfig, decoderConfig)
 	if _, err := rand.Read(data); err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	out, _ = codec.Encode(nil, data)
-	if string(out[1:]) != string(data) {
-		t.Fatalf("data don't match with little endian, raw data: %s, encoded data: %s\n", string(data), string(out))
+	if !bytes.Equal(out[1:], data) {
+		t.Fatalf("encoded data(%s) shoule be equal to the original data(%s)\n", string(out[1:]), string(data))
+	}
+	c.buf = out
+	if res, err := codec.Decode(c); err != nil {
+		t.Fatalf("decode data with error: %v\n", err)
+	} else if !bytes.Equal(res, data) {
+		t.Fatalf("decoded data(%s) shoule be equal to original data(%s)\n", string(res), string(data))
 	}
 }
 
@@ -94,20 +118,26 @@ func TestLengthFieldBasedFrameCodecWith2(t *testing.T) {
 	sz := 65536
 	data := make([]byte, sz)
 	if _, err := rand.Read(data); err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	if _, err := codec.Encode(nil, data); err == nil {
-		panic("should have a error of exceeding bytes.")
+		t.Fatal("should have a error of exceeding bytes.")
 	}
 
 	sz = rand.Intn(10) * 1024
 	data = make([]byte, sz)
 	if _, err := rand.Read(data); err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	out, _ := codec.Encode(nil, data)
-	if string(out[2:]) != string(data) {
-		t.Fatalf("data don't match with big endian, raw data: %s, encoded data: %s\n", string(data), string(out))
+	if !bytes.Equal(out[2:], data) {
+		t.Fatalf("encoded data(%s) shoule be equal to the original data(%s)\n", string(out[2:]), string(data))
+	}
+	c := &mockConn{buf: out}
+	if res, err := codec.Decode(c); err != nil {
+		t.Fatalf("decode data with error: %v\n", err)
+	} else if !bytes.Equal(res, data) {
+		t.Fatalf("decoded data(%s) shoule be equal to the original data(%s)\n", string(res), string(data))
 	}
 
 	encoderConfig.ByteOrder = binary.LittleEndian
@@ -116,11 +146,17 @@ func TestLengthFieldBasedFrameCodecWith2(t *testing.T) {
 	sz = rand.Intn(10) * 1024
 	data = make([]byte, sz)
 	if _, err := rand.Read(data); err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	out, _ = codec.Encode(nil, data)
-	if string(out[2:]) != string(data) {
-		t.Fatalf("data don't match with little endian, raw data: %s, encoded data: %s\n", string(data), string(out))
+	if !bytes.Equal(out[2:], data) {
+		t.Fatalf("encoded data(%s) shoule be equal to the original data(%s)\n", string(out[2:]), string(data))
+	}
+	c.buf = out
+	if res, err := codec.Decode(c); err != nil {
+		t.Fatalf("decode data with error: %v\n", err)
+	} else if !bytes.Equal(res, data) {
+		t.Fatalf("decoded data(%s) shoule be equal to original data(%s)\n", string(res), string(data))
 	}
 }
 
@@ -143,20 +179,26 @@ func TestLengthFieldBasedFrameCodecWith3(t *testing.T) {
 	sz := 16777216
 	data := make([]byte, sz)
 	if _, err := rand.Read(data); err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	if _, err := codec.Encode(nil, data); err == nil {
-		panic("should have a error of exceeding bytes.")
+		t.Fatal("should have a error of exceeding bytes.")
 	}
 
 	sz = rand.Intn(10) * 64 * 1024
 	data = make([]byte, sz)
 	if _, err := rand.Read(data); err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	out, _ := codec.Encode(nil, data)
-	if string(out[3:]) != string(data) {
-		t.Fatalf("data don't match with big endian, raw data: %s, encoded data: %s\n", string(data), string(out))
+	if !bytes.Equal(out[3:], data) {
+		t.Fatalf("encoded data(%s) shoule be equal to the original data(%s)\n", string(out[3:]), string(data))
+	}
+	c := &mockConn{buf: out}
+	if res, err := codec.Decode(c); err != nil {
+		t.Fatalf("decode data with error: %v\n", err)
+	} else if !bytes.Equal(res, data) {
+		t.Fatalf("decoded data(%s) shoule be equal to the original data(%s)\n", string(res), string(data))
 	}
 
 	encoderConfig.ByteOrder = binary.LittleEndian
@@ -168,22 +210,28 @@ func TestLengthFieldBasedFrameCodecWith3(t *testing.T) {
 		panic(err)
 	}
 	out, _ = codec.Encode(nil, data)
-	if string(out[3:]) != string(data) {
-		t.Fatalf("data don't match with little endian, raw data: %s, encoded data: %s\n", string(data), string(out))
+	if !bytes.Equal(out[3:], data) {
+		t.Fatalf("encoded data(%s) shoule be equal to the original data(%s)\n", string(out[3:]), string(data))
+	}
+	c.buf = out
+	if res, err := codec.Decode(c); err != nil {
+		t.Fatalf("decode data with error: %v\n", err)
+	} else if !bytes.Equal(res, data) {
+		t.Fatalf("decoded data(%s) shoule be equal to original data(%s)\n", string(res), string(data))
 	}
 
 	buf := make([]byte, 3)
 	rand.Read(buf)
 	bNum := readUint24(binary.BigEndian, buf)
 	p := writeUint24(binary.BigEndian, int(bNum))
-	if string(buf) != string(p) {
+	if !bytes.Equal(buf, p) {
 		t.Fatalf("data don't match with big endian, raw data: %s, recovered data: %s\n", string(buf), string(p))
 	}
 
 	rand.Read(buf)
 	bNum = readUint24(binary.LittleEndian, buf)
 	p = writeUint24(binary.LittleEndian, int(bNum))
-	if string(buf) != string(p) {
+	if !bytes.Equal(buf, p) {
 		t.Fatalf("data don't match with little endian, raw data: %s, recovered data: %s\n", string(buf), string(p))
 	}
 }
@@ -206,11 +254,17 @@ func TestLengthFieldBasedFrameCodecWith8(t *testing.T) {
 	sz := rand.Intn(10) * 1024 * 1024
 	data := make([]byte, sz)
 	if _, err := rand.Read(data); err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	out, _ := codec.Encode(nil, data)
-	if string(out[8:]) != string(data) {
-		t.Fatalf("data don't match with big endian, raw data: %s, encoded data: %s\n", string(data), string(out))
+	if !bytes.Equal(out[8:], data) {
+		t.Fatalf("encoded data(%s) shoule be equal to the original data(%s)\n", string(out[8:]), string(data))
+	}
+	c := &mockConn{buf: out}
+	if res, err := codec.Decode(c); err != nil {
+		t.Fatalf("decode data with error: %v\n", err)
+	} else if !bytes.Equal(res, data) {
+		t.Fatalf("decoded data(%s) shoule be equal to the original data(%s)\n", string(res), string(data))
 	}
 
 	encoderConfig.ByteOrder = binary.LittleEndian
@@ -222,15 +276,21 @@ func TestLengthFieldBasedFrameCodecWith8(t *testing.T) {
 		panic(err)
 	}
 	out, _ = codec.Encode(nil, data)
-	if string(out[8:]) != string(data) {
-		t.Fatalf("data don't match with little endian, raw data: %s, encoded data: %s\n", string(data), string(out))
+	if !bytes.Equal(out[8:], data) {
+		t.Fatalf("encoded data(%s) shoule be equal to the original data(%s)\n", string(out[8:]), string(data))
+	}
+	c.buf = out
+	if res, err := codec.Decode(c); err != nil {
+		t.Fatalf("decode data with error: %v\n", err)
+	} else if !bytes.Equal(res, data) {
+		t.Fatalf("decoded data(%s) shoule be equal to original data(%s)\n", string(res), string(data))
 	}
 }
 
 func TestFixedLengthFrameCodec_Encode(t *testing.T) {
 	codec := NewFixedLengthFrameCodec(8)
 	if data, err := codec.Encode(nil, make([]byte, 15)); data != nil || err != errors.ErrInvalidFixedLength {
-		panic("should have a error of invalid fixed length")
+		t.Fatal("should have a error of invalid fixed length")
 	}
 }
 
@@ -238,7 +298,7 @@ func TestInnerBufferReadN(t *testing.T) {
 	var in innerBuffer
 	data := make([]byte, 10)
 	if _, err := rand.Read(data); err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	in = data
 	if _, err := in.readN(-1); err == nil {
