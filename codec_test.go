@@ -309,18 +309,15 @@ func TestLengthFieldBasedFrameCodecZeroPlayLoad(t *testing.T) {
 		InitialBytesToStrip: 4,
 	}
 	codec := NewLengthFieldBasedFrameCodec(encoderConfig, decoderConfig)
-	sz := 0
-	data := make([]byte, sz)
-	if _, err := rand.Read(data); err != nil {
-		panic(err)
+	out, _ := codec.Encode(nil, nil)
+	if len(out[4:]) != 0 {
+		t.Fatalf("encoded data should be empty, but got: %s\n", string(out[4:]))
 	}
-	encoded, _ := codec.Encode(nil, data)
-	if string(encoded[4:]) != string(data) {
-		t.Fatalf("data don't match with big endian, raw data: %s, encoded data: %s\n", string(data), string(encoded))
-	}
-	decoded, err := codec.Decode(&mockConn{buf: encoded})
+	res, err := codec.Decode(&mockConn{buf: out})
 	if err != nil {
-		t.Fatalf("decode error raw data: %s , decoded data: %s\n", string(encoded), string(decoded))
+		t.Fatalf("decode error with error: %v\n", err)
+	}else if len(res) != 0{
+		t.Fatalf("decoded data should be empty, but got: %s\n", string(res[4:]))
 	}
 }
 
