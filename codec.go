@@ -222,8 +222,12 @@ func (cc *LengthFieldBasedFrameCodec) Encode(c Conn, buf []byte) (out []byte, er
 type innerBuffer []byte
 
 func (in *innerBuffer) readN(n int) (buf []byte, err error) {
-	if n <= 0 {
-		return nil, errors.New("zero or negative length is invalid")
+	if n == 0 {
+		return nil, nil
+	}
+
+	if n < 0 {
+		return nil, errors.New("negative length is invalid")
 	} else if n > len(*in) {
 		return nil, errors.New("exceeding buffer length")
 	}

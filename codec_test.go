@@ -294,6 +294,36 @@ func TestFixedLengthFrameCodec_Encode(t *testing.T) {
 	}
 }
 
+func TestLengthFieldBasedFrameCodecZeroPlayLoad(t *testing.T) {
+	encoderConfig := EncoderConfig{
+		ByteOrder:                       binary.BigEndian,
+		LengthFieldLength:               4,
+		LengthAdjustment:                0,
+		LengthIncludesLengthFieldLength: false,
+	}
+	decoderConfig := DecoderConfig{
+		ByteOrder:           binary.BigEndian,
+		LengthFieldOffset:   0,
+		LengthFieldLength:   4,
+		LengthAdjustment:    0,
+		InitialBytesToStrip: 4,
+	}
+	codec := NewLengthFieldBasedFrameCodec(encoderConfig, decoderConfig)
+	sz := 0
+	data := make([]byte, sz)
+	if _, err := rand.Read(data); err != nil {
+		panic(err)
+	}
+	encoded, _ := codec.Encode(nil, data)
+	if string(encoded[4:]) != string(data) {
+		t.Fatalf("data don't match with big endian, raw data: %s, encoded data: %s\n", string(data), string(encoded))
+	}
+	decoded, err := codec.Decode(&mockConn{buf: encoded})
+	if err != nil {
+		t.Fatalf("decode error raw data: %s , decoded data: %s\n", string(encoded), string(decoded))
+	}
+}
+
 func TestInnerBufferReadN(t *testing.T) {
 	var in innerBuffer
 	data := make([]byte, 10)
