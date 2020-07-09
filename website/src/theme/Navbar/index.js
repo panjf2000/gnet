@@ -9,8 +9,6 @@ import Toggle from '@theme/Toggle';
 
 import classnames from 'classnames';
 import {fetchNewHighlight} from '@site/src/exports/newHighlight';
-import {fetchNewPost} from '@site/src/exports/newPost';
-import {fetchNewRelease} from '@site/src/exports/newRelease';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import useHideableNavbar from '@theme/hooks/useHideableNavbar';
@@ -24,16 +22,6 @@ function navLinkAttributes(label, right) {
   let attrs = {'label': label};
 
   switch(label.toLowerCase()) {
-    case 'blog':
-      const newPost = fetchNewPost();
-
-      if (newPost) {
-        attrs.badge = 'new';
-        attrs.badgeStyle = 'primary';
-      }
-
-      return attrs;
-
     case 'chat':
       attrs.hideText = right == true;
       attrs.icon = 'message-circle';
@@ -42,19 +30,6 @@ function navLinkAttributes(label, right) {
     case 'community':
       attrs.hideText = right == true;
       attrs.icon = 'users';
-      return attrs;
-
-    case 'download':
-      const newRelease = fetchNewRelease();
-
-      attrs.hideText = right == true;
-      attrs.icon = 'download';
-
-      if (newRelease) {
-        attrs.badge = 'new';
-        attrs.badgeStyle = 'primary';
-      }
-
       return attrs;
 
     case 'github':

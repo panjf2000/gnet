@@ -10,8 +10,7 @@ import Tabs from '@theme/Tabs';
 
 import classnames from 'classnames';
 import { fetchNewHighlight } from '@site/src/exports/newHighlight';
-import { fetchNewPost } from '@site/src/exports/newPost';
-import { fetchNewRelease } from '@site/src/exports/newRelease';
+import {fetchNewPost} from '@site/src/exports/newPost';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 
 import _ from 'lodash';
@@ -219,10 +218,9 @@ function InstallationSection() {
 }
 
 function Notice() {
-  const newHighlight = fetchNewHighlight();
   const newPost = fetchNewPost();
-  const newRelease = fetchNewRelease();
-  const items = [newHighlight, newPost, newRelease];
+  const newHighlight = fetchNewHighlight();
+  const items = [newPost, newHighlight];
   const item = _(items).compact().sortBy('date').value()[0];
 
   if (item) {
@@ -238,7 +236,6 @@ function Notice() {
 function Home() {
   const context = useDocusaurusContext();
   const { siteConfig = {} } = context;
-  const { metadata: { latest_release } } = siteConfig.customFields;
 
   // useEffect(() => {
   //   cloudify();

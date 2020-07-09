@@ -58,7 +58,7 @@ function Footer() {
           <div className="row footer__links">
             <div className="col col--5 footer__col">
               <div className="margin-bottom--md">
-                <SVG className="navbar__logo" src="/img/logo-light.svg" alt="Vector" width="150" height="auto" />
+                <SVG className="navbar__logo" src="/img/logo-light.svg" alt="Gnet" width="150" height="auto" />
               </div>
               <div className="margin-bottom--md">
                 <MailingListForm description={false} width="150px" />

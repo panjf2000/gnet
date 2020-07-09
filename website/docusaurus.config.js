@@ -20,9 +20,10 @@ module.exports = {
         src: "img/logo-light.svg",
       },
       links: [
-        { href: "https://pkg.go.dev/github.com/panjf2000/gnet?tab=doc", label: "Documentations", position: "left" },
-        { href: "https://taohuawu.club/", label: "Blog", position: "left" },
-        { href: "https://github.com/gnet-io", label: "Community", position: "right" },
+        { to: "docs/", label: "Documentations", position: "left" },
+        { to: "blog/", label: "Blog", position: "left" },
+        { to: "highlights/", label: "Highlights", position: "right" },
+        { to: "community/", label: "Community", position: "right" },
         {
           href: "https://github.com/panjf2000/gnet",
           label: "GitHub",
@@ -42,7 +43,7 @@ module.exports = {
           items: [
             {
               label: "What is Gnet?",
-              href: "https://github.com/panjf2000/gnet#-introduction",
+              to: "docs/about/what-is-gnet/",
             },
             {
               label: "Contact Us",
@@ -87,26 +88,24 @@ module.exports = {
   },
   presets: [],
   plugins: [
-    // [
-    //   "@docusaurus/plugin-content-docs",
-    //   {
-    //     editUrl: "https://github.com/panjf2000/gnet/edit/master/website/",
-    //     sidebarPath: require.resolve("./sidebars.js"),
-    //   },
-    // ],
-    // [
-    //   "@docusaurus/plugin-content-blog",
-    //   {
-    //     feedOptions: {
-    //       type: "all",
-    //       copyright: `Copyright © ${new Date().getFullYear()} Andy Pan.`,
-    //     },
-    //   },
-    // ],
+    [
+      "@docusaurus/plugin-content-docs",
+      {
+        editUrl: "https://github.com/panjf2000/gnet/edit/master/website/",
+        sidebarPath: require.resolve("./sidebars.js"),
+      },
+    ],
+    [
+      "@docusaurus/plugin-content-blog",
+      {
+        feedOptions: {
+          type: "all",
+          copyright: `Copyright © ${new Date().getFullYear()} Andy Pan.`,
+        },
+      },
+    ],
     ["@docusaurus/plugin-content-pages", {}],
-    // path.resolve(__dirname, "./plugins/guides"),
-    // path.resolve(__dirname, "./plugins/highlights"),
-    // path.resolve(__dirname, "./plugins/releases"),
+    path.resolve(__dirname, "./plugins/highlights"),
     // [path.resolve(__dirname, "./plugins/sitemap"), {}],
   ],
   scripts: [],

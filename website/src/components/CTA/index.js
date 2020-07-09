@@ -7,23 +7,23 @@ function CTA({github, inline, size, style}) {
 
   return <div className="row row--squished">
     <div className="col">
-      <a href="https://twitter.com/vectordotdev" target="_blank" className={classes}>
+      <a href="https://twitter.com/_andy_pan" target="_blank" className={classes}>
         <div className="panel--icon">
           <i className="feather icon-twitter" title="Twitter"></i>
         </div>
         <div>
-          <div className="panel--title">Follow @vectordotdev</div>
+          <div className="panel--title">Follow @_andy_pan</div>
           <div className="panel--description">Get real-time updates!</div>
         </div>
       </a>
     </div>
     {github != false && <div className="col">
-      <a href="https://github.com/timberio/vector" target="_blank" className={classes}>
+      <a href="https://github.com/panjf2000/gnet" target="_blank" className={classes}>
         <div className="panel--icon">
           <i className="feather icon-github"></i>
         </div>
         <div>
-          <div className="panel--title">Star timberio/vector</div>
+          <div className="panel--title">Star panjf2000/gnet</div>
           <div className="panel--description">Star the repo to support us.</div>
         </div>
       </a>

@@ -14,7 +14,7 @@ import { useLocation } from 'react-router-dom';
 import './styles.css';
 
 // purposefully hardcoded to protect against people copying our site
-const VECTOR_HOST = 'https://vector.dev';
+const GNET_HOST = 'https://gnet.host';
 
 function Layout(props) {
   const {siteConfig = {}} = useDocusaurusContext();
@@ -41,7 +41,7 @@ function Layout(props) {
   const faviconUrl = useBaseUrl(favicon);
   const location = useLocation();
   let canonURL = location ?
-    (VECTOR_HOST + (location.pathname.endsWith('/') ? location.pathname : (location.pathname + '/'))) :
+    (GNET_HOST + (location.pathname.endsWith('/') ? location.pathname : (location.pathname + '/'))) :
     null;
 
   return (
