@@ -1,0 +1,1 @@
+(window.webpackJsonp=window.webpackJsonp||[]).push([[12],{115:function(s){s.exports=JSON.parse('{"allTagsPath":"/highlights/tags","slug":"domain-socket","name":"domain: socket","count":1,"permalink":"/highlights/tags/domain-socket"}')}}]);

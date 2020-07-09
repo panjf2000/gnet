@@ -1,0 +1,51 @@
+/*!
+ * XRegExp 4.0.0
+ * <xregexp.com>
+ * Steven Levithan (c) 2007-2017 MIT License
+ */
+
+/*!
+ * XRegExp Unicode Base 4.0.0
+ * <xregexp.com>
+ * Steven Levithan (c) 2008-2017 MIT License
+ */
+
+/*!
+ * XRegExp Unicode Blocks 4.0.0
+ * <xregexp.com>
+ * Steven Levithan (c) 2010-2017 MIT License
+ * Unicode data by Mathias Bynens <mathiasbynens.be>
+ */
+
+/*!
+ * XRegExp Unicode Categories 4.0.0
+ * <xregexp.com>
+ * Steven Levithan (c) 2010-2017 MIT License
+ * Unicode data by Mathias Bynens <mathiasbynens.be>
+ */
+
+/*!
+ * XRegExp Unicode Properties 4.0.0
+ * <xregexp.com>
+ * Steven Levithan (c) 2012-2017 MIT License
+ * Unicode data by Mathias Bynens <mathiasbynens.be>
+ */
+
+/*!
+ * XRegExp Unicode Scripts 4.0.0
+ * <xregexp.com>
+ * Steven Levithan (c) 2010-2017 MIT License
+ * Unicode data by Mathias Bynens <mathiasbynens.be>
+ */
+
+/*!
+ * XRegExp.build 4.0.0
+ * <xregexp.com>
+ * Steven Levithan (c) 2012-2017 MIT License
+ */
+
+/*!
+ * XRegExp.matchRecursive 4.0.0
+ * <xregexp.com>
+ * Steven Levithan (c) 2009-2017 MIT License
+ */
