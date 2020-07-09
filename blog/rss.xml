@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0">
+    <channel>
+        <title>Gnet Blog</title>
+        <link>https://gnet.host/blog</link>
+        <description>Gnet Blog</description>
+        <lastBuildDate>Fri, 13 Mar 2020 00:00:00 GMT</lastBuildDate>
+        <docs>https://validator.w3.org/feed/docs/rss2.html</docs>
+        <generator>https://github.com/jpmonette/feed</generator>
+        <copyright>Copyright © 2020 Andy Pan.</copyright>
+        <item>
+            <title><![CDATA[Presenting Gnet]]></title>
+            <link>https://gnet.host/blog/presenting-gnet</link>
+            <guid>presenting-gnet</guid>
+            <pubDate>Fri, 13 Mar 2020 00:00:00 GMT</pubDate>
+            <description><![CDATA[Hello World! We present you, gnet!]]></description>
+        </item>
+    </channel>
+</rss>

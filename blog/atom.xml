@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+    <id>https://gnet.host/blog</id>
+    <title>Gnet Blog</title>
+    <updated>2020-03-13T00:00:00.000Z</updated>
+    <generator>https://github.com/jpmonette/feed</generator>
+    <link rel="alternate" href="https://gnet.host/blog"/>
+    <subtitle>Gnet Blog</subtitle>
+    <icon>https://gnet.host/favicon.ico</icon>
+    <rights>Copyright © 2020 Andy Pan.</rights>
+    <entry>
+        <title type="html"><![CDATA[Presenting Gnet]]></title>
+        <id>presenting-gnet</id>
+        <link href="https://gnet.host/blog/presenting-gnet"/>
+        <updated>2020-03-13T00:00:00.000Z</updated>
+        <summary type="html"><![CDATA[Hello World! We present you, gnet!]]></summary>
+    </entry>
+</feed>
