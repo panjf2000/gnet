@@ -190,13 +190,13 @@ func (el *eventloop) loopWrite(c *conn) error {
 }
 
 func (el *eventloop) loopCloseConn(c *conn, err error) error {
-	if !c.outboundBuffer.IsEmpty() && err == nil {
-		_ = el.loopWrite(c)
-	}
-
 	if !c.opened {
 		el.svr.logger.Debugf("The fd=%d in event-loop(%d) is already closed, skipping it", c.fd, el.idx)
 		return nil
+	}
+
+	if !c.outboundBuffer.IsEmpty() && err == nil {
+		_ = el.loopWrite(c)
 	}
 
 	err0, err1 := el.poller.Delete(c.fd), unix.Close(c.fd)
