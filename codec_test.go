@@ -316,7 +316,7 @@ func TestLengthFieldBasedFrameCodecZeroPlayLoad(t *testing.T) {
 	res, err := codec.Decode(&mockConn{buf: out})
 	if err != nil {
 		t.Fatalf("decode error with error: %v\n", err)
-	}else if len(res) != 0{
+	} else if len(res) != 0 {
 		t.Fatalf("decoded data should be empty, but got: %s\n", string(res[4:]))
 	}
 }
