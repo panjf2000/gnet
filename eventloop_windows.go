@@ -33,7 +33,6 @@ type eventloop struct {
 	ch                chan interface{}        // command channel
 	idx               int                     // loop index
 	svr               *server                 // server in loop
-	codec             ICodec                  // codec for TCP
 	connCount         int32                   // number of active connections in event-loop
 	connections       map[*stdConn]struct{}   // track all the sockets bound to this loop
 	eventHandler      EventHandler            // user eventHandler
@@ -108,9 +107,11 @@ func (el *eventloop) loopRead(ti *tcpIn) (err error) {
 	for inFrame, _ := c.read(); inFrame != nil; inFrame, _ = c.read() {
 		out, action := el.eventHandler.React(inFrame, c)
 		if out != nil {
-			outFrame, _ := el.codec.Encode(c, out)
+			outFrame, _ := c.codec.Encode(c, out)
 			el.eventHandler.PreWrite()
-			_, err = c.conn.Write(outFrame)
+			if _, err = c.conn.Write(outFrame); err != nil {
+				return el.loopError(c, err)
+			}
 		}
 		switch action {
 		case None:
@@ -118,9 +119,6 @@ func (el *eventloop) loopRead(ti *tcpIn) (err error) {
 			return el.loopCloseConn(c)
 		case Shutdown:
 			return errors.ErrServerShutdown
-		}
-		if err != nil {
-			return el.loopError(c, err)
 		}
 	}
 	_, _ = c.inboundBuffer.Write(c.buffer.Bytes())
@@ -199,8 +197,11 @@ func (el *eventloop) loopWake(c *stdConn) error {
 	//}
 	out, action := el.eventHandler.React(nil, c)
 	if out != nil {
-		frame, _ := el.codec.Encode(c, out)
-		_, _ = c.conn.Write(frame)
+		if frame, err := c.codec.Encode(c, out); err != nil {
+			return err
+		} else if _, err = c.conn.Write(frame); err != nil {
+			return err
+		}
 	}
 
 	return el.handleAction(c, action)

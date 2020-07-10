@@ -110,7 +110,6 @@ func (svr *server) activateEventLoops(numEventLoop int) (err error) {
 			el := &eventloop{
 				ln:                l,
 				svr:               svr,
-				codec:             svr.codec,
 				poller:            p,
 				packet:            make([]byte, 0x10000),
 				connections:       make(map[int]*conn),
@@ -136,7 +135,6 @@ func (svr *server) activateReactors(numEventLoop int) error {
 			el := &eventloop{
 				ln:                svr.ln,
 				svr:               svr,
-				codec:             svr.codec,
 				poller:            p,
 				packet:            make([]byte, 0x10000),
 				connections:       make(map[int]*conn),
