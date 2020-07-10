@@ -53,7 +53,7 @@ English | [🇨🇳中文](README_ZH.md)
 
 ## Buffer
 
-[**Reusable and auto-scaling Ring Buffer**](https://gnet.host/blog/presenting-gnet/#reusable-and-auto-scaling-ring-buffer)
+- [**Reusable and auto-scaling Ring Buffer**](https://gnet.host/blog/presenting-gnet/#reusable-and-auto-scaling-ring-buffer)
 
 # 🎉 Getting Started
 
