@@ -4,10 +4,17 @@
         <title>Gnet Blog</title>
         <link>https://gnet.host/blog</link>
         <description>Gnet Blog</description>
-        <lastBuildDate>Fri, 13 Mar 2020 00:00:00 GMT</lastBuildDate>
+        <lastBuildDate>Sat, 14 Mar 2020 00:00:00 GMT</lastBuildDate>
         <docs>https://validator.w3.org/feed/docs/rss2.html</docs>
         <generator>https://github.com/jpmonette/feed</generator>
         <copyright>Copyright © 2020 Andy Pan.</copyright>
+        <item>
+            <title><![CDATA[Gnet 导视]]></title>
+            <link>https://gnet.host/blog/presenting-gnet-cn</link>
+            <guid>presenting-gnet-cn</guid>
+            <pubDate>Sat, 14 Mar 2020 00:00:00 GMT</pubDate>
+            <description><![CDATA[最快的 Go 网络框架 gnet 来啦！]]></description>
+        </item>
         <item>
             <title><![CDATA[Presenting Gnet]]></title>
             <link>https://gnet.host/blog/presenting-gnet</link>
