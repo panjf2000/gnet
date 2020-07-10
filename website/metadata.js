@@ -14,21 +14,20 @@ module.exports = {
   },
   "latest_post": {
     "author_github": "https://github.com/panjf2000",
-    "date": "2020-03-13",
-    "description": "Gnet is a high-performance, lightweight, non-blocking, event-driven networking framework written in pure Go.",
-    "id": "presenting-gnet",
-    "path": "website/blog/2020-03-13-presenting-gnet.md",
-    "permalink": "/blog/2020-03-13-presenting-gnet/",
+    "date": "2020-03-14",
+    "description": "gnet 是一个高性能、轻量级、非阻塞的事件驱动 Go 网络框架。",
+    "id": "presenting-gnet-cn",
+    "path": "website/blog/2020-03-14-presenting-gnet-cn.md",
+    "permalink": "/blog/2020-03-14-presenting-gnet-cn/",
     "tags": [
-      "type: post",
-      "domain: testing"
+      "type: 官宣",
+      "domain: 展示"
     ],
     "title": "Presenting Gnet"
   },
   "post_tags": [
-    "type: announcement",
-    "type: post",
-    "domain: presentation"
+    "type: 官宣",
+    "domain: 展示"
   ],
   "team": [
     {

@@ -5,6 +5,7 @@ module.exports = {
       label: 'About',
       items: [
         "about/what-is-gnet",
+        "about/what-is-gnet-cn",
       ],
     },
   ]

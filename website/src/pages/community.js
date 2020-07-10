@@ -96,9 +96,11 @@ function Community() {
 
             <p>
               Gnet's networking model is designed and tuned to handling millions of network connections/requests, which backs gnet up to be the fatest networking framework in Go.
+              In addition to the first-class networking model, the implementation of auto-scaling and reusable ring-buffers in gnet is also one of the critical essentials for its high performance.
             </p>
             <ol>
-              <li><a href="https://github.com/panjf2000/gnet#networking-model-of-multiple-threadsgoroutines" target="_blank">Networking model inside gnet</a></li>
+              <li><a href="https://gnet.host/blog/presenting-gnet/#networking-model-of-multiple-threadsgoroutines">Networking models inside gnet</a></li>
+              <li><a href="https://gnet.host/blog/presenting-gnet/#reusable-and-auto-scaling-ring-buffer">Reusable and auto-scaling ring-buffers in gnet</a></li>
               <li><a href="https://www.freecodecamp.org/news/million-websockets-and-go-cc58418460bb/" target="_blank">A Million WebSockets and Go</a></li>
               <li><a href="https://speakerdeck.com/eranyanay/going-infinite-handling-1m-websockets-connections-in-go" target="_blank">Going Infinite, handling 1M websockets connections in Go</a></li>
             </ol>

@@ -4,7 +4,7 @@ title: "What is Gnet?"
 description: "High-level description of the Gnet framework and its features."
 ---
 
-## Introduction
+## 📖 Introduction
 
 `gnet` is an event-driven networking framework that is fast and lightweight. It makes direct [epoll](https://en.wikipedia.org/wiki/Epoll) and [kqueue](https://en.wikipedia.org/wiki/Kqueue) syscalls rather than using the standard Go [net](https://golang.org/pkg/net/) package and works in a similar manner as [netty](https://github.com/netty/netty) and [libuv](https://github.com/libuv/libuv), which makes `gnet` achieve a much higher performance than Go [net](https://golang.org/pkg/net/).
 
@@ -14,7 +14,7 @@ description: "High-level description of the Gnet framework and its features."
 
 **`gnet` derives from the project: `evio` while having a much higher performance and more features.**
 
-## Features
+## 🚀 Features
 
 - [x] [High-performance](#-performance) event-loop under networking model of multiple threads/goroutines
 - [x] Built-in goroutine pool powered by the library [ants](https://github.com/panjf2000/ants)
@@ -32,6 +32,6 @@ description: "High-level description of the Gnet framework and its features."
 - [x] Supporting Windows platform with ~~event-driven mechanism of IOCP~~ Go stdlib: net
 - [ ] Implementation of `gnet` Client
 
-## Documentations
+## 📚 Documentation
 
-For more details, please go to <a href="https://pkg.go.dev/github.com/panjf2000/gnet?tab=doc" target="_blank">Documentations for gnet</a>.
+For more details about using `gnet`, please visit <a href="https://pkg.go.dev/github.com/panjf2000/gnet?tab=doc" target="_blank">documentations for gnet</a>.
