@@ -88,7 +88,6 @@ func (svr *server) startEventLoops(numEventLoop int) {
 		el := &eventloop{
 			ch:                make(chan interface{}, commandBufferSize),
 			svr:               svr,
-			codec:             svr.codec,
 			connections:       make(map[*stdConn]struct{}),
 			eventHandler:      svr.eventHandler,
 			calibrateCallback: svr.subEventLoopSet.calibrate,

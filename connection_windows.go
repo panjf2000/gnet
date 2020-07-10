@@ -63,7 +63,7 @@ func newTCPConn(conn net.Conn, el *eventloop) *stdConn {
 	return &stdConn{
 		conn:          conn,
 		loop:          el,
-		codec:         el.codec,
+		codec:         el.svr.codec,
 		inboundBuffer: prb.Get(),
 	}
 }
@@ -176,9 +176,9 @@ func (c *stdConn) BufferLength() int {
 func (c *stdConn) AsyncWrite(buf []byte) (err error) {
 	var encodedBuf []byte
 	if encodedBuf, err = c.codec.Encode(c, buf); err == nil {
-		c.loop.ch <- func() error {
-			_, _ = c.conn.Write(encodedBuf)
-			return nil
+		c.loop.ch <- func() (err error) {
+			_, err = c.conn.Write(encodedBuf)
+			return
 		}
 	}
 	return

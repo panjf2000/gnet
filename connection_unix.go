@@ -54,7 +54,7 @@ func newTCPConn(fd int, el *eventloop, sa unix.Sockaddr) *conn {
 		fd:             fd,
 		sa:             sa,
 		loop:           el,
-		codec:          el.codec,
+		codec:          el.svr.codec,
 		inboundBuffer:  prb.Get(),
 		outboundBuffer: prb.Get(),
 	}
@@ -106,25 +106,31 @@ func (c *conn) read() ([]byte, error) {
 	return c.codec.Decode(c)
 }
 
-func (c *conn) write(buf []byte) {
-	if !c.outboundBuffer.IsEmpty() {
-		_, _ = c.outboundBuffer.Write(buf)
+func (c *conn) write(buf []byte) (err error) {
+	var outFrame []byte
+	if outFrame, err = c.codec.Encode(c, buf); err != nil {
 		return
 	}
-	n, err := unix.Write(c.fd, buf)
-	if err != nil {
+	if !c.outboundBuffer.IsEmpty() {
+		_, _ = c.outboundBuffer.Write(outFrame)
+		return
+	}
+
+	var n int
+	if n, err = unix.Write(c.fd, outFrame); err != nil {
 		if err == unix.EAGAIN {
-			_, _ = c.outboundBuffer.Write(buf)
-			_ = c.loop.poller.ModReadWrite(c.fd)
+			_, _ = c.outboundBuffer.Write(outFrame)
+			err = c.loop.poller.ModReadWrite(c.fd)
 			return
 		}
 		_ = c.loop.loopCloseConn(c, os.NewSyscallError("write", err))
 		return
 	}
-	if n < len(buf) {
-		_, _ = c.outboundBuffer.Write(buf[n:])
-		_ = c.loop.poller.ModReadWrite(c.fd)
+	if n < len(outFrame) {
+		_, _ = c.outboundBuffer.Write(outFrame[n:])
+		err = c.loop.poller.ModReadWrite(c.fd)
 	}
+	return
 }
 
 func (c *conn) sendTo(buf []byte) error {
@@ -206,17 +212,13 @@ func (c *conn) BufferLength() int {
 	return c.inboundBuffer.Length() + len(c.buffer)
 }
 
-func (c *conn) AsyncWrite(buf []byte) (err error) {
-	var encodedBuf []byte
-	if encodedBuf, err = c.codec.Encode(c, buf); err == nil {
-		return c.loop.poller.Trigger(func() error {
-			if c.opened {
-				c.write(encodedBuf)
-			}
-			return nil
-		})
-	}
-	return
+func (c *conn) AsyncWrite(buf []byte) error {
+	return c.loop.poller.Trigger(func() (err error) {
+		if c.opened {
+			err = c.write(buf)
+		}
+		return
+	})
 }
 
 func (c *conn) SendTo(buf []byte) error {

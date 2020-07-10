@@ -36,7 +36,6 @@ type eventloop struct {
 	ln                *listener               // listener
 	idx               int                     // loop index in the server loops list
 	svr               *server                 // server in loop
-	codec             ICodec                  // codec for TCP
 	packet            []byte                  // read packet buffer
 	poller            *netpoll.Poller         // epoll or kqueue
 	connCount         int32                   // number of active connections in event-loop
@@ -140,7 +139,9 @@ func (el *eventloop) loopRead(c *conn) error {
 		if out != nil {
 			outFrame, _ := c.codec.Encode(c, out)
 			el.eventHandler.PreWrite()
-			c.write(outFrame)
+			if err = c.write(out); err != nil {
+				return err
+			}
 		}
 		switch action {
 		case None:
@@ -199,8 +200,7 @@ func (el *eventloop) loopCloseConn(c *conn, err error) error {
 		_ = el.loopWrite(c)
 	}
 
-	err0, err1 := el.poller.Delete(c.fd), unix.Close(c.fd)
-	if err0 == nil && err1 == nil {
+	if err0, err1 := el.poller.Delete(c.fd), unix.Close(c.fd); err0 == nil && err1 == nil {
 		delete(el.connections, c.fd)
 		el.calibrateCallback(el, -1)
 		if el.eventHandler.OnClosed(c, err) == Shutdown {
@@ -226,8 +226,9 @@ func (el *eventloop) loopWake(c *conn) error {
 	//}
 	out, action := el.eventHandler.React(nil, c)
 	if out != nil {
-		frame, _ := el.codec.Encode(c, out)
-		c.write(frame)
+		if err := c.write(out); err != nil {
+			return err
+		}
 	}
 
 	return el.handleAction(c, action)

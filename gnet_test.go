@@ -23,6 +23,7 @@ package gnet
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -298,7 +299,7 @@ func startCodecClient(network, addr string, multicore, async bool, codec ICodec)
 		if _, err := io.ReadFull(rd, data2); err != nil {
 			panic(err)
 		}
-		if string(encodedData) != string(data2) && !async {
+		if !bytes.Equal(encodedData, data2) && !async {
 			// panic(fmt.Sprintf("mismatch %s/multi-core:%t: %d vs %d bytes, %s:%s", network, multicore,
 			//	len(encodedData), len(data2), string(encodedData), string(data2)))
 			panic(fmt.Sprintf("mismatch %s/multi-core:%t: %d vs %d bytes", network, multicore, len(encodedData), len(data2)))
@@ -569,7 +570,7 @@ func startClient(network, addr string, multicore, async bool) {
 		if _, err := io.ReadFull(rd, data2); err != nil {
 			panic(err)
 		}
-		if string(data) != string(data2) && !async {
+		if !bytes.Equal(data, data2) && !async {
 			panic(fmt.Sprintf("mismatch %s/multi-core:%t: %d vs %d bytes\n", network, multicore, len(data), len(data2)))
 		}
 	}
