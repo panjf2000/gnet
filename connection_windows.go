@@ -57,6 +57,7 @@ type stdConn struct {
 	remoteAddr    net.Addr               // remote peer addr
 	byteBuffer    *bytebuffer.ByteBuffer // bytes buffer for buffering current packet and data in ring-buffer
 	inboundBuffer *ringbuffer.RingBuffer // buffer for data from client
+	closed        bool                   // closed flag
 }
 
 func newTCPConn(conn net.Conn, el *eventloop) *stdConn {
@@ -76,6 +77,7 @@ func (c *stdConn) releaseTCP() {
 	c.inboundBuffer = nil
 	bytebuffer.Put(c.buffer)
 	c.buffer = nil
+	c.closed = true
 }
 
 func newUDPConn(el *eventloop, localAddr, remoteAddr net.Addr, buf *bytebuffer.ByteBuffer) *stdConn {

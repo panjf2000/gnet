@@ -176,6 +176,9 @@ func (el *eventloop) loopTicker() {
 }
 
 func (el *eventloop) loopError(c *stdConn, err error) (e error) {
+	if c.closed {
+		return nil
+	}
 	if e = c.conn.Close(); e == nil {
 		delete(el.connections, c)
 		el.calibrateCallback(el, -1)
