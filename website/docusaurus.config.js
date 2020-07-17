@@ -81,8 +81,8 @@ module.exports = {
       copyright: `Copyright © ${new Date().getFullYear()} Andy Pan`,
     },
     algolia: {
-      apiKey: "",
-      indexName: "",
+      apiKey: "a9aa400312a1e718f717e1164d912086",
+      indexName: "gnet",
       algoliaOptions: {}, // Optional, if provided by Algolia
     },
   },

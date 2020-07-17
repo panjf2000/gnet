@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
 
-yarn run build
+yarn build
 
 GIT_USER=panjf2000 yarn deploy
