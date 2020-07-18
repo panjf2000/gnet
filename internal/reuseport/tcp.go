@@ -129,20 +129,17 @@ func tcpReusablePort(proto, addr string, reusePort bool) (fd int, netAddr net.Ad
 		}
 	}()
 
-	if err = unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_REUSEADDR, 1); err != nil {
-		err = os.NewSyscallError("setsockopt", err)
+	if err = os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_REUSEADDR, 1)); err != nil {
 		return
 	}
 
 	if reusePort {
-		if err = unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_REUSEPORT, 1); err != nil {
-			err = os.NewSyscallError("setsockopt", err)
+		if err = os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_REUSEPORT, 1)); err != nil {
 			return
 		}
 	}
 
-	if err = unix.Bind(fd, sockaddr); err != nil {
-		err = os.NewSyscallError("bind", err)
+	if err = os.NewSyscallError("bind", unix.Bind(fd, sockaddr)); err != nil {
 		return
 	}
 

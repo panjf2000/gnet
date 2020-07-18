@@ -66,8 +66,8 @@ func OpenPoller() (poller *Poller, err error) {
 
 // Close closes the poller.
 func (p *Poller) Close() error {
-	if err := unix.Close(p.fd); err != nil {
-		return os.NewSyscallError("close", err)
+	if err := os.NewSyscallError("close", unix.Close(p.fd)); err != nil {
+		return err
 	}
 	return os.NewSyscallError("close", unix.Close(p.wfd))
 }

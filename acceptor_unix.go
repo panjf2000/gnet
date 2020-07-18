@@ -36,8 +36,8 @@ func (svr *server) acceptNewConnection(fd int) error {
 		}
 		return os.NewSyscallError("accept", err)
 	}
-	if err := unix.SetNonblock(nfd, true); err != nil {
-		return os.NewSyscallError("fcntl nonblock", err)
+	if err = os.NewSyscallError("fcntl nonblock", unix.SetNonblock(nfd, true)); err != nil {
+		return err
 	}
 	el := svr.subEventLoopSet.next(nfd)
 	c := newTCPConn(nfd, el, sa)

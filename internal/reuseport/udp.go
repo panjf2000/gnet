@@ -128,19 +128,16 @@ func udpReusablePort(proto, addr string, reusePort bool) (fd int, netAddr net.Ad
 	}()
 
 	// Allow broadcast.
-	if err = unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_BROADCAST, 1); err != nil {
-		err = os.NewSyscallError("setsockopt", err)
+	if err = os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_BROADCAST, 1)); err != nil {
 		return
 	}
 
-	if err = unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_REUSEADDR, 1); err != nil {
-		err = os.NewSyscallError("setsockopt", err)
+	if err = os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_REUSEADDR, 1)); err != nil {
 		return
 	}
 
 	if reusePort {
-		if err = unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_REUSEPORT, 1); err != nil {
-			err = os.NewSyscallError("setsockopt", err)
+		if err = os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_REUSEPORT, 1)); err != nil {
 			return
 		}
 	}

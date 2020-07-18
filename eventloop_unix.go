@@ -87,8 +87,8 @@ func (el *eventloop) loopAccept(fd int) error {
 			}
 			return os.NewSyscallError("accept", err)
 		}
-		if err = unix.SetNonblock(nfd, true); err != nil {
-			return os.NewSyscallError("fcntl nonblock", err)
+		if err = os.NewSyscallError("fcntl nonblock", unix.SetNonblock(nfd, true)); err != nil {
+			return err
 		}
 		c := newTCPConn(nfd, el, sa)
 		if err = el.poller.AddRead(c.fd); err == nil {
