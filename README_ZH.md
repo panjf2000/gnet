@@ -88,14 +88,14 @@ Go : go1.14.x linux/amd64
 
 ![All language](https://raw.githubusercontent.com/panjf2000/illustrations/master/benchmark/techempower-all.jpg)
 
-这是包含全部编程语言框架的性能排名前 50 的结果，总榜单包含了全世界共计 382 个框架。
+这是包含全部编程语言框架的性能排名前 50 的结果，总榜单包含了全世界共计 422 个框架，其中 `gnet` 排名第二。
 
 
 ![Golang](https://raw.githubusercontent.com/panjf2000/illustrations/master/benchmark/techempower-go.png)
 
-这是 Go 语言分类下的全部排名。
+这是 Go 语言分类下的全部排名，`gnet` 超越了其他所有框架，位列第一，是最快的 Go 网络框架。
 
-完整的排行可以通过 [Full ranking list of Plaintext](https://www.techempower.com/benchmarks/#section=test&runid=c7152e8f-5b33-4ae7-9e89-630af44bc8de&hw=ph&test=plaintext) 查看.
+完整的排行可以通过 [TechEmpower Plaintext Benchmark](https://www.techempower.com/benchmarks/#section=test&runid=53c6220a-e110-466c-a333-2e879fea21ad&hw=ph&test=plaintext) 查看.
 
 ## 同类型的网络库性能对比
 

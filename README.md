@@ -90,14 +90,14 @@ Go : go1.14.x linux/amd64
 
 ![All language](https://raw.githubusercontent.com/panjf2000/illustrations/master/benchmark/techempower-all.jpg)
 
-This is the top 50 on the framework ranking of all programming languages consists of a total of 382 frameworks from all over the world.
+This is the top 50 on the framework ranking of all programming languages consists of a total of 422 frameworks from all over the world where `gnet` is the runner-up.
 
 
 ![Golang](https://raw.githubusercontent.com/panjf2000/illustrations/master/benchmark/techempower-go.png)
 
-This is the full framework ranking of Golang.
+This is the full framework ranking of Go and `gnet` tops all the other frameworks, which makes `gnet` the fastest networking framework in Go.
 
-To see the full ranking list, visit [Full ranking list of Plaintext](https://www.techempower.com/benchmarks/#section=test&runid=c7152e8f-5b33-4ae7-9e89-630af44bc8de&hw=ph&test=plaintext).
+To see the full ranking list, visit [TechEmpower Plaintext Benchmark](https://www.techempower.com/benchmarks/#section=test&runid=53c6220a-e110-466c-a333-2e879fea21ad&hw=ph&test=plaintext).
 
 ## Contrasts to the similar networking libraries
 
