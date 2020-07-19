@@ -44,37 +44,6 @@ English | [🇨🇳中文](README_ZH.md)
 - [x] Supporting Windows platform with ~~event-driven mechanism of IOCP~~ Go stdlib: net
 - [ ] Implementation of `gnet` Client
 
-# 💡 Key Designs
-
-## Networking Models
-
-- [**Multiple Reactors**](https://gnet.host/blog/presenting-gnet/#multiple-reactors)
-- [**Multiple Reactors + Goroutine Pool**](https://gnet.host/blog/presenting-gnet/#multiple-reactors--goroutine-pool)
-
-## Buffer
-
-- [**Reusable and auto-scaling Ring Buffer**](https://gnet.host/blog/presenting-gnet/#reusable-and-auto-scaling-ring-buffer)
-
-# 🎉 Getting Started
-
-## Prerequisites
-
-`gnet` requires Go 1.9 or later.
-
-## Installation
-
-```powershell
-go get -u github.com/panjf2000/gnet
-```
-
-`gnet` is available as a Go module, with [Go 1.11 Modules](https://github.com/golang/go/wiki/Modules) support (Go 1.11+), just simply `import "github.com/panjf2000/gnet"` in your source code and `go [build|run|test]` will download the necessary dependencies automatically.
-
-# 📚 Documentation
-
-## About
-
-- [What is Gnet?](https://gnet.host/docs/about/what-is-gnet/)
-
 # 📊 Performance
 
 ## Benchmarks on TechEmpower
@@ -149,27 +118,17 @@ GOMAXPROCS=4
 
 # 🏛 Website
 
-For more details about `gnet`, go [Presenting Gnet](https://gnet.host/blog/presenting-gnet/).
+Please visit the [official website](https://gnet.host/blog/presenting-gnet/) for more details about architecture, usage and other information of `gnet`.
 
 # ⚠️ License
 
-Source code in `gnet` is available under the MIT [License](/LICENSE).
+Source code in `gnet` is available under the [MIT License](/LICENSE).
 
 # 👏 Contributors
 
 Please read the [Contributing Guidelines](CONTRIBUTING.md) before opening a PR and thank you to all the developers who already made contributions to `gnet`!
 
 [![](https://opencollective.com/gnet/contributors.svg?width=890&button=false)](https://github.com/panjf2000/gnet/graphs/contributors)
-
-# 🙏 Acknowledgments
-
-- [evio](https://github.com/tidwall/evio)
-- [netty](https://github.com/netty/netty)
-- [ants](https://github.com/panjf2000/ants)
-- [go_reuseport](https://github.com/kavu/go_reuseport)
-- [bytebufferpool](https://github.com/valyala/bytebufferpool)
-- [goframe](https://github.com/smallnest/goframe)
-- [ringbuffer](https://github.com/smallnest/ringbuffer)
 
 # ⚓ Relevant Articles
 

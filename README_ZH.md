@@ -44,35 +44,6 @@
 - [x] 支持 Windows 平台，基于 ~~IOCP 事件驱动机制~~ Go 标准网络库
 - [ ] 实现 `gnet` 客户端
 
-# 💡 核心设计
-## 多线程/Go程网络模型
-- [**主从多 Reactors**](https://gnet.host/blog/presenting-gnet-cn/#主从多-reactors)
-- [**主从多 Reactors + 线程/Go程池**](https://gnet.host/blog/presenting-gnet-cn/#主从多-reactors--线程go程池)
-
-## Buffer
-
-- [**可重用且自动扩容的 Ring-Buffer**](https://gnet.host/blog/presenting-gnet-cn/#可重用且自动扩容的-ring-buffer)
-
-# 🎉 开始使用
-
-## 前提
-
-`gnet` 需要 Go 版本 >= 1.9。
-
-## 安装
-
-```powershell
-go get -u github.com/panjf2000/gnet
-```
-
-`gnet` 支持作为一个 Go module 被导入，基于 [Go 1.11 Modules](https://github.com/golang/go/wiki/Modules) (Go 1.11+)，只需要在你的项目里直接 `import "github.com/panjf2000/gnet"`，然后运行 `go [build|run|test]` 自动下载和构建需要的依赖包。
-
-# 📚 文档
-
-## 关于
-
-- [Gnet 是什么？](https://gnet.host/docs/about/what-is-gnet-cn/)
-
 # 📊 性能测试
 
 ## TechEmpower 性能测试
@@ -147,27 +118,17 @@ GOMAXPROCS=4
 
 # 🏛 官网
 
-关于 `gnet` 更多细节，请前往 [Gnet 导视](https://gnet.host/blog/presenting-gnet-cn/)。
+关于 `gnet` 的架构设计、使用方法以及其他更多的信息和细节，请访问[官网](https://gnet.host)。
 
 # ⚠️ 证书
 
-`gnet` 的源码允许用户在遵循 MIT [开源证书](/LICENSE) 规则的前提下使用。
+`gnet` 的源码允许用户在遵循 [MIT 开源证书](/LICENSE) 规则的前提下使用。
 
 # 👏 贡献者
 
 请在提 PR 之前仔细阅读 [Contributing Guidelines](CONTRIBUTING.md)，感谢那些为 `gnet` 贡献过代码的开发者！
 
 [![](https://opencollective.com/gnet/contributors.svg?width=890&button=false)](https://github.com/panjf2000/gnet/graphs/contributors)
-
-# 🙏 致谢
-
-- [evio](https://github.com/tidwall/evio)
-- [netty](https://github.com/netty/netty)
-- [ants](https://github.com/panjf2000/ants)
-- [go_reuseport](https://github.com/kavu/go_reuseport)
-- [bytebufferpool](https://github.com/valyala/bytebufferpool)
-- [goframe](https://github.com/smallnest/goframe)
-- [ringbuffer](https://github.com/smallnest/ringbuffer)
 
 # ⚓ 相关文章
 
