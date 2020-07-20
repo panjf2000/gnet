@@ -118,7 +118,7 @@ GOMAXPROCS=4
 
 # 🏛 官网
 
-关于 `gnet` 的架构设计、使用方法以及其他更多的信息和细节，请访问[官网](https://gnet.host)。
+关于 `gnet` 的架构设计、使用方法以及其他更多的信息和细节，请访问[官网](https://gnet.host/blog/presenting-gnet-cn/)。
 
 # ⚠️ 证书
 
