@@ -119,32 +119,6 @@ function Feature({ icon, title, description }) {
   );
 }
 
-const hardware = `
-# Hardware
-CPU: 28 HT Cores Intel(R) Xeon(R) Gold 5120 CPU @ 2.20GHz
-Mem: 32GB RAM
-OS : Ubuntu 18.04.3 4.15.0-88-generic #88-Ubuntu
-Net: Switched 10-gigabit ethernet
-Go : go1.14.x linux/amd64
-`
-
-function Performance() {
-  return (
-    <section className={styles.performance}>
-      <div className="container">
-        <AnchoredH2 id="performance">Performance</AnchoredH2>
-        <div className="sub-title">Benchmarks on TechEmpower</div>
-        <CodeBlock className="language-bash">{hardware}</CodeBlock>
-        <br />
-        <img src="/img/techempower-all.jpg" alt="All language" />
-        <br />
-        <p className="hero--subsubtitle">This is the top <strong><em>50</em></strong> on the framework ranking of all programming languages consists of a total of <strong><em>382 frameworks</em></strong> from all over the world.</p>
-
-      </div>
-    </section>
-  );
-}
-
 function Topologies() {
   return (
     <section className="topologies">
@@ -212,6 +186,36 @@ function InstallationSection() {
         <p className="hero--subtitle">Run <strong><em>go get</em></strong> to download gnet:</p>
         <CodeBlock className="language-bash">go get -u github.com/panjf2000/gnet</CodeBlock>
         <p className="hero--subsubtitle">gnet is available as a Go module, with Go 1.11 Modules support (Go 1.11+), just simply import "github.com/panjf2000/gnet" in your source code and go [build|run|test] will download the necessary dependencies automatically.</p>
+      </div>
+    </section>
+  );
+}
+
+const hardware = `
+# Hardware
+CPU: 28 HT Cores Intel(R) Xeon(R) Gold 5120 CPU @ 2.20GHz
+Mem: 32GB RAM
+OS : Ubuntu 18.04.3 4.15.0-88-generic #88-Ubuntu
+Net: Switched 10-gigabit ethernet
+Go : go1.14.x linux/amd64
+`
+
+function Performance() {
+  return (
+    <section className={styles.performance}>
+      <div className="container">
+        <AnchoredH2 id="performance">Performance</AnchoredH2>
+        <div className="sub-title">Benchmarks on TechEmpower</div>
+        <CodeBlock className="language-bash">{hardware}</CodeBlock>
+        <br />
+        <img src="/img/techempower-all.jpg" alt="All languages" />
+        <br />
+        <p className="hero--subtitle">This is the <strong><em>top 50</em></strong> on the framework ranking of all programming languages consists of a total of <strong><em>422 frameworks</em></strong> from all over the world where <code>gnet</code> is the runner-up.</p>
+        <img src="/img/techempower-go.png" alt="Go" />
+        <br />
+        <p className="hero--subtitle">This is the full framework ranking of Go and <code>gnet</code> tops all the other frameworks, which makes <code>gnet</code> the <strong><em>fastest</em></strong> networking framework in Go.</p>
+        <br />
+        <p className="hero--subtitle">To check the full ranking list, visit <Link to="https://www.techempower.com/benchmarks/#section=test&runid=53c6220a-e110-466c-a333-2e879fea21ad&hw=ph&test=plaintext"> TechEmpower Plaintext Benchmark</Link>.</p>
       </div>
     </section>
   );
