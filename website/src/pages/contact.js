@@ -45,7 +45,7 @@ function Contact() {
                 </a>
               </div>
               <div className="col">
-                <a href="https://gitter.im/gnet-framework/community" target="_blank" className="panel text--center">
+                <a href="https://gitter.im/gnet-io/gnet" target="_blank" className="panel text--center">
                   <div className="panel--icon">
                     <i className="feather icon-message-circle"></i>
                   </div>

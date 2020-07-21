@@ -28,7 +28,7 @@ function Community() {
           <div className="container">
             <div className="row">
               <div className="col">
-                <a href="https://gitter.im/gnet-framework/community" target="_blank" className="panel panel--button">
+                <a href="https://gitter.im/gnet-io/gnet" target="_blank" className="panel panel--button">
                   <div className="panel--icon">
                     <i className="feather icon-message-circle"></i>
                   </div>
@@ -89,7 +89,7 @@ function Community() {
             <ol>
               <li>Read our <a href="https://github.com/panjf2000/gnet/blob/master/CONTRIBUTING.md" target="_blank">contribution guide</a>.</li>
               <li>Start with <a href="https://github.com/panjf2000/gnet/issues?q=is%3Aissue+label%3A%22good+first+issue%22" target="_blank">good first issues</a>.</li>
-              <li>Join our <a href="https://gitter.im/gnet-framework/community" target="_blank">chat</a> if you have any questions. We are happy to help!</li>
+              <li>Join our <a href="https://gitter.im/gnet-io/gnet" target="_blank">chat</a> if you have any questions. We are happy to help!</li>
             </ol>
 
             <AnchoredH3 id="contribute" className="header--flush margin-top--lg">Why is Gnet so fast?</AnchoredH3>
