@@ -49,7 +49,7 @@ English | [🇨🇳中文](README_ZH.md)
 ## Benchmarks on TechEmpower
 
 ```powershell
-# Hardware
+# Hardware Environment
 CPU: 28 HT Cores Intel(R) Xeon(R) Gold 5120 CPU @ 2.20GHz
 Mem: 32GB RAM
 OS : Ubuntu 18.04.3 4.15.0-88-generic #88-Ubuntu
@@ -59,12 +59,12 @@ Go : go1.14.x linux/amd64
 
 ![All language](https://raw.githubusercontent.com/panjf2000/illustrations/master/benchmark/techempower-all.jpg)
 
-This is the top 50 on the framework ranking of all programming languages consists of a total of 422 frameworks from all over the world where `gnet` is the runner-up.
+This is the ***top 50*** on the framework ranking of all programming languages consists of a total of ***422 frameworks*** from all over the world where `gnet` is the ***runner-up***.
 
 
 ![Golang](https://raw.githubusercontent.com/panjf2000/illustrations/master/benchmark/techempower-go.png)
 
-This is the full framework ranking of Go and `gnet` tops all the other frameworks, which makes `gnet` the fastest networking framework in Go.
+This is the full framework ranking of Go and `gnet` tops all the other frameworks, which makes `gnet` the ***fastest*** networking framework in Go.
 
 To see the full ranking list, visit [TechEmpower Plaintext Benchmark](https://www.techempower.com/benchmarks/#section=test&runid=53c6220a-e110-466c-a333-2e879fea21ad&hw=ph&test=plaintext).
 
