@@ -36,7 +36,7 @@
 - [x] 简洁的 APIs
 - [x] 基于 Ring-Buffer 的高效内存利用
 - [x] 支持多种网络协议/IPC 机制：`TCP`、`UDP` 和 `Unix Domain Socket`
-- [x] 支持多种负载均衡算法：`Round-Robin(轮询)`、`Source Addr Hash(源地址哈希)` 和 `Least-Connections(最少连接数)`
+- [x] 支持多种负载均衡算法：`Round-Robin(轮询)`、`Source-Addr-Hash(源地址哈希)` 和 `Least-Connections(最少连接数)`
 - [x] 支持两种事件驱动机制：**Linux** 里的 `epoll` 以及 **FreeBSD/DragonFly/Darwin** 里的 `kqueue`
 - [x] 支持异步写操作
 - [x] 灵活的事件定时器

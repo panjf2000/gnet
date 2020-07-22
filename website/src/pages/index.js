@@ -74,8 +74,8 @@ const features = [
     icon: 'shield',
     description: (
       <>
-        Gnet supports multiple load-balancing algorithms: Round-Robin, Source Addr Hash and Least-Connections,
-        users is able to choose the most suitable load-balancing algorithm based on their business scenario.
+        Gnet supports multiple load-balancing algorithms: Round-Robin, Source-Addr-Hash and Least-Connections,
+        enabling users to choose the most suitable load-balancing algorithm based on their business scenarios.
       </>
     ),
   },
