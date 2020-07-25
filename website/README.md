@@ -28,6 +28,4 @@ served using any static contents hosting service.
 
 ## Deployment
 
-Automatically setup through Netlify. Commits to master will update the
-production site and each branch will get a preview site as part of the Github
-checks.
+This website is automatically deployed to `GitHub Pages`. Whenever a new commit lands in `master`, Travis CI will run the suite of tests and if everything passes, this website will be deployed via the yarn deploy script.
