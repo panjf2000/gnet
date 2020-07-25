@@ -9,7 +9,6 @@ dist: bionic
 matrix:
   allow_failures:
     - go: master
-      env: DOC=true
   fast_finish: true
   include:
     - os: linux

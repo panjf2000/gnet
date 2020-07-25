@@ -46,6 +46,10 @@ module.exports = {
               to: "docs/about/what-is-gnet/",
             },
             {
+              label: "The Team",
+              to: "community/#team",
+            },
+            {
               label: "Contact Us",
               to: "contact/",
             },
@@ -55,20 +59,24 @@ module.exports = {
           title: "Community",
           items: [
             {
+              label: "Chat",
+              to: "https://gitter.im/gnet-io/gnet",
+            },
+            {
               label: "Github",
-              href: "https://github.com/panjf2000/gnet",
+              to: "https://github.com/panjf2000/gnet",
             },
             {
               label: "Github Organization",
-              href: "https://github.com/gnet-io",
+              to: "https://github.com/gnet-io",
             },
             {
               label: "Twitter",
-              href: "https://twitter.com/_andy_pan",
+              to: "https://twitter.com/_andy_pan",
             },
             {
               label: "Blog",
-              href: "https://taohuawu.club/",
+              to: "blog/",
             },
           ],
         },

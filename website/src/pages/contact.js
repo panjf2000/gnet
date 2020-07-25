@@ -30,7 +30,7 @@ function Contact() {
                     <i className="feather icon-mail"></i>
                   </div>
                   <div className="panel--title">panjf2000@gmail.com</div>
-                  <div className="panel--description">Shoot me an email</div>
+                  <div className="panel--description">Send me an email</div>
                 </a>
               </div>
               <div className="col">
