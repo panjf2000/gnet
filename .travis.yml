@@ -8,7 +8,7 @@ dist: bionic
 
 matrix:
   allow_failures:
-    - go: master
+    - env: DOC=true
   fast_finish: true
   include:
     - os: linux
@@ -29,10 +29,6 @@ matrix:
       language: go
       go: 1.14.x
       env: GNET_LOGGING_MODE=prod
-    - os: linux
-      language: go
-      go: master
-      env: GNET_LOGGING_MODE=prod
     - os: osx
       language: go
       go: 1.13.x
@@ -41,10 +37,6 @@ matrix:
       language: go
       go: 1.14.x
       env: GNET_LOGGING_MODE=dev
-    - os: osx
-      language: go
-      go: master
-      env: GNET_LOGGING_MODE=dev
     - os: windows
       language: go
       go: 1.13.x
@@ -52,10 +44,6 @@ matrix:
     - os: windows
       language: go
       go: 1.14.x
-      env: GNET_LOGGING_MODE=test
-    - os: windows
-      language: go
-      go: master
       env: GNET_LOGGING_MODE=test
 
 go_import_path: github.com/panjf2000/gnet
