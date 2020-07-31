@@ -109,7 +109,10 @@ func (c *stdConn) Read() []byte {
 }
 
 func (c *stdConn) ResetBuffer() {
-	c.buffer.Reset()
+	if c.buffer != nil {
+		c.buffer.Reset()
+	}
+
 	c.inboundBuffer.Reset()
 	bytebuffer.Put(c.byteBuffer)
 	c.byteBuffer = nil
