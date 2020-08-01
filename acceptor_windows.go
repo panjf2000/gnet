@@ -24,8 +24,6 @@ package gnet
 import (
 	"hash/crc32"
 	"time"
-
-	"github.com/panjf2000/gnet/pool/bytebuffer"
 )
 
 // hashCode hashes a string to a unique hashcode.
@@ -49,11 +47,10 @@ func (svr *server) listenerRun() {
 				err = e
 				return
 			}
-			buf := bytebuffer.Get()
-			_, _ = buf.Write(packet[:n])
 
 			el := svr.subEventLoopSet.next(hashCode(addr.String()))
-			el.ch <- &udpIn{newUDPConn(el, svr.ln.lnaddr, addr, buf)}
+			c := newUDPConn(el, svr.ln.lnaddr, addr)
+			el.ch <- packUDPConn(c, packet[:n])
 		} else {
 			// Accept TCP socket.
 			conn, e := svr.ln.ln.Accept()
@@ -73,9 +70,7 @@ func (svr *server) listenerRun() {
 						el.ch <- &stderr{c, err}
 						return
 					}
-					buf := bytebuffer.Get()
-					_, _ = buf.Write(packet[:n])
-					el.ch <- &tcpIn{c, buf}
+					el.ch <- packTCPConn(c, packet[:n])
 				}
 			}()
 		}

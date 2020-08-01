@@ -22,11 +22,11 @@
 package gnet
 
 import (
+	"github.com/panjf2000/gnet/pool/bytebuffer"
 	"net"
 	"time"
 
 	"github.com/panjf2000/gnet/errors"
-	"github.com/panjf2000/gnet/pool/bytebuffer"
 )
 
 type eventloop struct {
@@ -61,9 +61,10 @@ func (el *eventloop) loopRun() {
 			err = v
 		case *stdConn:
 			err = el.loopAccept(v)
-		case *tcpIn:
-			err = el.loopRead(v)
-		case *udpIn:
+		case *tcpConn:
+			v.c.buffer = v.bb
+			err = el.loopRead(v.c)
+		case *udpConn:
 			err = el.loopReadUDP(v.c)
 		case *stderr:
 			err = el.loopError(v.c, v.err)
@@ -73,7 +74,7 @@ func (el *eventloop) loopRun() {
 			err = v()
 		}
 		if err != nil {
-			el.svr.logger.Infof("Event-loop(%d) is exiting due to an unexpected error: %v", el.idx, err)
+			el.svr.logger.Infof("Event-loop(%d) is exiting due to the error: %v", el.idx, err)
 			break
 		}
 	}
@@ -100,10 +101,7 @@ func (el *eventloop) loopAccept(c *stdConn) error {
 	return el.handleAction(c, action)
 }
 
-func (el *eventloop) loopRead(ti *tcpIn) (err error) {
-	c := ti.c
-	c.buffer = ti.in
-
+func (el *eventloop) loopRead(c *stdConn) (err error) {
 	for inFrame, _ := c.read(); inFrame != nil; inFrame, _ = c.read() {
 		out, action := el.eventHandler.React(inFrame, c)
 		if out != nil {

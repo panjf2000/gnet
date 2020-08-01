@@ -38,12 +38,12 @@ type wakeReq struct {
 	c *stdConn
 }
 
-type tcpIn struct {
+type tcpConn struct {
 	c  *stdConn
-	in *bytebuffer.ByteBuffer
+	bb *bytebuffer.ByteBuffer
 }
 
-type udpIn struct {
+type udpConn struct {
 	c *stdConn
 }
 
@@ -57,6 +57,19 @@ type stdConn struct {
 	remoteAddr    net.Addr               // remote peer addr
 	byteBuffer    *bytebuffer.ByteBuffer // bytes buffer for buffering current packet and data in ring-buffer
 	inboundBuffer *ringbuffer.RingBuffer // buffer for data from client
+}
+
+func packTCPConn(c *stdConn, buf []byte) *tcpConn {
+	packet := &tcpConn{c: c}
+	packet.bb = bytebuffer.Get()
+	_, _ = packet.bb.Write(buf)
+	return packet
+}
+
+func packUDPConn(c *stdConn, buf []byte) *udpConn {
+	_, _ = c.buffer.Write(buf)
+	packet := &udpConn{c: c}
+	return packet
 }
 
 func newTCPConn(conn net.Conn, el *eventloop) *stdConn {
@@ -78,12 +91,12 @@ func (c *stdConn) releaseTCP() {
 	c.buffer = nil
 }
 
-func newUDPConn(el *eventloop, localAddr, remoteAddr net.Addr, buf *bytebuffer.ByteBuffer) *stdConn {
+func newUDPConn(el *eventloop, localAddr, remoteAddr net.Addr) *stdConn {
 	return &stdConn{
 		loop:       el,
+		buffer:     bytebuffer.Get(),
 		localAddr:  localAddr,
 		remoteAddr: remoteAddr,
-		buffer:     buf,
 	}
 }
 
