@@ -36,16 +36,16 @@ const features = [
     icon: 'unlock',
     description: (
       <>
-        Gnet is iock-free during the entire life cycle, which gets gnet out of synchronization.
+        Gnet is lock-free during the entire runtime, which speeds gnet up regardless of the synchronization issue.
       </>
     ),
   },
   {
-    title: 'Concise APIs',
+    title: 'Concise & Easy-to-use APIs',
     icon: 'codepen',
     description: (
       <>
-        Gnet provides concise APIs to users, it only exposes the essential APIs and takes over most of the tough work for users,
+        Gnet provides concise and easy-to-use APIs for users, it only exposes the essential APIs and takes over most of the tough work for users,
         minimizes the complexity of business code so that developers are able to concentrate on business logic instead of the underlying implementation.
       </>
     ),

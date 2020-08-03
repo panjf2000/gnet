@@ -19,9 +19,9 @@ description: "High-level description of the Gnet framework and its features."
 - [x] [High-performance](#-performance) event-loop under networking model of multiple threads/goroutines
 - [x] Built-in goroutine pool powered by the library [ants](https://github.com/panjf2000/ants)
 - [x] Built-in memory pool with bytes powered by the library [bytebufferpool](https://github.com/valyala/bytebufferpool)
-- [x] Lock-free during the entire life cycle
-- [x] Concise APIs
-- [x] Efficient memory usage: Ring-Buffer
+- [x] Lock-free during the entire runtime
+- [x] Concise and easy-to-use APIs
+- [x] Efficient and reusable memory buffer: Ring-Buffer
 - [x] Supporting multiple protocols/IPC mechanism: `TCP`, `UDP` and `Unix Domain Socket`
 - [x] Supporting multiple load-balancing algorithms: `Round-Robin`, `Source-Addr-Hash` and `Least-Connections`
 - [x] Supporting two event-driven mechanisms: `epoll` on **Linux** and `kqueue` on **FreeBSD/DragonFly/Darwin**
