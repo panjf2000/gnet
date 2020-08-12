@@ -46,7 +46,6 @@ func (svr *server) acceptNewConnection(fd int) error {
 			return
 		}
 		el.connections[nfd] = c
-		el.calibrateCallback(el, 1)
 		err = el.loopOpen(c)
 		return
 	})

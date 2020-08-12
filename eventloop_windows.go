@@ -84,13 +84,13 @@ func (el *eventloop) loopAccept(c *stdConn) error {
 	el.connections[c] = struct{}{}
 	c.localAddr = el.svr.ln.lnaddr
 	c.remoteAddr = c.conn.RemoteAddr()
-	el.calibrateCallback(el, 1)
 	if el.svr.opts.TCPKeepAlive > 0 {
 		if c, ok := c.conn.(*net.TCPConn); ok {
 			_ = c.SetKeepAlive(true)
 			_ = c.SetKeepAlivePeriod(el.svr.opts.TCPKeepAlive)
 		}
 	}
+	el.calibrateCallback(el, 1)
 
 	out, action := el.eventHandler.OnOpened(c)
 	if out != nil {

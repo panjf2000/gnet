@@ -93,7 +93,6 @@ func (el *eventloop) loopAccept(fd int) error {
 		c := newTCPConn(nfd, el, sa)
 		if err = el.poller.AddRead(c.fd); err == nil {
 			el.connections[c.fd] = c
-			el.calibrateCallback(el, 1)
 			return el.loopOpen(c)
 		}
 		return err
@@ -111,6 +110,7 @@ func (el *eventloop) loopOpen(c *conn) error {
 			_ = netpoll.SetKeepAlive(c.fd, int(el.svr.opts.TCPKeepAlive/time.Second))
 		}
 	}
+	el.calibrateCallback(el, 1)
 
 	out, action := el.eventHandler.OnOpened(c)
 	if out != nil {
