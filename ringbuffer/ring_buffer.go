@@ -21,7 +21,6 @@ package ringbuffer
 
 import (
 	"errors"
-	"unsafe"
 
 	"github.com/panjf2000/gnet/internal"
 	"github.com/panjf2000/gnet/pool/bytebuffer"
@@ -300,10 +299,7 @@ func (r *RingBuffer) Free() int {
 
 // WriteString writes the contents of the string s to buffer, which accepts a slice of bytes.
 func (r *RingBuffer) WriteString(s string) (n int, err error) {
-	x := (*[2]uintptr)(unsafe.Pointer(&s))
-	h := [3]uintptr{x[0], x[1], x[1]}
-	buf := *(*[]byte)(unsafe.Pointer(&h))
-	return r.Write(buf)
+	return r.Write(internal.StringToBytes(s))
 }
 
 // ByteBuffer returns all available read bytes. It does not move the read pointer and only copy the available data.

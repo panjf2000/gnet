@@ -26,6 +26,8 @@ import (
 	"net"
 	"sync"
 	"sync/atomic"
+
+	"github.com/panjf2000/gnet/internal"
 )
 
 // LoadBalancing represents the the type of load-balancing algorithm.
@@ -39,7 +41,7 @@ const (
 	// serving the least number of active connections at the current time.
 	LeastConnections
 
-	// SourceAddrHash assignes the next accepted connection to the event-loop by hashing socket fd.
+	// SourceAddrHash assignes the next accepted connection to the event-loop by hashing the remote address.
 	SourceAddrHash
 )
 
@@ -212,14 +214,14 @@ func (set *sourceAddrHashEventLoopSet) register(el *eventloop) {
 
 // hash hashes a string to a unique hash code.
 func (set *sourceAddrHashEventLoopSet) hash(s string) int {
-	v := int(crc32.ChecksumIEEE([]byte(s)))
+	v := int(crc32.ChecksumIEEE(internal.StringToBytes(s)))
 	if v >= 0 {
 		return v
 	}
 	return -v
 }
 
-// next returns the eligible event-loop by taking the remainder of a given fd as the index of event-loop list.
+// next returns the eligible event-loop by taking the remainder of a hash code as the index of event-loop list.
 func (set *sourceAddrHashEventLoopSet) next(netAddr net.Addr) *eventloop {
 	hashCode := set.hash(netAddr.String())
 	return set.eventLoops[hashCode%set.size]
