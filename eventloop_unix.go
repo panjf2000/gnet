@@ -90,7 +90,8 @@ func (el *eventloop) loopAccept(fd int) error {
 		if err = os.NewSyscallError("fcntl nonblock", unix.SetNonblock(nfd, true)); err != nil {
 			return err
 		}
-		c := newTCPConn(nfd, el, sa)
+		netAddr := netpoll.SockaddrToTCPOrUnixAddr(sa)
+		c := newTCPConn(nfd, el, sa, netAddr)
 		if err = el.poller.AddRead(c.fd); err == nil {
 			el.connections[c.fd] = c
 			return el.loopOpen(c)
@@ -103,13 +104,6 @@ func (el *eventloop) loopAccept(fd int) error {
 
 func (el *eventloop) loopOpen(c *conn) error {
 	c.opened = true
-	c.localAddr = el.ln.lnaddr
-	c.remoteAddr = netpoll.SockaddrToTCPOrUnixAddr(c.sa)
-	if el.svr.opts.TCPKeepAlive > 0 {
-		if proto := el.ln.network; proto == "tcp" || proto == "unix" {
-			_ = netpoll.SetKeepAlive(c.fd, int(el.svr.opts.TCPKeepAlive/time.Second))
-		}
-	}
 	el.calibrateCallback(el, 1)
 
 	out, action := el.eventHandler.OnOpened(c)

@@ -72,13 +72,22 @@ func packUDPConn(c *stdConn, buf []byte) *udpConn {
 	return packet
 }
 
-func newTCPConn(conn net.Conn, el *eventloop) *stdConn {
-	return &stdConn{
+func newTCPConn(conn net.Conn, el *eventloop) (c *stdConn) {
+	c = &stdConn{
 		conn:          conn,
 		loop:          el,
 		codec:         el.svr.codec,
 		inboundBuffer: prb.Get(),
 	}
+	c.localAddr = el.svr.ln.lnaddr
+	c.remoteAddr = c.conn.RemoteAddr()
+	if el.svr.opts.TCPKeepAlive > 0 {
+		if tc, ok := conn.(*net.TCPConn); ok {
+			_ = tc.SetKeepAlive(true)
+			_ = tc.SetKeepAlivePeriod(el.svr.opts.TCPKeepAlive)
+		}
+	}
+	return
 }
 
 func (c *stdConn) releaseTCP() {

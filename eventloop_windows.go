@@ -22,9 +22,9 @@
 package gnet
 
 import (
-	"github.com/panjf2000/gnet/pool/bytebuffer"
-	"net"
 	"time"
+
+	"github.com/panjf2000/gnet/pool/bytebuffer"
 
 	"github.com/panjf2000/gnet/errors"
 )
@@ -82,14 +82,6 @@ func (el *eventloop) loopRun() {
 
 func (el *eventloop) loopAccept(c *stdConn) error {
 	el.connections[c] = struct{}{}
-	c.localAddr = el.svr.ln.lnaddr
-	c.remoteAddr = c.conn.RemoteAddr()
-	if el.svr.opts.TCPKeepAlive > 0 {
-		if c, ok := c.conn.(*net.TCPConn); ok {
-			_ = c.SetKeepAlive(true)
-			_ = c.SetKeepAlivePeriod(el.svr.opts.TCPKeepAlive)
-		}
-	}
 	el.calibrateCallback(el, 1)
 
 	out, action := el.eventHandler.OnOpened(c)
