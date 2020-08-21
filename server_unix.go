@@ -235,7 +235,7 @@ func serve(eventHandler EventHandler, listener *listener, options *Options) erro
 	}
 
 	svr.cond = sync.NewCond(&sync.Mutex{})
-	svr.ticktock = make(chan time.Duration, 1)
+	svr.ticktock = make(chan time.Duration, channelBuffer(1))
 	svr.logger = logging.DefaultLogger
 	svr.codec = func() ICodec {
 		if options.Codec == nil {

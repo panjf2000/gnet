@@ -40,8 +40,8 @@ type conn struct {
 	sa             unix.Sockaddr          // remote socket address
 	ctx            interface{}            // user-defined context
 	loop           *eventloop             // connected event-loop
-	buffer         []byte                 // reuse memory of inbound data as a temporary buffer
 	codec          ICodec                 // codec for TCP
+	buffer         []byte                 // reuse memory of inbound data as a temporary buffer
 	opened         bool                   // connection opened event fired
 	localAddr      net.Addr               // local addr
 	remoteAddr     net.Addr               // remote addr
