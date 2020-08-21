@@ -36,8 +36,8 @@ type eventloop struct {
 	ln                *listener               // listener
 	idx               int                     // loop index in the server loops list
 	svr               *server                 // server in loop
-	packet            []byte                  // read packet buffer
 	poller            *netpoll.Poller         // epoll or kqueue
+	packet            []byte                  // read packet buffer
 	connCount         int32                   // number of active connections in event-loop
 	connections       map[int]*conn           // loop connections fd -> conn
 	eventHandler      EventHandler            // user eventHandler
@@ -165,7 +165,7 @@ func (el *eventloop) loopWrite(c *conn) error {
 	}
 	c.outboundBuffer.Shift(n)
 
-	if len(head) == n && tail != nil {
+	if n == len(head) && tail != nil {
 		n, err = unix.Write(c.fd, tail)
 		if err != nil {
 			if err == unix.EAGAIN {
@@ -189,8 +189,15 @@ func (el *eventloop) loopCloseConn(c *conn, err error) error {
 		return nil
 	}
 
-	if !c.outboundBuffer.IsEmpty() && err == nil {
-		_ = el.loopWrite(c)
+	if !c.outboundBuffer.IsEmpty() {
+		el.eventHandler.PreWrite()
+
+		head, tail := c.outboundBuffer.LazyReadAll()
+		if n, err := unix.Write(c.fd, head); err == nil {
+			if n == len(head) && tail != nil {
+				_, _ = unix.Write(c.fd, tail)
+			}
+		}
 	}
 
 	if err0, err1 := el.poller.Delete(c.fd), unix.Close(c.fd); err0 == nil && err1 == nil {
