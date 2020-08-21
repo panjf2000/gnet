@@ -53,7 +53,7 @@ type Server struct {
 	// Multicore indicates whether the server will be effectively created with multi-cores, if so,
 	// then you must take care of synchronizing the shared data between all event callbacks, otherwise,
 	// it will run the server with single thread. The number of threads in the server will be automatically
-	// assigned to the value of runtime.NumCPU().
+	// assigned to the value of logical CPUs usable by the current process.
 	Multicore bool
 
 	// The Addr parameter is the listening address that align

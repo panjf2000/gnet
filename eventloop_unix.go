@@ -90,6 +90,7 @@ func (el *eventloop) loopAccept(fd int) error {
 		if err = os.NewSyscallError("fcntl nonblock", unix.SetNonblock(nfd, true)); err != nil {
 			return err
 		}
+
 		netAddr := netpoll.SockaddrToTCPOrUnixAddr(sa)
 		c := newTCPConn(nfd, el, sa, netAddr)
 		if err = el.poller.AddRead(c.fd); err == nil {
@@ -143,6 +144,9 @@ func (el *eventloop) loopRead(c *conn) error {
 		case Shutdown:
 			return errors.ErrServerShutdown
 		}
+
+		// Check the status of connection every loop since it might be closed during writing data back to client due to
+		// some kind of system error.
 		if !c.opened {
 			return nil
 		}
@@ -189,6 +193,7 @@ func (el *eventloop) loopCloseConn(c *conn, err error) error {
 		return nil
 	}
 
+	// Send residual data in buffer back to client before actually closing the connection.
 	if !c.outboundBuffer.IsEmpty() {
 		el.eventHandler.PreWrite()
 

@@ -50,11 +50,13 @@ func (svr *server) activateSubReactor(el *eventloop) {
 	if el.idx == 0 && svr.opts.Ticker {
 		go el.loopTicker()
 	}
+
 	switch err := el.poller.Polling(func(fd int, filter int16) error {
 		if c, ack := el.connections[fd]; ack {
 			if filter == netpoll.EVFilterSock {
 				return el.loopCloseConn(c, nil)
 			}
+
 			switch c.outboundBuffer.IsEmpty() {
 			// Don't change the ordering of processing EVFILT_WRITE | EVFILT_READ | EV_ERROR/EV_EOF unless you're 100%
 			// sure what you're doing!

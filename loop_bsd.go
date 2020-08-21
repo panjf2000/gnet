@@ -29,6 +29,7 @@ func (el *eventloop) handleEvent(fd int, filter int16) error {
 		if filter == netpoll.EVFilterSock {
 			return el.loopCloseConn(c, nil)
 		}
+
 		switch c.outboundBuffer.IsEmpty() {
 		// Don't change the ordering of processing EVFILT_WRITE | EVFILT_READ | EV_ERROR/EV_EOF unless you're 100%
 		// sure what you're doing!

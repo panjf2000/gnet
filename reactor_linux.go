@@ -47,6 +47,7 @@ func (svr *server) activateSubReactor(el *eventloop) {
 	if el.idx == 0 && svr.opts.Ticker {
 		go el.loopTicker()
 	}
+
 	switch err := el.poller.Polling(func(fd int, ev uint32) error {
 		if c, ack := el.connections[fd]; ack {
 			switch c.outboundBuffer.IsEmpty() {
