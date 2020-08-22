@@ -474,23 +474,24 @@ func (s *testServer) OnClosed(c Conn, err error) (action Action) {
 
 func (s *testServer) React(frame []byte, c Conn) (out []byte, action Action) {
 	if s.async {
+		buf := bytebuffer.Get()
+		_, _ = buf.Write(frame)
+		s.bytesList = append(s.bytesList, buf)
+
 		if s.network == "tcp" || s.network == "unix" {
-			_ = c.BufferLength()
-			buf := bytebuffer.Get()
-			_, _ = buf.Write(frame)
-			s.bytesList = append(s.bytesList, buf)
 			// just for test
+			_ = c.BufferLength()
 			c.ShiftN(1)
+
 			_ = s.workerPool.Submit(
 				func() {
 					_ = c.AsyncWrite(buf.Bytes())
 				})
 			return
-		}
-		if s.network == "udp" {
+		} else if s.network == "udp" {
 			_ = s.workerPool.Submit(
 				func() {
-					_ = c.SendTo(frame)
+					_ = c.SendTo(buf.Bytes())
 				})
 			return
 		}
