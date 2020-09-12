@@ -21,9 +21,17 @@
 
 package gnet
 
-import "time"
+import (
+	"runtime"
+	"time"
+)
 
-func (svr *server) listenerRun() {
+func (svr *server) listenerRun(lockOSThread bool) {
+	if lockOSThread {
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+	}
+
 	var err error
 	defer func() { svr.signalShutdown(err) }()
 	var packet [0x10000]byte

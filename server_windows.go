@@ -78,7 +78,7 @@ func (svr *server) signalShutdown(err error) {
 func (svr *server) startListener() {
 	svr.listenerWG.Add(1)
 	go func() {
-		svr.listenerRun()
+		svr.listenerRun(svr.opts.LockOSThread)
 		svr.listenerWG.Done()
 	}()
 }
@@ -97,7 +97,7 @@ func (svr *server) startEventLoops(numEventLoop int) {
 
 	svr.loopWG.Add(svr.subEventLoopSet.len())
 	svr.subEventLoopSet.iterate(func(i int, el *eventloop) bool {
-		go el.loopRun()
+		go el.loopRun(svr.opts.LockOSThread)
 		return true
 	})
 }

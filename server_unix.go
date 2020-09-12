@@ -70,7 +70,7 @@ func (svr *server) startEventLoops() {
 	svr.subEventLoopSet.iterate(func(i int, el *eventloop) bool {
 		svr.wg.Add(1)
 		go func() {
-			el.loopRun()
+			el.loopRun(svr.opts.LockOSThread)
 			svr.wg.Done()
 		}()
 		return true
@@ -88,7 +88,7 @@ func (svr *server) startSubReactors() {
 	svr.subEventLoopSet.iterate(func(i int, el *eventloop) bool {
 		svr.wg.Add(1)
 		go func() {
-			svr.activateSubReactor(el)
+			svr.activateSubReactor(el, svr.opts.LockOSThread)
 			svr.wg.Done()
 		}()
 		return true
@@ -163,7 +163,7 @@ func (svr *server) activateReactors(numEventLoop int) error {
 		// Start main reactor in background.
 		svr.wg.Add(1)
 		go func() {
-			svr.activateMainReactor()
+			svr.activateMainReactor(svr.opts.LockOSThread)
 			svr.wg.Done()
 		}()
 	} else {

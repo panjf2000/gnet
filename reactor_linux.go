@@ -21,12 +21,20 @@
 package gnet
 
 import (
+	"runtime"
+
 	"github.com/panjf2000/gnet/errors"
 	"github.com/panjf2000/gnet/internal/netpoll"
 )
 
-func (svr *server) activateMainReactor() {
+func (svr *server) activateMainReactor(lockOSThread bool) {
+	if lockOSThread {
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+	}
+
 	defer svr.signalShutdown()
+
 	switch err := svr.mainLoop.poller.Polling(func(fd int, ev uint32) error { return svr.acceptNewConnection(fd) }); err {
 	case errors.ErrServerShutdown:
 		svr.logger.Infof("Main reactor is exiting normally on the signal error: %v", err)
@@ -35,7 +43,12 @@ func (svr *server) activateMainReactor() {
 	}
 }
 
-func (svr *server) activateSubReactor(el *eventloop) {
+func (svr *server) activateSubReactor(el *eventloop, lockOSThread bool) {
+	if lockOSThread {
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+	}
+
 	defer func() {
 		el.closeAllConns()
 		if el.idx == 0 && svr.opts.Ticker {

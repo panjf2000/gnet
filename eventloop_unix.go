@@ -25,6 +25,7 @@ package gnet
 
 import (
 	"os"
+	"runtime"
 	"time"
 
 	"github.com/panjf2000/gnet/errors"
@@ -51,7 +52,12 @@ func (el *eventloop) closeAllConns() {
 	}
 }
 
-func (el *eventloop) loopRun() {
+func (el *eventloop) loopRun(lockOSThread bool) {
+	if lockOSThread {
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+	}
+
 	defer func() {
 		el.closeAllConns()
 		el.ln.close()

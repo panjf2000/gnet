@@ -45,6 +45,12 @@ type Options struct {
 	// assigned to the value of logical CPUs usable by the current process.
 	Multicore bool
 
+	// LockOSThread is used to determine whether each I/O event-loop is associated to an OS thread, it is useful when you
+	// need some kind of mechanisms like thread local storage, or invoke certain C libraries (such as graphics lib: GLib)
+	// that require thread-level manipulation via cgo, or want all I/O event-loops to actually run in parallel for a
+	// potential higher performance.
+	LockOSThread bool
+
 	// LB represents the load-balancing algorithm used when assigning new connections.
 	LB LoadBalancing
 
@@ -80,6 +86,13 @@ func WithOptions(options Options) Option {
 func WithMulticore(multicore bool) Option {
 	return func(opts *Options) {
 		opts.Multicore = multicore
+	}
+}
+
+// WithLockOSThread sets up lockOSThread mode for I/O event-loops.
+func WithLockOSThread(lockOSThread bool) Option {
+	return func(opts *Options) {
+		opts.LockOSThread = lockOSThread
 	}
 }
 

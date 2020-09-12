@@ -23,6 +23,8 @@ package errors
 import "errors"
 
 var (
+	// ErrTooManyEventLoopThreads occurs when attempting to set up more than 10,000 event-loop goroutines under LockOSThread mode.
+	ErrTooManyEventLoopThreads = errors.New("too many event-loops under LockOSThread mode")
 	// ErrUnsupportedProtocol occurs when trying to use protocol that is not supported.
 	ErrUnsupportedProtocol = errors.New("only unix, tcp/tcp4/tcp6, udp/udp4/udp6 are supported")
 	// ErrUnsupportedTCPProtocol occurs when trying to use an unsupported TCP protocol.

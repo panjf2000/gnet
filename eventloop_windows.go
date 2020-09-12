@@ -22,6 +22,7 @@
 package gnet
 
 import (
+	"runtime"
 	"time"
 
 	"github.com/panjf2000/gnet/pool/bytebuffer"
@@ -39,7 +40,12 @@ type eventloop struct {
 	calibrateCallback func(*eventloop, int32) // callback func for re-adjusting connCount
 }
 
-func (el *eventloop) loopRun() {
+func (el *eventloop) loopRun(lockOSThread bool) {
+	if lockOSThread {
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+	}
+
 	var err error
 	defer func() {
 		if el.idx == 0 && el.svr.opts.Ticker {

@@ -530,7 +530,7 @@ func testServe(network, addr string, reuseport, multicore, async bool, nclients 
 		nclients:   nclients,
 		workerPool: goroutine.Default(),
 	}
-	must(Serve(ts, network+"://"+addr, WithMulticore(multicore), WithReusePort(reuseport), WithTicker(true),
+	must(Serve(ts, network+"://"+addr, WithLockOSThread(async), WithMulticore(multicore), WithReusePort(reuseport), WithTicker(true),
 		WithTCPKeepAlive(time.Minute*1), WithLoadBalancing(lb)))
 }
 
@@ -1021,4 +1021,13 @@ func (t *testCloseConnectionServer) Tick() (delay time.Duration, action Action) 
 func testCloseConnection(network, addr string) {
 	events := &testCloseConnectionServer{network: network, addr: addr}
 	must(Serve(events, network+"://"+addr, WithTicker(true)))
+}
+
+func TestServerOptionsCheck(t *testing.T) {
+	if err := Serve(&EventServer{}, "tcp://:3500", WithNumEventLoop(10001), WithLockOSThread(true)); err != errors.ErrTooManyEventLoopThreads {
+		t.Fail()
+		t.Log("error returned with LockOSThread option")
+	} else {
+		t.Log("got expected result")
+	}
 }
