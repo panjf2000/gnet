@@ -4,7 +4,7 @@ module.exports = {
     "date": "2020-05-11",
     "description": "Released v1.2.0",
     "hide_on_release_notes": false,
-    "id": "2020-07-05-releasing-1-2-0",
+    "id": "2020-05-11-released-1-2-0",
     "path": "website/highlights/2020-05-11-released-1-2-0.md",
     "permalink": "/highlights/2020-05-11-released-1-2-0/",
     "tags": [
