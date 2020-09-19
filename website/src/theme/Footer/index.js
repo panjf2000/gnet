@@ -116,6 +116,14 @@ function Footer() {
                 ) : (
                   <FooterLogo alt={logo.alt} url={logoUrl} />
                 )}
+                <br />
+                <a
+                  href="https://www.digitalocean.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={styles.footerLogoLink}>
+                  <img alt="DigitalOcean" src="https://opensource.nyc3.cdn.digitaloceanspaces.com/attribution/assets/PoweredByDO/DO_Powered_by_Badge_blue.svg" width="201px" />
+                </a>
               </div>
             )}
             {copyright}<br />

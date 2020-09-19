@@ -1113,12 +1113,6 @@ GOMAXPROCS=4
 - [最快的 Go 网络框架 gnet 来啦！](https://taohuawu.club/releasing-gnet-v1-with-techempower)
 - [字节跳动在 Go 网络库上的实践](https://taohuawu.club/bytedance-network-library-practices)
 
-# 🔋 JetBrains 开源证书支持
-
-`gnet` 项目一直以来都是在 JetBrains 公司旗下的 GoLand 集成开发环境中进行开发，基于 **free JetBrains Open Source license(s)** 正版免费授权，在此表达我的谢意。
-
-<a href="https://www.jetbrains.com/?from=gnet" target="_blank"><img src="https://raw.githubusercontent.com/panjf2000/illustrations/master/jetbrains/jetbrains-variant-4.png" width="250" align="middle" /></a>
-
 # 💰 支持
 
 如果有意向，可以通过每个月定量的少许捐赠来支持这个项目。
@@ -1141,6 +1135,27 @@ GOMAXPROCS=4
 <td><a href="https://www.paypal.me/R136a1X" target="_blank"><img src="https://raw.githubusercontent.com/panjf2000/illustrations/master/payments/PayPal.JPG" width="250" /></a></td>
 </tr></table>
 
-## 捐赠者名单
+# 💴 捐赠者名单
 
 <a target="_blank" href="https://github.com/patrick-othmer"><img src="https://avatars1.githubusercontent.com/u/8964313" width="100" alt="Patrick Othmer" /></a>&nbsp;&nbsp;<a target="_blank" href="https://github.com/panjf2000/gnet"><img src="https://avatars2.githubusercontent.com/u/50285334" width="100" alt="Jimmy" /></a>&nbsp;&nbsp;<a target="_blank" href="https://github.com/cafra"><img src="https://avatars0.githubusercontent.com/u/13758306" width="100" alt="ChenZhen" /></a>&nbsp;&nbsp;<a target="_blank" href="https://github.com/yangwenmai"><img src="https://avatars0.githubusercontent.com/u/1710912" width="100" alt="Mai Yang" /></a>&nbsp;&nbsp;<a target="_blank" href="https://github.com/BeijingWks"><img src="https://avatars3.githubusercontent.com/u/33656339" width="100" alt="王开帅" /></a>
+
+# 💵 付费支持
+
+<p align="center">
+	<a title="XS:CODE" target="_blank" href="https://xscode.com/panjf2000/gnet"><img src="https://raw.githubusercontent.com/panjf2000/illustrations/master/go/gnet-banner.png" /></a>
+</p>
+
+如果你需要一个深度定制的 `gnet` 版本且想要作者协助开发、或者是需要花费时间精力的 bug 修复/快速方案/咨询等，可以到[这里](https://xscode.com/panjf2000/gnet)申请付费支持。
+
+# 🔑 JetBrains 开源证书支持
+
+`gnet` 项目一直以来都是在 JetBrains 公司旗下的 GoLand 集成开发环境中进行开发，基于 **free JetBrains Open Source license(s)** 正版免费授权，在此表达我的谢意。
+<a href="https://www.jetbrains.com/?from=gnet" target="_blank"><img src="https://raw.githubusercontent.com/panjf2000/illustrations/master/jetbrains/jetbrains-variant-4.png" width="250" align="middle" /></a>
+
+# 🔋 赞助商
+
+<p>
+	<h3>本项目由以下机构赞助：</h3>
+	<a href="https://www.digitalocean.com/"><img src="https://opensource.nyc3.cdn.digitaloceanspaces.com/attribution/assets/SVG/DO_Logo_horizontal_blue.svg" width="201px" />
+	</a>
+</p>
