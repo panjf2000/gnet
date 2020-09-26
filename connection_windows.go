@@ -94,6 +94,7 @@ func (c *stdConn) releaseTCP() {
 	c.ctx = nil
 	c.localAddr = nil
 	c.remoteAddr = nil
+	c.conn = nil
 	prb.Put(c.inboundBuffer)
 	c.inboundBuffer = nil
 	bytebuffer.Put(c.buffer)
@@ -199,7 +200,9 @@ func (c *stdConn) AsyncWrite(buf []byte) (err error) {
 	var encodedBuf []byte
 	if encodedBuf, err = c.codec.Encode(c, buf); err == nil {
 		c.loop.ch <- func() (err error) {
-			_, err = c.conn.Write(encodedBuf)
+			if c.conn != nil {
+				_, err = c.conn.Write(encodedBuf)
+			}
 			return
 		}
 	}
