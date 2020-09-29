@@ -60,7 +60,7 @@ function Community() {
         <section>
           <div className="container">
             <AnchoredH2 id="team">Meet The Team</AnchoredH2>
-            <div className="sub-title">Andy Pan is the creator of gnet and the only core contributor at present, hoping more developers will join us in the future.</div>
+            <div className="sub-title">Andy Pan is the creator of gnet and the only core contributor at present, hoping more developers will join me in the future.</div>
 
             <div className={styles.coreTeam}>
               {team.map((member, idx) => (

@@ -25,11 +25,11 @@ function Contact() {
           <div className="container">
             <div className="row">
               <div className="col">
-                <a href="mailto:panjf2000@andypan.site" className="panel text--center">
+                <a href="mailto:i@andypan.site" className="panel text--center">
                   <div className="panel--icon">
                     <i className="feather icon-mail"></i>
                   </div>
-                  <div className="panel--title">panjf2000@andypan.site</div>
+                  <div className="panel--title">i@andypan.site</div>
                   <div className="panel--description">Send me an email</div>
                 </a>
               </div>
