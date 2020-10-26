@@ -86,6 +86,39 @@ func (el *eventloop) loopRun(lockOSThread bool) {
 	el.svr.logger.Infof("Event-loop(%d) is exiting due to error: %v", el.idx, err)
 }
 
+func (el *eventloop) connect(c *conn) error {
+	return el.poller.Trigger(func() (err error) {
+		if err = el.poller.AddWrite(c.fd); err != nil {
+			return
+		}
+		el.connections[c.fd] = c
+		return nil
+	})
+}
+
+func (el *eventloop) handleConnecting(c *conn) (err error) {
+	var buf [1]byte
+	if c.connecting {
+		// Portable check based on method described here: https://cr.yp.to/docs/connect.html
+		if _, err = unix.Getpeername(c.fd); err != nil {
+			if err != unix.ENOTCONN {
+				return err
+			}
+			_, err = unix.Read(c.fd, buf[:])
+			return err
+		}
+		// Connected
+		el.poller.Delete(c.fd) // On linux using AddRead without a Delete is an epoll_ctl error (file already exists)
+				       // On bsd, just using ModRead doesn't behave as expected, so instead remove the fd and re-add
+		c.connecting = false
+		if err = el.poller.AddReadWrite(c.fd); err == nil {
+			return el.loopOpen(el.connections[c.fd])
+		}
+		return err
+	}
+	return nil
+}
+
 func (el *eventloop) loopAccept(fd int) error {
 	if fd == el.ln.fd {
 		if el.ln.network == "udp" {

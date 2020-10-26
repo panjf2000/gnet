@@ -94,6 +94,12 @@ func (s Server) DupFd() (dupFD int, err error) {
 
 // Conn is a interface of gnet connection.
 type Conn interface {
+	// Dial connects to addr returning a new Conn on the same eventloop as this Conn
+	Dial(addr string) (Conn, error)
+
+	// ID is the unique (per-process) identity of this Conn
+	ID() int
+
 	// Context returns a user-defined context.
 	Context() (ctx interface{})
 

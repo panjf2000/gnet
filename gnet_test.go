@@ -31,6 +31,7 @@ import (
 	"math/rand"
 	"net"
 	"runtime"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -156,27 +157,67 @@ func TestCodecServe(t *testing.T) {
 				testCodecServe("tcp", ":9998", true, true, 10, true, nil)
 			})
 		})
+		t.Run("tcp-async-peer", func(t *testing.T) {
+			t.Run("1-loop-LineBasedFrameCodec", func(t *testing.T) {
+				testCodecPeerServe("tcp", ":9991", false, true, 10, true, new(LineBasedFrameCodec), ":9199", true)
+			})
+			t.Run("1-loop-DelimiterBasedFrameCodec", func(t *testing.T) {
+				testCodecPeerServe("tcp", ":9992", false, true, 10, true, NewDelimiterBasedFrameCodec('|'), ":9299", true)
+			})
+			t.Run("1-loop-FixedLengthFrameCodec", func(t *testing.T) {
+				testCodecPeerServe("tcp", ":9993", false, true, 10, true, NewFixedLengthFrameCodec(64), ":9399", true)
+			})
+			t.Run("1-loop-LengthFieldBasedFrameCodec", func(t *testing.T) {
+				testCodecPeerServe("tcp", ":9994", false, true, 10, true, nil, ":9499", true)
+			})
+			t.Run("N-loop-LineBasedFrameCodec", func(t *testing.T) {
+				testCodecPeerServe("tcp", ":9995", true, true, 10, true, new(LineBasedFrameCodec), ":9599", true)
+			})
+			t.Run("N-loop-DelimiterBasedFrameCodec", func(t *testing.T) {
+				testCodecPeerServe("tcp", ":9996", true, true, 10, true, NewDelimiterBasedFrameCodec('|'), ":9699", true)
+			})
+			t.Run("N-loop-FixedLengthFrameCodec", func(t *testing.T) {
+				testCodecPeerServe("tcp", ":9997", true, true, 10, true, NewFixedLengthFrameCodec(64), ":9799", true)
+			})
+			t.Run("N-loop-LengthFieldBasedFrameCodec", func(t *testing.T) {
+				testCodecPeerServe("tcp", ":9998", true, true, 10, true, nil, ":9899", true)
+			})
+		})
 	})
+}
+
+type clientProxy struct {
+	client Conn
+	peer   Conn
 }
 
 type testCodecServer struct {
 	*EventServer
 	network      string
 	addr         string
+	peer         string
+	isPrim       bool
+	isPeer       bool
 	multicore    bool
 	async        bool
 	nclients     int
+	npeers       int
 	started      int32
 	connected    int32
 	disconnected int32
 	codec        ICodec
+	clientMap    sync.Map // map[int]*clientProxy{}
+	peerMap      sync.Map // map[int]int
 	workerPool   *goroutine.Pool
 }
 
 func (s *testCodecServer) OnOpened(c Conn) (out []byte, action Action) {
 	c.SetContext(c)
-	atomic.AddInt32(&s.connected, 1)
-	out = []byte("sweetness\r\n")
+	// dont send the header to a peer on creating the connection, or when we're a peer
+	if (s.isPrim && c.RemoteAddr().String() != s.peer) || !(s.isPrim || s.isPeer) {
+		atomic.AddInt32(&s.connected, 1)
+		out = []byte("sweetness\r\n")
+	}
 	if c.LocalAddr() == nil {
 		panic("nil local addr")
 	}
@@ -191,9 +232,15 @@ func (s *testCodecServer) OnClosed(c Conn, err error) (action Action) {
 		panic("invalid context")
 	}
 
-	atomic.AddInt32(&s.disconnected, 1)
+	target := int32(s.nclients)
+	if s.isPeer {
+		target = int32(s.npeers)
+	}
+	if !(s.isPrim && s.peer == c.RemoteAddr().String()) {
+		atomic.AddInt32(&s.disconnected, 1)
+	}
 	if atomic.LoadInt32(&s.connected) == atomic.LoadInt32(&s.disconnected) &&
-		atomic.LoadInt32(&s.disconnected) == int32(s.nclients) {
+		atomic.LoadInt32(&s.disconnected) == target {
 		action = Shutdown
 	}
 
@@ -201,6 +248,53 @@ func (s *testCodecServer) OnClosed(c Conn, err error) (action Action) {
 }
 
 func (s *testCodecServer) React(frame []byte, c Conn) (out []byte, action Action) {
+	// In peer tests we have two servers: primary and peer
+	// clients write to the primary, which has isPrim==true,
+	// the primary writes to the peer, which has isPeer==false
+	if s.isPrim {
+		// If we are a primary we have two potential actions
+		// 1. If the `Conn` is from a client, we must see if it is a new client or an existing one
+		//    a. if it is a new client, we connect to a peer and record the connection in the connMap
+		//    b. if it is an existing client, we reuse the peer connection for this client
+		// 2. If the `Conn` is from a peer, we must resolve the destination client and send the response to it
+		if iface, ok := s.peerMap.Load(c.ID()); ok {
+			clientID := iface.(int)
+			proxy, ok := s.clientMap.Load(clientID)
+			if !ok {
+				panic(fmt.Sprintf("unknown client %d for peer %d", clientID, c.ID()))
+			}
+			data := append([]byte{}, frame...)
+			_ = s.workerPool.Submit(func() {
+				_ = proxy.(*clientProxy).client.AsyncWrite(data)
+			})
+		} else {
+			var conn Conn
+			if iface, ok := s.clientMap.Load(c.ID()); !ok {
+				var err error
+				conn, err = c.Dial(s.network + "://" + s.peer)
+				if err != nil {
+					panic(err)
+				}
+
+				s.peerMap.Store(conn.ID(), c.ID())
+				s.clientMap.Store(c.ID(), &clientProxy{client: c, peer: conn})
+			} else {
+				proxy := iface.(*clientProxy)
+				conn = proxy.peer
+			}
+			data := append([]byte{}, frame...)
+			_ = s.workerPool.Submit(func() {
+				_ = conn.AsyncWrite(data)
+			})
+		}
+		return
+	}
+
+	if s.isPrim {
+		panic("bad state")
+	}
+
+	// else s.isPeer || !s.isPrim
 	if s.async {
 		if frame != nil {
 			data := append([]byte{}, frame...)
@@ -215,6 +309,9 @@ func (s *testCodecServer) React(frame []byte, c Conn) (out []byte, action Action
 }
 
 func (s *testCodecServer) Tick() (delay time.Duration, action Action) {
+	if s.isPeer {
+		return
+	}
 	if atomic.LoadInt32(&s.started) == 0 {
 		for i := 0; i < s.nclients; i++ {
 			go func() {
@@ -233,6 +330,10 @@ var (
 )
 
 func testCodecServe(network, addr string, multicore, async bool, nclients int, reuseport bool, codec ICodec) {
+	testCodecPeerServe(network, addr, multicore, async, nclients, reuseport, codec, "", false)
+}
+
+func testCodecPeerServe(network, addr string, multicore, async bool, nclients int, reuseport bool, codec ICodec, peer string, usePeer bool) {
 	var err error
 	fieldLength := fieldLengths[n]
 	if codec == nil {
@@ -255,9 +356,38 @@ func testCodecServe(network, addr string, multicore, async bool, nclients int, r
 	if n > 4 {
 		n = 0
 	}
+
+	if usePeer && !async {
+		panic("Illegal test condition usePeer && !async")
+	}
+
+	if usePeer {
+		go func() {
+			var err error
+			ps := &testCodecServer{
+				network: network, addr: peer, multicore: multicore, async: async, nclients: 0, npeers: nclients,
+				codec: codec, workerPool: goroutine.Default(), peer: addr, isPeer: true,
+			}
+			if reuseport {
+				err = Serve(ps, network+"://"+peer, WithMulticore(multicore), WithTicker(true),
+					WithTCPKeepAlive(time.Minute*5), WithCodec(codec), WithReusePort(true))
+			} else {
+				err = Serve(ps, network+"://"+peer, WithMulticore(multicore), WithTicker(true),
+					WithTCPKeepAlive(time.Minute*5), WithCodec(codec))
+			}
+			if err != nil {
+				panic(err)
+			}
+		}()
+	}
+
 	ts := &testCodecServer{
 		network: network, addr: addr, multicore: multicore, async: async, nclients: nclients,
-		codec: codec, workerPool: goroutine.Default(),
+		codec: codec, workerPool: goroutine.Default(), peer: peer, isPrim: usePeer,
+	}
+	if usePeer {
+		ts.clientMap = sync.Map{}
+		ts.peerMap = sync.Map{}
 	}
 	if reuseport {
 		err = Serve(ts, network+"://"+addr, WithMulticore(multicore), WithTicker(true),

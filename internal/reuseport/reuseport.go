@@ -28,7 +28,14 @@ package reuseport
 
 import (
 	"net"
+
+	"golang.org/x/sys/unix"
 )
+
+// TCPConnect calls tcpConnectedSocket.
+func TCPConnect(proto, addr string) (int, bool, unix.Sockaddr, net.Addr, error) {
+	return tcpConnectedSocket(proto, addr)
+}
 
 // TCPSocket calls tcpReusablePort.
 func TCPSocket(proto, addr string, reusePort bool) (int, net.Addr, error) {

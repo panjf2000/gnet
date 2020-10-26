@@ -22,7 +22,9 @@
 package gnet
 
 import (
+	"errors"
 	"net"
+	"reflect"
 
 	"github.com/panjf2000/gnet/pool/bytebuffer"
 	prb "github.com/panjf2000/gnet/pool/ringbuffer"
@@ -122,6 +124,18 @@ func (c *stdConn) read() ([]byte, error) {
 }
 
 // ================================= Public APIs of gnet.Conn =================================
+
+func (c *stdConn) Dial(addr string) (conn Conn, err error) {
+	_ = addr
+	return nil, errors.New("unsupported on windows")
+}
+
+func (c *stdConn) ID() int {
+	v := reflect.ValueOf(c.conn)
+	netFD := reflect.Indirect(reflect.Indirect(v).FieldByName("fd"))
+	fd := int(netFD.FieldByName("sysfd").Int())
+	return fd
+}
 
 func (c *stdConn) Read() []byte {
 	if c.inboundBuffer.IsEmpty() {

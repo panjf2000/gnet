@@ -24,11 +24,13 @@
 package gnet
 
 import (
+	"errors"
 	"net"
 	"os"
 	"time"
 
 	"github.com/panjf2000/gnet/internal/netpoll"
+	"github.com/panjf2000/gnet/internal/reuseport"
 	"github.com/panjf2000/gnet/pool/bytebuffer"
 	prb "github.com/panjf2000/gnet/pool/ringbuffer"
 	"github.com/panjf2000/gnet/ringbuffer"
@@ -43,6 +45,7 @@ type conn struct {
 	codec          ICodec                 // codec for TCP
 	buffer         []byte                 // reuse memory of inbound data as a temporary buffer
 	opened         bool                   // connection opened event fired
+	connecting     bool		      // async connection is still being established
 	localAddr      net.Addr               // local addr
 	remoteAddr     net.Addr               // remote addr
 	byteBuffer     *bytebuffer.ByteBuffer // bytes buffer for buffering current packet and data in ring-buffer
@@ -147,6 +150,31 @@ func (c *conn) sendTo(buf []byte) error {
 
 // ================================= Public APIs of gnet.Conn =================================
 
+func (c *conn) Dial(addr string) (conn Conn, err error) {
+	var (
+		fd         int
+		connecting bool
+		sockaddr   unix.Sockaddr
+		remoteAddr net.Addr
+	)
+	network, address := parseProtoAddr(addr)
+
+	if network != "tcp" {
+		return nil, errors.New("unsupported network")
+	}
+
+	fd, connecting, sockaddr, remoteAddr, err = reuseport.TCPConnect(network, address)
+
+	tc := newTCPConn(fd, c.loop, sockaddr, remoteAddr)
+	tc.connecting = connecting
+	err = c.loop.connect(tc)
+	return tc, err
+}
+
+func (c *conn) ID() int {
+	return c.fd
+}
+
 func (c *conn) Read() []byte {
 	if c.inboundBuffer.IsEmpty() {
 		return c.buffer
@@ -224,6 +252,9 @@ func (c *conn) AsyncWrite(buf []byte) error {
 	return c.loop.poller.Trigger(func() (err error) {
 		if c.opened {
 			err = c.write(buf)
+		} else if c.connecting {
+			// Reschedule
+			return c.AsyncWrite(buf)
 		}
 		return
 	})

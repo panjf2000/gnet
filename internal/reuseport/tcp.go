@@ -148,3 +148,37 @@ func tcpReusablePort(proto, addr string, reusePort bool) (fd int, netAddr net.Ad
 
 	return
 }
+
+// tcpConnectedSocket creates an endpoint for communication and returns a file descriptor that refers to that endpoint.
+// the descriptor is a (possibly) connected TCP socket.
+func tcpConnectedSocket(proto, addr string) (fd int, connecting bool, sockaddr unix.Sockaddr, netAddr net.Addr, err error) {
+	var (
+		family int
+	)
+
+	if sockaddr, family, netAddr, err = getTCPSockaddr(proto, addr); err != nil {
+		return
+	}
+
+	if fd, err = sysSocket(family, unix.SOCK_STREAM, unix.IPPROTO_TCP); err != nil {
+		err = os.NewSyscallError("socket", err)
+		return
+	}
+	defer func() {
+		if err != nil {
+			_ = unix.Close(fd)
+		}
+	}()
+
+
+	if err = os.NewSyscallError("connect", unix.Connect(fd, sockaddr)); err != nil {
+		// If the socket is non-blocking, the connect could be incomplete, and the caller must handle that.
+		// The `connecting` boolean indicartes that connect is still in progress
+		if err.(*os.SyscallError).Unwrap() == unix.EINPROGRESS {
+			connecting = true
+			err = nil
+		}
+		return
+	}
+	return
+}
