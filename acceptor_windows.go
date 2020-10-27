@@ -58,7 +58,6 @@ func (svr *server) listenerRun(lockOSThread bool) {
 			c := newTCPConn(conn, el)
 			el.ch <- c
 			go func() {
-				var packet [0x10000]byte
 				for {
 					n, err := c.conn.Read(packet[:])
 					if err != nil {
