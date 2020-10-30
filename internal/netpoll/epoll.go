@@ -96,7 +96,7 @@ func (p *Poller) Polling(callback func(fd int, ev uint32) error) error {
 	for {
 		n, err := unix.EpollWait(p.fd, el.events, -1)
 		if err != nil && err != unix.EINTR {
-			logging.DefaultLogger.Warnf("Error occurs in epoll, %v", os.NewSyscallError("epoll_wait", err))
+			logging.DefaultLogger.Warnf("Error occurs in epoll: %v", os.NewSyscallError("epoll_wait", err))
 			continue
 		}
 
@@ -107,7 +107,7 @@ func (p *Poller) Polling(callback func(fd int, ev uint32) error) error {
 				case errors.ErrAcceptSockets, errors.ErrServerShutdown:
 					return err
 				default:
-					logging.DefaultLogger.Warnf("Error occurs in event-loop, %v", err)
+					logging.DefaultLogger.Warnf("Error occurs in event-loop: %v", err)
 				}
 			} else {
 				wakenUp = true

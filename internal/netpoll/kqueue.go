@@ -87,7 +87,7 @@ func (p *Poller) Polling(callback func(fd int, filter int16) error) error {
 	for {
 		n, err := unix.Kevent(p.fd, nil, el.events, nil)
 		if err != nil && err != unix.EINTR {
-			logging.DefaultLogger.Warnf("Error occurs in kqueue, %v", os.NewSyscallError("kevent wait", err))
+			logging.DefaultLogger.Warnf("Error occurs in kqueue: %v", os.NewSyscallError("kevent wait", err))
 			continue
 		}
 
@@ -103,7 +103,7 @@ func (p *Poller) Polling(callback func(fd int, filter int16) error) error {
 				case errors.ErrAcceptSockets, errors.ErrServerShutdown:
 					return err
 				default:
-					logging.DefaultLogger.Warnf("Error occurs in event-loop, %v", err)
+					logging.DefaultLogger.Warnf("Error occurs in event-loop: %v", err)
 				}
 			} else {
 				wakenUp = true
