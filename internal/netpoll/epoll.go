@@ -27,6 +27,7 @@ import (
 	"os"
 	"unsafe"
 
+	"github.com/panjf2000/gnet/errors"
 	"github.com/panjf2000/gnet/internal"
 	"github.com/panjf2000/gnet/internal/logging"
 	"golang.org/x/sys/unix"
@@ -88,31 +89,43 @@ func (p *Poller) Trigger(job internal.Job) (err error) {
 }
 
 // Polling blocks the current goroutine, waiting for network-events.
-func (p *Poller) Polling(callback func(fd int, ev uint32) error) (err error) {
+func (p *Poller) Polling(callback func(fd int, ev uint32) error) error {
 	el := newEventList(InitEvents)
 	var wakenUp bool
+
 	for {
-		n, err0 := unix.EpollWait(p.fd, el.events, -1)
-		if err0 != nil && err0 != unix.EINTR {
-			logging.DefaultLogger.Warnf("Error occurs in epoll, %v", os.NewSyscallError("epoll_wait", err0))
+		n, err := unix.EpollWait(p.fd, el.events, -1)
+		if err != nil && err != unix.EINTR {
+			logging.DefaultLogger.Warnf("Error occurs in epoll, %v", os.NewSyscallError("epoll_wait", err))
 			continue
 		}
+
 		for i := 0; i < n; i++ {
 			if fd := int(el.events[i].Fd); fd != p.wfd {
-				if err = callback(fd, el.events[i].Events); err != nil {
-					return
+				switch err = callback(fd, el.events[i].Events); err {
+				case nil:
+				case errors.ErrAcceptSockets, errors.ErrServerShutdown:
+					return err
+				default:
+					logging.DefaultLogger.Warnf("Error occurs in event-loop, %v", err)
 				}
 			} else {
 				wakenUp = true
 				_, _ = unix.Read(p.wfd, p.wfdBuf)
 			}
 		}
+
 		if wakenUp {
 			wakenUp = false
-			if err = p.asyncJobQueue.ForEach(); err != nil {
-				return
+			switch err = p.asyncJobQueue.ForEach(); err {
+			case nil:
+			case errors.ErrServerShutdown:
+				return err
+			default:
+				logging.DefaultLogger.Warnf("Error occurs in user-defined function, %v", err)
 			}
 		}
+
 		if n == el.size {
 			el.increase()
 		}

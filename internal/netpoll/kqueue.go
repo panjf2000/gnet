@@ -26,6 +26,7 @@ package netpoll
 import (
 	"os"
 
+	"github.com/panjf2000/gnet/errors"
 	"github.com/panjf2000/gnet/internal"
 	"github.com/panjf2000/gnet/internal/logging"
 	"golang.org/x/sys/unix"
@@ -79,15 +80,17 @@ func (p *Poller) Trigger(job internal.Job) (err error) {
 }
 
 // Polling blocks the current goroutine, waiting for network-events.
-func (p *Poller) Polling(callback func(fd int, filter int16) error) (err error) {
+func (p *Poller) Polling(callback func(fd int, filter int16) error) error {
 	el := newEventList(InitEvents)
 	var wakenUp bool
+
 	for {
-		n, err0 := unix.Kevent(p.fd, nil, el.events, nil)
-		if err0 != nil && err0 != unix.EINTR {
-			logging.DefaultLogger.Warnf("Error occurs in kqueue, %v", os.NewSyscallError("kevent wait", err0))
+		n, err := unix.Kevent(p.fd, nil, el.events, nil)
+		if err != nil && err != unix.EINTR {
+			logging.DefaultLogger.Warnf("Error occurs in kqueue, %v", os.NewSyscallError("kevent wait", err))
 			continue
 		}
+
 		var evFilter int16
 		for i := 0; i < n; i++ {
 			if fd := int(el.events[i].Ident); fd != 0 {
@@ -95,19 +98,29 @@ func (p *Poller) Polling(callback func(fd int, filter int16) error) (err error) 
 				if (el.events[i].Flags&unix.EV_EOF != 0) || (el.events[i].Flags&unix.EV_ERROR != 0) {
 					evFilter = EVFilterSock
 				}
-				if err = callback(fd, evFilter); err != nil {
-					return
+				switch err = callback(fd, evFilter); err {
+				case nil:
+				case errors.ErrAcceptSockets, errors.ErrServerShutdown:
+					return err
+				default:
+					logging.DefaultLogger.Warnf("Error occurs in event-loop, %v", err)
 				}
 			} else {
 				wakenUp = true
 			}
 		}
+
 		if wakenUp {
 			wakenUp = false
-			if err = p.asyncJobQueue.ForEach(); err != nil {
-				return
+			switch err = p.asyncJobQueue.ForEach(); err {
+			case nil:
+			case errors.ErrServerShutdown:
+				return err
+			default:
+				logging.DefaultLogger.Warnf("Error occurs in user-defined function, %v", err)
 			}
 		}
+
 		if n == el.size {
 			el.increase()
 		}
