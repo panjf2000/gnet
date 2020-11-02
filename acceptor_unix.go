@@ -36,7 +36,7 @@ func (svr *server) acceptNewConnection(fd int) error {
 		if err == unix.EAGAIN {
 			return nil
 		}
-		return errors.ErrAcceptSockets
+		return errors.ErrAcceptSocket
 	}
 	if err = os.NewSyscallError("fcntl nonblock", unix.SetNonblock(nfd, true)); err != nil {
 		return err
