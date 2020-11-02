@@ -25,6 +25,7 @@ package gnet
 import (
 	"os"
 
+	"github.com/panjf2000/gnet/errors"
 	"github.com/panjf2000/gnet/internal/netpoll"
 	"golang.org/x/sys/unix"
 )
@@ -35,7 +36,7 @@ func (svr *server) acceptNewConnection(fd int) error {
 		if err == unix.EAGAIN {
 			return nil
 		}
-		return os.NewSyscallError("accept", err)
+		return errors.ErrAcceptSocket
 	}
 	if err = os.NewSyscallError("fcntl nonblock", unix.SetNonblock(nfd, true)); err != nil {
 		return err

@@ -23,6 +23,10 @@ package errors
 import "errors"
 
 var (
+	// ErrServerShutdown occurs when server is closing.
+	ErrServerShutdown = errors.New("server is going to be shutdown")
+	// ErrAcceptSocket occurs when acceptor does not accept the new connection properly.
+	ErrAcceptSocket = errors.New("accept a new connection error")
 	// ErrTooManyEventLoopThreads occurs when attempting to set up more than 10,000 event-loop goroutines under LockOSThread mode.
 	ErrTooManyEventLoopThreads = errors.New("too many event-loops under LockOSThread mode")
 	// ErrUnsupportedProtocol occurs when trying to use protocol that is not supported.
@@ -35,8 +39,9 @@ var (
 	ErrUnsupportedUDSProtocol = errors.New("only unix is supported")
 	// ErrUnsupportedPlatform occurs when running gnet on an unsupported platform.
 	ErrUnsupportedPlatform = errors.New("unsupported platform in gnet")
-	// ErrServerShutdown occurs when server is closing.
-	ErrServerShutdown = errors.New("server is going to be shutdown")
+
+	// ================================================= codec errors =================================================
+
 	// ErrInvalidFixedLength occurs when the output data have invalid fixed length.
 	ErrInvalidFixedLength = errors.New("invalid fixed length of bytes")
 	// ErrUnexpectedEOF occurs when no enough data to read by codec.
