@@ -40,7 +40,6 @@ var (
 	// ErrUnsupportedPlatform occurs when running gnet on an unsupported platform.
 	ErrUnsupportedPlatform = errors.New("unsupported platform in gnet")
 
-
 	// ================================================= codec errors =================================================
 
 	// ErrInvalidFixedLength occurs when the output data have invalid fixed length.
