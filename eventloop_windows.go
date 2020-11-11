@@ -24,6 +24,7 @@ package gnet
 import (
 	"runtime"
 	"time"
+	"unsafe"
 
 	"github.com/panjf2000/gnet/pool/bytebuffer"
 
@@ -31,6 +32,14 @@ import (
 )
 
 type eventloop struct {
+	internalEventloop
+
+	// Prevents eventloop from false sharing by padding extra memory with the difference
+	// between the cache line size "s" and (eventloop mod s) for the most common CPU architectures.
+	_ [64 - unsafe.Sizeof(internalEventloop{})%64]byte
+}
+
+type internalEventloop struct {
 	ch                chan interface{}        // command channel
 	idx               int                     // loop index
 	svr               *server                 // server in loop

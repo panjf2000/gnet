@@ -107,15 +107,14 @@ func (svr *server) activateEventLoops(numEventLoop int) (err error) {
 
 		var p *netpoll.Poller
 		if p, err = netpoll.OpenPoller(); err == nil {
-			el := &eventloop{
-				ln:                l,
-				svr:               svr,
-				poller:            p,
-				packet:            make([]byte, 0x10000),
-				connections:       make(map[int]*conn),
-				eventHandler:      svr.eventHandler,
-				calibrateCallback: svr.subEventLoopSet.calibrate,
-			}
+			el := new(eventloop)
+			el.ln = l
+			el.svr = svr
+			el.poller = p
+			el.packet = make([]byte, 0x10000)
+			el.connections = make(map[int]*conn)
+			el.eventHandler = svr.eventHandler
+			el.calibrateCallback = svr.subEventLoopSet.calibrate
 			_ = el.poller.AddRead(el.ln.fd)
 			svr.subEventLoopSet.register(el)
 		} else {
@@ -132,15 +131,14 @@ func (svr *server) activateEventLoops(numEventLoop int) (err error) {
 func (svr *server) activateReactors(numEventLoop int) error {
 	for i := 0; i < numEventLoop; i++ {
 		if p, err := netpoll.OpenPoller(); err == nil {
-			el := &eventloop{
-				ln:                svr.ln,
-				svr:               svr,
-				poller:            p,
-				packet:            make([]byte, 0x10000),
-				connections:       make(map[int]*conn),
-				eventHandler:      svr.eventHandler,
-				calibrateCallback: svr.subEventLoopSet.calibrate,
-			}
+			el := new(eventloop)
+			el.ln = svr.ln
+			el.svr = svr
+			el.poller = p
+			el.packet = make([]byte, 0x10000)
+			el.connections = make(map[int]*conn)
+			el.eventHandler = svr.eventHandler
+			el.calibrateCallback = svr.subEventLoopSet.calibrate
 			svr.subEventLoopSet.register(el)
 		} else {
 			return err
@@ -151,12 +149,11 @@ func (svr *server) activateReactors(numEventLoop int) error {
 	svr.startSubReactors()
 
 	if p, err := netpoll.OpenPoller(); err == nil {
-		el := &eventloop{
-			ln:     svr.ln,
-			idx:    -1,
-			poller: p,
-			svr:    svr,
-		}
+		el := new(eventloop)
+		el.ln = svr.ln
+		el.idx = -1
+		el.poller = p
+		el.svr = svr
 		_ = el.poller.AddRead(el.ln.fd)
 		svr.mainLoop = el
 

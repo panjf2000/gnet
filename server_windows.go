@@ -85,13 +85,12 @@ func (svr *server) startListener() {
 
 func (svr *server) startEventLoops(numEventLoop int) {
 	for i := 0; i < numEventLoop; i++ {
-		el := &eventloop{
-			ch:                make(chan interface{}, channelBuffer(commandBufferSize)),
-			svr:               svr,
-			connections:       make(map[*stdConn]struct{}),
-			eventHandler:      svr.eventHandler,
-			calibrateCallback: svr.subEventLoopSet.calibrate,
-		}
+		el := new(eventloop)
+		el.ch = make(chan interface{}, channelBuffer(commandBufferSize))
+		el.svr = svr
+		el.connections = make(map[*stdConn]struct{})
+		el.eventHandler = svr.eventHandler
+		el.calibrateCallback = svr.subEventLoopSet.calibrate
 		svr.subEventLoopSet.register(el)
 	}
 

@@ -29,6 +29,7 @@ import (
 	"os"
 	"runtime"
 	"time"
+	"unsafe"
 
 	gerrors "github.com/panjf2000/gnet/errors"
 	"github.com/panjf2000/gnet/internal/netpoll"
@@ -36,6 +37,14 @@ import (
 )
 
 type eventloop struct {
+	internalEventloop
+
+	// Prevents eventloop from false sharing by padding extra memory with the difference
+	// between the cache line size "s" and (eventloop mod s) for the most common CPU architectures.
+	_ [64 - unsafe.Sizeof(internalEventloop{})%64]byte
+}
+
+type internalEventloop struct {
 	ln                *listener               // listener
 	idx               int                     // loop index in the server loops list
 	svr               *server                 // server in loop
