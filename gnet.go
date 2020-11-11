@@ -73,7 +73,7 @@ type Server struct {
 
 // CountConnections counts the number of currently active connections and returns it.
 func (s Server) CountConnections() (count int) {
-	s.svr.subEventLoopSet.iterate(func(i int, el *eventloop) bool {
+	s.svr.lb.iterate(func(i int, el *eventloop) bool {
 		count += int(atomic.LoadInt32(&el.connCount))
 		return true
 	})

@@ -37,17 +37,17 @@ import (
 )
 
 type server struct {
-	ln              *listener          // all the listeners
-	wg              sync.WaitGroup     // event-loop close WaitGroup
-	opts            *Options           // options with server
-	once            sync.Once          // make sure only signalShutdown once
-	cond            *sync.Cond         // shutdown signaler
-	codec           ICodec             // codec for TCP stream
-	logger          logging.Logger     // customized logger for logging info
-	ticktock        chan time.Duration // ticker channel
-	mainLoop        *eventloop         // main event-loop for accepting connections
-	eventHandler    EventHandler       // user eventHandler
-	subEventLoopSet loadBalancer       // event-loops for handling events
+	ln           *listener          // all the listeners
+	lb           loadBalancer       // event-loops for handling events
+	wg           sync.WaitGroup     // event-loop close WaitGroup
+	opts         *Options           // options with server
+	once         sync.Once          // make sure only signalShutdown once
+	cond         *sync.Cond         // shutdown signaler
+	codec        ICodec             // codec for TCP stream
+	logger       logging.Logger     // customized logger for logging info
+	ticktock     chan time.Duration // ticker channel
+	mainLoop     *eventloop         // main event-loop for accepting connections
+	eventHandler EventHandler       // user eventHandler
 }
 
 // waitForShutdown waits for a signal to shutdown.
@@ -67,7 +67,7 @@ func (svr *server) signalShutdown() {
 }
 
 func (svr *server) startEventLoops() {
-	svr.subEventLoopSet.iterate(func(i int, el *eventloop) bool {
+	svr.lb.iterate(func(i int, el *eventloop) bool {
 		svr.wg.Add(1)
 		go func() {
 			el.loopRun(svr.opts.LockOSThread)
@@ -78,14 +78,14 @@ func (svr *server) startEventLoops() {
 }
 
 func (svr *server) closeEventLoops() {
-	svr.subEventLoopSet.iterate(func(i int, el *eventloop) bool {
+	svr.lb.iterate(func(i int, el *eventloop) bool {
 		_ = el.poller.Close()
 		return true
 	})
 }
 
 func (svr *server) startSubReactors() {
-	svr.subEventLoopSet.iterate(func(i int, el *eventloop) bool {
+	svr.lb.iterate(func(i int, el *eventloop) bool {
 		svr.wg.Add(1)
 		go func() {
 			svr.activateSubReactor(el, svr.opts.LockOSThread)
@@ -114,9 +114,9 @@ func (svr *server) activateEventLoops(numEventLoop int) (err error) {
 			el.packet = make([]byte, 0x10000)
 			el.connections = make(map[int]*conn)
 			el.eventHandler = svr.eventHandler
-			el.calibrateCallback = svr.subEventLoopSet.calibrate
+			el.calibrateCallback = svr.lb.calibrate
 			_ = el.poller.AddRead(el.ln.fd)
-			svr.subEventLoopSet.register(el)
+			svr.lb.register(el)
 		} else {
 			return
 		}
@@ -138,8 +138,8 @@ func (svr *server) activateReactors(numEventLoop int) error {
 			el.packet = make([]byte, 0x10000)
 			el.connections = make(map[int]*conn)
 			el.eventHandler = svr.eventHandler
-			el.calibrateCallback = svr.subEventLoopSet.calibrate
-			svr.subEventLoopSet.register(el)
+			el.calibrateCallback = svr.lb.calibrate
+			svr.lb.register(el)
 		} else {
 			return err
 		}
@@ -183,7 +183,7 @@ func (svr *server) stop() {
 	svr.waitForShutdown()
 
 	// Notify all loops to close by closing all listeners
-	svr.subEventLoopSet.iterate(func(i int, el *eventloop) bool {
+	svr.lb.iterate(func(i int, el *eventloop) bool {
 		sniffErrorAndLog(el.poller.Trigger(func() error {
 			return errors.ErrServerShutdown
 		}))
@@ -224,11 +224,11 @@ func serve(eventHandler EventHandler, listener *listener, options *Options) erro
 
 	switch options.LB {
 	case RoundRobin:
-		svr.subEventLoopSet = new(roundRobinEventLoopSet)
+		svr.lb = new(roundRobinLoadBalancer)
 	case LeastConnections:
-		svr.subEventLoopSet = new(leastConnectionsEventLoopSet)
+		svr.lb = new(leastConnectionsLoadBalancer)
 	case SourceAddrHash:
-		svr.subEventLoopSet = new(sourceAddrHashEventLoopSet)
+		svr.lb = new(sourceAddrHashLoadBalancer)
 	}
 
 	svr.cond = sync.NewCond(&sync.Mutex{})

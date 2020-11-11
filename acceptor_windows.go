@@ -44,7 +44,7 @@ func (svr *server) listenerRun(lockOSThread bool) {
 				return
 			}
 
-			el := svr.subEventLoopSet.next(addr)
+			el := svr.lb.next(addr)
 			c := newUDPConn(el, svr.ln.lnaddr, addr)
 			el.ch <- packUDPConn(c, packet[:n])
 		} else {
@@ -54,7 +54,7 @@ func (svr *server) listenerRun(lockOSThread bool) {
 				err = e
 				return
 			}
-			el := svr.subEventLoopSet.next(conn.RemoteAddr())
+			el := svr.lb.next(conn.RemoteAddr())
 			c := newTCPConn(conn, el)
 			el.ch <- c
 			go func() {
