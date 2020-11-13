@@ -88,9 +88,11 @@ func (el *eventloop) loopRun(lockOSThread bool) {
 		case func() error:
 			err = v()
 		}
-		if err != nil {
-			el.svr.logger.Infof("Event-loop(%d) is exiting due to the error: %v", el.idx, err)
+
+		if err == errors.ErrServerShutdown {
 			break
+		} else if err != nil {
+			el.svr.logger.Infof("Event-loop(%d) is exiting due to the error: %v", el.idx, err)
 		}
 	}
 }
@@ -181,16 +183,21 @@ func (el *eventloop) loopTicker() {
 }
 
 func (el *eventloop) loopError(c *stdConn, err error) (e error) {
-	if e = c.conn.Close(); e == nil {
+	defer func() {
+		if err := c.conn.Close(); err != nil {
+			el.svr.logger.Warnf("Failed to close connection(%s), error: %v", c.remoteAddr.String(), err)
+			if e == nil {
+				e = err
+			}
+		}
 		delete(el.connections, c)
 		el.calibrateCallback(el, -1)
-		switch el.eventHandler.OnClosed(c, err) {
-		case Shutdown:
-			return errors.ErrServerShutdown
-		}
 		c.releaseTCP()
-	} else {
-		el.svr.logger.Warnf("Failed to close connection(%s), error: %v", c.remoteAddr.String(), e)
+	}()
+
+	switch el.eventHandler.OnClosed(c, err) {
+	case Shutdown:
+		return errors.ErrServerShutdown
 	}
 
 	return
