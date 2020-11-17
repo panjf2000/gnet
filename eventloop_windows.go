@@ -60,7 +60,7 @@ func (el *eventloop) loopRun(lockOSThread bool) {
 		if el.idx == 0 && el.svr.opts.Ticker {
 			close(el.svr.ticktock)
 		}
-		el.svr.signalShutdown(err)
+		el.svr.signalShutdownWithErr(err)
 		el.svr.loopWG.Done()
 		el.loopEgress()
 		el.svr.loopWG.Done()

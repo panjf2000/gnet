@@ -7,5 +7,5 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.16.0
-	golang.org/x/sys v0.0.0-20201101102859-da207088b7d1
+	golang.org/x/sys v0.0.0-20201116194326-cc9327a14d48
 )

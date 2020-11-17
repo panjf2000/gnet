@@ -25,6 +25,8 @@ import "errors"
 var (
 	// ErrServerShutdown occurs when server is closing.
 	ErrServerShutdown = errors.New("server is going to be shutdown")
+	// ErrServerInShutdown occurs when attempting to shut the server down more than once.
+	ErrServerInShutdown = errors.New("server is already in shutdown")
 	// ErrAcceptSocket occurs when acceptor does not accept the new connection properly.
 	ErrAcceptSocket = errors.New("accept a new connection error")
 	// ErrTooManyEventLoopThreads occurs when attempting to set up more than 10,000 event-loop goroutines under LockOSThread mode.

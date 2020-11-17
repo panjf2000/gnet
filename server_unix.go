@@ -24,11 +24,9 @@
 package gnet
 
 import (
-	"os"
-	"os/signal"
 	"runtime"
 	"sync"
-	"syscall"
+	"sync/atomic"
 	"time"
 
 	"github.com/panjf2000/gnet/errors"
@@ -37,7 +35,7 @@ import (
 )
 
 type server struct {
-	ln           *listener          // all the listeners
+	ln           *listener          // the listener for accepting new connections
 	lb           loadBalancer       // event-loops for handling events
 	wg           sync.WaitGroup     // event-loop close WaitGroup
 	opts         *Options           // options with server
@@ -47,7 +45,14 @@ type server struct {
 	logger       logging.Logger     // customized logger for logging info
 	ticktock     chan time.Duration // ticker channel
 	mainLoop     *eventloop         // main event-loop for accepting connections
+	inShutdown   int32              // whether the server is in shutdown
 	eventHandler EventHandler       // user eventHandler
+}
+
+var serverFarm sync.Map
+
+func (svr *server) isInShutdown() bool {
+	return atomic.LoadInt32(&svr.inShutdown) == 1
 }
 
 // waitForShutdown waits for a signal to shutdown.
@@ -205,9 +210,11 @@ func (svr *server) stop() {
 	if svr.mainLoop != nil {
 		sniffErrorAndLog(svr.mainLoop.poller.Close())
 	}
+
+	atomic.StoreInt32(&svr.inShutdown, 1)
 }
 
-func serve(eventHandler EventHandler, listener *listener, options *Options) error {
+func serve(eventHandler EventHandler, listener *listener, options *Options, protoAddr string) error {
 	// Figure out the correct number of loops/goroutines to use.
 	numEventLoop := 1
 	if options.Multicore {
@@ -256,23 +263,14 @@ func serve(eventHandler EventHandler, listener *listener, options *Options) erro
 	}
 	defer svr.eventHandler.OnShutdown(server)
 
-	shutdown := make(chan os.Signal, 1)
-	signal.Notify(shutdown, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-	defer close(shutdown)
-
-	go func() {
-		if <-shutdown == nil {
-			return
-		}
-		svr.signalShutdown()
-	}()
-
 	if err := svr.start(numEventLoop); err != nil {
 		svr.closeEventLoops()
 		svr.logger.Errorf("gnet server is stopping with error: %v", err)
 		return err
 	}
 	defer svr.stop()
+
+	serverFarm.Store(protoAddr, svr)
 
 	return nil
 }

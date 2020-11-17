@@ -33,7 +33,7 @@ func (svr *server) listenerRun(lockOSThread bool) {
 	}
 
 	var err error
-	defer func() { svr.signalShutdown(err) }()
+	defer func() { svr.signalShutdownWithErr(err) }()
 	var packet [0x10000]byte
 	for {
 		if svr.ln.pconn != nil {

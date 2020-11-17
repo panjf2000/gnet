@@ -22,6 +22,7 @@
 package gnet
 
 import (
+	"context"
 	"net"
 	"runtime"
 	"strings"
@@ -255,7 +256,42 @@ func Serve(eventHandler EventHandler, protoAddr string, opts ...Option) (err err
 	}
 	defer ln.close()
 
-	return serve(eventHandler, ln, options)
+	return serve(eventHandler, ln, options, protoAddr)
+}
+
+// shutdownPollInterval is how often we poll to check whether server has been shut down during gnet.Stop().
+var shutdownPollInterval = 500 * time.Millisecond
+
+// Stop gracefully shuts down the server without interrupting any active eventloops,
+// it waits indefinitely for connections and eventloops to be closed and then shuts down.
+func Stop(protoAddr string, timeout time.Duration) error {
+	var svr *server
+	if s, ok := serverFarm.Load(protoAddr); ok {
+		svr = s.(*server)
+		svr.signalShutdown()
+		defer serverFarm.Delete(protoAddr)
+	} else {
+		return errors.ErrServerInShutdown
+	}
+
+	if svr.isInShutdown() {
+		return errors.ErrServerInShutdown
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	ticker := time.NewTicker(shutdownPollInterval)
+	defer ticker.Stop()
+	for {
+		if svr.isInShutdown() {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+		}
+	}
 }
 
 func parseProtoAddr(addr string) (network, address string) {
