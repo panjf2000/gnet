@@ -264,7 +264,7 @@ var shutdownPollInterval = 500 * time.Millisecond
 
 // Stop gracefully shuts down the server without interrupting any active eventloops,
 // it waits indefinitely for connections and eventloops to be closed and then shuts down.
-func Stop(protoAddr string, timeout time.Duration) error {
+func Stop(ctx context.Context, protoAddr string) error {
 	var svr *server
 	if s, ok := serverFarm.Load(protoAddr); ok {
 		svr = s.(*server)
@@ -278,8 +278,6 @@ func Stop(protoAddr string, timeout time.Duration) error {
 		return errors.ErrServerInShutdown
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
 	ticker := time.NewTicker(shutdownPollInterval)
 	defer ticker.Stop()
 	for {

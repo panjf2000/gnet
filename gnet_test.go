@@ -24,6 +24,7 @@ package gnet
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -1067,7 +1068,11 @@ func (t *testStopServer) Tick() (delay time.Duration, action Action) {
 			}
 			fmt.Println(string(data))
 
-			go Stop(t.protoAddr, 3*time.Second)
+			go func() {
+				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+				defer cancel()
+				fmt.Println("stop server...", Stop(ctx, t.protoAddr))
+			}()
 
 			// waiting the server shutdown.
 			_, err = conn.Read(data)
