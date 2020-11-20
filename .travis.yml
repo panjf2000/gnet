@@ -74,9 +74,9 @@ script:
       case $TRAVIS_OS_NAME in
         linux|osx)
           golint ./... | reviewdog -f=golint -reporter=github-check
-          golangci-lint run --out-format=line-number -E goimports -E gocritic -E misspell -E godot | reviewdog -f=golangci-lint -reporter=github-check
+          golangci-lint run --out-format=line-number -D structcheck -E goimports -E gocritic -E misspell -E godot | reviewdog -f=golangci-lint -reporter=github-check
           golint ./... | reviewdog -f=golint -reporter=github-pr-review
-          golangci-lint run --out-format=line-number -E goimports -E gocritic -E misspell -E godot | reviewdog -f=golangci-lint -reporter=github-pr-review
+          golangci-lint run --out-format=line-number -D structcheck -E goimports -E gocritic -E misspell -E godot | reviewdog -f=golangci-lint -reporter=github-pr-review
           ;;
       esac
       go test -v ./...

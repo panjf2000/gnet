@@ -29,6 +29,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// Dup is the wrapper for dupCloseOnExec.
 func Dup(fd int) (int, string, error) {
 	return dupCloseOnExec(fd)
 }
