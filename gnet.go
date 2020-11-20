@@ -81,6 +81,17 @@ func (s Server) CountConnections() (count int) {
 	return
 }
 
+// DupFd returns a copy of the underlying file descriptor of listener.
+// It is the caller's responsibility to close dupFD when finished.
+// Closing listener does not affect dupFD, and closing dupFD does not affect listener.
+func (s Server) DupFd() (dupFD int, err error) {
+	dupFD, sc, err := s.svr.ln.Dup()
+	if err != nil {
+		logging.DefaultLogger.Warnf("%s failed when duplicating new fd\n", sc)
+	}
+	return
+}
+
 // Conn is a interface of gnet connection.
 type Conn interface {
 	// Context returns a user-defined context.

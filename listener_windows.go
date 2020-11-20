@@ -26,6 +26,7 @@ import (
 	"sync"
 
 	"github.com/panjf2000/gnet/errors"
+	"github.com/panjf2000/gnet/internal/netpoll"
 )
 
 type listener struct {
@@ -34,6 +35,10 @@ type listener struct {
 	pconn         net.PacketConn
 	lnaddr        net.Addr
 	addr, network string
+}
+
+func (ln *listener) Dup() (int, string, error) {
+	return netpoll.Dup(0)
 }
 
 func (ln *listener) normalize() (err error) {

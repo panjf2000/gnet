@@ -111,9 +111,11 @@ func (svr *server) startEventLoops(numEventLoop int) {
 	})
 }
 
-func (svr *server) stop() {
+func (svr *server) stop(s Server) {
 	// Wait on a signal for shutdown.
 	svr.logger.Infof("Server is being shutdown on the signal error: %v", svr.waitForShutdown())
+
+	svr.eventHandler.OnShutdown(s)
 
 	// Close listener.
 	svr.ln.close()
@@ -186,7 +188,6 @@ func serve(eventHandler EventHandler, listener *listener, options *Options, prot
 	case Shutdown:
 		return
 	}
-	defer svr.eventHandler.OnShutdown(server)
 
 	// Start all event-loops in background.
 	svr.startEventLoops(numEventLoop)
@@ -194,7 +195,7 @@ func serve(eventHandler EventHandler, listener *listener, options *Options, prot
 	// Start listener in background.
 	svr.startListener()
 
-	defer svr.stop()
+	defer svr.stop(server)
 
 	serverFarm.Store(protoAddr, svr)
 

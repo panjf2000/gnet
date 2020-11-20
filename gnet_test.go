@@ -903,6 +903,11 @@ func (t *testShutdownActionOnOpenServer) OnOpened(c Conn) (out []byte, action Ac
 	return
 }
 
+func (t *testShutdownActionOnOpenServer) OnShutdown(s Server) {
+	dupFD, err := s.DupFd()
+	fmt.Printf("dup fd: %d with error: %v\n", dupFD, err)
+}
+
 func (t *testShutdownActionOnOpenServer) Tick() (delay time.Duration, action Action) {
 	if !t.action {
 		t.action = true
@@ -969,7 +974,7 @@ func testUDPShutdown(network, addr string) {
 }
 
 func TestCloseConnection(t *testing.T) {
-	testCloseConnection("tcp", ":9991")
+	testCloseConnection("tcp", ":9992")
 }
 
 type testCloseConnectionServer struct {
@@ -1033,7 +1038,7 @@ func TestServerOptionsCheck(t *testing.T) {
 }
 
 func TestStop(t *testing.T) {
-	testStop("tcp", ":9991")
+	testStop("tcp", ":9993")
 }
 
 type testStopServer struct {

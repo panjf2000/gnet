@@ -183,9 +183,11 @@ func (svr *server) start(numEventLoop int) error {
 	return svr.activateReactors(numEventLoop)
 }
 
-func (svr *server) stop() {
+func (svr *server) stop(s Server) {
 	// Wait on a signal for shutdown
 	svr.waitForShutdown()
+
+	svr.eventHandler.OnShutdown(s)
 
 	// Notify all loops to close by closing all listeners
 	svr.lb.iterate(func(i int, el *eventloop) bool {
@@ -261,14 +263,13 @@ func serve(eventHandler EventHandler, listener *listener, options *Options, prot
 	case Shutdown:
 		return nil
 	}
-	defer svr.eventHandler.OnShutdown(server)
 
 	if err := svr.start(numEventLoop); err != nil {
 		svr.closeEventLoops()
 		svr.logger.Errorf("gnet server is stopping with error: %v", err)
 		return err
 	}
-	defer svr.stop()
+	defer svr.stop(server)
 
 	serverFarm.Store(protoAddr, svr)
 
