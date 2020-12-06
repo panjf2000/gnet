@@ -975,7 +975,7 @@ events.Tick = func() (delay time.Duration, action Action){
 
 `gnet` supports UDP protocol so the `gnet.Serve` method can bind to UDP addresses. 
 
-- All incoming and outgoing packets will not be buffered but read and sent directly.
+- All incoming and outgoing packets will not be buffered but read and sent directly, which means all functions of `gnet.Conn` that manipulate the internal buffers are not available; users should use the `frame []byte` from the `gnet.React(frame []byte, c gnet.Conn)` as the UDP packet instead calling functions of `gnet.Conn`, like `c.Read()`, `c.ResetBuffer()`, `c.BufferLength()` and so on, to process data.
 - The `EventHandler.OnOpened` and `EventHandler.OnClosed` events are not available for UDP sockets, only the `React` event.
 - The UDP equivalents of  `AsyncWrite([]byte)` in TCP is `SendTo([]byte)`.
 

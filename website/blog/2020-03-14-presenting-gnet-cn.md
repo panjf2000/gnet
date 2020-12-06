@@ -972,9 +972,9 @@ events.Tick = func() (delay time.Duration, action Action){
 
 `gnet` 支持 UDP 协议，所以在 `gnet.Serve` 里绑定允许绑定 UDP 地址，`gnet` 的 UDP 支持有如下的特性：
 
-- 网络数据的读入和写出不做缓冲，会一次性读写客户端。
--  `EventHandler.OnOpened` 和 `EventHandler.OnClosed` 这两个事件在 UDP 下不可用，唯一可用的事件是 `React`。
--  TCP 里的异步写操作是 `AsyncWrite([]byte)` 方法，而在 UDP 里对应的方法是  `SendTo([]byte)`。
+- 网络数据的读入和写出不做缓冲，会一次性读写客户端，也就是说 `gnet.Conn` 所有那些操作内部的 buffer 的函数都不可用，比如 `c.Read()`, `c.ResetBuffer()`, `c.BufferLength()` 和其他 buffer 相关的函数；使用者不能调用上述那些函数去操作数据，而应该直接使用 `gnet.React(frame []byte, c gnet.Conn)` 函数入参中的 `frame []byte` 作为 UDP 数据包。
+- `EventHandler.OnOpened` 和 `EventHandler.OnClosed` 这两个事件在 UDP 下不可用，唯一可用的事件是 `React`。
+- TCP 里的异步写操作是 `AsyncWrite([]byte)` 方法，而在 UDP 里对应的方法是  `SendTo([]byte)`。
 
 ## Unix Domain Socket 支持
 
