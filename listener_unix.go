@@ -59,10 +59,6 @@ func (ln *listener) normalize() (err error) {
 	default:
 		err = errors.ErrUnsupportedProtocol
 	}
-	if err != nil {
-		return
-	}
-
 	return
 }
 
