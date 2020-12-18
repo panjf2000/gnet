@@ -29,8 +29,12 @@ import (
 type spinLock uint32
 
 func (sl *spinLock) Lock() {
+	wait := 1
 	for !atomic.CompareAndSwapUint32((*uint32)(sl), 0, 1) {
-		runtime.Gosched()
+		for i := 0; i < wait; i++ {
+			runtime.Gosched()
+		}
+		wait <<= 1
 	}
 }
 
