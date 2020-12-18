@@ -132,8 +132,7 @@ func (c *conn) write(buf []byte) (err error) {
 			err = c.loop.poller.ModReadWrite(c.fd)
 			return
 		}
-		_ = c.loop.loopCloseConn(c, os.NewSyscallError("write", err))
-		return
+		return c.loop.loopCloseConn(c, os.NewSyscallError("write", err))
 	}
 	if n < len(outFrame) {
 		_, _ = c.outboundBuffer.Write(outFrame[n:])

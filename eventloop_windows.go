@@ -24,6 +24,7 @@ package gnet
 import (
 	"runtime"
 	"time"
+	"unsafe"
 
 	"github.com/panjf2000/gnet/pool/bytebuffer"
 
@@ -31,6 +32,14 @@ import (
 )
 
 type eventloop struct {
+	internalEventloop
+
+	// Prevents eventloop from false sharing by padding extra memory with the difference
+	// between the cache line size "s" and (eventloop mod s) for the most common CPU architectures.
+	_ [64 - unsafe.Sizeof(internalEventloop{})%64]byte
+}
+
+type internalEventloop struct {
 	ch                chan interface{}        // command channel
 	idx               int                     // loop index
 	svr               *server                 // server in loop
@@ -51,7 +60,7 @@ func (el *eventloop) loopRun(lockOSThread bool) {
 		if el.idx == 0 && el.svr.opts.Ticker {
 			close(el.svr.ticktock)
 		}
-		el.svr.signalShutdown(err)
+		el.svr.signalShutdownWithErr(err)
 		el.svr.loopWG.Done()
 		el.loopEgress()
 		el.svr.loopWG.Done()
@@ -79,9 +88,11 @@ func (el *eventloop) loopRun(lockOSThread bool) {
 		case func() error:
 			err = v()
 		}
-		if err != nil {
-			el.svr.logger.Infof("Event-loop(%d) is exiting due to the error: %v", el.idx, err)
+
+		if err == errors.ErrServerShutdown {
 			break
+		} else if err != nil {
+			el.svr.logger.Infof("Event-loop(%d) is exiting due to the error: %v", el.idx, err)
 		}
 	}
 }
@@ -172,16 +183,21 @@ func (el *eventloop) loopTicker() {
 }
 
 func (el *eventloop) loopError(c *stdConn, err error) (e error) {
-	if e = c.conn.Close(); e == nil {
+	defer func() {
+		if err := c.conn.Close(); err != nil {
+			el.svr.logger.Warnf("Failed to close connection(%s), error: %v", c.remoteAddr.String(), err)
+			if e == nil {
+				e = err
+			}
+		}
 		delete(el.connections, c)
 		el.calibrateCallback(el, -1)
-		switch el.eventHandler.OnClosed(c, err) {
-		case Shutdown:
-			return errors.ErrServerShutdown
-		}
 		c.releaseTCP()
-	} else {
-		el.svr.logger.Warnf("Failed to close connection(%s), error: %v", c.remoteAddr.String(), e)
+	}()
+
+	switch el.eventHandler.OnClosed(c, err) {
+	case Shutdown:
+		return errors.ErrServerShutdown
 	}
 
 	return

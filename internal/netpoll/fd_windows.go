@@ -1,5 +1,4 @@
-// Copyright (c) 2019 Andy Pan
-// Copyright (c) 2018 Joshua J Baker
+// Copyright (c) 2020 Andy Pan
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -19,56 +18,14 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-package gnet
+package netpoll
 
 import (
-	"runtime"
-	"time"
+	"syscall"
 )
 
-func (svr *server) listenerRun(lockOSThread bool) {
-	if lockOSThread {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-	}
-
-	var err error
-	defer func() { svr.signalShutdownWithErr(err) }()
-	var packet [0x10000]byte
-	for {
-		if svr.ln.pconn != nil {
-			// Read data from UDP socket.
-			n, addr, e := svr.ln.pconn.ReadFrom(packet[:])
-			if e != nil {
-				err = e
-				return
-			}
-
-			el := svr.lb.next(addr)
-			c := newUDPConn(el, svr.ln.lnaddr, addr)
-			el.ch <- packUDPConn(c, packet[:n])
-		} else {
-			// Accept TCP socket.
-			conn, e := svr.ln.ln.Accept()
-			if e != nil {
-				err = e
-				return
-			}
-			el := svr.lb.next(conn.RemoteAddr())
-			c := newTCPConn(conn, el)
-			el.ch <- c
-			go func() {
-				var packet [0x10000]byte
-				for {
-					n, err := c.conn.Read(packet[:])
-					if err != nil {
-						_ = c.conn.SetReadDeadline(time.Time{})
-						el.ch <- &stderr{c, err}
-						return
-					}
-					el.ch <- packTCPConn(c, packet[:n])
-				}
-			}()
-		}
-	}
+// Dup still hangs in the air.
+func Dup(fd int) (int, string, error) {
+	// TODO: Implement dup() on Windows.
+	return -1, "dup", syscall.EWINDOWS
 }

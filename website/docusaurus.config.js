@@ -50,7 +50,7 @@ module.exports = {
               to: "community/#team",
             },
             {
-              label: "Contact Us",
+              label: "Contact Me",
               to: "contact/",
             },
           ],

@@ -55,15 +55,15 @@ type (
 		calibrate(*eventloop, int32)
 	}
 
-	// roundRobinEventLoopSet with Round-Robin algorithm.
-	roundRobinEventLoopSet struct {
+	// roundRobinLoadBalancer with Round-Robin algorithm.
+	roundRobinLoadBalancer struct {
 		nextLoopIndex int
 		eventLoops    []*eventloop
 		size          int
 	}
 
-	// leastConnectionsEventLoopSet with Least-Connections algorithm.
-	leastConnectionsEventLoopSet struct {
+	// leastConnectionsLoadBalancer with Least-Connections algorithm.
+	leastConnectionsLoadBalancer struct {
 		sync.RWMutex
 		minHeap                 minEventLoopHeap
 		cachedRoot              *eventloop
@@ -71,8 +71,8 @@ type (
 		calibrateConnsThreshold int32
 	}
 
-	// sourceAddrHashEventLoopSet with Hash algorithm.
-	sourceAddrHashEventLoopSet struct {
+	// sourceAddrHashLoadBalancer with Hash algorithm.
+	sourceAddrHashLoadBalancer struct {
 		eventLoops []*eventloop
 		size       int
 	}
@@ -80,34 +80,34 @@ type (
 
 // ==================================== Implementation of Round-Robin load-balancer ====================================
 
-func (set *roundRobinEventLoopSet) register(el *eventloop) {
-	el.idx = set.size
-	set.eventLoops = append(set.eventLoops, el)
-	set.size++
+func (lb *roundRobinLoadBalancer) register(el *eventloop) {
+	el.idx = lb.size
+	lb.eventLoops = append(lb.eventLoops, el)
+	lb.size++
 }
 
 // next returns the eligible event-loop based on Round-Robin algorithm.
-func (set *roundRobinEventLoopSet) next(_ net.Addr) (el *eventloop) {
-	el = set.eventLoops[set.nextLoopIndex]
-	if set.nextLoopIndex++; set.nextLoopIndex >= set.size {
-		set.nextLoopIndex = 0
+func (lb *roundRobinLoadBalancer) next(_ net.Addr) (el *eventloop) {
+	el = lb.eventLoops[lb.nextLoopIndex]
+	if lb.nextLoopIndex++; lb.nextLoopIndex >= lb.size {
+		lb.nextLoopIndex = 0
 	}
 	return
 }
 
-func (set *roundRobinEventLoopSet) iterate(f func(int, *eventloop) bool) {
-	for i, el := range set.eventLoops {
+func (lb *roundRobinLoadBalancer) iterate(f func(int, *eventloop) bool) {
+	for i, el := range lb.eventLoops {
 		if !f(i, el) {
 			break
 		}
 	}
 }
 
-func (set *roundRobinEventLoopSet) len() int {
-	return set.size
+func (lb *roundRobinLoadBalancer) len() int {
+	return lb.size
 }
 
-func (set *roundRobinEventLoopSet) calibrate(el *eventloop, delta int32) {
+func (lb *roundRobinLoadBalancer) calibrate(el *eventloop, delta int32) {
 	atomic.AddInt32(&el.connCount, delta)
 }
 
@@ -147,18 +147,18 @@ func (h *minEventLoopHeap) Pop() interface{} {
 	return x
 }
 
-func (set *leastConnectionsEventLoopSet) register(el *eventloop) {
-	set.Lock()
-	heap.Push(&set.minHeap, el)
+func (lb *leastConnectionsLoadBalancer) register(el *eventloop) {
+	lb.Lock()
+	heap.Push(&lb.minHeap, el)
 	if el.idx == 0 {
-		set.cachedRoot = el
+		lb.cachedRoot = el
 	}
-	set.calibrateConnsThreshold = int32(set.minHeap.Len())
-	set.Unlock()
+	lb.calibrateConnsThreshold = int32(lb.minHeap.Len())
+	lb.Unlock()
 }
 
 // next returns the eligible event-loop by taking the root node from minimum heap based on Least-Connections algorithm.
-func (set *leastConnectionsEventLoopSet) next(_ net.Addr) (el *eventloop) {
+func (lb *leastConnectionsLoadBalancer) next(_ net.Addr) (el *eventloop) {
 	// set.RLock()
 	// el = set.minHeap[0]
 	// set.RUnlock()
@@ -166,54 +166,54 @@ func (set *leastConnectionsEventLoopSet) next(_ net.Addr) (el *eventloop) {
 
 	// In most cases, `next` method returns the cached event-loop immediately and it only reconstructs the minimum heap
 	// every `calibrateConnsThreshold` times for reducing locks to global mutex.
-	if atomic.LoadInt32(&set.threshold) >= set.calibrateConnsThreshold {
-		set.Lock()
-		heap.Init(&set.minHeap)
-		set.cachedRoot = set.minHeap[0]
-		atomic.StoreInt32(&set.threshold, 0)
-		set.Unlock()
+	if atomic.LoadInt32(&lb.threshold) >= lb.calibrateConnsThreshold {
+		lb.Lock()
+		heap.Init(&lb.minHeap)
+		lb.cachedRoot = lb.minHeap[0]
+		atomic.StoreInt32(&lb.threshold, 0)
+		lb.Unlock()
 	}
-	return set.cachedRoot
+	return lb.cachedRoot
 }
 
-func (set *leastConnectionsEventLoopSet) iterate(f func(int, *eventloop) bool) {
-	set.RLock()
-	for i, el := range set.minHeap {
+func (lb *leastConnectionsLoadBalancer) iterate(f func(int, *eventloop) bool) {
+	lb.RLock()
+	for i, el := range lb.minHeap {
 		if !f(i, el) {
 			break
 		}
 	}
-	set.RUnlock()
+	lb.RUnlock()
 }
 
-func (set *leastConnectionsEventLoopSet) len() (size int) {
-	set.RLock()
-	size = set.minHeap.Len()
-	set.RUnlock()
+func (lb *leastConnectionsLoadBalancer) len() (size int) {
+	lb.RLock()
+	size = lb.minHeap.Len()
+	lb.RUnlock()
 	return
 }
 
-func (set *leastConnectionsEventLoopSet) calibrate(el *eventloop, delta int32) {
+func (lb *leastConnectionsLoadBalancer) calibrate(el *eventloop, delta int32) {
 	// set.Lock()
 	// el.connCount += delta
 	// heap.Fix(&set.minHeap, el.idx)
 	// set.Unlock()
-	set.RLock()
+	lb.RLock()
 	atomic.AddInt32(&el.connCount, delta)
-	atomic.AddInt32(&set.threshold, 1)
-	set.RUnlock()
+	atomic.AddInt32(&lb.threshold, 1)
+	lb.RUnlock()
 }
 
 // ======================================= Implementation of Hash load-balancer ========================================
 
-func (set *sourceAddrHashEventLoopSet) register(el *eventloop) {
-	el.idx = set.size
-	set.eventLoops = append(set.eventLoops, el)
-	set.size++
+func (lb *sourceAddrHashLoadBalancer) register(el *eventloop) {
+	el.idx = lb.size
+	lb.eventLoops = append(lb.eventLoops, el)
+	lb.size++
 }
 
 // hash hashes a string to a unique hash code.
-func (set *sourceAddrHashEventLoopSet) hash(s string) int {
+func (lb *sourceAddrHashLoadBalancer) hash(s string) int {
 	v := int(crc32.ChecksumIEEE(internal.StringToBytes(s)))
 	if v >= 0 {
 		return v
@@ -222,23 +222,23 @@ func (set *sourceAddrHashEventLoopSet) hash(s string) int {
 }
 
 // next returns the eligible event-loop by taking the remainder of a hash code as the index of event-loop list.
-func (set *sourceAddrHashEventLoopSet) next(netAddr net.Addr) *eventloop {
-	hashCode := set.hash(netAddr.String())
-	return set.eventLoops[hashCode%set.size]
+func (lb *sourceAddrHashLoadBalancer) next(netAddr net.Addr) *eventloop {
+	hashCode := lb.hash(netAddr.String())
+	return lb.eventLoops[hashCode%lb.size]
 }
 
-func (set *sourceAddrHashEventLoopSet) iterate(f func(int, *eventloop) bool) {
-	for i, el := range set.eventLoops {
+func (lb *sourceAddrHashLoadBalancer) iterate(f func(int, *eventloop) bool) {
+	for i, el := range lb.eventLoops {
 		if !f(i, el) {
 			break
 		}
 	}
 }
 
-func (set *sourceAddrHashEventLoopSet) len() int {
-	return set.size
+func (lb *sourceAddrHashLoadBalancer) len() int {
+	return lb.size
 }
 
-func (set *sourceAddrHashEventLoopSet) calibrate(el *eventloop, delta int32) {
+func (lb *sourceAddrHashLoadBalancer) calibrate(el *eventloop, delta int32) {
 	atomic.AddInt32(&el.connCount, delta)
 }

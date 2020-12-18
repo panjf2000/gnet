@@ -23,11 +23,9 @@ package gnet
 
 import (
 	"errors"
-	"os"
-	"os/signal"
 	"runtime"
 	"sync"
-	"syscall"
+	"sync/atomic"
 	"time"
 
 	errors2 "github.com/panjf2000/gnet/errors"
@@ -42,18 +40,25 @@ const (
 var errCloseAllConns = errors.New("close all connections in event-loop")
 
 type server struct {
-	ln              *listener          // all the listeners
-	cond            *sync.Cond         // shutdown signaler
-	opts            *Options           // options with server
-	serr            error              // signal error
-	once            sync.Once          // make sure only signalShutdown once
-	codec           ICodec             // codec for TCP stream
-	loopWG          sync.WaitGroup     // loop close WaitGroup
-	logger          logging.Logger     // customized logger for logging info
-	ticktock        chan time.Duration // ticker channel
-	listenerWG      sync.WaitGroup     // listener close WaitGroup
-	eventHandler    EventHandler       // user eventHandler
-	subEventLoopSet loadBalancer       // event-loops for handling events
+	ln           *listener          // the listeners for accepting new connections
+	lb           loadBalancer       // event-loops for handling events
+	cond         *sync.Cond         // shutdown signaler
+	opts         *Options           // options with server
+	serr         error              // signal error
+	once         sync.Once          // make sure only signalShutdown once
+	codec        ICodec             // codec for TCP stream
+	loopWG       sync.WaitGroup     // loop close WaitGroup
+	logger       logging.Logger     // customized logger for logging info
+	ticktock     chan time.Duration // ticker channel
+	listenerWG   sync.WaitGroup     // listener close WaitGroup
+	inShutdown   int32              // whether the server is in shutdown
+	eventHandler EventHandler       // user eventHandler
+}
+
+var serverFarm sync.Map
+
+func (svr *server) isInShutdown() bool {
+	return atomic.LoadInt32(&svr.inShutdown) == 1
 }
 
 // waitForShutdown waits for a signal to shutdown.
@@ -65,8 +70,13 @@ func (svr *server) waitForShutdown() error {
 	return err
 }
 
-// signalShutdown signals a shutdown an begins server closing.
-func (svr *server) signalShutdown(err error) {
+// signalShutdown signals the server to shut down.
+func (svr *server) signalShutdown() {
+	svr.signalShutdownWithErr(nil)
+}
+
+// signalShutdownWithErr signals the server to shut down with an error.
+func (svr *server) signalShutdownWithErr(err error) {
 	svr.once.Do(func() {
 		svr.cond.L.Lock()
 		svr.serr = err
@@ -85,33 +95,34 @@ func (svr *server) startListener() {
 
 func (svr *server) startEventLoops(numEventLoop int) {
 	for i := 0; i < numEventLoop; i++ {
-		el := &eventloop{
-			ch:                make(chan interface{}, channelBuffer(commandBufferSize)),
-			svr:               svr,
-			connections:       make(map[*stdConn]struct{}),
-			eventHandler:      svr.eventHandler,
-			calibrateCallback: svr.subEventLoopSet.calibrate,
-		}
-		svr.subEventLoopSet.register(el)
+		el := new(eventloop)
+		el.ch = make(chan interface{}, channelBuffer(commandBufferSize))
+		el.svr = svr
+		el.connections = make(map[*stdConn]struct{})
+		el.eventHandler = svr.eventHandler
+		el.calibrateCallback = svr.lb.calibrate
+		svr.lb.register(el)
 	}
 
-	svr.loopWG.Add(svr.subEventLoopSet.len())
-	svr.subEventLoopSet.iterate(func(i int, el *eventloop) bool {
+	svr.loopWG.Add(svr.lb.len())
+	svr.lb.iterate(func(i int, el *eventloop) bool {
 		go el.loopRun(svr.opts.LockOSThread)
 		return true
 	})
 }
 
-func (svr *server) stop() {
+func (svr *server) stop(s Server) {
 	// Wait on a signal for shutdown.
 	svr.logger.Infof("Server is being shutdown on the signal error: %v", svr.waitForShutdown())
+
+	svr.eventHandler.OnShutdown(s)
 
 	// Close listener.
 	svr.ln.close()
 	svr.listenerWG.Wait()
 
 	// Notify all loops to close.
-	svr.subEventLoopSet.iterate(func(i int, el *eventloop) bool {
+	svr.lb.iterate(func(i int, el *eventloop) bool {
 		el.ch <- errors2.ErrServerShutdown
 		return true
 	})
@@ -120,15 +131,17 @@ func (svr *server) stop() {
 	svr.loopWG.Wait()
 
 	// Close all connections.
-	svr.loopWG.Add(svr.subEventLoopSet.len())
-	svr.subEventLoopSet.iterate(func(i int, el *eventloop) bool {
+	svr.loopWG.Add(svr.lb.len())
+	svr.lb.iterate(func(i int, el *eventloop) bool {
 		el.ch <- errCloseAllConns
 		return true
 	})
 	svr.loopWG.Wait()
+
+	atomic.StoreInt32(&svr.inShutdown, 1)
 }
 
-func serve(eventHandler EventHandler, listener *listener, options *Options) (err error) {
+func serve(eventHandler EventHandler, listener *listener, options *Options, protoAddr string) (err error) {
 	// Figure out the correct number of loops/goroutines to use.
 	numEventLoop := 1
 	if options.Multicore {
@@ -145,11 +158,11 @@ func serve(eventHandler EventHandler, listener *listener, options *Options) (err
 
 	switch options.LB {
 	case RoundRobin:
-		svr.subEventLoopSet = new(roundRobinEventLoopSet)
+		svr.lb = new(roundRobinLoadBalancer)
 	case LeastConnections:
-		svr.subEventLoopSet = new(leastConnectionsEventLoopSet)
+		svr.lb = new(leastConnectionsLoadBalancer)
 	case SourceAddrHash:
-		svr.subEventLoopSet = new(sourceAddrHashEventLoopSet)
+		svr.lb = new(sourceAddrHashLoadBalancer)
 	}
 
 	svr.ticktock = make(chan time.Duration, 1)
@@ -175,18 +188,6 @@ func serve(eventHandler EventHandler, listener *listener, options *Options) (err
 	case Shutdown:
 		return
 	}
-	defer svr.eventHandler.OnShutdown(server)
-
-	shutdown := make(chan os.Signal, 1)
-	signal.Notify(shutdown, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-	defer close(shutdown)
-
-	go func() {
-		if <-shutdown == nil {
-			return
-		}
-		svr.signalShutdown(errors.New("caught OS signal"))
-	}()
 
 	// Start all event-loops in background.
 	svr.startEventLoops(numEventLoop)
@@ -194,7 +195,9 @@ func serve(eventHandler EventHandler, listener *listener, options *Options) (err
 	// Start listener in background.
 	svr.startListener()
 
-	defer svr.stop()
+	defer svr.stop(server)
+
+	serverFarm.Store(protoAddr, svr)
 
 	return
 }

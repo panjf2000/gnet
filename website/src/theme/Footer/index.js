@@ -68,7 +68,7 @@ function Footer() {
                 &nbsp;&nbsp;&nbsp;&nbsp;
                 <a href="https://github.com/panjf2000/gnet" target="_blank"><i className="feather icon-github" alt="Gnet's Github Repo"></i></a>
                 &nbsp;&nbsp;&nbsp;&nbsp;
-                <a href="https://taohuawu.club/rss.xml" target="_blank"><i className="feather icon-rss" alt="Gnet's RSS feed"></i></a>
+                <a href="https://strikefreedom.top/rss.xml" target="_blank"><i className="feather icon-rss" alt="Gnet's RSS feed"></i></a>
               </div>
             </div>
             {links.map((linkItem, i) => (

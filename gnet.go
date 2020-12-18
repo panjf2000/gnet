@@ -22,6 +22,7 @@
 package gnet
 
 import (
+	"context"
 	"net"
 	"runtime"
 	"strings"
@@ -73,10 +74,21 @@ type Server struct {
 
 // CountConnections counts the number of currently active connections and returns it.
 func (s Server) CountConnections() (count int) {
-	s.svr.subEventLoopSet.iterate(func(i int, el *eventloop) bool {
+	s.svr.lb.iterate(func(i int, el *eventloop) bool {
 		count += int(atomic.LoadInt32(&el.connCount))
 		return true
 	})
+	return
+}
+
+// DupFd returns a copy of the underlying file descriptor of listener.
+// It is the caller's responsibility to close dupFD when finished.
+// Closing listener does not affect dupFD, and closing dupFD does not affect listener.
+func (s Server) DupFd() (dupFD int, err error) {
+	dupFD, sc, err := s.svr.ln.Dup()
+	if err != nil {
+		logging.DefaultLogger.Warnf("%s failed when duplicating new fd\n", sc)
+	}
 	return
 }
 
@@ -255,7 +267,40 @@ func Serve(eventHandler EventHandler, protoAddr string, opts ...Option) (err err
 	}
 	defer ln.close()
 
-	return serve(eventHandler, ln, options)
+	return serve(eventHandler, ln, options, protoAddr)
+}
+
+// shutdownPollInterval is how often we poll to check whether server has been shut down during gnet.Stop().
+var shutdownPollInterval = 500 * time.Millisecond
+
+// Stop gracefully shuts down the server without interrupting any active eventloops,
+// it waits indefinitely for connections and eventloops to be closed and then shuts down.
+func Stop(ctx context.Context, protoAddr string) error {
+	var svr *server
+	if s, ok := serverFarm.Load(protoAddr); ok {
+		svr = s.(*server)
+		svr.signalShutdown()
+		defer serverFarm.Delete(protoAddr)
+	} else {
+		return errors.ErrServerInShutdown
+	}
+
+	if svr.isInShutdown() {
+		return errors.ErrServerInShutdown
+	}
+
+	ticker := time.NewTicker(shutdownPollInterval)
+	defer ticker.Stop()
+	for {
+		if svr.isInShutdown() {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+		}
+	}
 }
 
 func parseProtoAddr(addr string) (network, address string) {

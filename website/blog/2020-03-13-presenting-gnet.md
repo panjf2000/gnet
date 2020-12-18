@@ -975,7 +975,7 @@ events.Tick = func() (delay time.Duration, action Action){
 
 `gnet` supports UDP protocol so the `gnet.Serve` method can bind to UDP addresses. 
 
-- All incoming and outgoing packets will not be buffered but read and sent directly.
+- All incoming and outgoing packets will not be buffered but read and sent directly, which means all functions of `gnet.Conn` that manipulate the internal buffers are not available; users should use the `frame []byte` from the `gnet.React(frame []byte, c gnet.Conn)` as the UDP packet instead calling functions of `gnet.Conn`, like `c.Read()`, `c.ResetBuffer()`, `c.BufferLength()` and so on, to process data.
 - The `EventHandler.OnOpened` and `EventHandler.OnClosed` events are not available for UDP sockets, only the `React` event.
 - The UDP equivalents of  `AsyncWrite([]byte)` in TCP is `SendTo([]byte)`.
 
@@ -1111,10 +1111,10 @@ Please read the [Contributing Guidelines](https://github.com/panjf2000/gnet/blob
 
 - [A Million WebSockets and Go](https://www.freecodecamp.org/news/million-websockets-and-go-cc58418460bb/)
 - [Going Infinite, handling 1M websockets connections in Go](https://speakerdeck.com/eranyanay/going-infinite-handling-1m-websockets-connections-in-go)
-- [Go netpoll I/O 多路复用构建原生网络模型之源码深度解析](https://taohuawu.club/go-netpoll-io-multiplexing-reactor)
-- [gnet: 一个轻量级且高性能的 Golang 网络库](https://taohuawu.club/go-event-loop-networking-library-gnet)
-- [最快的 Go 网络框架 gnet 来啦！](https://taohuawu.club/releasing-gnet-v1-with-techempower)
-- [字节跳动在 Go 网络库上的实践](https://taohuawu.club/bytedance-network-library-practices)
+- [Go netpoller 原生网络模型之源码全面揭秘](https://strikefreedom.top/go-netpoll-io-multiplexing-reactor)
+- [gnet: 一个轻量级且高性能的 Golang 网络库](https://strikefreedom.top/go-event-loop-networking-library-gnet)
+- [最快的 Go 网络框架 gnet 来啦！](https://strikefreedom.top/releasing-gnet-v1-with-techempower)
+- [字节跳动在 Go 网络库上的实践](https://strikefreedom.top/bytedance-network-library-practices)
 
 # 💰 Backers
 

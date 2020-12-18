@@ -972,9 +972,9 @@ events.Tick = func() (delay time.Duration, action Action){
 
 `gnet` 支持 UDP 协议，所以在 `gnet.Serve` 里绑定允许绑定 UDP 地址，`gnet` 的 UDP 支持有如下的特性：
 
-- 网络数据的读入和写出不做缓冲，会一次性读写客户端。
--  `EventHandler.OnOpened` 和 `EventHandler.OnClosed` 这两个事件在 UDP 下不可用，唯一可用的事件是 `React`。
--  TCP 里的异步写操作是 `AsyncWrite([]byte)` 方法，而在 UDP 里对应的方法是  `SendTo([]byte)`。
+- 网络数据的读入和写出不做缓冲，会一次性读写客户端，也就是说 `gnet.Conn` 所有那些操作内部的 buffer 的函数都不可用，比如 `c.Read()`, `c.ResetBuffer()`, `c.BufferLength()` 和其他 buffer 相关的函数；使用者不能调用上述那些函数去操作数据，而应该直接使用 `gnet.React(frame []byte, c gnet.Conn)` 函数入参中的 `frame []byte` 作为 UDP 数据包。
+- `EventHandler.OnOpened` 和 `EventHandler.OnClosed` 这两个事件在 UDP 下不可用，唯一可用的事件是 `React`。
+- TCP 里的异步写操作是 `AsyncWrite([]byte)` 方法，而在 UDP 里对应的方法是  `SendTo([]byte)`。
 
 ## Unix Domain Socket 支持
 
@@ -1108,10 +1108,10 @@ GOMAXPROCS=4
 
 - [A Million WebSockets and Go](https://www.freecodecamp.org/news/million-websockets-and-go-cc58418460bb/)
 - [Going Infinite, handling 1M websockets connections in Go](https://speakerdeck.com/eranyanay/going-infinite-handling-1m-websockets-connections-in-go)
-- [Go netpoll I/O 多路复用构建原生网络模型之源码深度解析](https://taohuawu.club/go-netpoll-io-multiplexing-reactor)
-- [gnet: 一个轻量级且高性能的 Golang 网络库](https://taohuawu.club/go-event-loop-networking-library-gnet)
-- [最快的 Go 网络框架 gnet 来啦！](https://taohuawu.club/releasing-gnet-v1-with-techempower)
-- [字节跳动在 Go 网络库上的实践](https://taohuawu.club/bytedance-network-library-practices)
+- [Go netpoller 原生网络模型之源码全面揭秘](https://strikefreedom.top/go-netpoll-io-multiplexing-reactor)
+- [gnet: 一个轻量级且高性能的 Golang 网络库](https://strikefreedom.top/go-event-loop-networking-library-gnet)
+- [最快的 Go 网络框架 gnet 来啦！](https://strikefreedom.top/releasing-gnet-v1-with-techempower)
+- [字节跳动在 Go 网络库上的实践](https://strikefreedom.top/bytedance-network-library-practices)
 
 # 💰 支持
 
