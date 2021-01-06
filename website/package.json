@@ -16,7 +16,7 @@
     "@types/fs-extra": "^8.1.0",
     "@types/lodash": "^4.14.149",
     "@types/semver": "^7.1.0",
-    "axios": "^0.18.1",
+    "axios": "^0.21.1",
     "cash-dom": "^4.1.5",
     "classnames": "^2.2.6",
     "color": "^3.1.2",
