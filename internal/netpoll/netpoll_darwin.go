@@ -22,13 +22,20 @@
 package netpoll
 
 import (
+	"errors"
 	"os"
+	"time"
 
 	"golang.org/x/sys/unix"
 )
 
-// SetKeepAlive sets the keepalive for the connection.
-func SetKeepAlive(fd, secs int) error {
+// SetKeepAlive sets whether the operating system should send
+// keep-alive messages on the connection and sets period between keep-alive's.
+func SetKeepAlive(fd int, d time.Duration) error {
+	if d <= 0 {
+		return errors.New("invalid time duration")
+	}
+	secs := int(d / time.Second)
 	if err := os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_KEEPALIVE, 1)); err != nil {
 		return err
 	}

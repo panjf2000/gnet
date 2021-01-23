@@ -26,7 +26,6 @@ package gnet
 import (
 	"net"
 	"os"
-	"time"
 
 	"github.com/panjf2000/gnet/internal/netpoll"
 	"github.com/panjf2000/gnet/pool/bytebuffer"
@@ -61,11 +60,19 @@ func newTCPConn(fd int, el *eventloop, sa unix.Sockaddr, remoteAddr net.Addr) (c
 	}
 	c.localAddr = el.ln.lnaddr
 	c.remoteAddr = remoteAddr
-	if el.svr.opts.TCPKeepAlive > 0 {
-		if proto := el.ln.network; proto == "tcp" || proto == "unix" {
-			_ = netpoll.SetKeepAlive(fd, int(el.svr.opts.TCPKeepAlive/time.Second))
-		}
+
+	if el.svr.ln.network != "tcp" {
+		return
 	}
+
+	var noDelay bool
+	switch el.svr.opts.TCPNoDelay {
+	case TCPNoDelay:
+		noDelay = true
+	case TCPDelay:
+	}
+	_ = netpoll.SetNoDelay(fd, noDelay)
+	_ = netpoll.SetKeepAlive(fd, el.svr.opts.TCPKeepAlive)
 	return
 }
 

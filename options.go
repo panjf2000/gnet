@@ -37,6 +37,15 @@ func loadOptions(options ...Option) *Options {
 	return opts
 }
 
+// TCPSocketOpt is the type of TCP socket options.
+type TCPSocketOpt int
+
+// Available TCP socket options.
+const (
+	TCPNoDelay TCPSocketOpt = iota
+	TCPDelay
+)
+
 // Options are set when the client opens.
 type Options struct {
 	// Multicore indicates whether the server will be effectively created with multi-cores, if so,
@@ -66,6 +75,13 @@ type Options struct {
 
 	// TCPKeepAlive sets up a duration for (SO_KEEPALIVE) socket option.
 	TCPKeepAlive time.Duration
+
+	// TCPNoDelay controls whether the operating system should delay
+	// packet transmission in hopes of sending fewer packets (Nagle's algorithm).
+	//
+	// The default is true (no delay), meaning that data is sent
+	// as soon as possible after a Write.
+	TCPNoDelay TCPSocketOpt
 
 	// ICodec encodes and decodes TCP stream.
 	Codec ICodec
@@ -117,10 +133,17 @@ func WithReusePort(reusePort bool) Option {
 	}
 }
 
-// WithTCPKeepAlive sets up SO_KEEPALIVE socket option.
+// WithTCPKeepAlive sets up the SO_KEEPALIVE socket option with duration.
 func WithTCPKeepAlive(tcpKeepAlive time.Duration) Option {
 	return func(opts *Options) {
 		opts.TCPKeepAlive = tcpKeepAlive
+	}
+}
+
+// WithTCPNoDelay enable/disable the TCP_NODELAY socket option.
+func WithTCPNoDelay(tcpNoDelay TCPSocketOpt) Option {
+	return func(opts *Options) {
+		opts.TCPNoDelay = tcpNoDelay
 	}
 }
 

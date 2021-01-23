@@ -1,5 +1,4 @@
 // Copyright (c) 2019 Andy Pan
-// Copyright (c) 2017 Joshua J Baker
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -19,30 +18,25 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-// +build linux freebsd dragonfly
+// +build linux freebsd dragonfly darwin
 
 package netpoll
 
 import (
-	"errors"
 	"os"
-	"time"
 
 	"golang.org/x/sys/unix"
 )
 
-// SetKeepAlive sets whether the operating system should send
-// keep-alive messages on the connection and sets period between keep-alive's.
-func SetKeepAlive(fd int, d time.Duration) error {
-	if d <= 0 {
-		return errors.New("invalid time duration")
+// SetNoDelay controls whether the operating system should delay
+// packet transmission in hopes of sending fewer packets (Nagle's algorithm).
+//
+// The default is true (no delay), meaning that data is
+// sent as soon as possible after a Write.
+func SetNoDelay(fd int, noDelay bool) error {
+	var arg int
+	if noDelay {
+		arg = 1
 	}
-	secs := int(d / time.Second)
-	if err := os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_KEEPALIVE, 1)); err != nil {
-		return err
-	}
-	if err := os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.IPPROTO_TCP, unix.TCP_KEEPINTVL, secs)); err != nil {
-		return err
-	}
-	return os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.IPPROTO_TCP, unix.TCP_KEEPIDLE, secs))
+	return os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.IPPROTO_TCP, unix.TCP_NODELAY, arg))
 }

@@ -532,7 +532,7 @@ func testServe(network, addr string, reuseport, multicore, async bool, nclients 
 		workerPool: goroutine.Default(),
 	}
 	must(Serve(ts, network+"://"+addr, WithLockOSThread(async), WithMulticore(multicore), WithReusePort(reuseport), WithTicker(true),
-		WithTCPKeepAlive(time.Minute*1), WithLoadBalancing(lb)))
+		WithTCPKeepAlive(time.Minute*1), WithTCPNoDelay(TCPDelay), WithLoadBalancing(lb)))
 }
 
 func startClient(network, addr string, multicore, async bool) {
