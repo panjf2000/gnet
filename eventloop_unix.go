@@ -49,7 +49,7 @@ type internalEventloop struct {
 	idx               int                     // loop index in the server loops list
 	svr               *server                 // server in loop
 	poller            *netpoll.Poller         // epoll or kqueue
-	packet            []byte                  // read packet buffer
+	packet            []byte                  // read packet buffer whose capacity is 64KB
 	connCount         int32                   // number of active connections in event-loop
 	connections       map[int]*conn           // loop connections fd -> conn
 	eventHandler      EventHandler            // user eventHandler

@@ -118,9 +118,6 @@ func (r *RingBuffer) Shift(n int) {
 
 	if n < r.Length() {
 		r.r = (r.r + n) & r.mask
-		if r.r == r.w {
-			r.isEmpty = true
-		}
 	} else {
 		r.Reset()
 	}
@@ -154,7 +151,7 @@ func (r *RingBuffer) Read(p []byte) (n int, err error) {
 		copy(p, r.buf[r.r:r.r+n])
 		r.r += n
 		if r.r == r.w {
-			r.isEmpty = true
+			r.Reset()
 		}
 		return
 	}
@@ -174,7 +171,7 @@ func (r *RingBuffer) Read(p []byte) (n int, err error) {
 	}
 	r.r = (r.r + n) & r.mask
 	if r.r == r.w {
-		r.isEmpty = true
+		r.Reset()
 	}
 
 	return n, err
@@ -191,7 +188,7 @@ func (r *RingBuffer) ReadByte() (b byte, err error) {
 		r.r = 0
 	}
 	if r.r == r.w {
-		r.isEmpty = true
+		r.Reset()
 	}
 
 	return b, err
@@ -370,14 +367,20 @@ func (r *RingBuffer) IsEmpty() bool {
 
 // Reset the read pointer and writer pointer to zero.
 func (r *RingBuffer) Reset() {
-	r.r = 0
-	r.w = 0
 	r.isEmpty = true
+	r.r, r.w = 0, 0
+
+	// Shrink the internal buffer for saving memory.
+	newCap := r.size / 2
+	newBuf := make([]byte, newCap)
+	r.buf = newBuf
+	r.size = newCap
+	r.mask = newCap - 1
 }
 
 func (r *RingBuffer) malloc(cap int) {
 	var newCap int
-	if r.size == 0 && initSize >= cap {
+	if r.size == 0 && cap < initSize {
 		newCap = initSize
 	} else {
 		newCap = internal.CeilToPowerOfTwo(r.size + cap)
@@ -385,9 +388,9 @@ func (r *RingBuffer) malloc(cap int) {
 	newBuf := make([]byte, newCap)
 	oldLen := r.Length()
 	_, _ = r.Read(newBuf)
+	r.buf = newBuf
 	r.r = 0
 	r.w = oldLen
 	r.size = newCap
 	r.mask = newCap - 1
-	r.buf = newBuf
 }

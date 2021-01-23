@@ -144,6 +144,7 @@ func TestRingBuffer_Write(t *testing.T) {
 	}
 
 	rb.Reset()
+	size = rb.Cap()
 	// write 4 * 2 = 8 bytes
 	n, _ = rb.Write([]byte(strings.Repeat("abcd", 2)))
 	if n != 8 {
@@ -264,6 +265,7 @@ func TestRingBuffer_Read(t *testing.T) {
 
 	// write 16 bytes to read
 	_, _ = rb.Write([]byte(strings.Repeat("abcd", 4)))
+	// read all data from buffer, it will be shrunk from 64 to 32.
 	n, err = rb.Read(buf)
 	if err != nil {
 		t.Fatalf("read failed: %v", err)
@@ -274,15 +276,16 @@ func TestRingBuffer_Read(t *testing.T) {
 	if rb.Length() != 0 {
 		t.Fatalf("expect len 0 bytes but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
 	}
-	if rb.Free() != 64 {
+	if rb.Free() != 32 {
 		t.Fatalf("expect free 64 bytes but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
 	}
-	if rb.r != 16 {
-		t.Fatalf("expect r.r=16 but got %d. r.w=%d", rb.r, rb.w)
+	if rb.r != 0 {
+		t.Fatalf("expect r.r=0 but got %d. r.w=%d", rb.r, rb.w)
 	}
 
-	// write long slice to read, it will scale from 64 to 128 bytes.
+	// write long slice to read, it will scale from 32 to 128 bytes.
 	_, _ = rb.Write([]byte(strings.Repeat("abcd", 20)))
+	// read all data from buffer, it will be shrunk from 128 to 64.
 	n, err = rb.Read(buf)
 	if err != nil {
 		t.Fatalf("read failed: %v", err)
@@ -293,11 +296,11 @@ func TestRingBuffer_Read(t *testing.T) {
 	if rb.Length() != 0 {
 		t.Fatalf("expect len 0 bytes but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
 	}
-	if rb.Free() != 128 {
+	if rb.Free() != 64 {
 		t.Fatalf("expect free 128 bytes but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
 	}
-	if rb.r != 80 {
-		t.Fatalf("expect r.r=80 but got %d. r.w=%d", rb.r, rb.w)
+	if rb.r != 0 {
+		t.Fatalf("expect r.r=0 but got %d. r.w=%d", rb.r, rb.w)
 	}
 
 	rb.Reset()
@@ -374,7 +377,7 @@ func TestRingBuffer_ByteInterface(t *testing.T) {
 		t.Fatalf("expect IsFull is false but got true")
 	}
 
-	// write to, isFull
+	// write two, isFull
 	_ = rb.WriteByte('b')
 	if rb.Length() != 2 {
 		t.Fatalf("expect len 2 bytes but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
@@ -461,7 +464,7 @@ func TestRingBuffer_ByteInterface(t *testing.T) {
 	if rb.Length() != 0 {
 		t.Fatalf("expect len 0 byte but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
 	}
-	if rb.Free() != 4 {
+	if rb.Free() != 2 {
 		t.Fatalf("expect free 4 byte but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
 	}
 	// check empty or full
@@ -470,5 +473,25 @@ func TestRingBuffer_ByteInterface(t *testing.T) {
 	}
 	if rb.IsFull() {
 		t.Fatalf("expect IsFull is false but got true")
+	}
+}
+
+func TestShrinkBuffer(t *testing.T) {
+	testStr := "Hello World!"
+	testCap := 1024
+
+	rb := New(testCap)
+	_, _ = rb.WriteString(testStr)
+	rb.LazyReadAll()
+	rb.Shift(len(testStr))
+	if rb.Cap() != testCap/2 {
+		t.Fatalf("expect buffer capacity %d, but got %d", testCap/2, rb.Cap())
+	}
+
+	_, _ = rb.WriteString(testStr)
+	rb.LazyReadAll()
+	rb.Reset()
+	if rb.Cap() != testCap/4 {
+		t.Fatalf("expect buffer capacity %d, but got %d", testCap/4, rb.Cap())
 	}
 }
