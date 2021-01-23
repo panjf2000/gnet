@@ -112,11 +112,15 @@ func (p *Poller) Polling(callback func(fd int, filter int16) error) error {
 
 		if wakenUp {
 			wakenUp = false
-			switch err = p.asyncJobQueue.ForEach(); err {
+			leftover, err := p.asyncJobQueue.ForEach()
+			switch err {
 			case nil:
 			case errors.ErrServerShutdown:
 				return err
 			default:
+				if q := len(leftover); q > 0 && q == p.asyncJobQueue.Batch(leftover) {
+					_, err = unix.Kevent(p.fd, wakeChanges, nil, nil)
+				}
 				logging.DefaultLogger.Warnf("Error occurs in user-defined function, %v", err)
 			}
 		}
