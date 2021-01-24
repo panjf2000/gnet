@@ -143,12 +143,11 @@ GOMAXPROCS=4
 
 # 🎡 用户案例
 
-欢迎在这里添加你的案例~~
+以下公司/组织在生产环境上使用了 `gnet` 作为底层网络服务。
 
-<!--
-<a href="https://github.com/panjf2000/gnet" target="_blank"><img src="https://raw.githubusercontent.com/panjf2000/logos/master/gnet/logo.png" width="150" align="middle"/></a>&nbsp;&nbsp;
-<a href="https://www.tencent.com"><img src="https://www.tencent.com/img/index/tencent_logo.png" width="250" align="middle"/></a>&nbsp;&nbsp;
--->
+<a href="https://www.tencent.com"><img src="https://img.taohuawu.club/gallery/tencent_logo.png" width="250" align="middle"/></a>&nbsp;&nbsp;<a href="https://www.iqiyi.com" target="_blank"><img src="https://img.taohuawu.club/gallery/iqiyi-logo.png" width="150" align="middle"/></a>&nbsp;&nbsp;<a href="https://www.mi.com" target="_blank"><img src="https://img.taohuawu.club/gallery/mi-logo.png" width="150" align="middle"/></a>&nbsp;&nbsp;<a href="https://www.360.cn" target="_blank"><img src="https://img.taohuawu.club/gallery/360-logo.png" width="150" align="middle"/></a>
+
+**欢迎添加你的用户案例进上面的列表**~~
 
 # 💰 支持
 
