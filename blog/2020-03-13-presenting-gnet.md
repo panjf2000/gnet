@@ -1116,6 +1116,14 @@ Please read the [Contributing Guidelines](https://github.com/panjf2000/gnet/blob
 - [最快的 Go 网络框架 gnet 来啦！](https://strikefreedom.top/releasing-gnet-v1-with-techempower)
 - [字节跳动在 Go 网络库上的实践](https://strikefreedom.top/bytedance-network-library-practices)
 
+# 🎡 User cases
+
+The following companies/organizations use `gnet` as the underlying network service in production.
+
+<a href="https://www.tencent.com"><img src="https://img.taohuawu.club/gallery/tencent_logo.png" width="250" align="middle"/></a>&nbsp;&nbsp;<a href="https://www.iqiyi.com" target="_blank"><img src="https://img.taohuawu.club/gallery/iqiyi-logo.png" width="150" align="middle"/></a>&nbsp;&nbsp;<a href="https://www.mi.com" target="_blank"><img src="https://img.taohuawu.club/gallery/mi-logo.png" width="150" align="middle"/></a>&nbsp;&nbsp;<a href="https://www.360.cn" target="_blank"><img src="https://img.taohuawu.club/gallery/360-logo.png" width="150" align="middle"/></a>
+
+If your project is also using `gnet`, feel free to open a [pull request](https://github.com/panjf2000/gnet/pulls) to refresh this list of user cases.
+
 # 💰 Backers
 
 Support us with a monthly donation and help us continue our activities.

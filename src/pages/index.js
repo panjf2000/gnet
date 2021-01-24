@@ -215,7 +215,24 @@ function Performance() {
         <br />
         <p className="hero--subtitle">This is the full framework ranking of Go and <code>gnet</code> tops all the other frameworks, which makes <code>gnet</code> the <strong><em>fastest</em></strong> networking framework in Go.</p>
         <br />
-        <p className="hero--subtitle">To check the full ranking list, visit <Link to="https://www.techempower.com/benchmarks/#section=test&runid=53c6220a-e110-466c-a333-2e879fea21ad&hw=ph&test=plaintext"> TechEmpower Plaintext Benchmark</Link>.</p>
+        <p className="hero--subtitle">To check the full ranking list, visit <Link to="https://www.techempower.com/benchmarks/#section=test&runid=53c6220a-e110-466c-a333-2e879fea21ad&hw=ph&test=plaintext">TechEmpower Plaintext Benchmark</Link>.</p>
+      </div>
+    </section>
+  );
+}
+
+function UseCases() {
+  return (
+    <section className={styles.usecases}>
+      <div className="container">
+        <AnchoredH2 id="usecases">User cases</AnchoredH2>
+        <div className="sub-title">The following companies/organizations use <code>gnet</code> as the underlying network service in production.</div>
+        <a href="https://www.tencent.com"><img src="https://img.taohuawu.club/gallery/tencent_logo.png" width="300" align="middle"/></a>
+        <a href="https://www.iqiyi.com" target="_blank"><img src="https://img.taohuawu.club/gallery/iqiyi-logo.png" width="300" align="middle"/></a>
+        <a href="https://www.mi.com" target="_blank"><img src="https://img.taohuawu.club/gallery/mi-logo.png" width="300" align="middle"/></a>
+        <a href="https://www.360.cn" target="_blank"><img src="https://img.taohuawu.club/gallery/360-logo.png" width="300" align="middle"/></a>
+        <br />
+        <p className="hero--subtitle">If your project is also using <code>gnet</code>, feel free to open a <Link to="https://github.com/panjf2000/gnet/pulls">pull request</Link> to refresh this list of user cases.</p>
       </div>
     </section>
   );
@@ -268,6 +285,7 @@ function Home() {
         <Topologies />
         <InstallationSection />
         <Performance />
+        <UseCases />
       </main>
     </Layout>
   );
