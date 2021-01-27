@@ -25,6 +25,7 @@ package netpoll
 
 import (
 	"os"
+	"runtime"
 
 	"github.com/panjf2000/gnet/errors"
 	"github.com/panjf2000/gnet/internal"
@@ -84,12 +85,21 @@ func (p *Poller) Polling(callback func(fd int, filter int16) error) error {
 	el := newEventList(InitEvents)
 	var wakenUp bool
 
+	var (
+		ts  unix.Timespec
+		tsp *unix.Timespec
+	)
 	for {
-		n, err := unix.Kevent(p.fd, nil, el.events, nil)
-		if err != nil && err != unix.EINTR {
-			logging.DefaultLogger.Warnf("Error occurs in kqueue: %v", os.NewSyscallError("kevent wait", err))
+		n, err := unix.Kevent(p.fd, nil, el.events, tsp)
+		if n == 0 || (n < 0 && err == unix.EINTR) {
+			tsp = nil
+			runtime.Gosched()
 			continue
+		} else if err != nil {
+			logging.DefaultLogger.Warnf("Error occurs in kqueue: %v", os.NewSyscallError("kevent wait", err))
+			return err
 		}
+		tsp = &ts
 
 		var evFilter int16
 		for i := 0; i < n; i++ {

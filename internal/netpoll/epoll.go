@@ -25,6 +25,7 @@ package netpoll
 
 import (
 	"os"
+	"runtime"
 	"unsafe"
 
 	"github.com/panjf2000/gnet/errors"
@@ -93,12 +94,18 @@ func (p *Poller) Polling(callback func(fd int, ev uint32) error) error {
 	el := newEventList(InitEvents)
 	var wakenUp bool
 
+	var msec = -1
 	for {
-		n, err := unix.EpollWait(p.fd, el.events, -1)
-		if err != nil && err != unix.EINTR {
-			logging.DefaultLogger.Warnf("Error occurs in epoll: %v", os.NewSyscallError("epoll_wait", err))
+		n, err := unix.EpollWait(p.fd, el.events, msec)
+		if n == 0 || (n < 0 && err == unix.EINTR) {
+			msec = -1
+			runtime.Gosched()
 			continue
+		} else if err != nil {
+			logging.DefaultLogger.Warnf("Error occurs in epoll: %v", os.NewSyscallError("epoll_wait", err))
+			return err
 		}
+		msec = 0
 
 		for i := 0; i < n; i++ {
 			if fd := int(el.events[i].Fd); fd != p.wfd {
