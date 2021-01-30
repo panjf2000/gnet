@@ -136,7 +136,9 @@ func (p *Poller) Polling(callback func(fd int, filter int16) error) error {
 		}
 
 		if n == el.size {
-			el.increase()
+			el.expand()
+		} else if n < el.size>>1 {
+			el.shrink()
 		}
 	}
 }

@@ -371,7 +371,7 @@ func (r *RingBuffer) Reset() {
 	r.r, r.w = 0, 0
 
 	// Shrink the internal buffer for saving memory.
-	newCap := r.size / 2
+	newCap := r.size >> 1
 	newBuf := make([]byte, newCap)
 	r.buf = newBuf
 	r.size = newCap

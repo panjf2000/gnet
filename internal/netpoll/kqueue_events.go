@@ -45,7 +45,12 @@ func newEventList(size int) *eventList {
 	return &eventList{size, make([]unix.Kevent_t, size)}
 }
 
-func (el *eventList) increase() {
+func (el *eventList) expand() {
 	el.size <<= 1
+	el.events = make([]unix.Kevent_t, el.size)
+}
+
+func (el *eventList) shrink() {
+	el.size >>= 1
 	el.events = make([]unix.Kevent_t, el.size)
 }
