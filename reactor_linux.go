@@ -66,12 +66,10 @@ func (svr *server) activateSubReactor(el *eventloop, lockOSThread bool) {
 				if ev&netpoll.OutEvents != 0 {
 					return el.loopWrite(c)
 				}
-				return nil
 			case true:
 				if ev&netpoll.InEvents != 0 {
 					return el.loopRead(c)
 				}
-				return nil
 			}
 		}
 		return nil

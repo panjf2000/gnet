@@ -32,13 +32,12 @@ func (el *eventloop) handleEvent(fd int, ev uint32) error {
 			if ev&netpoll.OutEvents != 0 {
 				return el.loopWrite(c)
 			}
-			return nil
 		case true:
 			if ev&netpoll.InEvents != 0 {
 				return el.loopRead(c)
 			}
-			return nil
 		}
+		return nil
 	}
 	return el.loopAccept(fd)
 }

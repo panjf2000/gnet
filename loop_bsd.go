@@ -38,13 +38,12 @@ func (el *eventloop) handleEvent(fd int, filter int16) error {
 			if filter == netpoll.EVFilterWrite {
 				return el.loopWrite(c)
 			}
-			return nil
 		case true:
 			if filter == netpoll.EVFilterRead {
 				return el.loopRead(c)
 			}
-			return nil
 		}
+		return nil
 	}
 	return el.loopAccept(fd)
 }

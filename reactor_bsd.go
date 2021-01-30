@@ -72,12 +72,10 @@ func (svr *server) activateSubReactor(el *eventloop, lockOSThread bool) {
 				if filter == netpoll.EVFilterWrite {
 					return el.loopWrite(c)
 				}
-				return nil
 			case true:
 				if filter == netpoll.EVFilterRead {
 					return el.loopRead(c)
 				}
-				return nil
 			}
 		}
 		return nil
