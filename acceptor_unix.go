@@ -46,13 +46,19 @@ func (svr *server) acceptNewConnection(fd int) error {
 	el := svr.lb.next(netAddr)
 	c := newTCPConn(nfd, el, sa, netAddr)
 
-	_ = el.poller.Trigger(func() (err error) {
+	err = el.poller.Trigger(func() (err error) {
 		if err = el.poller.AddRead(nfd); err != nil {
+			_ = unix.Close(nfd)
+			c.releaseTCP()
 			return
 		}
 		el.connections[nfd] = c
 		err = el.loopOpen(c)
 		return
 	})
+	if err != nil {
+		_ = unix.Close(nfd)
+		c.releaseTCP()
+	}
 	return nil
 }
