@@ -169,6 +169,10 @@ func (el *eventloop) loopRead(c *conn) error {
 }
 
 func (el *eventloop) loopWrite(c *conn) error {
+	if c.outboundBuffer.IsEmpty() {
+		return nil
+	}
+
 	el.eventHandler.PreWrite()
 
 	head, tail := c.outboundBuffer.LazyReadAll()

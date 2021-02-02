@@ -29,7 +29,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Run unit tests for utils
-        run: go test -v ./...
+        run: go test $(go list ./... | tail -n +2)
       - name: Run unit tests for server
         run: go test -v -coverprofile=coverage -covermode=count -timeout 60s
       - name: Upload code coverage report to Codecov
