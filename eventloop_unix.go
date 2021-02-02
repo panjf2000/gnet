@@ -145,6 +145,9 @@ func (el *eventloop) loopRead(c *conn) error {
 		out, action := el.eventHandler.React(inFrame, c)
 		if out != nil {
 			el.eventHandler.PreWrite()
+			// Encode data and try to write it back to the client, this attempt is based on a fact:
+			// a client socket waits for the response data after sending request data to the server,
+			// which makes the client socket writable.
 			if err = c.write(out); err != nil {
 				return err
 			}
@@ -196,6 +199,8 @@ func (el *eventloop) loopWrite(c *conn) error {
 		c.outboundBuffer.Shift(n)
 	}
 
+	// All data have been drained, it's no need to monitor the writable events,
+	// remove the writable event from poller to help the future event-loops.
 	if c.outboundBuffer.IsEmpty() {
 		_ = el.poller.ModRead(c.fd)
 	}

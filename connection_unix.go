@@ -127,6 +127,8 @@ func (c *conn) write(buf []byte) (err error) {
 	if outFrame, err = c.codec.Encode(c, buf); err != nil {
 		return
 	}
+	// If there is pending data in outbound buffer, the current data ought to be appended to the outbound buffer
+	// for maintaining the sequence of network packets.
 	if !c.outboundBuffer.IsEmpty() {
 		_, _ = c.outboundBuffer.Write(outFrame)
 		return
@@ -134,6 +136,7 @@ func (c *conn) write(buf []byte) (err error) {
 
 	var n int
 	if n, err = unix.Write(c.fd, outFrame); err != nil {
+		// A temporary error occurs, append the data to outbound buffer, writing it back to client in the next round.
 		if err == unix.EAGAIN {
 			_, _ = c.outboundBuffer.Write(outFrame)
 			err = c.loop.poller.ModReadWrite(c.fd)
@@ -141,6 +144,7 @@ func (c *conn) write(buf []byte) (err error) {
 		}
 		return c.loop.loopCloseConn(c, os.NewSyscallError("write", err))
 	}
+	// Fail to send all data back to client, buffer the leftover data for the next round.
 	if n < len(outFrame) {
 		_, _ = c.outboundBuffer.Write(outFrame[n:])
 		err = c.loop.poller.ModReadWrite(c.fd)
