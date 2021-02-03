@@ -134,7 +134,7 @@ func (el *eventloop) loopOpen(c *conn) error {
 func (el *eventloop) loopRead(c *conn) error {
 	// If there is pending data in outbound buffer, then we should omit this readable event
 	// and prioritize the writable events to achieve a higher performance.
-	if !c.outboundBuffer.IsEmpty() {
+	if !c.opened || !c.outboundBuffer.IsEmpty() {
 		return nil
 	}
 
