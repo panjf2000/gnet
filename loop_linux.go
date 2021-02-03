@@ -40,7 +40,7 @@ func (el *eventloop) handleEvent(fd int, ev uint32) error {
 				return err
 			}
 		}
-		if ev&netpoll.InEvents != 0 && c.outboundBuffer.IsEmpty() {
+		if ev&netpoll.InEvents != 0 {
 			return el.loopRead(c)
 		}
 		return nil
