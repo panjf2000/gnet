@@ -84,7 +84,8 @@ var (
 // Trigger wakes up the poller blocked in waiting for network-events and runs jobs in asyncJobQueue.
 func (p *Poller) Trigger(job internal.Job) (err error) {
 	if p.asyncJobQueue.Push(job) == 1 {
-		_, err = unix.Write(p.wfd, b)
+		for _, err = unix.Write(p.wfd, b); err != nil; _, err = unix.Write(p.wfd, b) {
+		}
 	}
 	return os.NewSyscallError("write", err)
 }
@@ -124,6 +125,7 @@ func (p *Poller) Polling(callback func(fd int, ev uint32) error) error {
 
 		if wakenUp {
 			wakenUp = false
+		runAsyncJobs:
 			leftover, err := p.asyncJobQueue.ForEach()
 			switch err {
 			case nil:
@@ -131,7 +133,9 @@ func (p *Poller) Polling(callback func(fd int, ev uint32) error) error {
 				return err
 			default:
 				if q := len(leftover); q > 0 && q == p.asyncJobQueue.Batch(leftover) {
-					_, err = unix.Write(p.wfd, b)
+					if _, err = unix.Write(p.wfd, b); err != nil {
+						goto runAsyncJobs
+					}
 				}
 				logging.DefaultLogger.Warnf("Error occurs in user-defined function, %v", err)
 			}

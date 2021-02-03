@@ -75,7 +75,8 @@ var wakeChanges = []unix.Kevent_t{{
 // Trigger wakes up the poller blocked in waiting for network-events and runs jobs in asyncJobQueue.
 func (p *Poller) Trigger(job internal.Job) (err error) {
 	if p.asyncJobQueue.Push(job) == 1 {
-		_, err = unix.Kevent(p.fd, wakeChanges, nil, nil)
+		for _, err = unix.Kevent(p.fd, wakeChanges, nil, nil); err != nil; _, err = unix.Kevent(p.fd, wakeChanges, nil, nil) {
+		}
 	}
 	return os.NewSyscallError("kevent trigger", err)
 }
@@ -122,6 +123,7 @@ func (p *Poller) Polling(callback func(fd int, filter int16) error) error {
 
 		if wakenUp {
 			wakenUp = false
+		runAsyncJobs:
 			leftover, err := p.asyncJobQueue.ForEach()
 			switch err {
 			case nil:
@@ -129,7 +131,9 @@ func (p *Poller) Polling(callback func(fd int, filter int16) error) error {
 				return err
 			default:
 				if q := len(leftover); q > 0 && q == p.asyncJobQueue.Batch(leftover) {
-					_, err = unix.Kevent(p.fd, wakeChanges, nil, nil)
+					if _, err = unix.Kevent(p.fd, wakeChanges, nil, nil); err != nil {
+						goto runAsyncJobs
+					}
 				}
 				logging.DefaultLogger.Warnf("Error occurs in user-defined function, %v", err)
 			}
