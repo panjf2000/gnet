@@ -78,13 +78,17 @@ Go : go1.14.x linux/amd64
 
 ```powershell
 # Machine information
-        OS : Ubuntu 18.04/x86_64
-       CPU : 8 Virtual CPUs
+        OS : Ubuntu 20.04/x86_64
+       CPU : 8 processors, AMD EPYC 7K62 48-Core Processor
     Memory : 16.0 GiB
 
-# Go version and configurations
-Go Version : go1.12.9 linux/amd64
-GOMAXPROCS=8
+# Go version and settings
+Go Version : go1.15.7 linux/amd64
+GOMAXPROCS : 8
+
+# Netwokr settings
+TCP connections : 300
+Test duration   : 30s
 ```
 
 #### Echo Server
@@ -101,13 +105,17 @@ GOMAXPROCS=8
 
 ```powershell
 # Machine information
-        OS : macOS Mojave 10.14.6/x86_64
-       CPU : 4 CPUs
-    Memory : 8.0 GiB
+        OS : macOS Catalina 10.15.7/x86_64
+       CPU : 6-Core Intel Core i7
+    Memory : 16.0 GiB
 
 # Go version and configurations
-Go Version : go version go1.12.9 darwin/amd64
-GOMAXPROCS=4
+Go Version : go1.15.7 darwin/amd64
+GOMAXPROCS : 12
+
+# Netwokr settings
+TCP connections : 100
+Test duration   : 20s
 ```
 
 #### Echo Server
