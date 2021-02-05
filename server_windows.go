@@ -97,6 +97,9 @@ func (svr *server) startEventLoops(numEventLoop int) {
 		el.eventHandler = svr.eventHandler
 		el.calibrateCallback = svr.lb.calibrate
 		svr.lb.register(el)
+		if el.idx == 0 && svr.opts.Ticker {
+			go el.loopTicker()
+		}
 	}
 
 	svr.loopWG.Add(svr.lb.len())
@@ -112,6 +115,7 @@ func (svr *server) stop(s Server) {
 
 	svr.eventHandler.OnShutdown(s)
 
+	close(svr.ticktock)
 	// Close listener.
 	svr.ln.close()
 	svr.listenerWG.Wait()

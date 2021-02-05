@@ -57,18 +57,11 @@ func (el *eventloop) loopRun(lockOSThread bool) {
 
 	var err error
 	defer func() {
-		if el.idx == 0 && el.svr.opts.Ticker {
-			close(el.svr.ticktock)
-		}
 		el.svr.signalShutdownWithErr(err)
 		el.svr.loopWG.Done()
 		el.loopEgress()
 		el.svr.loopWG.Done()
 	}()
-
-	if el.idx == 0 && el.svr.opts.Ticker {
-		go el.loopTicker()
-	}
 
 	for v := range el.ch {
 		switch v := v.(type) {
