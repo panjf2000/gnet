@@ -29,17 +29,17 @@ import (
 	"unsafe"
 
 	"github.com/panjf2000/gnet/errors"
-	"github.com/panjf2000/gnet/internal"
 	"github.com/panjf2000/gnet/internal/logging"
+	"github.com/panjf2000/gnet/internal/netpoll/queue"
 	"golang.org/x/sys/unix"
 )
 
 // Poller represents a poller which is in charge of monitoring file-descriptors.
 type Poller struct {
-	fd            int    // epoll fd
-	wfd           int    // wake fd
-	wfdBuf        []byte // wfd buffer to read packet
-	asyncJobQueue internal.AsyncJobQueue
+	fd             int    // epoll fd
+	wfd            int    // wake fd
+	wfdBuf         []byte // wfd buffer to read packet
+	asyncTaskQueue queue.AsyncTaskQueue
 }
 
 // OpenPoller instantiates a poller.
@@ -62,7 +62,7 @@ func OpenPoller() (poller *Poller, err error) {
 		poller = nil
 		return
 	}
-	poller.asyncJobQueue = internal.NewAsyncJobQueue()
+	poller.asyncTaskQueue = queue.NewLockFreeQueue()
 	return
 }
 
@@ -81,9 +81,9 @@ var (
 	b        = (*(*[8]byte)(unsafe.Pointer(&u)))[:]
 )
 
-// Trigger wakes up the poller blocked in waiting for network-events and runs jobs in asyncJobQueue.
-func (p *Poller) Trigger(job internal.Job) (err error) {
-	if p.asyncJobQueue.Push(job) == 1 {
+// Trigger wakes up the poller blocked in waiting for network-events and runs jobs in asyncTaskQueue.
+func (p *Poller) Trigger(task queue.Task) (err error) {
+	if p.asyncTaskQueue.Enqueue(task) == 1 {
 		for _, err = unix.Write(p.wfd, b); err != nil; _, err = unix.Write(p.wfd, b) {
 		}
 	}
@@ -95,7 +95,7 @@ func (p *Poller) Polling(callback func(fd int, ev uint32) error) error {
 	el := newEventList(InitEvents)
 	var wakenUp bool
 
-	var msec = -1
+	msec := -1
 	for {
 		n, err := unix.EpollWait(p.fd, el.events, msec)
 		if n == 0 || (n < 0 && err == unix.EINTR) {
@@ -125,19 +125,14 @@ func (p *Poller) Polling(callback func(fd int, ev uint32) error) error {
 
 		if wakenUp {
 			wakenUp = false
-		runAsyncJobs:
-			leftover, err := p.asyncJobQueue.ForEach()
-			switch err {
-			case nil:
-			case errors.ErrServerShutdown:
-				return err
-			default:
-				if q := len(leftover); q > 0 && q == p.asyncJobQueue.Batch(leftover) {
-					if _, err = unix.Write(p.wfd, b); err != nil {
-						goto runAsyncJobs
-					}
+			for task := p.asyncTaskQueue.Dequeue(); task != nil; task = p.asyncTaskQueue.Dequeue() {
+				switch err = task(); err {
+				case nil:
+				case errors.ErrServerShutdown:
+					return err
+				default:
+					logging.DefaultLogger.Warnf("Error occurs in user-defined function, %v", err)
 				}
-				logging.DefaultLogger.Warnf("Error occurs in user-defined function, %v", err)
 			}
 		}
 

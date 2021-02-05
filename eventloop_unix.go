@@ -72,15 +72,8 @@ func (el *eventloop) loopRun(lockOSThread bool) {
 	defer func() {
 		el.closeAllConns()
 		el.ln.close()
-		if el.idx == 0 && el.svr.opts.Ticker {
-			close(el.svr.ticktock)
-		}
 		el.svr.signalShutdown()
 	}()
-
-	if el.idx == 0 && el.svr.opts.Ticker {
-		go el.loopTicker()
-	}
 
 	err := el.poller.Polling(el.handleEvent)
 	el.svr.logger.Infof("Event-loop(%d) is exiting due to error: %v", el.idx, err)
