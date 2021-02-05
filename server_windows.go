@@ -97,6 +97,8 @@ func (svr *server) startEventLoops(numEventLoop int) {
 		el.eventHandler = svr.eventHandler
 		el.calibrateCallback = svr.lb.calibrate
 		svr.lb.register(el)
+
+		// Start the ticker.
 		if el.idx == 0 && svr.opts.Ticker {
 			go el.loopTicker()
 		}
@@ -115,7 +117,6 @@ func (svr *server) stop(s Server) {
 
 	svr.eventHandler.OnShutdown(s)
 
-	close(svr.ticktock)
 	// Close listener.
 	svr.ln.close()
 	svr.listenerWG.Wait()
@@ -136,6 +137,11 @@ func (svr *server) stop(s Server) {
 		return true
 	})
 	svr.loopWG.Wait()
+
+	// Stop the ticker.
+	if svr.opts.Ticker {
+		close(svr.ticktock)
+	}
 
 	atomic.StoreInt32(&svr.inShutdown, 1)
 }

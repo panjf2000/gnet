@@ -34,16 +34,7 @@ func (svr *server) activateMainReactor(lockOSThread bool) {
 		defer runtime.UnlockOSThread()
 	}
 
-	defer func() {
-		if svr.opts.Ticker {
-			close(svr.ticktock)
-		}
-		svr.signalShutdown()
-	}()
-
-	if svr.opts.Ticker {
-		go svr.mainLoop.loopTicker()
-	}
+	defer svr.signalShutdown()
 
 	err := svr.mainLoop.poller.Polling(func(fd int, filter int16) error { return svr.acceptNewConnection(fd) })
 	svr.logger.Infof("Main reactor is exiting due to error: %v", err)

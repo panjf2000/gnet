@@ -122,6 +122,11 @@ func (svr *server) activateEventLoops(numEventLoop int) (err error) {
 			el.calibrateCallback = svr.lb.calibrate
 			_ = el.poller.AddRead(el.ln.fd)
 			svr.lb.register(el)
+
+			// Start the ticker.
+			if el.idx == 0 && svr.opts.Ticker {
+				go el.loopTicker()
+			}
 		} else {
 			return
 		}
@@ -145,6 +150,11 @@ func (svr *server) activateReactors(numEventLoop int) error {
 			el.eventHandler = svr.eventHandler
 			el.calibrateCallback = svr.lb.calibrate
 			svr.lb.register(el)
+
+			// Start the ticker.
+			if el.idx == 0 && svr.opts.Ticker {
+				go el.loopTicker()
+			}
 		} else {
 			return err
 		}
@@ -159,7 +169,6 @@ func (svr *server) activateReactors(numEventLoop int) error {
 		el.idx = -1
 		el.svr = svr
 		el.poller = p
-		el.eventHandler = svr.eventHandler
 		_ = el.poller.AddRead(el.ln.fd)
 		svr.mainLoop = el
 
@@ -212,6 +221,11 @@ func (svr *server) stop(s Server) {
 
 	if svr.mainLoop != nil {
 		sniffErrorAndLog(svr.mainLoop.poller.Close())
+	}
+
+	// Stop the ticker.
+	if svr.opts.Ticker {
+		close(svr.ticktock)
 	}
 
 	atomic.StoreInt32(&svr.inShutdown, 1)
