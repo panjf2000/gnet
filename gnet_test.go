@@ -258,13 +258,8 @@ func testCodecServe(network, addr string, multicore, async bool, nclients int, r
 		network: network, addr: addr, multicore: multicore, async: async, nclients: nclients,
 		codec: codec, workerPool: goroutine.Default(),
 	}
-	if reuseport {
-		err = Serve(ts, network+"://"+addr, WithMulticore(multicore), WithTicker(true),
-			WithTCPKeepAlive(time.Minute*5), WithCodec(codec), WithReusePort(true))
-	} else {
-		err = Serve(ts, network+"://"+addr, WithMulticore(multicore), WithTicker(true),
-			WithTCPKeepAlive(time.Minute*5), WithCodec(codec))
-	}
+	err = Serve(ts, network+"://"+addr, WithMulticore(multicore), WithTicker(true),
+		WithTCPKeepAlive(time.Minute*5), WithCodec(codec), WithReusePort(reuseport))
 	if err != nil {
 		panic(err)
 	}
