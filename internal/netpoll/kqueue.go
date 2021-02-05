@@ -26,6 +26,7 @@ package netpoll
 import (
 	"os"
 	"runtime"
+	"sync/atomic"
 
 	"github.com/panjf2000/gnet/errors"
 	"github.com/panjf2000/gnet/internal/logging"
@@ -36,6 +37,7 @@ import (
 // Poller represents a poller which is in charge of monitoring file-descriptors.
 type Poller struct {
 	fd             int
+	netpollWakeSig int32
 	asyncTaskQueue queue.AsyncTaskQueue
 }
 
@@ -73,9 +75,10 @@ var wakeChanges = []unix.Kevent_t{{
 }}
 
 // Trigger wakes up the poller blocked in waiting for network-events and runs jobs in asyncTaskQueue.
-func (p *Poller) Trigger(job queue.Task) (err error) {
-	if p.asyncTaskQueue.Enqueue(job) == 1 {
-		for _, err = unix.Kevent(p.fd, wakeChanges, nil, nil); err != nil; _, err = unix.Kevent(p.fd, wakeChanges, nil, nil) {
+func (p *Poller) Trigger(task queue.Task) (err error) {
+	p.asyncTaskQueue.Enqueue(task)
+	if atomic.CompareAndSwapInt32(&p.netpollWakeSig, 0, 1) {
+		for _, err = unix.Kevent(p.fd, wakeChanges, nil, nil); err == unix.EINTR || err == unix.EAGAIN; _, err = unix.Kevent(p.fd, wakeChanges, nil, nil) {
 		}
 	}
 	return os.NewSyscallError("kevent trigger", err)
@@ -84,11 +87,11 @@ func (p *Poller) Trigger(job queue.Task) (err error) {
 // Polling blocks the current goroutine, waiting for network-events.
 func (p *Poller) Polling(callback func(fd int, filter int16) error) error {
 	el := newEventList(InitEvents)
-	var wakenUp bool
 
 	var (
-		ts  unix.Timespec
-		tsp *unix.Timespec
+		ts      unix.Timespec
+		tsp     *unix.Timespec
+		wakenUp bool
 	)
 	for {
 		n, err := unix.Kevent(p.fd, nil, el.events, tsp)
@@ -132,6 +135,7 @@ func (p *Poller) Polling(callback func(fd int, filter int16) error) error {
 					logging.DefaultLogger.Warnf("Error occurs in user-defined function, %v", err)
 				}
 			}
+			atomic.StoreInt32(&p.netpollWakeSig, 0)
 		}
 
 		if n == el.size {

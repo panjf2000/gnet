@@ -92,7 +92,6 @@ import (
 type lockFreeQueue struct {
 	head unsafe.Pointer
 	tail unsafe.Pointer
-	size int32
 }
 
 type node struct {
@@ -107,7 +106,7 @@ func NewLockFreeQueue() AsyncTaskQueue {
 }
 
 // Enqueue puts the given value v at the tail of the queue.
-func (q *lockFreeQueue) Enqueue(task Task) int {
+func (q *lockFreeQueue) Enqueue(task Task) {
 	n := &node{value: task}
 loop:
 	tail := load(&q.tail)
@@ -119,7 +118,7 @@ loop:
 			if cas(&tail.next, next, n) {
 				// Enqueue is done. Try to swing tail to the inserted node.
 				cas(&q.tail, tail, n)
-				return int(atomic.AddInt32(&q.size, 1))
+				return
 			}
 		} else { // tail was not pointing to the last node
 			// Try to swing Tail to the next node.
@@ -149,7 +148,6 @@ loop:
 			// Read value before CAS, otherwise another dequeue might free the next node.
 			task := next.value
 			if cas(&q.head, head, next) {
-				atomic.AddInt32(&q.size, -1)
 				// Dequeue is done. return value.
 				return task
 			}

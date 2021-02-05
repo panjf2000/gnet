@@ -25,6 +25,6 @@ type Task func() error
 
 // AsyncTaskQueue is a queue storing asynchronous tasks.
 type AsyncTaskQueue interface {
-	Enqueue(Task) int
+	Enqueue(Task)
 	Dequeue() Task
 }

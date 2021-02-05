@@ -33,7 +33,7 @@ const (
 	// ExpiryDuration is the interval time to clean up those expired workers.
 	ExpiryDuration = 10 * time.Second
 
-	// Nonblocking decides what to do when submitting a new job to a full worker pool: waiting for a available worker
+	// Nonblocking decides what to do when submitting a new task to a full worker pool: waiting for a available worker
 	// or returning nil directly.
 	Nonblocking = true
 )

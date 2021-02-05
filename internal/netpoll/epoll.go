@@ -26,6 +26,7 @@ package netpoll
 import (
 	"os"
 	"runtime"
+	"sync/atomic"
 	"unsafe"
 
 	"github.com/panjf2000/gnet/errors"
@@ -39,6 +40,7 @@ type Poller struct {
 	fd             int    // epoll fd
 	wfd            int    // wake fd
 	wfdBuf         []byte // wfd buffer to read packet
+	netpollWakeSig int32
 	asyncTaskQueue queue.AsyncTaskQueue
 }
 
@@ -83,8 +85,9 @@ var (
 
 // Trigger wakes up the poller blocked in waiting for network-events and runs jobs in asyncTaskQueue.
 func (p *Poller) Trigger(task queue.Task) (err error) {
-	if p.asyncTaskQueue.Enqueue(task) == 1 {
-		for _, err = unix.Write(p.wfd, b); err != nil; _, err = unix.Write(p.wfd, b) {
+	p.asyncTaskQueue.Enqueue(task)
+	if atomic.CompareAndSwapInt32(&p.netpollWakeSig, 0, 1) {
+		for _, err = unix.Write(p.wfd, b); err == unix.EINTR || err == unix.EAGAIN; _, err = unix.Write(p.wfd, b) {
 		}
 	}
 	return os.NewSyscallError("write", err)
@@ -134,6 +137,7 @@ func (p *Poller) Polling(callback func(fd int, ev uint32) error) error {
 					logging.DefaultLogger.Warnf("Error occurs in user-defined function, %v", err)
 				}
 			}
+			atomic.StoreInt32(&p.netpollWakeSig, 0)
 		}
 
 		if n == el.size {
