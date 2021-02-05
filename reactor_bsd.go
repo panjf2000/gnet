@@ -34,7 +34,16 @@ func (svr *server) activateMainReactor(lockOSThread bool) {
 		defer runtime.UnlockOSThread()
 	}
 
-	defer svr.signalShutdown()
+	defer func() {
+		if svr.opts.Ticker {
+			close(svr.ticktock)
+		}
+		svr.signalShutdown()
+	}()
+
+	if svr.opts.Ticker {
+		go svr.mainLoop.loopTicker()
+	}
 
 	err := svr.mainLoop.poller.Polling(func(fd int, filter int16) error { return svr.acceptNewConnection(fd) })
 	svr.logger.Infof("Main reactor is exiting due to error: %v", err)
@@ -48,15 +57,8 @@ func (svr *server) activateSubReactor(el *eventloop, lockOSThread bool) {
 
 	defer func() {
 		el.closeAllConns()
-		if el.idx == 0 && svr.opts.Ticker {
-			close(svr.ticktock)
-		}
 		svr.signalShutdown()
 	}()
-
-	if el.idx == 0 && svr.opts.Ticker {
-		go el.loopTicker()
-	}
 
 	err := el.poller.Polling(func(fd int, filter int16) (err error) {
 		if c, ack := el.connections[fd]; ack {

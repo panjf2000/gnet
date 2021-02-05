@@ -38,7 +38,6 @@ import (
 	"github.com/panjf2000/gnet/errors"
 	"github.com/panjf2000/gnet/pool/bytebuffer"
 	"github.com/panjf2000/gnet/pool/goroutine"
-	"github.com/valyala/bytebufferpool"
 	"go.uber.org/zap"
 )
 
@@ -431,7 +430,6 @@ type testServer struct {
 	clientActive int32
 	disconnected int32
 	workerPool   *goroutine.Pool
-	bytesList    []*bytebufferpool.ByteBuffer
 }
 
 func (s *testServer) OnInitComplete(svr Server) (action Action) {
@@ -464,9 +462,6 @@ func (s *testServer) OnClosed(c Conn, err error) (action Action) {
 	if atomic.LoadInt32(&s.connected) == atomic.LoadInt32(&s.disconnected) &&
 		atomic.LoadInt32(&s.disconnected) == int32(s.nclients) {
 		action = Shutdown
-		for i := range s.bytesList {
-			bytebuffer.Put(s.bytesList[i])
-		}
 		s.workerPool.Release()
 	}
 
@@ -477,7 +472,6 @@ func (s *testServer) React(frame []byte, c Conn) (out []byte, action Action) {
 	if s.async {
 		buf := bytebuffer.Get()
 		_, _ = buf.Write(frame)
-		s.bytesList = append(s.bytesList, buf)
 
 		if s.network == "tcp" || s.network == "unix" {
 			// just for test

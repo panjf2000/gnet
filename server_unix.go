@@ -157,8 +157,9 @@ func (svr *server) activateReactors(numEventLoop int) error {
 		el := new(eventloop)
 		el.ln = svr.ln
 		el.idx = -1
-		el.poller = p
 		el.svr = svr
+		el.poller = p
+		el.eventHandler = svr.eventHandler
 		_ = el.poller.AddRead(el.ln.fd)
 		svr.mainLoop = el
 
