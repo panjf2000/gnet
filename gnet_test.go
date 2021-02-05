@@ -621,12 +621,13 @@ type testWakeConnServer struct {
 	*EventServer
 	network string
 	addr    string
-	conn    Conn
+	conn    chan Conn
+	c       Conn
 	wake    bool
 }
 
 func (t *testWakeConnServer) OnOpened(c Conn) (out []byte, action Action) {
-	t.conn = c
+	t.conn <- c
 	return
 }
 
@@ -658,13 +659,14 @@ func (t *testWakeConnServer) Tick() (delay time.Duration, action Action) {
 		}()
 		return
 	}
-	_ = t.conn.Wake()
+	t.c = <-t.conn
+	_ = t.c.Wake()
 	delay = time.Millisecond * 100
 	return
 }
 
 func testWakeConn(network, addr string) {
-	svr := &testWakeConnServer{network: network, addr: addr}
+	svr := &testWakeConnServer{network: network, addr: addr, conn: make(chan Conn, 1)}
 	logger := zap.NewExample()
 	must(Serve(svr, network+"://"+addr, WithTicker(true), WithNumEventLoop(2*runtime.NumCPU()),
 		WithLogger(logger.Sugar())))
