@@ -114,6 +114,8 @@ func (p *Poller) Polling(callback func(fd int, ev uint32) error) error {
 				case nil:
 				case errors.ErrAcceptSocket, errors.ErrServerShutdown:
 					return err
+				default:
+					logging.DefaultLogger.Warnf("Error occurs in event-loop: %v", err)
 				}
 			} else {
 				wakenUp = true
