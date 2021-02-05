@@ -28,15 +28,15 @@ import (
 	"runtime"
 
 	"github.com/panjf2000/gnet/errors"
-	"github.com/panjf2000/gnet/internal"
 	"github.com/panjf2000/gnet/internal/logging"
+	"github.com/panjf2000/gnet/internal/netpoll/queue"
 	"golang.org/x/sys/unix"
 )
 
 // Poller represents a poller which is in charge of monitoring file-descriptors.
 type Poller struct {
-	fd            int
-	asyncJobQueue internal.AsyncJobQueue
+	fd             int
+	asyncTaskQueue queue.AsyncTaskQueue
 }
 
 // OpenPoller instantiates a poller.
@@ -57,7 +57,7 @@ func OpenPoller() (poller *Poller, err error) {
 		err = os.NewSyscallError("kevent add|clear", err)
 		return
 	}
-	poller.asyncJobQueue = internal.NewAsyncJobQueue()
+	poller.asyncTaskQueue = queue.NewLockFreeQueue()
 	return
 }
 
@@ -72,9 +72,9 @@ var wakeChanges = []unix.Kevent_t{{
 	Fflags: unix.NOTE_TRIGGER,
 }}
 
-// Trigger wakes up the poller blocked in waiting for network-events and runs jobs in asyncJobQueue.
-func (p *Poller) Trigger(job internal.Job) (err error) {
-	if p.asyncJobQueue.Push(job) == 1 {
+// Trigger wakes up the poller blocked in waiting for network-events and runs jobs in asyncTaskQueue.
+func (p *Poller) Trigger(job queue.Task) (err error) {
+	if p.asyncTaskQueue.Enqueue(job) == 1 {
 		for _, err = unix.Kevent(p.fd, wakeChanges, nil, nil); err != nil; _, err = unix.Kevent(p.fd, wakeChanges, nil, nil) {
 		}
 	}
@@ -123,19 +123,14 @@ func (p *Poller) Polling(callback func(fd int, filter int16) error) error {
 
 		if wakenUp {
 			wakenUp = false
-		runAsyncJobs:
-			leftover, err := p.asyncJobQueue.ForEach()
-			switch err {
-			case nil:
-			case errors.ErrServerShutdown:
-				return err
-			default:
-				if q := len(leftover); q > 0 && q == p.asyncJobQueue.Batch(leftover) {
-					if _, err = unix.Kevent(p.fd, wakeChanges, nil, nil); err != nil {
-						goto runAsyncJobs
-					}
+			for task := p.asyncTaskQueue.Dequeue(); task != nil; task = p.asyncTaskQueue.Dequeue() {
+				switch err = task(); err {
+				case nil:
+				case errors.ErrServerShutdown:
+					return err
+				default:
+					logging.DefaultLogger.Warnf("Error occurs in user-defined function, %v", err)
 				}
-				logging.DefaultLogger.Warnf("Error occurs in user-defined function, %v", err)
 			}
 		}
 

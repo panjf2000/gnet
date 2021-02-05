@@ -1,5 +1,4 @@
-// Copyright (c) 2019 Andy Pan
-// Copyright (c) 2018 Joshua J Baker
+// Copyright (c) 2021 Andy Pan
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -19,52 +18,13 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-package internal
+package queue
 
-import "sync"
+// Task is a asynchronous function.
+type Task func() error
 
-// Job is a asynchronous function.
-type Job func() error
-
-// AsyncJobQueue queues pending tasks.
-type AsyncJobQueue struct {
-	lock sync.Locker
-	jobs []Job
-}
-
-// NewAsyncJobQueue creates a note-queue.
-func NewAsyncJobQueue() AsyncJobQueue {
-	return AsyncJobQueue{lock: SpinLock()}
-}
-
-// Push enqueues a job onto queue.
-func (q *AsyncJobQueue) Push(job Job) (pending int) {
-	q.lock.Lock()
-	q.jobs = append(q.jobs, job)
-	pending = len(q.jobs)
-	q.lock.Unlock()
-	return
-}
-
-// Batch enqueues a batch of jobs onto queue.
-func (q *AsyncJobQueue) Batch(jobs []Job) (pending int) {
-	q.lock.Lock()
-	q.jobs = append(q.jobs, jobs...)
-	pending = len(q.jobs)
-	q.lock.Unlock()
-	return
-}
-
-// ForEach iterates this queue and executes each note with a given func.
-func (q *AsyncJobQueue) ForEach() (leftover []Job, err error) {
-	q.lock.Lock()
-	jobs := q.jobs
-	q.jobs = nil
-	q.lock.Unlock()
-	for i := range jobs {
-		if err = jobs[i](); err != nil {
-			return jobs[i+1:], err
-		}
-	}
-	return
+// AsyncTaskQueue is a queue storing asynchronous tasks.
+type AsyncTaskQueue interface {
+	Enqueue(Task) int
+	Dequeue() Task
 }
