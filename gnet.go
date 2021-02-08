@@ -160,6 +160,8 @@ type (
 		// OnOpened fires when a new connection has been opened.
 		// The parameter:c has information about the connection such as it's local and remote address.
 		// Parameter:out is the return value which is going to be sent back to the client.
+		//
+		// Note that the bytes returned by OnOpened will be sent back to client without being encoded.
 		OnOpened(c Conn) (out []byte, action Action)
 
 		// OnClosed fires when a connection has been closed.
