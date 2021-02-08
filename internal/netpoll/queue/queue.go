@@ -27,4 +27,5 @@ type Task func() error
 type AsyncTaskQueue interface {
 	Enqueue(Task)
 	Dequeue() Task
+	Empty() bool
 }

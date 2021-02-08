@@ -128,7 +128,11 @@ func (p *Poller) Polling(callback func(fd int, ev uint32) error) error {
 
 		if wakenUp {
 			wakenUp = false
-			for task := p.asyncTaskQueue.Dequeue(); task != nil; task = p.asyncTaskQueue.Dequeue() {
+			var task queue.Task
+			for i := 0; i < AsyncTasks; i++ {
+				if task = p.asyncTaskQueue.Dequeue(); task == nil {
+					break
+				}
 				switch err = task(); err {
 				case nil:
 				case errors.ErrServerShutdown:
@@ -138,6 +142,10 @@ func (p *Poller) Polling(callback func(fd int, ev uint32) error) error {
 				}
 			}
 			atomic.StoreInt32(&p.netpollWakeSig, 0)
+			if !p.asyncTaskQueue.Empty() {
+				for _, err = unix.Write(p.wfd, b); err == unix.EINTR || err == unix.EAGAIN; _, err = unix.Write(p.wfd, b) {
+				}
+			}
 		}
 
 		if n == el.size {
