@@ -35,7 +35,7 @@
 - [x] 内置 bytes 内存池，由开源库 [bytebufferpool](https://github.com/valyala/bytebufferpool) 提供支持
 - [x] 整个生命周期是无锁的
 - [x] 简单易用的 APIs
-- [x] 基于 Ring-Buffer 的高效且可重用的内存 buffer
+- [x] 高效、可重用而且自动伸缩的环形内存 buffer
 - [x] 支持多种网络协议/IPC 机制：`TCP`、`UDP` 和 `Unix Domain Socket`
 - [x] 支持多种负载均衡算法：`Round-Robin(轮询)`、`Source-Addr-Hash(源地址哈希)` 和 `Least-Connections(最少连接数)`
 - [x] 支持两种事件驱动机制：**Linux** 里的 `epoll` 以及 **FreeBSD/DragonFly/Darwin** 里的 `kqueue`

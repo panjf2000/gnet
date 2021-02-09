@@ -36,7 +36,7 @@ English | [🇨🇳中文](README_ZH.md)
 - [x] Built-in memory pool with bytes powered by the library [bytebufferpool](https://github.com/valyala/bytebufferpool)
 - [x] Lock-free during the entire runtime
 - [x] Concise and easy-to-use APIs
-- [x] Efficient and reusable memory buffer: Ring-Buffer
+- [x] Efficient, reusable and scalable memory buffer: Ring-Buffer
 - [x] Supporting multiple protocols/IPC mechanism: `TCP`, `UDP` and `Unix Domain Socket`
 - [x] Supporting multiple load-balancing algorithms: `Round-Robin`, `Source-Addr-Hash` and `Least-Connections`
 - [x] Supporting two event-driven mechanisms: `epoll` on **Linux** and `kqueue` on **FreeBSD/DragonFly/Darwin**
