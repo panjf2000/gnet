@@ -128,8 +128,11 @@ func (el *eventloop) loopRead(c *stdConn) (err error) {
 	return
 }
 
-func (el *eventloop) loopCloseConn(c *stdConn) error {
-	return c.conn.SetReadDeadline(time.Now())
+func (el *eventloop) loopCloseConn(c *stdConn) (err error) {
+	if c.conn != nil {
+		err = c.conn.SetReadDeadline(time.Now())
+	}
+	return
 }
 
 func (el *eventloop) loopEgress() {
