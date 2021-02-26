@@ -60,6 +60,10 @@ type Options struct {
 	// potential higher performance.
 	LockOSThread bool
 
+	// ReadBufferCap is the maximum number of bytes that can be read from the client when the readable event comes.
+	// The default value is 16KB, it can be reduced to avoid starving subsequent client connections.
+	ReadBufferCap int
+
 	// LB represents the load-balancing algorithm used when assigning new connections.
 	LB LoadBalancing
 
@@ -105,10 +109,17 @@ func WithMulticore(multicore bool) Option {
 	}
 }
 
-// WithLockOSThread sets up lockOSThread mode for I/O event-loops.
+// WithLockOSThread sets up LockOSThread mode for I/O event-loops.
 func WithLockOSThread(lockOSThread bool) Option {
 	return func(opts *Options) {
 		opts.LockOSThread = lockOSThread
+	}
+}
+
+// WithReadBufferCap sets up ReadBufferCap for reading bytes.
+func WithReadBufferCap(readBufferCap int) Option {
+	return func(opts *Options) {
+		opts.ReadBufferCap = readBufferCap
 	}
 }
 

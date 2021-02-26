@@ -116,7 +116,7 @@ func (svr *server) activateEventLoops(numEventLoop int) (err error) {
 			el.ln = l
 			el.svr = svr
 			el.poller = p
-			el.packet = make([]byte, 0x10000)
+			el.packet = make([]byte, svr.opts.ReadBufferCap)
 			el.connections = make(map[int]*conn)
 			el.eventHandler = svr.eventHandler
 			el.calibrateCallback = svr.lb.calibrate
@@ -145,7 +145,7 @@ func (svr *server) activateReactors(numEventLoop int) error {
 			el.ln = svr.ln
 			el.svr = svr
 			el.poller = p
-			el.packet = make([]byte, 0x10000)
+			el.packet = make([]byte, svr.opts.ReadBufferCap)
 			el.connections = make(map[int]*conn)
 			el.eventHandler = svr.eventHandler
 			el.calibrateCallback = svr.lb.calibrate
@@ -232,7 +232,7 @@ func (svr *server) stop(s Server) {
 }
 
 func serve(eventHandler EventHandler, listener *listener, options *Options, protoAddr string) error {
-	// Figure out the correct number of loops/goroutines to use.
+	// Figure out the proper number of event-loops/goroutines to run.
 	numEventLoop := 1
 	if options.Multicore {
 		numEventLoop = runtime.NumCPU()

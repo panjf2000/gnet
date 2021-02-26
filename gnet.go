@@ -261,6 +261,10 @@ func Serve(eventHandler EventHandler, protoAddr string, opts ...Option) (err err
 		return errors.ErrTooManyEventLoopThreads
 	}
 
+	if options.ReadBufferCap <= 0 {
+		options.ReadBufferCap = 0x4000
+	}
+
 	network, addr := parseProtoAddr(protoAddr)
 
 	var ln *listener
