@@ -45,6 +45,7 @@ type conn struct {
 	localAddr      net.Addr               // local addr
 	remoteAddr     net.Addr               // remote addr
 	byteBuffer     *bytebuffer.ByteBuffer // bytes buffer for buffering current packet and data in ring-buffer
+	writePending   int                    // how many read calls the socket has missed
 	inboundBuffer  *ringbuffer.RingBuffer // buffer for data from client
 	outboundBuffer *ringbuffer.RingBuffer // buffer for data that is ready to write to client
 }

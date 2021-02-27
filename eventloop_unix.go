@@ -127,8 +127,18 @@ func (el *eventloop) loopOpen(c *conn) error {
 func (el *eventloop) loopRead(c *conn) error {
 	// If there is pending data in outbound buffer, then we should omit this readable event
 	// and prioritize the writable events to achieve a higher performance.
-	if !c.opened || !c.outboundBuffer.IsEmpty() {
+	//
+	// Note that the client may send massive amounts of data to server by write() under blocking mode,
+	// resulting in that it won't receive any responses before the server read all data from client, in this case
+	// if the socket send buffer is full, we need to let it go and continue reading the data to prevent blocking forever.
+	if !c.opened {
 		return nil
+	}
+	if !c.outboundBuffer.IsEmpty() {
+		if c.writePending < 64 {
+			c.writePending++
+			return nil
+		}
 	}
 
 	n, err := unix.Read(c.fd, el.packet)
@@ -171,6 +181,8 @@ func (el *eventloop) loopRead(c *conn) error {
 }
 
 func (el *eventloop) loopWrite(c *conn) error {
+	c.writePending--
+
 	if c.outboundBuffer.IsEmpty() {
 		return nil
 	}
