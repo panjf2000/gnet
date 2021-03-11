@@ -67,7 +67,14 @@ func (svr *server) activateSubReactor(el *eventloop, lockOSThread bool) {
 					return err
 				}
 			}
-			if ev&netpoll.InEvents != 0 {
+			// If there is pending data in outbound buffer, then we should omit this readable event
+			// and prioritize the writable events to achieve a higher performance.
+			//
+			// Note that the client may send massive amounts of data to server by write() under blocking mode,
+			// resulting in that it won't receive any responses before the server read all data from client,
+			// in which case if the socket send buffer is full, we need to let it go and continue reading the data
+			// to prevent blocking forever.
+			if ev&netpoll.InEvents != 0 && (ev&netpoll.OutEvents == 0 || c.outboundBuffer.IsEmpty()) {
 				return el.loopRead(c)
 			}
 		}
