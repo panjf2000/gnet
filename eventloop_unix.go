@@ -199,7 +199,8 @@ func (el *eventloop) loopWrite(c *conn) error {
 
 func (el *eventloop) loopCloseConn(c *conn, err error) (rerr error) {
 	if !c.opened {
-		return fmt.Errorf("the fd=%d in event-loop(%d) is already closed, skipping it", c.fd, el.idx)
+		//return fmt.Errorf("the fd=%d in event-loop(%d) is already closed, skipping it", c.fd, el.idx)
+		return nil
 	}
 
 	// Send residual data in buffer back to client before actually closing the connection.
