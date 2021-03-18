@@ -233,7 +233,7 @@ function UseCases() {
         <a href="https://www.360.cn" target="_blank"><img src="https://img.taohuawu.club/gallery/360-logo.png" width="300" align="middle"/></a>
         <a href="https://tieba.baidu.com" target="_blank"><img src="https://img.taohuawu.club/gallery/baidu-tieba-logo.png" width="300" align="middle"/></a>
         <br />
-        <p className="hero--subtitle">If your project is also using <code>gnet</code>, feel free to open a <Link to="https://github.com/panjf2000/gnet/pulls">pull request</Link> to refresh this list of user cases.</p>
+        <p className="hero--subtitle">If your projects are also using <code>gnet</code>, feel free to open a <Link to="https://github.com/panjf2000/gnet/pulls">pull request</Link> to refresh this list of user cases.</p>
       </div>
     </section>
   );
