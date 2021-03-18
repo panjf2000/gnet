@@ -153,7 +153,7 @@ Test duration   : 20s
 
 以下公司/组织在生产环境上使用了 `gnet` 作为底层网络服务。
 
-<a href="https://www.tencent.com"><img src="https://img.taohuawu.club/gallery/tencent_logo.png" width="250" align="middle"/></a>&nbsp;&nbsp;<a href="https://www.iqiyi.com" target="_blank"><img src="https://img.taohuawu.club/gallery/iqiyi-logo.png" width="150" align="middle"/></a>&nbsp;&nbsp;<a href="https://www.mi.com" target="_blank"><img src="https://img.taohuawu.club/gallery/mi-logo.png" width="150" align="middle"/></a>&nbsp;&nbsp;<a href="https://www.360.cn" target="_blank"><img src="https://img.taohuawu.club/gallery/360-logo.png" width="150" align="middle"/></a>
+<a href="https://www.tencent.com"><img src="https://img.taohuawu.club/gallery/tencent_logo.png" width="250" align="middle"/></a>&nbsp;&nbsp;<a href="https://www.iqiyi.com" target="_blank"><img src="https://img.taohuawu.club/gallery/iqiyi-logo.png" width="200" align="middle"/></a>&nbsp;&nbsp;<a href="https://www.mi.com" target="_blank"><img src="https://img.taohuawu.club/gallery/mi-logo.png" width="150" align="middle"/></a>&nbsp;&nbsp;<a href="https://www.360.cn" target="_blank"><img src="https://img.taohuawu.club/gallery/360-logo.png" width="200" align="middle"/></a>&nbsp;&nbsp;<a href="https://tieba.baidu.com/" target="_blank"><img src="https://img.taohuawu.club/gallery/baidu-tieba-logo.png" width="200" align="middle"/></a>
 
 如果你的项目也在使用 `gnet`，欢迎给我提 Pull Request 来更新这份用户案例列表。
 
