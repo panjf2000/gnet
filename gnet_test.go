@@ -28,6 +28,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"math/rand"
 	"net"
 	"runtime"
@@ -1084,4 +1085,64 @@ func (t *testStopServer) Tick() (delay time.Duration, action Action) {
 func testStop(network, addr string) {
 	events := &testStopServer{network: network, addr: addr, protoAddr: network + "://" + addr}
 	must(Serve(events, events.protoAddr, WithTicker(true)))
+}
+
+type testExecutorServer struct {
+	*EventServer
+	network, addr, protoAddr string
+
+	executed chan struct{}
+}
+
+func (tes *testExecutorServer) OnInitComplete(_ Server) (action Action) {
+	go func() {
+		c, err := net.Dial(tes.network, tes.addr)
+		if err != nil {
+			panic(err)
+		}
+		defer c.Close()
+
+		_, err = c.Write([]byte("something"))
+		if err != nil {
+			panic(err)
+		}
+
+		select {
+		case <-time.After(time.Second):
+			panic("task is not executed in time")
+		case <-tes.executed:
+			bts, err := ioutil.ReadAll(io.LimitReader(c, 5))
+			if err != nil {
+				panic(err)
+			}
+
+			strBts := string(bts)
+			if "hello" != strBts {
+				panic("unexpected content:" + strBts)
+			}
+		}
+
+		fmt.Println("stop server...", Stop(context.TODO(), tes.protoAddr))
+	}()
+
+	return None
+}
+
+func (tes *testExecutorServer) OnOpened(conn Conn) ([]byte, Action) {
+	must(conn.AsyncExecute(func(c Conn) ([]byte, Action) {
+		close(tes.executed)
+
+		return []byte("hello"), Close
+	}))
+
+	return nil, None
+}
+
+func TestAsyncExecute(t *testing.T) {
+	events := &testExecutorServer{
+		EventServer: &EventServer{}, network: "tcp", addr: ":8888", protoAddr: "tcp://:8888",
+		executed: make(chan struct{}),
+	}
+
+	must(Serve(events, events.protoAddr))
 }
