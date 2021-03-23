@@ -210,17 +210,20 @@ func (c *stdConn) BufferLength() int {
 }
 
 func (c *stdConn) AsyncWrite(buf []byte) error {
-	c.loop.ch <- func() (err error) {
+	c.loop.ch <- func() error {
 		if c.conn == nil {
-			return
+			return nil
 		}
 
-		var encodedBuf []byte
-		if encodedBuf, err = c.codec.Encode(c, buf); err == nil {
-			_, err = c.conn.Write(encodedBuf)
+		encodedBuf, err := c.codec.Encode(c, buf)
+		if err != nil {
+			return err
 		}
-		return
+
+		_, err = c.conn.Write(encodedBuf)
+		return err
 	}
+
 	return nil
 }
 
@@ -235,29 +238,25 @@ func (c *stdConn) Wake() error {
 }
 
 func (c *stdConn) AsyncExecute(cb func(conn Conn) ([]byte, Action)) error {
-	c.loop.ch <- func() (err error) {
+	c.loop.ch <- func() error {
 		if c.conn == nil {
-			return
+			return nil
 		}
 
 		buf, action := cb(c)
 
 		if len(buf) != 0 {
-			var encodedBuf []byte
-			if encodedBuf, err = c.codec.Encode(c, buf); err == nil {
+			encodedBuf, err := c.codec.Encode(c, buf)
+			if err == nil {
 				_, err = c.conn.Write(encodedBuf)
 			}
 
 			if err != nil {
-				return
+				return err
 			}
 		}
 
-		if action != None {
-			return c.loop.handleAction(c, action)
-		}
-
-		return
+		return c.loop.handleAction(c, action)
 	}
 
 	return nil
