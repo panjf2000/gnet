@@ -138,7 +138,7 @@ type Conn interface {
 	// instead of the event-loop goroutines.
 	AsyncWrite(buf []byte) error
 
-	// AsyncExecute wakes poller and executes provided callback into it.
+	// AsyncExecute wakes poller and executes provided callback within it.
 	// Provided func also returns bytes which will be written to conn and/or
 	// gnet.Action that will change connection or server state.
 	AsyncExecute(cb func(Conn) ([]byte, Action)) error
