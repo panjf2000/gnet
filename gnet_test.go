@@ -1135,6 +1135,12 @@ func (tes *testExecutorServer) OnOpened(conn Conn) ([]byte, Action) {
 		return []byte("hello"), Close
 	}))
 
+	must(conn.AsyncExecute(func(c Conn) ([]byte, Action) {
+		panic("should not be executed since it closed before")
+
+		return []byte("hello 2"), Close
+	}))
+
 	return nil, None
 }
 
