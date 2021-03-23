@@ -49,8 +49,8 @@ type conn struct {
 	outboundBuffer *ringbuffer.RingBuffer // buffer for data that is ready to write to client
 }
 
-func newTCPConn(fd int, el *eventloop, sa unix.Sockaddr, remoteAddr net.Addr) (c *conn) {
-	c = &conn{
+func newTCPConn(fd int, el *eventloop, sa unix.Sockaddr, remoteAddr net.Addr) *conn {
+	c := &conn{
 		fd:             fd,
 		sa:             sa,
 		loop:           el,
@@ -62,7 +62,7 @@ func newTCPConn(fd int, el *eventloop, sa unix.Sockaddr, remoteAddr net.Addr) (c
 	c.remoteAddr = remoteAddr
 
 	if el.svr.ln.network != "tcp" {
-		return
+		return c
 	}
 
 	var noDelay bool
@@ -73,7 +73,7 @@ func newTCPConn(fd int, el *eventloop, sa unix.Sockaddr, remoteAddr net.Addr) (c
 	}
 	_ = netpoll.SetNoDelay(fd, noDelay)
 	_ = netpoll.SetKeepAlive(fd, el.svr.opts.TCPKeepAlive)
-	return
+	return c
 }
 
 var emptyBuffer = ringbuffer.New(0)
@@ -234,11 +234,11 @@ func (c *conn) BufferLength() int {
 }
 
 func (c *conn) AsyncWrite(buf []byte) error {
-	return c.loop.poller.Trigger(func() (err error) {
+	return c.loop.poller.Trigger(func() error {
 		if c.opened {
-			err = c.write(buf)
+			return c.write(buf)
 		}
-		return
+		return nil
 	})
 }
 

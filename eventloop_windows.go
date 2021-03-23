@@ -103,13 +103,13 @@ func (el *eventloop) loopAccept(c *stdConn) error {
 	return el.handleAction(c, action)
 }
 
-func (el *eventloop) loopRead(c *stdConn) (err error) {
+func (el *eventloop) loopRead(c *stdConn) error {
 	for inFrame, _ := c.read(); inFrame != nil; inFrame, _ = c.read() {
 		out, action := el.eventHandler.React(inFrame, c)
 		if out != nil {
 			outFrame, _ := c.codec.Encode(c, out)
 			el.eventHandler.PreWrite()
-			if _, err = c.conn.Write(outFrame); err != nil {
+			if _, err := c.conn.Write(outFrame); err != nil {
 				return el.loopError(c, err)
 			}
 		}
@@ -125,14 +125,14 @@ func (el *eventloop) loopRead(c *stdConn) (err error) {
 	bytebuffer.Put(c.buffer)
 	c.buffer = nil
 
-	return
+	return nil
 }
 
-func (el *eventloop) loopCloseConn(c *stdConn) (err error) {
+func (el *eventloop) loopCloseConn(c *stdConn) error {
 	if c.conn != nil {
-		err = c.conn.SetReadDeadline(time.Now())
+		return c.conn.SetReadDeadline(time.Now())
 	}
-	return
+	return nil
 }
 
 func (el *eventloop) loopEgress() {
@@ -180,7 +180,7 @@ func (el *eventloop) loopTicker() {
 
 func (el *eventloop) loopError(c *stdConn, err error) (e error) {
 	defer func() {
-		if err := c.conn.Close(); err != nil {
+		if err = c.conn.Close(); err != nil {
 			el.svr.logger.Warnf("Failed to close connection(%s), error: %v", c.remoteAddr.String(), err)
 			if e == nil {
 				e = err
