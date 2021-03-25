@@ -1096,12 +1096,12 @@ type testClosedWakeUpServer struct {
 }
 
 func (tes *testClosedWakeUpServer) OnInitComplete(_ Server) (action Action) {
-	c, err := net.Dial(tes.network, tes.addr)
-	if err != nil {
-		panic(err)
-	}
-
 	go func() {
+		c, err := net.Dial(tes.network, tes.addr)
+		if err != nil {
+			panic(err)
+		}
+
 		_, err = c.Write([]byte("hello"))
 		if err != nil {
 			panic(err)
@@ -1123,7 +1123,7 @@ func (tes *testClosedWakeUpServer) OnInitComplete(_ Server) (action Action) {
 	return None
 }
 
-func (tes *testClosedWakeUpServer) React(bts []byte, conn Conn) ([]byte, Action) {
+func (tes *testClosedWakeUpServer) React(_ []byte, conn Conn) ([]byte, Action) {
 	if conn.RemoteAddr() == nil {
 		panic("react on closed conn")
 	}
