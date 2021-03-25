@@ -125,6 +125,10 @@ func (el *eventloop) loopOpen(c *conn) error {
 }
 
 func (el *eventloop) loopRead(c *conn) error {
+	if !c.opened {
+		return nil
+	}
+
 	n, err := unix.Read(c.fd, el.packet)
 	if n == 0 || err != nil {
 		if err == unix.EAGAIN {
@@ -165,6 +169,10 @@ func (el *eventloop) loopRead(c *conn) error {
 }
 
 func (el *eventloop) loopWrite(c *conn) error {
+	if !c.opened {
+		return nil
+	}
+
 	el.eventHandler.PreWrite()
 
 	head, tail := c.outboundBuffer.LazyReadAll()
@@ -243,6 +251,10 @@ func (el *eventloop) loopWake(c *conn) error {
 	//if co, ok := el.connections[c.fd]; !ok || co != c {
 	//	return nil // ignore stale wakes.
 	//}
+	if !c.opened {
+		return nil
+	}
+
 	out, action := el.eventHandler.React(nil, c)
 	if out != nil {
 		if err := c.write(out); err != nil {

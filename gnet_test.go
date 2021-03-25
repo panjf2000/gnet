@@ -1085,3 +1085,52 @@ func testStop(network, addr string) {
 	events := &testStopServer{network: network, addr: addr, protoAddr: network + "://" + addr}
 	must(Serve(events, events.protoAddr, WithTicker(true)))
 }
+
+type testClosedWakeUpServer struct {
+	*EventServer
+	network, addr, protoAddr string
+
+	stopped chan struct{}
+}
+
+func (tes *testClosedWakeUpServer) OnInitComplete(_ Server) (action Action) {
+	go func() {
+		c, err := net.Dial(tes.network, tes.addr)
+		if err != nil {
+			panic(err)
+		}
+		defer c.Close()
+
+		_, err = c.Write([]byte("something"))
+		if err != nil {
+			panic(err)
+		}
+
+		select {
+		case <-time.After(time.Second):
+			// panic("task is not executed in time")
+		// case <-tes.stopped:
+		}
+
+		fmt.Println("stop server...", Stop(context.TODO(), tes.protoAddr))
+	}()
+
+	return None
+}
+
+func (tes *testClosedWakeUpServer) React(_ []byte, conn Conn) ([]byte, Action) {
+	conn.ResetBuffer()
+
+	must(conn.Wake())
+
+	return nil, Close
+}
+
+func TestClosedWakeUp(t *testing.T) {
+	events := &testClosedWakeUpServer{
+		EventServer: &EventServer{}, network: "tcp", addr: ":8888", protoAddr: "tcp://:8888",
+		stopped: make(chan struct{}),
+	}
+
+	must(Serve(events, events.protoAddr))
+}
