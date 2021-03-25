@@ -130,7 +130,7 @@ func (el *eventloop) loopRead(c *stdConn) error {
 
 func (el *eventloop) loopCloseConn(c *stdConn) error {
 	if c.conn != nil {
-		err = c.conn.SetReadDeadline(time.Now())
+		err := c.conn.SetReadDeadline(time.Now())
 
 		delete(el.connections, c)
 		el.calibrateCallback(el, -1)
@@ -140,6 +140,8 @@ func (el *eventloop) loopCloseConn(c *stdConn) error {
 		}
 
 		c.releaseTCP()
+
+		return err
 	}
 	return nil
 }
