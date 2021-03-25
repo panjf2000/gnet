@@ -1146,7 +1146,11 @@ func (tes *testClosedWakeUpServer) React(_ []byte, conn Conn) ([]byte, Action) {
 }
 
 func (tes *testClosedWakeUpServer) OnClosed(c Conn, err error) (action Action) {
-	close(tes.serverClosed)
+	select {
+	case <-tes.serverClosed:
+	default:
+		close(tes.serverClosed)
+	}
 	return
 }
 
