@@ -1092,6 +1092,7 @@ type testExecutorServer struct {
 	network, addr, protoAddr string
 
 	executed chan struct{}
+	stopped chan struct{}
 }
 
 func (tes *testExecutorServer) OnInitComplete(_ Server) (action Action) {
@@ -1122,6 +1123,7 @@ func (tes *testExecutorServer) OnInitComplete(_ Server) (action Action) {
 			}
 		}
 
+		<-tes.stopped
 		fmt.Println("stop server...", Stop(context.TODO(), tes.protoAddr))
 	}()
 
@@ -1138,10 +1140,21 @@ func (tes *testExecutorServer) OnOpened(conn Conn) ([]byte, Action) {
 	return nil, None
 }
 
+func (tes *testExecutorServer) OnClosed(c Conn, _ error) (action Action)  {
+	close(tes.stopped)
+
+	c.AsyncExecute(func(c Conn) ([]byte, Action) {
+		panic("should not be executed")
+	})
+
+	return None
+}
+
 func TestAsyncExecute(t *testing.T) {
 	events := &testExecutorServer{
 		EventServer: &EventServer{}, network: "tcp", addr: ":8888", protoAddr: "tcp://:8888",
 		executed: make(chan struct{}),
+		stopped: make(chan struct{}),
 	}
 
 	must(Serve(events, events.protoAddr))
