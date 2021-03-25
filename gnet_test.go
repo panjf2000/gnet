@@ -1143,9 +1143,9 @@ func (tes *testExecutorServer) OnOpened(conn Conn) ([]byte, Action) {
 func (tes *testExecutorServer) OnClosed(c Conn, _ error) (action Action)  {
 	close(tes.stopped)
 
-	c.AsyncExecute(func(c Conn) ([]byte, Action) {
+	must(c.AsyncExecute(func(c Conn) ([]byte, Action) {
 		panic("should not be executed")
-	})
+	}))
 
 	return None
 }
