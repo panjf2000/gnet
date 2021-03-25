@@ -1104,7 +1104,7 @@ func (tes *testClosedWakeUpServer) OnInitComplete(_ Server) (action Action) {
 			panic(err)
 		}
 
-		<-time.After(time.Second)
+		<-time.After(time.Millisecond*300)
 
 		fmt.Println("stop server...", Stop(context.TODO(), tes.protoAddr))
 	}()
@@ -1116,11 +1116,11 @@ func (tes *testClosedWakeUpServer) React(_ []byte, conn Conn) ([]byte, Action) {
 	conn.ResetBuffer()
 
 	must(conn.Wake())
-	must(conn.AsyncWrite([]byte("hi")))
 
 	return nil, Close
 }
 
+// Test should not panic when we wake-up closed conn.
 func TestClosedWakeUp(t *testing.T) {
 	events := &testClosedWakeUpServer{
 		EventServer: &EventServer{}, network: "tcp", addr: ":8888", protoAddr: "tcp://:8888",
