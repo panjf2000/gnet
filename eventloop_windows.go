@@ -104,6 +104,10 @@ func (el *eventloop) loopAccept(c *stdConn) error {
 }
 
 func (el *eventloop) loopRead(c *stdConn) error {
+	if c.conn == nil {
+		return nil
+	}
+
 	for inFrame, _ := c.read(); inFrame != nil; inFrame, _ = c.read() {
 		out, action := el.eventHandler.React(inFrame, c)
 		if out != nil {
@@ -203,6 +207,10 @@ func (el *eventloop) loopWake(c *stdConn) error {
 	//if co, ok := el.connections[c]; !ok || co != c {
 	//	return nil // ignore stale wakes.
 	//}
+	if c.conn == nil {
+		return nil
+	}
+
 	out, action := el.eventHandler.React(nil, c)
 	if out != nil {
 		if frame, err := c.codec.Encode(c, out); err != nil {
@@ -229,6 +237,10 @@ func (el *eventloop) handleAction(c *stdConn, action Action) error {
 }
 
 func (el *eventloop) loopReadUDP(c *stdConn) error {
+	if c.conn == nil {
+		return nil
+	}
+
 	out, action := el.eventHandler.React(c.buffer.Bytes(), c)
 	if out != nil {
 		el.eventHandler.PreWrite()

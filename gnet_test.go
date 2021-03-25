@@ -1106,11 +1106,7 @@ func (tes *testClosedWakeUpServer) OnInitComplete(_ Server) (action Action) {
 			panic(err)
 		}
 
-		select {
-		case <-time.After(time.Second):
-			// panic("task is not executed in time")
-		// case <-tes.stopped:
-		}
+		<-time.After(time.Second)
 
 		fmt.Println("stop server...", Stop(context.TODO(), tes.protoAddr))
 	}()
