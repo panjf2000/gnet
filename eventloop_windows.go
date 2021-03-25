@@ -131,6 +131,15 @@ func (el *eventloop) loopRead(c *stdConn) (err error) {
 func (el *eventloop) loopCloseConn(c *stdConn) (err error) {
 	if c.conn != nil {
 		err = c.conn.SetReadDeadline(time.Now())
+
+		delete(el.connections, c)
+		el.calibrateCallback(el, -1)
+
+		if el.eventHandler.OnClosed(c, err) == Shutdown {
+			return gerrors.ErrServerShutdown
+		}
+
+		c.releaseTCP()
 	}
 	return
 }
