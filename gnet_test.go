@@ -1134,8 +1134,11 @@ func (tes *testClosedWakeUpServer) React(_ []byte, conn Conn) ([]byte, Action) {
 		close(tes.readen)
 	}
 
-	must(conn.Wake())
-	must(conn.Close())
+	// actually goroutines here needed only on windows since its async actions
+	// rely on an unbuffered channel and since we already into it - this will
+	// block forever.
+	go must(conn.Wake())
+	go must(conn.Close())
 
 	<-tes.clientClosed
 
