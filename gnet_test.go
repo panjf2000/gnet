@@ -1150,5 +1150,5 @@ func TestClosedWakeUp(t *testing.T) {
 		readen:       make(chan struct{}),
 	}
 
-	must(Serve(events, events.protoAddr, WithReusePort(true)))
+	must(Serve(events, events.protoAddr))
 }
