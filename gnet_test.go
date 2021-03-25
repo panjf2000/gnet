@@ -1128,7 +1128,9 @@ func (tes *testClosedWakeUpServer) React(bts []byte, conn Conn) ([]byte, Action)
 		panic("react on closed conn")
 	}
 
-	if string(bts) == "hello" {
+	select {
+	case <-tes.readen:
+	default:
 		close(tes.readen)
 	}
 
