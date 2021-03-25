@@ -136,7 +136,7 @@ func (el *eventloop) loopCloseConn(c *stdConn) error {
 		el.calibrateCallback(el, -1)
 
 		if el.eventHandler.OnClosed(c, err) == Shutdown {
-			return gerrors.ErrServerShutdown
+			return errors.ErrServerShutdown
 		}
 
 		c.releaseTCP()
