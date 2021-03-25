@@ -184,6 +184,10 @@ func (el *eventloop) loopTicker() {
 
 func (el *eventloop) loopError(c *stdConn, err error) (e error) {
 	defer func() {
+		if c.conn == nil {
+			return
+		}
+
 		if err = c.conn.Close(); err != nil {
 			el.svr.logger.Warnf("Failed to close connection(%s), error: %v", c.remoteAddr.String(), err)
 			if e == nil {
