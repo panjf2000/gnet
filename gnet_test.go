@@ -1124,7 +1124,9 @@ func (tes *testClosedWakeUpServer) OnInitComplete(_ Server) (action Action) {
 }
 
 func (tes *testClosedWakeUpServer) React(_ []byte, conn Conn) ([]byte, Action) {
-	conn.ResetBuffer()
+	if conn.RemoteAddr() == nil {
+		panic("react on closed conn")
+	}
 
 	close(tes.readen)
 
