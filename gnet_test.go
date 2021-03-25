@@ -1089,8 +1089,6 @@ func testStop(network, addr string) {
 type testClosedWakeUpServer struct {
 	*EventServer
 	network, addr, protoAddr string
-
-	stopped chan struct{}
 }
 
 func (tes *testClosedWakeUpServer) OnInitComplete(_ Server) (action Action) {
@@ -1118,6 +1116,7 @@ func (tes *testClosedWakeUpServer) React(_ []byte, conn Conn) ([]byte, Action) {
 	conn.ResetBuffer()
 
 	must(conn.Wake())
+	must(conn.AsyncWrite([]byte("hi")))
 
 	return nil, Close
 }
@@ -1125,7 +1124,6 @@ func (tes *testClosedWakeUpServer) React(_ []byte, conn Conn) ([]byte, Action) {
 func TestClosedWakeUp(t *testing.T) {
 	events := &testClosedWakeUpServer{
 		EventServer: &EventServer{}, network: "tcp", addr: ":8888", protoAddr: "tcp://:8888",
-		stopped: make(chan struct{}),
 	}
 
 	must(Serve(events, events.protoAddr))

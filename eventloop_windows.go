@@ -237,10 +237,6 @@ func (el *eventloop) handleAction(c *stdConn, action Action) error {
 }
 
 func (el *eventloop) loopReadUDP(c *stdConn) error {
-	if c.conn == nil {
-		return nil
-	}
-
 	out, action := el.eventHandler.React(c.buffer.Bytes(), c)
 	if out != nil {
 		el.eventHandler.PreWrite()
