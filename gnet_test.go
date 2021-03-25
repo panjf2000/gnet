@@ -1089,22 +1089,33 @@ func testStop(network, addr string) {
 type testClosedWakeUpServer struct {
 	*EventServer
 	network, addr, protoAddr string
+
+	readen       chan struct{}
+	serverClosed chan struct{}
+	clientClosed chan struct{}
 }
 
 func (tes *testClosedWakeUpServer) OnInitComplete(_ Server) (action Action) {
+	c, err := net.Dial(tes.network, tes.addr)
+	if err != nil {
+		panic(err)
+	}
+
 	go func() {
-		c, err := net.Dial(tes.network, tes.addr)
-		if err != nil {
-			panic(err)
-		}
-		defer c.Close()
-
-		_, err = c.Write([]byte("something"))
+		_, err = c.Write([]byte("hello"))
 		if err != nil {
 			panic(err)
 		}
 
-		<-time.After(time.Millisecond*300)
+		<-tes.readen
+		_, err = c.Write([]byte("hello again"))
+		if err != nil {
+			panic(err)
+		}
+
+		must(c.Close())
+		close(tes.clientClosed)
+		<-tes.serverClosed
 
 		fmt.Println("stop server...", Stop(context.TODO(), tes.protoAddr))
 	}()
@@ -1115,16 +1126,29 @@ func (tes *testClosedWakeUpServer) OnInitComplete(_ Server) (action Action) {
 func (tes *testClosedWakeUpServer) React(_ []byte, conn Conn) ([]byte, Action) {
 	conn.ResetBuffer()
 
-	must(conn.Wake())
+	close(tes.readen)
 
-	return nil, Close
+	must(conn.Wake())
+	must(conn.Close())
+
+	<-tes.clientClosed
+
+	return []byte("answer"), None
 }
 
-// Test should not panic when we wake-up closed conn.
+func (tes *testClosedWakeUpServer) OnClosed(c Conn, err error) (action Action) {
+	close(tes.serverClosed)
+	return
+}
+
+// Test should not panic when we wake-up server_closed conn.
 func TestClosedWakeUp(t *testing.T) {
 	events := &testClosedWakeUpServer{
 		EventServer: &EventServer{}, network: "tcp", addr: ":8888", protoAddr: "tcp://:8888",
+		clientClosed: make(chan struct{}),
+		serverClosed: make(chan struct{}),
+		readen:       make(chan struct{}),
 	}
 
-	must(Serve(events, events.protoAddr))
+	must(Serve(events, events.protoAddr, WithReusePort(true)))
 }
