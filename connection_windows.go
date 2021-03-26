@@ -247,11 +247,11 @@ func (c *stdConn) AsyncExecute(cb func(conn Conn) ([]byte, Action)) error {
 
 		if len(buf) != 0 {
 			encodedBuf, err := c.codec.Encode(c, buf)
-			if err == nil {
-				_, err = c.conn.Write(encodedBuf)
+			if err != nil {
+				return err
 			}
 
-			if err != nil {
+			if _, err = c.conn.Write(encodedBuf); err != nil {
 				return err
 			}
 		}
