@@ -180,6 +180,10 @@ func (el *eventloop) loopTicker() {
 
 func (el *eventloop) loopError(c *stdConn, err error) (e error) {
 	defer func() {
+		if c.conn == nil {
+			return
+		}
+
 		if err = c.conn.Close(); err != nil {
 			el.svr.logger.Warnf("Failed to close connection(%s), error: %v", c.remoteAddr.String(), err)
 			if e == nil {
@@ -203,6 +207,10 @@ func (el *eventloop) loopWake(c *stdConn) error {
 	//if co, ok := el.connections[c]; !ok || co != c {
 	//	return nil // ignore stale wakes.
 	//}
+	if c.conn == nil {
+		return nil
+	}
+
 	out, action := el.eventHandler.React(nil, c)
 	if out != nil {
 		if frame, err := c.codec.Encode(c, out); err != nil {
