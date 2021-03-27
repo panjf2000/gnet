@@ -125,10 +125,6 @@ func (el *eventloop) loopOpen(c *conn) error {
 }
 
 func (el *eventloop) loopRead(c *conn) error {
-	if !c.opened {
-		return nil
-	}
-
 	n, err := unix.Read(c.fd, el.packet)
 	if n == 0 || err != nil {
 		if err == unix.EAGAIN {
@@ -244,11 +240,8 @@ func (el *eventloop) loopCloseConn(c *conn, err error) (rerr error) {
 }
 
 func (el *eventloop) loopWake(c *conn) error {
-	//if co, ok := el.connections[c.fd]; !ok || co != c {
-	//	return nil // ignore stale wakes.
-	//}
-	if !c.opened {
-		return nil
+	if co, ok := el.connections[c.fd]; !ok || co != c {
+		return nil // ignore stale wakes.
 	}
 
 	out, action := el.eventHandler.React(nil, c)
