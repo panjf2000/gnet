@@ -18,6 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+//go:build linux || freebsd || dragonfly || darwin
 // +build linux freebsd dragonfly darwin
 
 package gnet
@@ -26,6 +27,7 @@ import (
 	"net"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/panjf2000/gnet/errors"
 	"github.com/panjf2000/gnet/internal/netpoll"
@@ -74,7 +76,28 @@ func (ln *listener) close() {
 		})
 }
 
-func initListener(network, addr string, sockopts ...socket.Option) (l *listener, err error) {
+func initListener(network, addr string, options *Options) (l *listener, err error) {
+	var sockopts []socket.Option
+	if options.ReusePort {
+		sockopt := socket.Option{SetSockopt: socket.SetReuseport, Opt: 1}
+		sockopts = append(sockopts, sockopt)
+	}
+	if network == "tcp" && options.TCPNoDelay == TCPNoDelay {
+		sockopt := socket.Option{SetSockopt: socket.SetNoDelay, Opt: 1}
+		sockopts = append(sockopts, sockopt)
+	}
+	if network == "tcp" && options.TCPKeepAlive > 0 {
+		sockopt := socket.Option{SetSockopt: socket.SetKeepAlive, Opt: int(options.TCPKeepAlive / time.Second)}
+		sockopts = append(sockopts, sockopt)
+	}
+	if options.SocketRecvBuffer > 0 {
+		sockopt := socket.Option{SetSockopt: socket.SetRecvBuffer, Opt: options.SocketRecvBuffer}
+		sockopts = append(sockopts, sockopt)
+	}
+	if options.SocketSendBuffer > 0 {
+		sockopt := socket.Option{SetSockopt: socket.SetSendBuffer, Opt: options.SocketSendBuffer}
+		sockopts = append(sockopts, sockopt)
+	}
 	l = &listener{network: network, addr: addr, sockopts: sockopts}
 	err = l.normalize()
 	return

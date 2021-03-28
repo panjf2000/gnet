@@ -32,7 +32,6 @@ import (
 	"github.com/panjf2000/gnet/errors"
 	"github.com/panjf2000/gnet/internal"
 	"github.com/panjf2000/gnet/internal/logging"
-	"github.com/panjf2000/gnet/internal/socket"
 )
 
 // Action is an action that occurs after the completion of an event.
@@ -273,28 +272,7 @@ func Serve(eventHandler EventHandler, protoAddr string, opts ...Option) (err err
 	network, addr := parseProtoAddr(protoAddr)
 
 	var ln *listener
-	var sockopts []socket.Option
-	if options.ReusePort {
-		sockopt := socket.Option{SetSockopt: socket.SetReuseport, Opt: 1}
-		sockopts = append(sockopts, sockopt)
-	}
-	if network == "tcp" && options.TCPNoDelay == TCPNoDelay {
-		sockopt := socket.Option{SetSockopt: socket.SetNoDelay, Opt: 1}
-		sockopts = append(sockopts, sockopt)
-	}
-	if network == "tcp" && options.TCPKeepAlive > 0 {
-		sockopt := socket.Option{SetSockopt: socket.SetKeepAlive, Opt: int(options.TCPKeepAlive / time.Second)}
-		sockopts = append(sockopts, sockopt)
-	}
-	if options.SocketRecvBuffer > 0 {
-		sockopt := socket.Option{SetSockopt: socket.SetRecvBuffer, Opt: options.SocketRecvBuffer}
-		sockopts = append(sockopts, sockopt)
-	}
-	if options.SocketSendBuffer > 0 {
-		sockopt := socket.Option{SetSockopt: socket.SetSendBuffer, Opt: options.SocketSendBuffer}
-		sockopts = append(sockopts, sockopt)
-	}
-	if ln, err = initListener(network, addr, sockopts...); err != nil {
+	if ln, err = initListener(network, addr, options); err != nil {
 		return
 	}
 	defer ln.close()

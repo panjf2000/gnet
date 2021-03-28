@@ -259,7 +259,7 @@ func testCodecServe(network, addr string, multicore, async bool, nclients int, r
 		codec: codec, workerPool: goroutine.Default(),
 	}
 	err = Serve(ts, network+"://"+addr, WithMulticore(multicore), WithTicker(true),
-		WithTCPKeepAlive(time.Minute*5), WithCodec(codec), WithReusePort(reuseport))
+		WithTCPKeepAlive(time.Minute*5), WithSocketRecvBuffer(8*1024), WithSocketSendBuffer(8*1024), WithCodec(codec), WithReusePort(reuseport))
 	if err != nil {
 		panic(err)
 	}
@@ -605,7 +605,7 @@ func TestBadAddresses(t *testing.T) {
 }
 
 func TestTick(t *testing.T) {
-	testTick("tcp", ":9991", t)
+	testTick("tcp", ":9989", t)
 }
 
 type testTickServer struct {
@@ -635,7 +635,7 @@ func testTick(network, addr string, t *testing.T) {
 }
 
 func TestWakeConn(t *testing.T) {
-	testWakeConn("tcp", ":9991")
+	testWakeConn("tcp", ":9990")
 }
 
 type testWakeConnServer struct {
