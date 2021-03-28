@@ -33,6 +33,7 @@ import (
 
 	gerrors "github.com/panjf2000/gnet/errors"
 	"github.com/panjf2000/gnet/internal/netpoll"
+	"github.com/panjf2000/gnet/internal/socket"
 	"golang.org/x/sys/unix"
 )
 
@@ -96,7 +97,7 @@ func (el *eventloop) loopAccept(fd int) error {
 			return err
 		}
 
-		netAddr := netpoll.SockaddrToTCPOrUnixAddr(sa)
+		netAddr := socket.SockaddrToTCPOrUnixAddr(sa)
 		c := newTCPConn(nfd, el, sa, netAddr)
 		if err = el.poller.AddRead(c.fd); err == nil {
 			el.connections[c.fd] = c

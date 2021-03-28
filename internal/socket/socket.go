@@ -1,5 +1,5 @@
-// Copyright (c) 2019 Andy Pan
-// Copyright (c) 2017 Joshua J Baker
+// Copyright (c) 2020 Andy Pan
+// Copyright (c) 2017 Max Riveiro
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -19,30 +19,34 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-// +build linux freebsd dragonfly
+// Package reuseport provides functions that return fd and net.Addr based on
+// given the protocol and address with a SO_REUSEPORT option set to the socket.
 
-package netpoll
+// +build linux freebsd dragonfly darwin
+
+package socket
 
 import (
-	"errors"
-	"os"
-	"time"
-
-	"golang.org/x/sys/unix"
+	"net"
 )
 
-// SetKeepAlive sets whether the operating system should send
-// keep-alive messages on the connection and sets period between keep-alive's.
-func SetKeepAlive(fd int, d time.Duration) error {
-	if d <= 0 {
-		return errors.New("invalid time duration")
-	}
-	secs := int(d / time.Second)
-	if err := os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_KEEPALIVE, 1)); err != nil {
-		return err
-	}
-	if err := os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.IPPROTO_TCP, unix.TCP_KEEPINTVL, secs)); err != nil {
-		return err
-	}
-	return os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.IPPROTO_TCP, unix.TCP_KEEPIDLE, secs))
+// Option is used for setting an option on socket.
+type Option struct {
+	SetSockopt func(int, int) error
+	Opt        int
+}
+
+// TCPSocket calls the internal tcpSocket.
+func TCPSocket(proto, addr string, sockopts ...Option) (int, net.Addr, error) {
+	return tcpSocket(proto, addr, sockopts...)
+}
+
+// UDPSocket calls the internal udpSocket.
+func UDPSocket(proto, addr string, sockopts ...Option) (int, net.Addr, error) {
+	return udpSocket(proto, addr, sockopts...)
+}
+
+// UnixSocket calls the internal udsSocket.
+func UnixSocket(proto, addr string, sockopts ...Option) (int, net.Addr, error) {
+	return udsSocket(proto, addr, sockopts...)
 }

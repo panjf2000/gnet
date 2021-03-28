@@ -20,7 +20,7 @@
 
 // +build linux freebsd dragonfly darwin
 
-package reuseport
+package socket
 
 import (
 	"net"
@@ -46,9 +46,9 @@ func getUnixSockaddr(proto, addr string) (sa unix.Sockaddr, family int, unixAddr
 	return
 }
 
-// udsReusablePort creates an endpoint for communication and returns a file descriptor that refers to that endpoint.
+// udsSocket creates an endpoint for communication and returns a file descriptor that refers to that endpoint.
 // Argument `reusePort` indicates whether the SO_REUSEPORT flag will be assigned.
-func udsReusablePort(proto, addr string, reusePort bool) (fd int, netAddr net.Addr, err error) {
+func udsSocket(proto, addr string, sockopts ...Option) (fd int, netAddr net.Addr, err error) {
 	var (
 		family   int
 		sockaddr unix.Sockaddr
@@ -68,12 +68,8 @@ func udsReusablePort(proto, addr string, reusePort bool) (fd int, netAddr net.Ad
 		}
 	}()
 
-	if err = os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_REUSEADDR, 1)); err != nil {
-		return
-	}
-
-	if reusePort {
-		if err = os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_REUSEPORT, 1)); err != nil {
+	for _, sockopt := range sockopts {
+		if err = sockopt.SetSockopt(fd, sockopt.Opt); err != nil {
 			return
 		}
 	}

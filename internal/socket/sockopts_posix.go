@@ -20,7 +20,7 @@
 
 // +build linux freebsd dragonfly darwin
 
-package netpoll
+package socket
 
 import (
 	"os"
@@ -33,10 +33,26 @@ import (
 //
 // The default is true (no delay), meaning that data is
 // sent as soon as possible after a Write.
-func SetNoDelay(fd int, noDelay bool) error {
-	var arg int
-	if noDelay {
-		arg = 1
+func SetNoDelay(fd, noDelay int) error {
+	return os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.IPPROTO_TCP, unix.TCP_NODELAY, noDelay))
+}
+
+// SetRecvBuffer sets the size of the operating system's
+// receive buffer associated with the connection.
+func SetRecvBuffer(fd, size int) error {
+	return unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_RCVBUF, size)
+}
+
+// SetSendBuffer sets the size of the operating system's
+// transmit buffer associated with the connection.
+func SetSendBuffer(fd, size int) error {
+	return unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_SNDBUF, size)
+}
+
+// SetReuseport enables SO_REUSEPORT option on socket.
+func SetReuseport(fd, reusePort int) error {
+	if err := os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_REUSEADDR, reusePort)); err != nil {
+		return err
 	}
-	return os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.IPPROTO_TCP, unix.TCP_NODELAY, arg))
+	return os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_REUSEPORT, reusePort))
 }
