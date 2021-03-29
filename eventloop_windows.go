@@ -181,7 +181,7 @@ func (el *eventloop) loopTicker() {
 func (el *eventloop) loopError(c *stdConn, err error) (e error) {
 	defer func() {
 		if _, ok := el.connections[c]; !ok {
-			return nil // ignore stale wakes.
+			return // ignore stale wakes.
 		}
 
 		if err = c.conn.Close(); err != nil {
