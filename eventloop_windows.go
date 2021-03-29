@@ -180,8 +180,8 @@ func (el *eventloop) loopTicker() {
 
 func (el *eventloop) loopError(c *stdConn, err error) (e error) {
 	defer func() {
-		if c.conn == nil {
-			return
+		if co, ok := el.connections[c]; !ok || co != c {
+			return nil // ignore stale wakes.
 		}
 
 		if err = c.conn.Close(); err != nil {
@@ -204,11 +204,8 @@ func (el *eventloop) loopError(c *stdConn, err error) (e error) {
 }
 
 func (el *eventloop) loopWake(c *stdConn) error {
-	//if co, ok := el.connections[c]; !ok || co != c {
-	//	return nil // ignore stale wakes.
-	//}
-	if c.conn == nil {
-		return nil
+	if co, ok := el.connections[c]; !ok || co != c {
+		return nil // ignore stale wakes.
 	}
 
 	out, action := el.eventHandler.React(nil, c)
