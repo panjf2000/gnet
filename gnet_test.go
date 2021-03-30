@@ -1085,3 +1085,83 @@ func testStop(network, addr string) {
 	events := &testStopServer{network: network, addr: addr, protoAddr: network + "://" + addr}
 	must(Serve(events, events.protoAddr, WithTicker(true)))
 }
+
+type testClosedWakeUpServer struct {
+	*EventServer
+	network, addr, protoAddr string
+
+	readen       chan struct{}
+	serverClosed chan struct{}
+	clientClosed chan struct{}
+}
+
+func (tes *testClosedWakeUpServer) OnInitComplete(_ Server) (action Action) {
+	go func() {
+		c, err := net.Dial(tes.network, tes.addr)
+		if err != nil {
+			panic(err)
+		}
+
+		_, err = c.Write([]byte("hello"))
+		if err != nil {
+			panic(err)
+		}
+
+		<-tes.readen
+		_, err = c.Write([]byte("hello again"))
+		if err != nil {
+			panic(err)
+		}
+
+		must(c.Close())
+		close(tes.clientClosed)
+		<-tes.serverClosed
+
+		fmt.Println("stop server...", Stop(context.TODO(), tes.protoAddr))
+	}()
+
+	return None
+}
+
+func (tes *testClosedWakeUpServer) React(_ []byte, conn Conn) ([]byte, Action) {
+	if conn.RemoteAddr() == nil {
+		panic("react on closed conn")
+	}
+
+	select {
+	case <-tes.readen:
+	default:
+		close(tes.readen)
+	}
+
+	// actually goroutines here needed only on windows since its async actions
+	// rely on an unbuffered channel and since we already into it - this will
+	// block forever.
+	go func() { must(conn.Wake()) }()
+	go func() { must(conn.Close()) }()
+
+	<-tes.clientClosed
+
+	return []byte("answer"), None
+}
+
+func (tes *testClosedWakeUpServer) OnClosed(c Conn, err error) (action Action) {
+	select {
+	case <-tes.serverClosed:
+	default:
+		close(tes.serverClosed)
+	}
+	return
+}
+
+// Test should not panic when we wake-up server_closed conn.
+func TestClosedWakeUp(t *testing.T) {
+	events := &testClosedWakeUpServer{
+		EventServer: &EventServer{}, network: "tcp", addr: ":8888", protoAddr: "tcp://:8888",
+		clientClosed: make(chan struct{}),
+		serverClosed: make(chan struct{}),
+		readen:       make(chan struct{}),
+	}
+
+	must(Serve(events, events.protoAddr))
+}

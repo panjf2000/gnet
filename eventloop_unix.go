@@ -241,9 +241,10 @@ func (el *eventloop) loopCloseConn(c *conn, err error) (rerr error) {
 }
 
 func (el *eventloop) loopWake(c *conn) error {
-	//if co, ok := el.connections[c.fd]; !ok || co != c {
-	//	return nil // ignore stale wakes.
-	//}
+	if co, ok := el.connections[c.fd]; !ok || co != c {
+		return nil // ignore stale wakes.
+	}
+
 	out, action := el.eventHandler.React(nil, c)
 	if out != nil {
 		if err := c.write(out); err != nil {
