@@ -109,7 +109,7 @@ func (c *stdConn) releaseTCP() {
 	c.remoteAddr = nil
 	c.conn = nil
 	prb.Put(c.inboundBuffer)
-	c.inboundBuffer = nil
+	c.inboundBuffer = ringbuffer.EmptyRingBuffer
 	bytebuffer.Put(c.buffer)
 	c.buffer = nil
 }
