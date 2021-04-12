@@ -1,5 +1,4 @@
-// Copyright (c) 2019 Andy Pan
-// Copyright (c) 2017 Joshua J Baker
+// Copyright (c) 2020 Andy Pan
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -19,30 +18,12 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-package netpoll
+// +build linux freebsd dragonfly
 
-import (
-	"errors"
-	"os"
-	"time"
+package socket
 
-	"golang.org/x/sys/unix"
-)
+import "golang.org/x/sys/unix"
 
-// SetKeepAlive sets whether the operating system should send
-// keep-alive messages on the connection and sets period between keep-alive's.
-func SetKeepAlive(fd int, d time.Duration) error {
-	if d <= 0 {
-		return errors.New("invalid time duration")
-	}
-	secs := int(d / time.Second)
-	if err := os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_KEEPALIVE, 1)); err != nil {
-		return err
-	}
-	switch err := os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.IPPROTO_TCP, unix.TCP_KEEPINTVL, secs)); err {
-	case nil, unix.ENOPROTOOPT: // OS X 10.7 and earlier don't support this option
-	default:
-		return err
-	}
-	return os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.IPPROTO_TCP, unix.TCP_KEEPALIVE, secs))
+func sysSocket(family, sotype, proto int) (int, error) {
+	return unix.Socket(family, sotype|unix.SOCK_NONBLOCK|unix.SOCK_CLOEXEC, proto)
 }

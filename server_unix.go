@@ -105,7 +105,7 @@ func (svr *server) activateEventLoops(numEventLoop int) (err error) {
 	for i := 0; i < numEventLoop; i++ {
 		l := svr.ln
 		if i > 0 && svr.opts.ReusePort {
-			if l, err = initListener(svr.ln.network, svr.ln.addr, svr.ln.reusePort); err != nil {
+			if l, err = initListener(svr.ln.network, svr.ln.addr, svr.opts); err != nil {
 				return
 			}
 		}

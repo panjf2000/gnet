@@ -1,5 +1,5 @@
-// Copyright (c) 2020 Andy Pan
-// Copyright (c) 2017 Ma Weiwei, Max Riveiro
+// Copyright (c) 2019 Andy Pan
+// Copyright (c) 2017 Joshua J Baker
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -19,35 +19,28 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-// +build freebsd dragonfly darwin
+// +build linux freebsd dragonfly
 
-package reuseport
+package socket
 
 import (
-	"runtime"
+	"errors"
+	"os"
 
 	"golang.org/x/sys/unix"
 )
 
-func maxListenerBacklog() int {
-	var (
-		n   uint32
-		err error
-	)
-	switch runtime.GOOS {
-	case "darwin":
-		n, err = unix.SysctlUint32("kern.ipc.somaxconn")
-	case "freebsd":
-		n, err = unix.SysctlUint32("kern.ipc.soacceptqueue")
+// SetKeepAlive sets whether the operating system should send
+// keep-alive messages on the connection and sets period between keep-alive's.
+func SetKeepAlive(fd, secs int) error {
+	if secs <= 0 {
+		return errors.New("invalid time duration")
 	}
-	if n == 0 || err != nil {
-		return unix.SOMAXCONN
+	if err := os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_KEEPALIVE, 1)); err != nil {
+		return err
 	}
-	// FreeBSD stores the backlog in a uint16, as does Linux.
-	// Assume the other BSDs do too. Truncate number to avoid wrapping.
-	// See issue 5030.
-	if n > 1<<16-1 {
-		n = 1<<16 - 1
+	if err := os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.IPPROTO_TCP, unix.TCP_KEEPINTVL, secs)); err != nil {
+		return err
 	}
-	return int(n)
+	return os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.IPPROTO_TCP, unix.TCP_KEEPIDLE, secs))
 }

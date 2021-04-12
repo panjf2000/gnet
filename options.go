@@ -90,6 +90,12 @@ type Options struct {
 	// as soon as possible after a Write.
 	TCPNoDelay TCPSocketOpt
 
+	// SocketRecvBuffer sets the maximum socket receive buffer in bytes.
+	SocketRecvBuffer int
+
+	// SocketSendBuffer sets the maximum socket send buffer in bytes.
+	SocketSendBuffer int
+
 	// ICodec encodes and decodes TCP stream.
 	Codec ICodec
 
@@ -158,6 +164,20 @@ func WithTCPKeepAlive(tcpKeepAlive time.Duration) Option {
 func WithTCPNoDelay(tcpNoDelay TCPSocketOpt) Option {
 	return func(opts *Options) {
 		opts.TCPNoDelay = tcpNoDelay
+	}
+}
+
+// WithSocketRecvBuffer sets the maximum socket receive buffer in bytes.
+func WithSocketRecvBuffer(recvBuf int) Option {
+	return func(opts *Options) {
+		opts.SocketRecvBuffer = recvBuf
+	}
+}
+
+// WithSocketSendBuffer sets the maximum socket send buffer in bytes.
+func WithSocketSendBuffer(sendBuf int) Option {
+	return func(opts *Options) {
+		opts.SocketSendBuffer = sendBuf
 	}
 }
 

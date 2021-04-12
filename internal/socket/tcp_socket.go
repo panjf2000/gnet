@@ -21,7 +21,7 @@
 
 // +build linux freebsd dragonfly darwin
 
-package reuseport
+package socket
 
 import (
 	"net"
@@ -89,7 +89,7 @@ func getTCPSockaddr(proto, addr string) (sa unix.Sockaddr, family int, tcpAddr *
 func determineTCPProto(proto string, addr *net.TCPAddr) (string, error) {
 	// If the protocol is set to "tcp", we try to determine the actual protocol
 	// version from the size of the resolved IP address. Otherwise, we simple use
-	// the protcol given to us by the caller.
+	// the protocol given to us by the caller.
 
 	if addr.IP.To4() != nil {
 		return "tcp4", nil
@@ -107,9 +107,9 @@ func determineTCPProto(proto string, addr *net.TCPAddr) (string, error) {
 	return "", errors.ErrUnsupportedTCPProtocol
 }
 
-// tcpReusablePort creates an endpoint for communication and returns a file descriptor that refers to that endpoint.
+// tcpSocket creates an endpoint for communication and returns a file descriptor that refers to that endpoint.
 // Argument `reusePort` indicates whether the SO_REUSEPORT flag will be assigned.
-func tcpReusablePort(proto, addr string, reusePort bool) (fd int, netAddr net.Addr, err error) {
+func tcpSocket(proto, addr string, sockopts ...Option) (fd int, netAddr net.Addr, err error) {
 	var (
 		family   int
 		sockaddr unix.Sockaddr
@@ -129,12 +129,8 @@ func tcpReusablePort(proto, addr string, reusePort bool) (fd int, netAddr net.Ad
 		}
 	}()
 
-	if err = os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_REUSEADDR, 1)); err != nil {
-		return
-	}
-
-	if reusePort {
-		if err = os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_REUSEPORT, 1)); err != nil {
+	for _, sockopt := range sockopts {
+		if err = sockopt.SetSockopt(fd, sockopt.Opt); err != nil {
 			return
 		}
 	}

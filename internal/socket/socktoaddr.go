@@ -20,7 +20,7 @@
 
 // +build linux freebsd dragonfly darwin
 
-package netpoll
+package socket
 
 import (
 	"net"

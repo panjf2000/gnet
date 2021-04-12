@@ -18,6 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+//go:build linux || freebsd || dragonfly || darwin
 // +build linux freebsd dragonfly darwin
 
 package gnet
@@ -26,10 +27,11 @@ import (
 	"net"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/panjf2000/gnet/errors"
 	"github.com/panjf2000/gnet/internal/netpoll"
-	"github.com/panjf2000/gnet/internal/reuseport"
+	"github.com/panjf2000/gnet/internal/socket"
 	"golang.org/x/sys/unix"
 )
 
@@ -37,8 +39,8 @@ type listener struct {
 	once          sync.Once
 	fd            int
 	lnaddr        net.Addr
-	reusePort     bool
 	addr, network string
+	sockopts      []socket.Option
 }
 
 func (ln *listener) Dup() (int, string, error) {
@@ -48,14 +50,14 @@ func (ln *listener) Dup() (int, string, error) {
 func (ln *listener) normalize() (err error) {
 	switch ln.network {
 	case "tcp", "tcp4", "tcp6":
-		ln.fd, ln.lnaddr, err = reuseport.TCPSocket(ln.network, ln.addr, ln.reusePort)
+		ln.fd, ln.lnaddr, err = socket.TCPSocket(ln.network, ln.addr, ln.sockopts...)
 		ln.network = "tcp"
 	case "udp", "udp4", "udp6":
-		ln.fd, ln.lnaddr, err = reuseport.UDPSocket(ln.network, ln.addr, ln.reusePort)
+		ln.fd, ln.lnaddr, err = socket.UDPSocket(ln.network, ln.addr, ln.sockopts...)
 		ln.network = "udp"
 	case "unix":
 		_ = os.RemoveAll(ln.addr)
-		ln.fd, ln.lnaddr, err = reuseport.UnixSocket(ln.network, ln.addr, ln.reusePort)
+		ln.fd, ln.lnaddr, err = socket.UnixSocket(ln.network, ln.addr, ln.sockopts...)
 	default:
 		err = errors.ErrUnsupportedProtocol
 	}
@@ -74,8 +76,29 @@ func (ln *listener) close() {
 		})
 }
 
-func initListener(network, addr string, reusePort bool) (l *listener, err error) {
-	l = &listener{network: network, addr: addr, reusePort: reusePort}
+func initListener(network, addr string, options *Options) (l *listener, err error) {
+	var sockopts []socket.Option
+	if options.ReusePort {
+		sockopt := socket.Option{SetSockopt: socket.SetReuseport, Opt: 1}
+		sockopts = append(sockopts, sockopt)
+	}
+	if network == "tcp" && options.TCPNoDelay == TCPNoDelay {
+		sockopt := socket.Option{SetSockopt: socket.SetNoDelay, Opt: 1}
+		sockopts = append(sockopts, sockopt)
+	}
+	if network == "tcp" && options.TCPKeepAlive > 0 {
+		sockopt := socket.Option{SetSockopt: socket.SetKeepAlive, Opt: int(options.TCPKeepAlive / time.Second)}
+		sockopts = append(sockopts, sockopt)
+	}
+	if options.SocketRecvBuffer > 0 {
+		sockopt := socket.Option{SetSockopt: socket.SetRecvBuffer, Opt: options.SocketRecvBuffer}
+		sockopts = append(sockopts, sockopt)
+	}
+	if options.SocketSendBuffer > 0 {
+		sockopt := socket.Option{SetSockopt: socket.SetSendBuffer, Opt: options.SocketSendBuffer}
+		sockopts = append(sockopts, sockopt)
+	}
+	l = &listener{network: network, addr: addr, sockopts: sockopts}
 	err = l.normalize()
 	return
 }

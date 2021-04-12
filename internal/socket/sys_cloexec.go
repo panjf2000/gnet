@@ -20,7 +20,7 @@
 
 // +build darwin
 
-package reuseport
+package socket
 
 import (
 	"syscall"

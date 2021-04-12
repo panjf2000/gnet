@@ -277,7 +277,7 @@ func Serve(eventHandler EventHandler, protoAddr string, opts ...Option) (err err
 	network, addr := parseProtoAddr(protoAddr)
 
 	var ln *listener
-	if ln, err = initListener(network, addr, options.ReusePort); err != nil {
+	if ln, err = initListener(network, addr, options); err != nil {
 		return
 	}
 	defer ln.close()

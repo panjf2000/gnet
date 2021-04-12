@@ -76,7 +76,7 @@ func (ln *listener) close() {
 	})
 }
 
-func initListener(network, addr string, _ bool) (l *listener, err error) {
+func initListener(network, addr string, _ *Options) (l *listener, err error) {
 	l = &listener{network: network, addr: addr}
 	err = l.normalize()
 	return

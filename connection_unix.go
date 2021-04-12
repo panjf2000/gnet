@@ -19,6 +19,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+//go:build linux || freebsd || dragonfly || darwin
 // +build linux freebsd dragonfly darwin
 
 package gnet
@@ -27,7 +28,7 @@ import (
 	"net"
 	"os"
 
-	"github.com/panjf2000/gnet/internal/netpoll"
+	"github.com/panjf2000/gnet/internal/socket"
 	"github.com/panjf2000/gnet/pool/bytebuffer"
 	prb "github.com/panjf2000/gnet/pool/ringbuffer"
 	"github.com/panjf2000/gnet/ringbuffer"
@@ -49,34 +50,18 @@ type conn struct {
 	outboundBuffer *ringbuffer.RingBuffer // buffer for data that is ready to write to client
 }
 
-func newTCPConn(fd int, el *eventloop, sa unix.Sockaddr, remoteAddr net.Addr) *conn {
-	c := &conn{
+func newTCPConn(fd int, el *eventloop, sa unix.Sockaddr, remoteAddr net.Addr) (c *conn) {
+	return &conn{
 		fd:             fd,
 		sa:             sa,
 		loop:           el,
 		codec:          el.svr.codec,
+		localAddr:      el.ln.lnaddr,
+		remoteAddr:     remoteAddr,
 		inboundBuffer:  prb.Get(),
 		outboundBuffer: prb.Get(),
 	}
-	c.localAddr = el.ln.lnaddr
-	c.remoteAddr = remoteAddr
-
-	if el.svr.ln.network != "tcp" {
-		return c
-	}
-
-	var noDelay bool
-	switch el.svr.opts.TCPNoDelay {
-	case TCPNoDelay:
-		noDelay = true
-	case TCPDelay:
-	}
-	_ = netpoll.SetNoDelay(fd, noDelay)
-	_ = netpoll.SetKeepAlive(fd, el.svr.opts.TCPKeepAlive)
-	return c
 }
-
-var emptyBuffer = ringbuffer.New(0)
 
 func (c *conn) releaseTCP() {
 	c.opened = false
@@ -87,8 +72,8 @@ func (c *conn) releaseTCP() {
 	c.remoteAddr = nil
 	prb.Put(c.inboundBuffer)
 	prb.Put(c.outboundBuffer)
-	c.inboundBuffer = nil
-	c.outboundBuffer = emptyBuffer
+	c.inboundBuffer = ringbuffer.EmptyRingBuffer
+	c.outboundBuffer = ringbuffer.EmptyRingBuffer
 	bytebuffer.Put(c.byteBuffer)
 	c.byteBuffer = nil
 }
@@ -98,7 +83,7 @@ func newUDPConn(fd int, el *eventloop, sa unix.Sockaddr) *conn {
 		fd:         fd,
 		sa:         sa,
 		localAddr:  el.ln.lnaddr,
-		remoteAddr: netpoll.SockaddrToUDPAddr(sa),
+		remoteAddr: socket.SockaddrToUDPAddr(sa),
 	}
 }
 

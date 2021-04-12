@@ -1,3 +1,4 @@
+// Copyright (c) 2020 Andy Pan
 // Copyright (c) 2017 Ma Weiwei, Max Riveiro
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -18,46 +19,35 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-package reuseport
+// +build freebsd dragonfly darwin
+
+package socket
 
 import (
-	"bufio"
-	"os"
-	"strconv"
-	"strings"
+	"runtime"
 
 	"golang.org/x/sys/unix"
 )
 
 func maxListenerBacklog() int {
-	fd, err := os.Open("/proc/sys/net/core/somaxconn")
-	if err != nil {
+	var (
+		n   uint32
+		err error
+	)
+	switch runtime.GOOS {
+	case "darwin":
+		n, err = unix.SysctlUint32("kern.ipc.somaxconn")
+	case "freebsd":
+		n, err = unix.SysctlUint32("kern.ipc.soacceptqueue")
+	}
+	if n == 0 || err != nil {
 		return unix.SOMAXCONN
 	}
-	defer fd.Close()
-
-	rd := bufio.NewReader(fd)
-	line, err := rd.ReadString('\n')
-	if err != nil {
-		return unix.SOMAXCONN
-	}
-
-	f := strings.Fields(line)
-	if len(f) < 1 {
-		return unix.SOMAXCONN
-	}
-
-	n, err := strconv.Atoi(f[0])
-	if err != nil || n == 0 {
-		return unix.SOMAXCONN
-	}
-
-	// Linux stores the backlog in a uint16.
-	// Truncate number to avoid wrapping.
+	// FreeBSD stores the backlog in a uint16, as does Linux.
+	// Assume the other BSDs do too. Truncate number to avoid wrapping.
 	// See issue 5030.
 	if n > 1<<16-1 {
 		n = 1<<16 - 1
 	}
-
-	return n
+	return int(n)
 }
