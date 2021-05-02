@@ -152,6 +152,8 @@ loop:
 			if cas(&q.head, head, next) {
 				// Dequeue is done. return value.
 				atomic.AddInt32(&q.len, -1)
+				//Setting  head pointer to nil to prevent memory leak
+				head = nil
 				return task
 			}
 		}
