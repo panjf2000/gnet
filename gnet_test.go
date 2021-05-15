@@ -1023,8 +1023,6 @@ func TestServerOptionsCheck(t *testing.T) {
 	if err := Serve(&EventServer{}, "tcp://:3500", WithNumEventLoop(10001), WithLockOSThread(true)); err != errors.ErrTooManyEventLoopThreads {
 		t.Fail()
 		t.Log("error returned with LockOSThread option")
-	} else {
-		t.Log("got expected result")
 	}
 }
 
