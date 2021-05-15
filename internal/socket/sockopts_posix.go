@@ -56,3 +56,7 @@ func SetReuseport(fd, reusePort int) error {
 	}
 	return os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_REUSEPORT, reusePort))
 }
+
+func SetIPv6Only(fd, ipv6only int) error {
+	return unix.SetsockoptInt(fd, unix.IPPROTO_IPV6, unix.IPV6_V6ONLY, ipv6only)
+}

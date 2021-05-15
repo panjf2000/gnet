@@ -33,7 +33,7 @@ import (
 
 var listenerBacklogMaxSize = maxListenerBacklog()
 
-func getTCPSockaddr(proto, addr string) (sa unix.Sockaddr, family int, tcpAddr *net.TCPAddr, err error) {
+func getTCPSockaddr(proto, addr string) (sa unix.Sockaddr, family int, tcpAddr *net.TCPAddr, ipv6only bool, err error) {
 	var tcpVersion string
 
 	tcpAddr, err = net.ResolveTCPAddr(proto, addr)
@@ -47,8 +47,6 @@ func getTCPSockaddr(proto, addr string) (sa unix.Sockaddr, family int, tcpAddr *
 	}
 
 	switch tcpVersion {
-	case "tcp":
-		sa, family = &unix.SockaddrInet4{Port: tcpAddr.Port}, unix.AF_INET
 	case "tcp4":
 		sa4 := &unix.SockaddrInet4{Port: tcpAddr.Port}
 
@@ -62,6 +60,9 @@ func getTCPSockaddr(proto, addr string) (sa unix.Sockaddr, family int, tcpAddr *
 
 		sa, family = sa4, unix.AF_INET
 	case "tcp6":
+		ipv6only = true
+		fallthrough
+	case "tcp":
 		sa6 := &unix.SockaddrInet6{Port: tcpAddr.Port}
 
 		if tcpAddr.IP != nil {
@@ -112,10 +113,11 @@ func determineTCPProto(proto string, addr *net.TCPAddr) (string, error) {
 func tcpSocket(proto, addr string, sockopts ...Option) (fd int, netAddr net.Addr, err error) {
 	var (
 		family   int
+		ipv6only bool
 		sockaddr unix.Sockaddr
 	)
 
-	if sockaddr, family, netAddr, err = getTCPSockaddr(proto, addr); err != nil {
+	if sockaddr, family, netAddr, ipv6only, err = getTCPSockaddr(proto, addr); err != nil {
 		return
 	}
 
@@ -128,6 +130,12 @@ func tcpSocket(proto, addr string, sockopts ...Option) (fd int, netAddr net.Addr
 			_ = unix.Close(fd)
 		}
 	}()
+
+	if family == unix.AF_INET6 && ipv6only {
+		if err = SetIPv6Only(fd, 1); err != nil {
+			return
+		}
+	}
 
 	for _, sockopt := range sockopts {
 		if err = sockopt.SetSockopt(fd, sockopt.Opt); err != nil {

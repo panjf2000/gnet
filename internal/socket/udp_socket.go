@@ -31,7 +31,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func getUDPSockaddr(proto, addr string) (sa unix.Sockaddr, family int, udpAddr *net.UDPAddr, err error) {
+func getUDPSockaddr(proto, addr string) (sa unix.Sockaddr, family int, udpAddr *net.UDPAddr, ipv6only bool, err error) {
 	var udpVersion string
 
 	udpAddr, err = net.ResolveUDPAddr(proto, addr)
@@ -45,8 +45,6 @@ func getUDPSockaddr(proto, addr string) (sa unix.Sockaddr, family int, udpAddr *
 	}
 
 	switch udpVersion {
-	case "udp":
-		sa, family = &unix.SockaddrInet4{Port: udpAddr.Port}, unix.AF_INET
 	case "udp4":
 		sa4 := &unix.SockaddrInet4{Port: udpAddr.Port}
 
@@ -60,6 +58,9 @@ func getUDPSockaddr(proto, addr string) (sa unix.Sockaddr, family int, udpAddr *
 
 		sa, family = sa4, unix.AF_INET
 	case "udp6":
+		ipv6only = true
+		fallthrough
+	case "udp":
 		sa6 := &unix.SockaddrInet6{Port: udpAddr.Port}
 
 		if udpAddr.IP != nil {
@@ -110,10 +111,11 @@ func determineUDPProto(proto string, addr *net.UDPAddr) (string, error) {
 func udpSocket(proto, addr string, sockopts ...Option) (fd int, netAddr net.Addr, err error) {
 	var (
 		family   int
+		ipv6only bool
 		sockaddr unix.Sockaddr
 	)
 
-	if sockaddr, family, netAddr, err = getUDPSockaddr(proto, addr); err != nil {
+	if sockaddr, family, netAddr, ipv6only, err = getUDPSockaddr(proto, addr); err != nil {
 		return
 	}
 
@@ -126,6 +128,12 @@ func udpSocket(proto, addr string, sockopts ...Option) (fd int, netAddr net.Addr
 			_ = unix.Close(fd)
 		}
 	}()
+
+	if family == unix.AF_INET6 && ipv6only {
+		if err = SetIPv6Only(fd, 1); err != nil {
+			return
+		}
+	}
 
 	// Allow broadcast.
 	if err = os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_BROADCAST, 1)); err != nil {
