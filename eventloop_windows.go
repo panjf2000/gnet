@@ -39,6 +39,7 @@ type eventloop struct {
 	_ [64 - unsafe.Sizeof(internalEventloop{})%64]byte
 }
 
+//nolint:structcheck
 type internalEventloop struct {
 	ch                chan interface{}        // command channel
 	idx               int                     // loop index

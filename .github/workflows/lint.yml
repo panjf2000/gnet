@@ -17,5 +17,5 @@ jobs:
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v2
         with:
-          version: v1.29
-          args: '-D structcheck'
+          version: v1.40
+          args: -E goimports -E gocritic -E misspell -E revive

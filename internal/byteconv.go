@@ -38,7 +38,7 @@ func BytesToString(b []byte) string {
 // Note it may break if the implementation of string or slice header changes in the future go versions.
 func StringToBytes(s string) (b []byte) {
 	/* #nosec G103 */
-	sh := *(*reflect.StringHeader)(unsafe.Pointer(&s))
+	sh := (*reflect.StringHeader)(unsafe.Pointer(&s))
 	/* #nosec G103 */
 	bh := (*reflect.SliceHeader)(unsafe.Pointer(&b))
 

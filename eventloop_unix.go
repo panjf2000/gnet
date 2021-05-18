@@ -45,6 +45,7 @@ type eventloop struct {
 	_ [64 - unsafe.Sizeof(internalEventloop{})%64]byte
 }
 
+//nolint:structcheck
 type internalEventloop struct {
 	ln                *listener               // listener
 	idx               int                     // loop index in the server loops list
@@ -200,7 +201,6 @@ func (el *eventloop) loopWrite(c *conn) error {
 
 func (el *eventloop) loopCloseConn(c *conn, err error) (rerr error) {
 	if !c.opened {
-		//return fmt.Errorf("the fd=%d in event-loop(%d) is already closed, skipping it", c.fd, el.idx)
 		return nil
 	}
 
