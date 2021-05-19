@@ -165,8 +165,7 @@ func (el *eventloop) loopTicker() {
 		el.ch <- func() (err error) {
 			delay, action := el.eventHandler.Tick()
 			el.svr.ticktock <- delay
-			switch action {
-			case Shutdown:
+			if action == Shutdown {
 				err = errors.ErrServerShutdown
 			}
 			return
@@ -196,8 +195,7 @@ func (el *eventloop) loopError(c *stdConn, err error) (e error) {
 		c.releaseTCP()
 	}()
 
-	switch el.eventHandler.OnClosed(c, err) {
-	case Shutdown:
+	if el.eventHandler.OnClosed(c, err) == Shutdown {
 		return errors.ErrServerShutdown
 	}
 
@@ -240,8 +238,7 @@ func (el *eventloop) loopReadUDP(c *stdConn) error {
 		el.eventHandler.PreWrite()
 		_, _ = el.svr.ln.pconn.WriteTo(out, c.remoteAddr)
 	}
-	switch action {
-	case Shutdown:
+	if action == Shutdown {
 		return errors.ErrServerShutdown
 	}
 	c.releaseUDP()
