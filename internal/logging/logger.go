@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-// package logging provides logging functionality for gnet server,
+// Package logging provides logging functionality for gnet server,
 // it sets up a default logger (powered by go.uber.org/zap)
 // which is about to be used by gnet server, it also allows users
 // to replace the default logger with their customized logger by just
@@ -34,7 +34,6 @@
 // The environment variable `GNET_LOGGING_MODE` determines which zap logger type will be created for logging,
 // "prod" (case-insensitive) means production logger while other values except "prod" including "dev" (case-insensitive)
 // represent development logger.
-
 package logging
 
 import (
