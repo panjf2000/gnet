@@ -20,7 +20,7 @@ jobs:
         os:
           - ubuntu-latest
           - macos-latest
-          - windows-latest
+#          - windows-latest
     name: Golangci-Lint
     runs-on: ${{ matrix.os }}
     steps:
@@ -29,4 +29,4 @@ jobs:
         uses: golangci/golangci-lint-action@v2
         with:
           version: v1.40
-          args: -E goimports -E gocritic -E misspell -E revive
+          args: -E gofumpt -E gocritic -E misspell -E revive

@@ -42,12 +42,10 @@ type (
 	}
 
 	// BuiltInFrameCodec is the built-in codec which will be assigned to gnet server when customized codec is not set up.
-	BuiltInFrameCodec struct {
-	}
+	BuiltInFrameCodec struct{}
 
 	// LineBasedFrameCodec encodes/decodes line-separated frames into/from TCP stream.
-	LineBasedFrameCodec struct {
-	}
+	LineBasedFrameCodec struct{}
 
 	// DelimiterBasedFrameCodec encodes/decodes specific-delimiter-separated frames into/from TCP stream.
 	DelimiterBasedFrameCodec struct {
