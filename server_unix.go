@@ -49,8 +49,6 @@ type server struct {
 	eventHandler EventHandler       // user eventHandler
 }
 
-var serverFarm sync.Map
-
 func (svr *server) isInShutdown() bool {
 	return atomic.LoadInt32(&svr.inShutdown) == 1
 }
@@ -286,7 +284,7 @@ func serve(eventHandler EventHandler, listener *listener, options *Options, prot
 	}
 	defer svr.stop(server)
 
-	serverFarm.Store(protoAddr, svr)
+	allServers.Store(protoAddr, svr)
 
 	return nil
 }

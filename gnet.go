@@ -26,6 +26,7 @@ import (
 	"net"
 	"runtime"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -279,17 +280,21 @@ func Serve(eventHandler EventHandler, protoAddr string, opts ...Option) (err err
 	return serve(eventHandler, ln, options, protoAddr)
 }
 
-// shutdownPollInterval is how often we poll to check whether server has been shut down during gnet.Stop().
-var shutdownPollInterval = 500 * time.Millisecond
+var (
+	allServers sync.Map
 
-// Stop gracefully shuts down the server without interrupting any active eventloops,
-// it waits indefinitely for connections and eventloops to be closed and then shuts down.
+	// shutdownPollInterval is how often we poll to check whether server has been shut down during gnet.Stop().
+	shutdownPollInterval = 500 * time.Millisecond
+)
+
+// Stop gracefully shuts down the server without interrupting any active event-loops,
+// it waits indefinitely for connections and event-loops to be closed and then shuts down.
 func Stop(ctx context.Context, protoAddr string) error {
 	var svr *server
-	if s, ok := serverFarm.Load(protoAddr); ok {
+	if s, ok := allServers.Load(protoAddr); ok {
 		svr = s.(*server)
 		svr.signalShutdown()
-		defer serverFarm.Delete(protoAddr)
+		defer allServers.Delete(protoAddr)
 	} else {
 		return errors.ErrServerInShutdown
 	}
