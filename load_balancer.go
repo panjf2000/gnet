@@ -24,7 +24,6 @@ import (
 	"container/heap"
 	"hash/crc32"
 	"net"
-	"sync"
 	"sync/atomic"
 
 	"github.com/panjf2000/gnet/internal"
@@ -52,7 +51,7 @@ type (
 		next(net.Addr) *eventloop
 		iterate(func(int, *eventloop) bool)
 		len() int
-		calibrate(*eventloop, int32)
+		calibrate()
 	}
 
 	// roundRobinLoadBalancer with Round-Robin algorithm.
@@ -64,11 +63,11 @@ type (
 
 	// leastConnectionsLoadBalancer with Least-Connections algorithm.
 	leastConnectionsLoadBalancer struct {
-		sync.RWMutex
-		minHeap                 minEventLoopHeap
-		cachedRoot              *eventloop
-		threshold               int32
-		calibrateConnsThreshold int32
+		cachedRoot     *eventloop
+		minHeap        minEventLoopHeap
+		eventLoopsCopy []*eventloop
+		threshold      int32
+		size           int32
 	}
 
 	// sourceAddrHashLoadBalancer with Hash algorithm.
@@ -107,9 +106,7 @@ func (lb *roundRobinLoadBalancer) len() int {
 	return lb.size
 }
 
-func (lb *roundRobinLoadBalancer) calibrate(el *eventloop, delta int32) {
-	atomic.AddInt32(&el.connCount, delta)
-}
+func (lb *roundRobinLoadBalancer) calibrate() {}
 
 // ================================= Implementation of Least-Connections load-balancer =================================
 
@@ -122,7 +119,7 @@ func (h minEventLoopHeap) Len() int {
 }
 
 func (h minEventLoopHeap) Less(i, j int) bool {
-	return atomic.LoadInt32(&h[i].connCount) < atomic.LoadInt32(&h[j].connCount)
+	return h[i].loadConn() < h[j].loadConn()
 }
 
 func (h minEventLoopHeap) Swap(i, j int) {
@@ -147,48 +144,39 @@ func (h *minEventLoopHeap) Pop() interface{} {
 }
 
 func (lb *leastConnectionsLoadBalancer) register(el *eventloop) {
-	lb.Lock()
 	heap.Push(&lb.minHeap, el)
 	if el.idx == 0 {
 		lb.cachedRoot = el
 	}
-	lb.calibrateConnsThreshold++
-	lb.Unlock()
+	lb.eventLoopsCopy = append(lb.eventLoopsCopy, el)
+	lb.size++
 }
 
 // next returns the eligible event-loop by taking the root node from minimum heap based on Least-Connections algorithm.
 func (lb *leastConnectionsLoadBalancer) next(_ net.Addr) (el *eventloop) {
-	// In most cases, `next` method returns the cached event-loop immediately and it only reconstructs the minimum heap
-	// every `calibrateConnsThreshold` times for reducing locks to global mutex.
-	if atomic.LoadInt32(&lb.threshold) >= lb.calibrateConnsThreshold {
-		lb.Lock()
+	// In most cases, `next` method returns the cached event-loop immediately,
+	// it only reconstructs the minimum heap every `size` times to avoid introducing a global lock.
+	if atomic.LoadInt32(&lb.threshold) >= lb.size {
 		heap.Init(&lb.minHeap)
 		lb.cachedRoot = lb.minHeap[0]
 		atomic.StoreInt32(&lb.threshold, 0)
-		lb.Unlock()
 	}
 	return lb.cachedRoot
 }
 
 func (lb *leastConnectionsLoadBalancer) iterate(f func(int, *eventloop) bool) {
-	lb.RLock()
-	for i, el := range lb.minHeap {
+	for i, el := range lb.eventLoopsCopy {
 		if !f(i, el) {
 			break
 		}
 	}
-	lb.RUnlock()
 }
 
-func (lb *leastConnectionsLoadBalancer) len() (size int) {
-	lb.RLock()
-	size = lb.minHeap.Len()
-	lb.RUnlock()
-	return
+func (lb *leastConnectionsLoadBalancer) len() int {
+	return int(lb.size)
 }
 
-func (lb *leastConnectionsLoadBalancer) calibrate(el *eventloop, delta int32) {
-	atomic.AddInt32(&el.connCount, delta)
+func (lb *leastConnectionsLoadBalancer) calibrate() {
 	atomic.AddInt32(&lb.threshold, 1)
 }
 
@@ -227,6 +215,4 @@ func (lb *sourceAddrHashLoadBalancer) len() int {
 	return lb.size
 }
 
-func (lb *sourceAddrHashLoadBalancer) calibrate(el *eventloop, delta int32) {
-	atomic.AddInt32(&el.connCount, delta)
-}
+func (lb *sourceAddrHashLoadBalancer) calibrate() {}

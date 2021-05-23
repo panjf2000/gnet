@@ -28,6 +28,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"sync/atomic"
 	"time"
 	"unsafe"
 
@@ -47,15 +48,22 @@ type eventloop struct {
 
 //nolint:structcheck
 type internalEventloop struct {
-	ln                *listener               // listener
-	idx               int                     // loop index in the server loops list
-	svr               *server                 // server in loop
-	poller            *netpoll.Poller         // epoll or kqueue
-	packet            []byte                  // read packet buffer whose capacity is 64KB
-	connCount         int32                   // number of active connections in event-loop
-	connections       map[int]*conn           // loop connections fd -> conn
-	eventHandler      EventHandler            // user eventHandler
-	calibrateCallback func(*eventloop, int32) // callback func for re-adjusting connCount
+	ln           *listener       // listener
+	idx          int             // loop index in the server loops list
+	svr          *server         // server in loop
+	poller       *netpoll.Poller // epoll or kqueue
+	packet       []byte          // read packet buffer whose capacity is 64KB
+	connCount    int32           // number of active connections in event-loop
+	connections  map[int]*conn   // loop connections fd -> conn
+	eventHandler EventHandler    // user eventHandler
+}
+
+func (el *eventloop) addConn(delta int32) {
+	atomic.AddInt32(&el.connCount, delta)
+}
+
+func (el *eventloop) loadConn() int32 {
+	return atomic.LoadInt32(&el.connCount)
 }
 
 func (el *eventloop) closeAllConns() {
@@ -112,7 +120,9 @@ func (el *eventloop) loopAccept(fd int) error {
 
 func (el *eventloop) loopOpen(c *conn) error {
 	c.opened = true
-	el.calibrateCallback(el, 1)
+	el.addConn(1)
+
+	el.svr.lb.calibrate()
 
 	out, action := el.eventHandler.OnOpened(c)
 	if out != nil {
@@ -218,7 +228,10 @@ func (el *eventloop) loopCloseConn(c *conn, err error) (rerr error) {
 
 	if err0, err1 := el.poller.Delete(c.fd), unix.Close(c.fd); err0 == nil && err1 == nil {
 		delete(el.connections, c.fd)
-		el.calibrateCallback(el, -1)
+		el.addConn(-1)
+
+		el.svr.lb.calibrate()
+
 		if el.eventHandler.OnClosed(c, err) == Shutdown {
 			return gerrors.ErrServerShutdown
 		}

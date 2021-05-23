@@ -27,7 +27,6 @@ import (
 	"runtime"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/panjf2000/gnet/errors"
@@ -77,7 +76,7 @@ type Server struct {
 // CountConnections counts the number of currently active connections and returns it.
 func (s Server) CountConnections() (count int) {
 	s.svr.lb.iterate(func(i int, el *eventloop) bool {
-		count += int(atomic.LoadInt32(&el.connCount))
+		count += int(el.loadConn())
 		return true
 	})
 	return

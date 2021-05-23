@@ -117,7 +117,6 @@ func (svr *server) activateEventLoops(numEventLoop int) (err error) {
 			el.packet = make([]byte, svr.opts.ReadBufferCap)
 			el.connections = make(map[int]*conn)
 			el.eventHandler = svr.eventHandler
-			el.calibrateCallback = svr.lb.calibrate
 			_ = el.poller.AddRead(el.ln.fd)
 			svr.lb.register(el)
 
@@ -146,7 +145,6 @@ func (svr *server) activateReactors(numEventLoop int) error {
 			el.packet = make([]byte, svr.opts.ReadBufferCap)
 			el.connections = make(map[int]*conn)
 			el.eventHandler = svr.eventHandler
-			el.calibrateCallback = svr.lb.calibrate
 			svr.lb.register(el)
 
 			// Start the ticker.

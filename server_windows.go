@@ -93,7 +93,6 @@ func (svr *server) startEventLoops(numEventLoop int) {
 		el.svr = svr
 		el.connections = make(map[*stdConn]struct{})
 		el.eventHandler = svr.eventHandler
-		el.calibrateCallback = svr.lb.calibrate
 		svr.lb.register(el)
 
 		// Start the ticker.

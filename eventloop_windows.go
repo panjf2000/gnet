@@ -23,6 +23,7 @@ package gnet
 
 import (
 	"runtime"
+	"sync/atomic"
 	"time"
 	"unsafe"
 
@@ -41,13 +42,20 @@ type eventloop struct {
 
 //nolint:structcheck
 type internalEventloop struct {
-	ch                chan interface{}        // command channel
-	idx               int                     // loop index
-	svr               *server                 // server in loop
-	connCount         int32                   // number of active connections in event-loop
-	connections       map[*stdConn]struct{}   // track all the sockets bound to this loop
-	eventHandler      EventHandler            // user eventHandler
-	calibrateCallback func(*eventloop, int32) // callback func for re-adjusting connCount
+	ch           chan interface{}      // command channel
+	idx          int                   // loop index
+	svr          *server               // server in loop
+	connCount    int32                 // number of active connections in event-loop
+	connections  map[*stdConn]struct{} // track all the sockets bound to this loop
+	eventHandler EventHandler          // user eventHandler
+}
+
+func (el *eventloop) addConn(delta int32) {
+	atomic.AddInt32(&el.connCount, delta)
+}
+
+func (el *eventloop) loadConn() int32 {
+	return atomic.LoadInt32(&el.connCount)
 }
 
 func (el *eventloop) loopRun(lockOSThread bool) {
@@ -93,7 +101,9 @@ func (el *eventloop) loopRun(lockOSThread bool) {
 
 func (el *eventloop) loopAccept(c *stdConn) error {
 	el.connections[c] = struct{}{}
-	el.calibrateCallback(el, 1)
+	el.addConn(1)
+
+	el.svr.lb.calibrate()
 
 	out, action := el.eventHandler.OnOpened(c)
 	if out != nil {
@@ -191,7 +201,10 @@ func (el *eventloop) loopError(c *stdConn, err error) (e error) {
 			}
 		}
 		delete(el.connections, c)
-		el.calibrateCallback(el, -1)
+		el.addConn(-1)
+
+		el.svr.lb.calibrate()
+
 		c.releaseTCP()
 	}()
 
