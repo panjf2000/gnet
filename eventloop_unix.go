@@ -122,8 +122,6 @@ func (el *eventloop) loopOpen(c *conn) error {
 	c.opened = true
 	el.addConn(1)
 
-	el.svr.lb.calibrate()
-
 	out, action := el.eventHandler.OnOpened(c)
 	if out != nil {
 		c.open(out)
@@ -229,8 +227,6 @@ func (el *eventloop) loopCloseConn(c *conn, err error) (rerr error) {
 	if err0, err1 := el.poller.Delete(c.fd), unix.Close(c.fd); err0 == nil && err1 == nil {
 		delete(el.connections, c.fd)
 		el.addConn(-1)
-
-		el.svr.lb.calibrate()
 
 		if el.eventHandler.OnClosed(c, err) == Shutdown {
 			return gerrors.ErrServerShutdown

@@ -103,8 +103,6 @@ func (el *eventloop) loopAccept(c *stdConn) error {
 	el.connections[c] = struct{}{}
 	el.addConn(1)
 
-	el.svr.lb.calibrate()
-
 	out, action := el.eventHandler.OnOpened(c)
 	if out != nil {
 		el.eventHandler.PreWrite()
@@ -202,8 +200,6 @@ func (el *eventloop) loopError(c *stdConn, err error) (e error) {
 		}
 		delete(el.connections, c)
 		el.addConn(-1)
-
-		el.svr.lb.calibrate()
 
 		c.releaseTCP()
 	}()
