@@ -109,7 +109,7 @@ func (svr *server) activateEventLoops(numEventLoop int) (err error) {
 		}
 
 		var p *netpoll.Poller
-		if p, err = netpoll.OpenPoller(); err == nil {
+		if p, err = netpoll.OpenPoller(svr.opts.AsyncTaskQueueCap); err == nil {
 			el := new(eventloop)
 			el.ln = l
 			el.svr = svr
@@ -137,7 +137,7 @@ func (svr *server) activateEventLoops(numEventLoop int) (err error) {
 
 func (svr *server) activateReactors(numEventLoop int) error {
 	for i := 0; i < numEventLoop; i++ {
-		if p, err := netpoll.OpenPoller(); err == nil {
+		if p, err := netpoll.OpenPoller(svr.opts.AsyncTaskQueueCap); err == nil {
 			el := new(eventloop)
 			el.ln = svr.ln
 			el.svr = svr
@@ -159,7 +159,7 @@ func (svr *server) activateReactors(numEventLoop int) error {
 	// Start sub reactors in background.
 	svr.startSubReactors()
 
-	if p, err := netpoll.OpenPoller(); err == nil {
+	if p, err := netpoll.OpenPoller(svr.opts.AsyncTaskQueueCap); err == nil {
 		el := new(eventloop)
 		el.ln = svr.ln
 		el.idx = -1

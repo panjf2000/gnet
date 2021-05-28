@@ -43,6 +43,10 @@ var (
 	ErrUnsupportedPlatform = errors.New("unsupported platform in gnet")
 	// ErrConnectionClosed occurs when trying to operate a closed connection.
 	ErrConnectionClosed = errors.New("connection is already closed")
+	// ErrConnectionSendBufferFull occurs when trying to write more data to a connection with full send buffer.
+	ErrConnectionSendBufferFull = errors.New("connection send buffer is full")
+	// ErrAsyncTaskQueueFull occurs when trying to queue a task but the queue is full.
+	ErrAsyncTaskQueueFull = errors.New("async task queue reaches its cap")
 
 	// ================================================= codec errors =================================================
 

@@ -164,6 +164,10 @@ func (q *lockFreeQueue) Empty() bool {
 	return atomic.LoadInt32(&q.len) == 0
 }
 
+func (q *lockFreeQueue) Size() int {
+	return int(atomic.LoadInt32(&q.len))
+}
+
 func load(p *unsafe.Pointer) (n *node) {
 	return (*node)(atomic.LoadPointer(p))
 }

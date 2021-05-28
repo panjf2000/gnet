@@ -27,6 +27,7 @@ import (
 	"net"
 	"os"
 
+	"github.com/panjf2000/gnet/errors"
 	"github.com/panjf2000/gnet/internal/socket"
 	"github.com/panjf2000/gnet/pool/bytebuffer"
 	prb "github.com/panjf2000/gnet/pool/ringbuffer"
@@ -116,6 +117,11 @@ func (c *conn) write(buf []byte) (err error) {
 	// If there is pending data in outbound buffer, the current data ought to be appended to the outbound buffer
 	// for maintaining the sequence of network packets.
 	if !c.outboundBuffer.IsEmpty() {
+		bufferLenCap := c.loop.svr.opts.PerConnSendBufferCap
+		if bufferLenCap > 0 && c.outboundBuffer.Length()+len(buf) > bufferLenCap {
+			// send buf full, drop packet
+			return errors.ErrConnectionSendBufferFull
+		}
 		_, _ = c.outboundBuffer.Write(outFrame)
 		return
 	}
@@ -237,7 +243,7 @@ func (c *conn) Wake() error {
 }
 
 func (c *conn) Close() error {
-	return c.loop.poller.Trigger(func() error {
+	return c.loop.poller.CriticalTrigger(func() error {
 		return c.loop.loopCloseConn(c, nil)
 	})
 }

@@ -28,4 +28,6 @@ type AsyncTaskQueue interface {
 	Enqueue(Task)
 	Dequeue() Task
 	Empty() bool
+	// number of tasks in the queue
+	Size() int
 }

@@ -99,6 +99,14 @@ type Options struct {
 	// ICodec encodes and decodes TCP stream.
 	Codec ICodec
 
+	// Max number of allowed tasks in the async queue.
+	// 0 means no cap.
+	AsyncTaskQueueCap int
+
+	// Max size of the per connection sending buffer in bytes.
+	// 0 means no cap.
+	PerConnSendBufferCap int
+
 	// Logger is the customized logger for logging info, if it is not set,
 	// then gnet will use the default logger powered by go.uber.org/zap.
 	Logger logging.Logger
@@ -192,6 +200,20 @@ func WithTicker(ticker bool) Option {
 func WithCodec(codec ICodec) Option {
 	return func(opts *Options) {
 		opts.Codec = codec
+	}
+}
+
+// WithAsyncTaskQueueCap sets the allowed
+func WithAsyncTaskQueueCap(AsyncTaskQueueCap int) Option {
+	return func(opts *Options) {
+		opts.AsyncTaskQueueCap = AsyncTaskQueueCap
+	}
+}
+
+// WithAsyncTaskQueueCap sets the allowed
+func WithPerConnSendBufferCap(PerConnSendBufferCap int) Option {
+	return func(opts *Options) {
+		opts.PerConnSendBufferCap = PerConnSendBufferCap
 	}
 }
 
