@@ -34,11 +34,11 @@ func (svr *server) listenerRun(lockOSThread bool) {
 
 	var err error
 	defer func() { svr.signalShutdownWithErr(err) }()
-	var packet [0x10000]byte
+	var buffer [0x10000]byte
 	for {
 		if svr.ln.pconn != nil {
 			// Read data from UDP socket.
-			n, addr, e := svr.ln.pconn.ReadFrom(packet[:])
+			n, addr, e := svr.ln.pconn.ReadFrom(buffer[:])
 			if e != nil {
 				err = e
 				return
@@ -46,7 +46,7 @@ func (svr *server) listenerRun(lockOSThread bool) {
 
 			el := svr.lb.next(addr)
 			c := newUDPConn(el, svr.ln.lnaddr, addr)
-			el.ch <- packUDPConn(c, packet[:n])
+			el.ch <- packUDPConn(c, buffer[:n])
 		} else {
 			// Accept TCP socket.
 			conn, e := svr.ln.ln.Accept()
@@ -58,15 +58,15 @@ func (svr *server) listenerRun(lockOSThread bool) {
 			c := newTCPConn(conn, el)
 			el.ch <- c
 			go func() {
-				var packet [0x10000]byte
+				var buffer [0x10000]byte
 				for {
-					n, err := c.conn.Read(packet[:])
+					n, err := c.conn.Read(buffer[:])
 					if err != nil {
 						_ = c.conn.SetReadDeadline(time.Time{})
 						el.ch <- &stderr{c, err}
 						return
 					}
-					el.ch <- packTCPConn(c, packet[:n])
+					el.ch <- packTCPConn(c, buffer[:n])
 				}
 			}()
 		}

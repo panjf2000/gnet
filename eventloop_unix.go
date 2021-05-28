@@ -52,7 +52,7 @@ type internalEventloop struct {
 	idx          int             // loop index in the server loops list
 	svr          *server         // server in loop
 	poller       *netpoll.Poller // epoll or kqueue
-	packet       []byte          // read packet buffer whose capacity is 64KB
+	buffer       []byte          // read packet buffer whose capacity is 64KB
 	connCount    int32           // number of active connections in event-loop
 	connections  map[int]*conn   // loop connections fd -> conn
 	eventHandler EventHandler    // user eventHandler
@@ -135,14 +135,14 @@ func (el *eventloop) loopOpen(c *conn) error {
 }
 
 func (el *eventloop) loopRead(c *conn) error {
-	n, err := unix.Read(c.fd, el.packet)
+	n, err := unix.Read(c.fd, el.buffer)
 	if n == 0 || err != nil {
 		if err == unix.EAGAIN {
 			return nil
 		}
 		return el.loopCloseConn(c, os.NewSyscallError("read", err))
 	}
-	c.buffer = el.packet[:n]
+	c.buffer = el.buffer[:n]
 
 	for inFrame, _ := c.read(); inFrame != nil; inFrame, _ = c.read() {
 		out, action := el.eventHandler.React(inFrame, c)
@@ -307,7 +307,7 @@ func (el *eventloop) handleAction(c *conn, action Action) error {
 }
 
 func (el *eventloop) loopReadUDP(fd int) error {
-	n, sa, err := unix.Recvfrom(fd, el.packet, 0)
+	n, sa, err := unix.Recvfrom(fd, el.buffer, 0)
 	if err != nil {
 		if err == unix.EAGAIN || err == unix.EWOULDBLOCK {
 			return nil
@@ -317,7 +317,7 @@ func (el *eventloop) loopReadUDP(fd int) error {
 	}
 
 	c := newUDPConn(fd, el, sa)
-	out, action := el.eventHandler.React(el.packet[:n], c)
+	out, action := el.eventHandler.React(el.buffer[:n], c)
 	if out != nil {
 		el.eventHandler.PreWrite()
 		_ = c.sendTo(out)

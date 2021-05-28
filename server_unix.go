@@ -114,7 +114,7 @@ func (svr *server) activateEventLoops(numEventLoop int) (err error) {
 			el.ln = l
 			el.svr = svr
 			el.poller = p
-			el.packet = make([]byte, svr.opts.ReadBufferCap)
+			el.buffer = make([]byte, svr.opts.ReadBufferCap)
 			el.connections = make(map[int]*conn)
 			el.eventHandler = svr.eventHandler
 			_ = el.poller.AddRead(el.ln.fd)
@@ -142,7 +142,7 @@ func (svr *server) activateReactors(numEventLoop int) error {
 			el.ln = svr.ln
 			el.svr = svr
 			el.poller = p
-			el.packet = make([]byte, svr.opts.ReadBufferCap)
+			el.buffer = make([]byte, svr.opts.ReadBufferCap)
 			el.connections = make(map[int]*conn)
 			el.eventHandler = svr.eventHandler
 			svr.lb.register(el)
