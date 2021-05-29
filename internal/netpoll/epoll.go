@@ -37,15 +37,16 @@ import (
 
 // Poller represents a poller which is in charge of monitoring file-descriptors.
 type Poller struct {
-	fd             int    // epoll fd
-	wfd            int    // wake fd
-	wfdBuf         []byte // wfd buffer to read packet
-	netpollWakeSig int32
-	asyncTaskQueue queue.AsyncTaskQueue
+	fd                int    // epoll fd
+	wfd               int    // wake fd
+	wfdBuf            []byte // wfd buffer to read packet
+	netpollWakeSig    int32
+	asyncTaskQueue    queue.AsyncTaskQueue
+	asyncTaskQueueCap int
 }
 
 // OpenPoller instantiates a poller.
-func OpenPoller() (poller *Poller, err error) {
+func OpenPoller(asyncTaskQueueCap int) (poller *Poller, err error) {
 	poller = new(Poller)
 	if poller.fd, err = unix.EpollCreate1(unix.EPOLL_CLOEXEC); err != nil {
 		poller = nil
@@ -65,6 +66,7 @@ func OpenPoller() (poller *Poller, err error) {
 		return
 	}
 	poller.asyncTaskQueue = queue.NewLockFreeQueue()
+	poller.asyncTaskQueueCap = asyncTaskQueueCap
 	return
 }
 
@@ -85,12 +87,30 @@ var (
 
 // Trigger wakes up the poller blocked in waiting for network-events and runs jobs in asyncTaskQueue.
 func (p *Poller) Trigger(task queue.Task) (err error) {
+	if p.asyncTaskQueueCap > 0 && p.asyncTaskQueue.Size() >= p.asyncTaskQueueCap {
+		return errors.ErrAsyncTaskQueueFull
+	}
 	p.asyncTaskQueue.Enqueue(task)
 	if atomic.CompareAndSwapInt32(&p.netpollWakeSig, 0, 1) {
 		for _, err = unix.Write(p.wfd, b); err == unix.EINTR || err == unix.EAGAIN; _, err = unix.Write(p.wfd, b) {
 		}
 	}
 	return os.NewSyscallError("write", err)
+}
+
+// CriticalTrigger wakes up the poller blocked in waiting for network-events and runs jobs in asyncTaskQueue.
+// The task will be put in the queue even if it reaches the cap.
+func (p *Poller) CriticalTrigger(task queue.Task) (err error) {
+	p.asyncTaskQueue.Enqueue(task)
+	if atomic.CompareAndSwapInt32(&p.netpollWakeSig, 0, 1) {
+		for _, err = unix.Write(p.wfd, b); err == unix.EINTR || err == unix.EAGAIN; _, err = unix.Write(p.wfd, b) {
+		}
+	}
+	return os.NewSyscallError("write", err)
+}
+
+func (p *Poller) AsyncTaskQueueSize() int {
+	return p.asyncTaskQueue.Size()
 }
 
 // Polling blocks the current goroutine, waiting for network-events.
