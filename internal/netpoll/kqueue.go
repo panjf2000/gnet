@@ -94,11 +94,11 @@ func (p *Poller) Trigger(fn func() error) (err error) {
 // CriticalTrigger wakes up the poller blocked in waiting for network-events and runs jobs in asyncTaskQueue.
 // The task will be put in the queue even if it reaches the cap.
 func (p *Poller) TriggerSend(conn interface{}, buf []byte) (err error) {
-	//if p.asyncTaskQueueCap > 0 {
-	//	if p.asyncTaskQueue.Size() >= p.asyncTaskQueueCap {
-	//		return errors.ErrAsyncTaskQueueFull
-	//	}
-	//}
+	if p.asyncTaskQueueCap > 0 {
+		if p.asyncTaskQueue.Size() >= p.asyncTaskQueueCap {
+			return errors.ErrAsyncTaskQueueFull
+		}
+	}
 	p.asyncTaskQueue.Enqueue(queue.Task{Conn: conn, Buf: buf})
 	if atomic.CompareAndSwapInt32(&p.netpollWakeSig, 0, 1) {
 		for _, err = unix.Kevent(p.fd, wakeChanges, nil, nil); err == unix.EINTR || err == unix.EAGAIN; _, err = unix.Kevent(p.fd, wakeChanges, nil, nil) {

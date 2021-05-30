@@ -25,8 +25,11 @@ package queue
 type Task struct {
 	Func func() error
 
+	// Conn and Buf is a data sending task.
+	// Conn is a gnet.conn. Use interface{} to avoid circular dependency
 	Conn interface{}
-	Buf  []byte
+	// The buffer to be sent by the gnet conn
+	Buf []byte
 }
 
 // AsyncTaskQueue is a queue storing asynchronous tasks.
