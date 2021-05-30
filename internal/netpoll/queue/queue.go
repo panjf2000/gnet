@@ -20,8 +20,7 @@
 
 package queue
 
-// Task is a asynchronous function.
-//type Task func() error
+// Task is an asynchronous function or a buffer pending to be sent to a connection.
 type Task struct {
 	Func func() error
 

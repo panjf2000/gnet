@@ -99,7 +99,7 @@ type Options struct {
 	// ICodec encodes and decodes TCP stream.
 	Codec ICodec
 
-	// Max number of allowed tasks in the async queue.
+	// A soft cap of allowed tasks in the async queue.
 	// 0 means no cap.
 	AsyncTaskQueueCap int
 

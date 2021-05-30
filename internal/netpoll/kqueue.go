@@ -81,7 +81,7 @@ var wakeChanges = []unix.Kevent_t{{
 }}
 
 // Trigger wakes up the poller blocked in waiting for network-events and runs jobs in asyncTaskQueue.
-// The task is dropped if the queue reaches the cap.
+// The task will be put in the queue even if it reaches the cap thus critial tasks won't be dropped.
 func (p *Poller) Trigger(fn func() error) (err error) {
 	p.asyncTaskQueue.Enqueue(queue.Task{Func: fn})
 	if atomic.CompareAndSwapInt32(&p.netpollWakeSig, 0, 1) {
@@ -91,8 +91,8 @@ func (p *Poller) Trigger(fn func() error) (err error) {
 	return os.NewSyscallError("kevent trigger", err)
 }
 
-// CriticalTrigger wakes up the poller blocked in waiting for network-events and runs jobs in asyncTaskQueue.
-// The task will be put in the queue even if it reaches the cap.
+// TriggerSend wakes up the poller to send the buf to the given connection.
+// The task is dropped if the queue reaches the cap, in that case the returned error is ErrAsyncTaskQueueFull.
 func (p *Poller) TriggerSend(conn interface{}, buf []byte) (err error) {
 	if p.asyncTaskQueueCap > 0 {
 		if p.asyncTaskQueue.Size() >= p.asyncTaskQueueCap {
