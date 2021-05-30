@@ -43,10 +43,13 @@ type Poller struct {
 	netpollWakeSig    int32
 	asyncTaskQueue    queue.AsyncTaskQueue
 	asyncTaskQueueCap int
+	taskHandler       TaskHandler
 }
 
+type TaskHandler func(task queue.Task) error
+
 // OpenPoller instantiates a poller.
-func OpenPoller(asyncTaskQueueCap int) (poller *Poller, err error) {
+func OpenPoller(asyncTaskQueueCap int, taskHandler TaskHandler) (poller *Poller, err error) {
 	poller = new(Poller)
 	if poller.fd, err = unix.EpollCreate1(unix.EPOLL_CLOEXEC); err != nil {
 		poller = nil
@@ -67,6 +70,7 @@ func OpenPoller(asyncTaskQueueCap int) (poller *Poller, err error) {
 	}
 	poller.asyncTaskQueue = queue.NewLockFreeQueue()
 	poller.asyncTaskQueueCap = asyncTaskQueueCap
+	poller.taskHandler = taskHandler
 	return
 }
 
@@ -86,11 +90,8 @@ var (
 )
 
 // Trigger wakes up the poller blocked in waiting for network-events and runs jobs in asyncTaskQueue.
-func (p *Poller) Trigger(task queue.Task) (err error) {
-	if p.asyncTaskQueueCap > 0 && p.asyncTaskQueue.Size() >= p.asyncTaskQueueCap {
-		return errors.ErrAsyncTaskQueueFull
-	}
-	p.asyncTaskQueue.Enqueue(task)
+func (p *Poller) Trigger(fn func() error) (err error) {
+	p.asyncTaskQueue.Enqueue(queue.Task{Func: fn})
 	if atomic.CompareAndSwapInt32(&p.netpollWakeSig, 0, 1) {
 		for _, err = unix.Write(p.wfd, b); err == unix.EINTR || err == unix.EAGAIN; _, err = unix.Write(p.wfd, b) {
 		}
@@ -100,8 +101,11 @@ func (p *Poller) Trigger(task queue.Task) (err error) {
 
 // CriticalTrigger wakes up the poller blocked in waiting for network-events and runs jobs in asyncTaskQueue.
 // The task will be put in the queue even if it reaches the cap.
-func (p *Poller) CriticalTrigger(task queue.Task) (err error) {
-	p.asyncTaskQueue.Enqueue(task)
+func (p *Poller) TriggerSend(conn interface{}, buf []byte) (err error) {
+	if p.asyncTaskQueueCap > 0 && p.asyncTaskQueue.Size() >= p.asyncTaskQueueCap {
+		return errors.ErrAsyncTaskQueueFull
+	}
+	p.asyncTaskQueue.Enqueue(queue.Task{Conn: conn, Buf: buf})
 	if atomic.CompareAndSwapInt32(&p.netpollWakeSig, 0, 1) {
 		for _, err = unix.Write(p.wfd, b); err == unix.EINTR || err == unix.EAGAIN; _, err = unix.Write(p.wfd, b) {
 		}
@@ -150,10 +154,10 @@ func (p *Poller) Polling(callback func(fd int, ev uint32) error) error {
 			wakenUp = false
 			var task queue.Task
 			for i := 0; i < AsyncTasks; i++ {
-				if task = p.asyncTaskQueue.Dequeue(); task == nil {
+				if task = p.asyncTaskQueue.Dequeue(); task.Func == nil && task.Buf == nil {
 					break
 				}
-				switch err = task(); err {
+				switch err = p.taskHandler(task); err {
 				case nil:
 				case errors.ErrServerShutdown:
 					return err
