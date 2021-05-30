@@ -143,7 +143,7 @@ loop:
 		if head == tail {
 			// Is queue empty?
 			if next == nil {
-				return nil
+				return Task{}
 			}
 			cas(&q.tail, tail, next) // tail is falling behind. Try to advance it.
 		} else {

@@ -271,7 +271,7 @@ func (el *eventloop) loopTicker() {
 		err   error
 	)
 	for {
-		err = el.poller.CriticalTrigger(func() (err error) {
+		err = el.poller.Trigger(func() (err error) {
 			delay, action := el.eventHandler.Tick()
 			el.svr.ticktock <- delay
 			switch action {

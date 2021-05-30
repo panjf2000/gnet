@@ -200,6 +200,7 @@ func (s *testCodecServer) OnClosed(c Conn, err error) (action Action) {
 }
 
 func (s *testCodecServer) React(frame []byte, c Conn) (out []byte, action Action) {
+	// FIXME: async mode would fail the test after my change.
 	if s.async {
 		if frame != nil {
 			data := append([]byte{}, frame...)

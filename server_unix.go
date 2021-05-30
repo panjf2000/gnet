@@ -32,6 +32,7 @@ import (
 	"github.com/panjf2000/gnet/errors"
 	"github.com/panjf2000/gnet/internal/logging"
 	"github.com/panjf2000/gnet/internal/netpoll"
+	"github.com/panjf2000/gnet/internal/netpoll/queue"
 )
 
 type server struct {
@@ -98,6 +99,18 @@ func (svr *server) startSubReactors() {
 	})
 }
 
+func asyncTaskHandler(task queue.Task) error {
+	if task.Func != nil {
+		return task.Func()
+	} else if len(task.Buf) != 0 {
+		c := task.Conn.(*conn)
+		if c.opened {
+			return c.write(task.Buf)
+		}
+	}
+	return nil
+}
+
 func (svr *server) activateEventLoops(numEventLoop int) (err error) {
 	// Create loops locally and bind the listeners.
 	for i := 0; i < numEventLoop; i++ {
@@ -109,7 +122,7 @@ func (svr *server) activateEventLoops(numEventLoop int) (err error) {
 		}
 
 		var p *netpoll.Poller
-		if p, err = netpoll.OpenPoller(svr.opts.AsyncTaskQueueCap); err == nil {
+		if p, err = netpoll.OpenPoller(svr.opts.AsyncTaskQueueCap, asyncTaskHandler); err == nil {
 			el := new(eventloop)
 			el.ln = l
 			el.svr = svr
@@ -137,7 +150,7 @@ func (svr *server) activateEventLoops(numEventLoop int) (err error) {
 
 func (svr *server) activateReactors(numEventLoop int) error {
 	for i := 0; i < numEventLoop; i++ {
-		if p, err := netpoll.OpenPoller(svr.opts.AsyncTaskQueueCap); err == nil {
+		if p, err := netpoll.OpenPoller(svr.opts.AsyncTaskQueueCap, asyncTaskHandler); err == nil {
 			el := new(eventloop)
 			el.ln = svr.ln
 			el.svr = svr
@@ -159,7 +172,7 @@ func (svr *server) activateReactors(numEventLoop int) error {
 	// Start sub reactors in background.
 	svr.startSubReactors()
 
-	if p, err := netpoll.OpenPoller(svr.opts.AsyncTaskQueueCap); err == nil {
+	if p, err := netpoll.OpenPoller(svr.opts.AsyncTaskQueueCap, asyncTaskHandler); err == nil {
 		el := new(eventloop)
 		el.ln = svr.ln
 		el.idx = -1

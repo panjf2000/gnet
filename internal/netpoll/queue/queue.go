@@ -21,7 +21,13 @@
 package queue
 
 // Task is a asynchronous function.
-type Task func() error
+//type Task func() error
+type Task struct {
+	Func func() error
+
+	Conn interface{}
+	Buf  []byte
+}
 
 // AsyncTaskQueue is a queue storing asynchronous tasks.
 type AsyncTaskQueue interface {
