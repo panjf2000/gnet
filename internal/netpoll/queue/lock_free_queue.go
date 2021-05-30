@@ -84,6 +84,7 @@
 package queue
 
 import (
+	"sync"
 	"sync/atomic"
 	"unsafe"
 )
@@ -93,6 +94,8 @@ type lockFreeQueue struct {
 	head unsafe.Pointer
 	tail unsafe.Pointer
 	len  int32
+
+	nodePool *sync.Pool
 }
 
 type node struct {
@@ -103,12 +106,18 @@ type node struct {
 // NewLockFreeQueue instantiates and returns a lockFreeQueue.
 func NewLockFreeQueue() AsyncTaskQueue {
 	n := unsafe.Pointer(&node{})
-	return &lockFreeQueue{head: n, tail: n}
+	np := &sync.Pool{
+		New: func() interface{} {
+			return &node{}
+		},
+	}
+	return &lockFreeQueue{head: n, tail: n, nodePool: np}
 }
 
 // Enqueue puts the given value v at the tail of the queue.
 func (q *lockFreeQueue) Enqueue(task Task) {
-	n := &node{value: task}
+	n := q.nodePool.Get().(*node)
+	n.value, n.next = task, nil
 loop:
 	tail := load(&q.tail)
 	next := load(&tail.next)
@@ -152,6 +161,7 @@ loop:
 			if cas(&q.head, head, next) {
 				// Dequeue is done. return value.
 				atomic.AddInt32(&q.len, -1)
+				q.nodePool.Put(head)
 				return task
 			}
 		}
