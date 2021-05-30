@@ -160,8 +160,9 @@ loop:
 			task := next.value
 			if cas(&q.head, head, next) {
 				// Dequeue is done. return value.
-				atomic.AddInt32(&q.len, -1)
+				next.value = Task{} // release the references to the task being dequeued
 				q.nodePool.Put(head)
+				atomic.AddInt32(&q.len, -1)
 				return task
 			}
 		}

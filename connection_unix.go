@@ -109,6 +109,14 @@ func (c *conn) read() ([]byte, error) {
 	return c.codec.Decode(c)
 }
 
+// Implement queue.Writable
+func (c *conn) Write(buf []byte) (err error) {
+	if c.opened {
+		err = c.write(buf)
+	}
+	return
+}
+
 func (c *conn) write(buf []byte) (err error) {
 	var outFrame []byte
 	if outFrame, err = c.codec.Encode(c, buf); err != nil {

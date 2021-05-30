@@ -20,14 +20,17 @@
 
 package queue
 
-// Task is an asynchronous function or a buffer pending to be sent to a connection.
+type Writable interface {
+	Write(buf []byte) error
+}
+
+// Task is Func func OR a buffer pending to be sent to a connection.
 type Task struct {
 	Func func() error
 
 	// Conn and Buf is a data sending task.
-	// Conn is a gnet.conn. Use interface{} to avoid circular dependency
-	Conn interface{}
-	// The buffer to be sent by the gnet conn
+	Conn Writable
+	// The buffer to be sent by the Conn
 	Buf []byte
 }
 

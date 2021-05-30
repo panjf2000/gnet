@@ -40,13 +40,12 @@ type Poller struct {
 	netpollWakeSig    int32
 	asyncTaskQueue    queue.AsyncTaskQueue
 	asyncTaskQueueCap int
-	taskHandler       TaskHandler
 }
 
 type TaskHandler func(task queue.Task) error
 
 // OpenPoller instantiates a poller.
-func OpenPoller(asyncTaskQueueCap int, taskHandler TaskHandler) (poller *Poller, err error) {
+func OpenPoller(asyncTaskQueueCap int) (poller *Poller, err error) {
 	poller = new(Poller)
 	if poller.fd, err = unix.Kqueue(); err != nil {
 		poller = nil
@@ -65,7 +64,6 @@ func OpenPoller(asyncTaskQueueCap int, taskHandler TaskHandler) (poller *Poller,
 	}
 	poller.asyncTaskQueue = queue.NewLockFreeQueue()
 	poller.asyncTaskQueueCap = asyncTaskQueueCap
-	poller.taskHandler = taskHandler
 	return
 }
 
@@ -93,7 +91,7 @@ func (p *Poller) Trigger(fn func() error) (err error) {
 
 // TriggerSend wakes up the poller to send the buf to the given connection.
 // The task is dropped if the queue reaches the cap, in that case the returned error is ErrAsyncTaskQueueFull.
-func (p *Poller) TriggerSend(conn interface{}, buf []byte) (err error) {
+func (p *Poller) TriggerSend(conn queue.Writable, buf []byte) (err error) {
 	if p.asyncTaskQueueCap > 0 {
 		if p.asyncTaskQueue.Size() >= p.asyncTaskQueueCap {
 			return errors.ErrAsyncTaskQueueFull
@@ -155,10 +153,16 @@ func (p *Poller) Polling(callback func(fd int, filter int16) error) error {
 			wakenUp = false
 			var task queue.Task
 			for i := 0; i < AsyncTasks; i++ {
-				if task = p.asyncTaskQueue.Dequeue(); task.Func == nil && task.Buf == nil {
+				task = p.asyncTaskQueue.Dequeue()
+				if task.Func != nil {
+					err = task.Func()
+				} else if task.Conn != nil {
+					err = task.Conn.Write(task.Buf)
+				} else {
+					// empty task means the task queue is empty
 					break
 				}
-				switch err = p.taskHandler(task); err {
+				switch err {
 				case nil:
 				case errors.ErrServerShutdown:
 					return err
