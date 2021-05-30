@@ -21,9 +21,11 @@
 package gnet
 
 import (
-	"container/heap"
 	"hash/crc32"
+	"math"
 	"net"
+	"sync/atomic"
+	"time"
 
 	"github.com/panjf2000/gnet/internal"
 )
@@ -61,10 +63,9 @@ type (
 
 	// leastConnectionsLoadBalancer with Least-Connections algorithm.
 	leastConnectionsLoadBalancer struct {
-		// cachedRoot     *eventloop
-		minHeap        minEventLoopHeap
-		eventLoopsCopy []*eventloop
-		size           int
+		cache      atomic.Value
+		eventLoops []*eventloop
+		size       int
 	}
 
 	// sourceAddrHashLoadBalancer with Hash algorithm.
@@ -105,84 +106,72 @@ func (lb *roundRobinLoadBalancer) len() int {
 
 // ================================= Implementation of Least-Connections load-balancer =================================
 
-// Leverage min-heap to optimize Least-Connections load-balancing.
-type minEventLoopHeap []*eventloop
-
-// Implement heap.Interface: Len, Less, Swap, Push, Pop.
-func (h minEventLoopHeap) Len() int {
-	return len(h)
-}
-
-func (h minEventLoopHeap) Less(i, j int) bool {
-	return h[i].loadConn() < h[j].loadConn()
-}
-
-func (h minEventLoopHeap) Swap(i, j int) {
-	h[i], h[j] = h[j], h[i]
-	h[i].idx, h[j].idx = i, j
-}
-
-func (h *minEventLoopHeap) Push(x interface{}) {
-	el := x.(*eventloop)
-	el.idx = len(*h)
-	*h = append(*h, el)
-}
-
-func (h *minEventLoopHeap) Pop() interface{} {
-	old := *h
-	i := len(old) - 1
-	x := old[i]
-	old[i] = nil // avoid memory leak
-	x.idx = -1   // for safety
-	*h = old[:i]
-	return x
-}
-
-func (lb *leastConnectionsLoadBalancer) register(el *eventloop) {
-	heap.Push(&lb.minHeap, el)
-	// if el.idx == 0 {
-	// 	lb.cachedRoot = el
-	// }
-	lb.eventLoopsCopy = append(lb.eventLoopsCopy, el)
-	lb.size++
+func (lb *leastConnectionsLoadBalancer) min() (el *eventloop) {
+	el = lb.eventLoops[0]
+	minN := el.loadConn()
+	for _, v := range lb.eventLoops[1:] {
+		if n := v.loadConn(); n < minN {
+			minN = n
+			el = v
+		}
+	}
+	return
 }
 
 // standardDeviation calculates and returns the standard deviation of all connection numbers in event-loops.
-// func (lb *leastConnectionsLoadBalancer) standardDeviation() float64 {
-//	var sum, variance float64
-//	for _, el := range lb.minHeap {
-//		sum += float64(el.loadConn())
-//	}
-//	length := float64(lb.minHeap.Len())
-//	mean := sum / length
-//	for _, el := range lb.minHeap {
-//		diff := float64(el.loadConn()) - mean
-//		variance += diff * diff
-//	}
-//	variance /= length
-//	return math.Sqrt(variance)
-// }
+func (lb *leastConnectionsLoadBalancer) standardDeviation() float64 {
+	var sum, variance float64
+	for _, el := range lb.eventLoops {
+		sum += float64(el.loadConn())
+	}
+	length := float64(len(lb.eventLoops))
+	mean := sum / length
+	for _, el := range lb.eventLoops {
+		diff := float64(el.loadConn()) - mean
+		variance += diff * diff
+	}
+	variance /= length
+	return math.Sqrt(variance)
+}
+
+// calibrate calculates the standard deviation of all connection-numbers in event-loops
+// and decides whether to reassign the lb.cache periodically.
+func (lb *leastConnectionsLoadBalancer) calibrate() {
+	ticker := time.NewTicker(100 * time.Millisecond)
+	for range ticker.C {
+		// We choose 2.5 as the magic number here, which approximately restricts the difference value
+		// between connection numbers in all event-loops to 10 ~ 20, on 8/16/32/48-core processors.
+		if lb.standardDeviation() >= 2.5 {
+			lb.cache.Store(lb.min())
+		}
+	}
+}
+
+func (lb *leastConnectionsLoadBalancer) register(el *eventloop) {
+	el.idx = lb.size
+	lb.eventLoops = append(lb.eventLoops, el)
+	lb.size++
+}
 
 // next returns the eligible event-loop by taking the root node from minimum heap based on Least-Connections algorithm.
 func (lb *leastConnectionsLoadBalancer) next(_ net.Addr) (el *eventloop) {
 	// In most cases, `next` method returns the cached event-loop immediately,
-	// we don't readjust the heap every time a connection is created or closed,
-	// but reconstruct the minimum heap only if the standard deviation of all
-	// connection-numbers in event-loops is greater than the magic number,
+	// we don't try to find the event-loop with minimum connections every time
+	// a connection is created or closed, but do it only if the standard deviation
+	// of all connection-numbers in event-loops is greater than the magic number,
 	// to avoid introducing a global lock.
-	// We choose 2.5 as the magic number here, which approximately restricts the difference value
-	// between connection numbers in all event-loops to 10 ~ 20, on 8/16/32/48-core processors.
-	// if lb.standardDeviation() > 2.5 {
-	//	heap.Init(&lb.minHeap)
-	//	lb.cachedRoot = lb.minHeap[0]
-	// }
-
-	heap.Init(&lb.minHeap)
-	return lb.minHeap[0]
+	v := lb.cache.Load()
+	if v == nil {
+		el = lb.eventLoops[0]
+		lb.cache.Store(el)
+		go lb.calibrate()
+		return
+	}
+	return v.(*eventloop)
 }
 
 func (lb *leastConnectionsLoadBalancer) iterate(f func(int, *eventloop) bool) {
-	for i, el := range lb.eventLoopsCopy {
+	for i, el := range lb.eventLoops {
 		if !f(i, el) {
 			break
 		}
