@@ -232,6 +232,9 @@ func (c *conn) BufferLength() int {
 }
 
 func (c *conn) AsyncWrite(buf []byte) error {
+	if !c.opened {
+		return errors.ErrConnectionClosed
+	}
 	return c.loop.poller.TriggerSend(c, buf)
 }
 
