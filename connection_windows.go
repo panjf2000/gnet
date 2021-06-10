@@ -243,3 +243,4 @@ func (c *stdConn) Context() interface{}       { return c.ctx }
 func (c *stdConn) SetContext(ctx interface{}) { c.ctx = ctx }
 func (c *stdConn) LocalAddr() net.Addr        { return c.localAddr }
 func (c *stdConn) RemoteAddr() net.Addr       { return c.remoteAddr }
+func (c *stdConn) FileDescriptor() int        { return 0 }

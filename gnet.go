@@ -107,6 +107,9 @@ type Conn interface {
 	// RemoteAddr is the connection's remote peer address.
 	RemoteAddr() (addr net.Addr)
 
+	// FileDescriptor is the connection's file descriptor.
+	FileDescriptor() (fd int)
+
 	// Read reads all data from inbound ring-buffer and event-loop-buffer without moving "read" pointer, which means
 	// it does not evict the data from buffers actually and those data will present in buffers until the
 	// ResetBuffer method is called.

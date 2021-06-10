@@ -182,6 +182,9 @@ func (s *testCodecServer) OnOpened(c Conn) (out []byte, action Action) {
 	if c.RemoteAddr() == nil {
 		panic("nil local addr")
 	}
+	if c.FileDescriptor() < 0 {
+		panic("wrong file descriptor")
+	}
 	return
 }
 
@@ -441,6 +444,9 @@ func (s *testServer) OnOpened(c Conn) (out []byte, action Action) {
 	}
 	if c.RemoteAddr() == nil {
 		panic("nil local addr")
+	}
+	if c.FileDescriptor() < 0 {
+		panic("wrong file descriptor")
 	}
 	return
 }
