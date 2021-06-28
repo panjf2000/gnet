@@ -100,7 +100,7 @@ func (svr *server) startSubReactors() {
 }
 
 func (svr *server) activateEventLoops(numEventLoop int) (err error) {
-	var firstLoop *eventloop
+	var striker *eventloop
 	// Create loops locally and bind the listeners.
 	for i := 0; i < numEventLoop; i++ {
 		l := svr.ln
@@ -124,7 +124,7 @@ func (svr *server) activateEventLoops(numEventLoop int) (err error) {
 
 			// Start the ticker.
 			if el.idx == 0 && svr.opts.Ticker {
-				firstLoop = el
+				striker = el
 			}
 		} else {
 			return
@@ -134,7 +134,7 @@ func (svr *server) activateEventLoops(numEventLoop int) (err error) {
 	// Start event-loops in background.
 	svr.startEventLoops()
 
-	go firstLoop.loopTicker(svr.tickerCtx)
+	go striker.loopTicker(svr.tickerCtx)
 
 	return
 }
@@ -179,7 +179,9 @@ func (svr *server) activateReactors(numEventLoop int) error {
 	}
 
 	// Start the ticker.
-	go svr.mainLoop.loopTicker(svr.tickerCtx)
+	if svr.opts.Ticker {
+		go svr.mainLoop.loopTicker(svr.tickerCtx)
+	}
 
 	return nil
 }
@@ -255,7 +257,9 @@ func serve(eventHandler EventHandler, listener *listener, options *Options, prot
 	}
 
 	svr.cond = sync.NewCond(&sync.Mutex{})
-	svr.tickerCtx, svr.cancelTicker = context.WithCancel(context.Background())
+	if svr.opts.Ticker {
+		svr.tickerCtx, svr.cancelTicker = context.WithCancel(context.Background())
+	}
 	svr.logger = logging.DefaultLogger
 	svr.codec = func() ICodec {
 		if options.Codec == nil {
