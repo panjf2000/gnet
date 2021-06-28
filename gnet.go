@@ -24,7 +24,6 @@ package gnet
 import (
 	"context"
 	"net"
-	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -332,21 +331,3 @@ func sniffErrorAndLog(err error) {
 		logging.DefaultLogger.Errorf(err.Error())
 	}
 }
-
-// channelBuffer determines whether the channel should be a buffered channel to get the best performance.
-var channelBuffer = func() int {
-	// Use blocking channel if GOMAXPROCS=1.
-	// This switches context from sender to receiver immediately,
-	// which results in higher performance.
-	var n int
-	if n = runtime.GOMAXPROCS(0); n == 1 {
-		return 0
-	}
-
-	// Make channel non-blocking and set up its capacity with GOMAXPROCS if GOMAXPROCS>1,
-	// otherwise the sender might be dragged down if the receiver is CPU-bound.
-	//
-	// GOMAXPROCS determines how many goroutines can run in parallel,
-	// which makes it the best choice as the channel capacity,
-	return n
-}()

@@ -284,10 +284,10 @@ func (el *eventloop) loopTicker(ctx context.Context) {
 		switch action {
 		case None:
 		case Shutdown:
-			el.svr.logger.Debugf("stopping ticker in event-loop(%d) from Tick()", el.idx)
-			el.poller.Trigger(func() error {
+			err := el.poller.Trigger(func() error {
 				return gerrors.ErrServerShutdown
 			})
+			el.svr.logger.Debugf("stopping ticker in event-loop(%d) from Tick(), Trigger:%v", el.idx, err)
 		}
 		if timer == nil {
 			timer = time.NewTimer(delay)
