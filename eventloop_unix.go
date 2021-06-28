@@ -285,8 +285,8 @@ func (el *eventloop) loopTicker(ctx context.Context) {
 		switch action {
 		case None:
 		case Shutdown:
-			err := el.poller.Trigger(func() error { return gerrors.ErrServerShutdown })
-			logging.Debugf("stopping ticker in event-loop(%d) from Tick(), Trigger:%v", el.idx, err)
+			_ = el.poller.Trigger(func() error { return gerrors.ErrServerShutdown })
+			// logging.Debugf("stopping ticker in event-loop(%d) from Tick(), Trigger:%v", el.idx, err)
 		}
 		if timer == nil {
 			timer = time.NewTimer(delay)
@@ -295,7 +295,7 @@ func (el *eventloop) loopTicker(ctx context.Context) {
 		}
 		select {
 		case <-ctx.Done():
-			logging.Debugf("stopping ticker in event-loop(%d) from Server, error:%v", el.idx, ctx.Err())
+			// logging.Debugf("stopping ticker in event-loop(%d) from Server, error:%v", el.idx, ctx.Err())
 			return
 		case <-timer.C:
 		}

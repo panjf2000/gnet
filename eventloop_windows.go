@@ -184,7 +184,7 @@ func (el *eventloop) loopTicker(ctx context.Context) {
 		delay, action = el.eventHandler.Tick()
 		if action == Shutdown {
 			el.ch <- func() error { return errors.ErrServerShutdown }
-			logging.Debugf("stopping ticker in event-loop(%d) from Tick()", el.idx)
+			// logging.Debugf("stopping ticker in event-loop(%d) from Tick()", el.idx)
 		}
 		if timer == nil {
 			timer = time.NewTimer(delay)
@@ -193,7 +193,7 @@ func (el *eventloop) loopTicker(ctx context.Context) {
 		}
 		select {
 		case <-ctx.Done():
-			logging.Debugf("stopping ticker in event-loop(%d) from Server, error:%v", el.idx, ctx.Err())
+			// logging.Debugf("stopping ticker in event-loop(%d) from Server, error:%v", el.idx, ctx.Err())
 			return
 		case <-timer.C:
 		}

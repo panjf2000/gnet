@@ -257,7 +257,7 @@ func Serve(eventHandler EventHandler, protoAddr string, opts ...Option) (err err
 		return
 	}
 	if options.Logger != nil {
-		logging.SetupLogger(options.Logger)
+		logging.SetupLogger(options.Logger, options.LogLevel)
 	}
 	defer logging.Cleanup()
 

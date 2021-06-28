@@ -30,15 +30,10 @@
 // it's a shortcut for NewProductionConfig().Build(...Option); the latter builds a development Logger
 // that writes DebugLevel and above logs to standard error in a human-friendly format,
 // it's a shortcut for NewDevelopmentConfig().Build(...Option).
-//
-// The environment variable `GNET_LOGGING_MODE` determines which zap logger type will be created for logging,
-// "prod" (case-insensitive) means production logger while other values except "prod" including "dev" (case-insensitive)
-// represent development logger.
 package logging
 
 import (
 	"errors"
-	"sync"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -50,19 +45,15 @@ var (
 	DefaultLogger Logger
 	zapLogger     *zap.Logger
 	loggingLevel  zapcore.Level
-
-	once sync.Once
 )
 
 // Init initializes the inside default logger of client.
 func Init(logLevel zapcore.Level) {
-	once.Do(func() {
-		cfg := zap.NewDevelopmentConfig()
-		loggingLevel = logLevel
-		cfg.Level = zap.NewAtomicLevelAt(logLevel)
-		zapLogger, _ = cfg.Build()
-		DefaultLogger = zapLogger.Sugar()
-	})
+	cfg := zap.NewDevelopmentConfig()
+	loggingLevel = logLevel
+	cfg.Level = zap.NewAtomicLevelAt(logLevel)
+	zapLogger, _ = cfg.Build()
+	DefaultLogger = zapLogger.Sugar()
 }
 
 func getEncoder() zapcore.Encoder {
@@ -99,10 +90,11 @@ func SetupLoggerWithPath(localPath string, logLevel zapcore.Level) (err error) {
 }
 
 // SetupLogger setups the logger by the Logger interface.
-func SetupLogger(logger Logger) {
+func SetupLogger(logger Logger, logLevel zapcore.Level) {
 	if logger == nil {
 		return
 	}
+	loggingLevel = logLevel
 	zapLogger = nil
 	DefaultLogger = logger
 }
