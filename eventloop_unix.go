@@ -24,6 +24,7 @@
 package gnet
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -264,31 +265,40 @@ func (el *eventloop) loopWake(c *conn) error {
 	return el.handleAction(c, action)
 }
 
-func (el *eventloop) loopTicker() {
+func (el *eventloop) loopTicker(ctx context.Context) {
+	if el == nil {
+		return
+	}
 	var (
-		delay time.Duration
-		open  bool
-		err   error
+		action Action
+		delay  time.Duration
+		timer  *time.Timer
 	)
-	for {
-		err = el.poller.Trigger(func() (err error) {
-			delay, action := el.eventHandler.Tick()
-			el.svr.ticktock <- delay
-			switch action {
-			case None:
-			case Shutdown:
-				err = gerrors.ErrServerShutdown
-			}
-			return
-		})
-		if err != nil {
-			el.svr.logger.Errorf("Failed to awake poller in event-loop(%d), error:%v, stopping ticker", el.idx, err)
-			break
+	defer func() {
+		if timer != nil {
+			timer.Stop()
 		}
-		if delay, open = <-el.svr.ticktock; open {
-			time.Sleep(delay)
+	}()
+	for {
+		delay, action = el.eventHandler.Tick()
+		switch action {
+		case None:
+		case Shutdown:
+			el.svr.logger.Debugf("stopping ticker in event-loop(%d) from Tick()", el.idx)
+			el.poller.Trigger(func() error {
+				return gerrors.ErrServerShutdown
+			})
+		}
+		if timer == nil {
+			timer = time.NewTimer(delay)
 		} else {
-			break
+			timer.Reset(delay)
+		}
+		select {
+		case <-ctx.Done():
+			el.svr.logger.Debugf("stopping ticker in event-loop(%d) from Server, error:%v", el.idx, ctx.Err())
+			return
+		case <-timer.C:
 		}
 	}
 }

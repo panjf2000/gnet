@@ -24,10 +24,10 @@
 package gnet
 
 import (
+	"context"
 	"runtime"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/panjf2000/gnet/errors"
 	"github.com/panjf2000/gnet/internal/logging"
@@ -43,9 +43,10 @@ type server struct {
 	cond         *sync.Cond         // shutdown signaler
 	codec        ICodec             // codec for TCP stream
 	logger       logging.Logger     // customized logger for logging info
-	ticktock     chan time.Duration // ticker channel
 	mainLoop     *eventloop         // main event-loop for accepting connections
 	inShutdown   int32              // whether the server is in shutdown
+	tickerCtx    context.Context    // context for ticker
+	cancelTicker context.CancelFunc // function to stop the ticker
 	eventHandler EventHandler       // user eventHandler
 }
 
@@ -99,6 +100,7 @@ func (svr *server) startSubReactors() {
 }
 
 func (svr *server) activateEventLoops(numEventLoop int) (err error) {
+	var firstLoop *eventloop
 	// Create loops locally and bind the listeners.
 	for i := 0; i < numEventLoop; i++ {
 		l := svr.ln
@@ -122,7 +124,7 @@ func (svr *server) activateEventLoops(numEventLoop int) (err error) {
 
 			// Start the ticker.
 			if el.idx == 0 && svr.opts.Ticker {
-				go el.loopTicker()
+				firstLoop = el
 			}
 		} else {
 			return
@@ -131,6 +133,8 @@ func (svr *server) activateEventLoops(numEventLoop int) (err error) {
 
 	// Start event-loops in background.
 	svr.startEventLoops()
+
+	go firstLoop.loopTicker(svr.tickerCtx)
 
 	return
 }
@@ -146,11 +150,6 @@ func (svr *server) activateReactors(numEventLoop int) error {
 			el.connections = make(map[int]*conn)
 			el.eventHandler = svr.eventHandler
 			svr.lb.register(el)
-
-			// Start the ticker.
-			if el.idx == 0 && svr.opts.Ticker {
-				go el.loopTicker()
-			}
 		} else {
 			return err
 		}
@@ -165,6 +164,7 @@ func (svr *server) activateReactors(numEventLoop int) error {
 		el.idx = -1
 		el.svr = svr
 		el.poller = p
+		el.eventHandler = svr.eventHandler
 		_ = el.poller.AddRead(el.ln.fd)
 		svr.mainLoop = el
 
@@ -177,6 +177,9 @@ func (svr *server) activateReactors(numEventLoop int) error {
 	} else {
 		return err
 	}
+
+	// Start the ticker.
+	go svr.mainLoop.loopTicker(svr.tickerCtx)
 
 	return nil
 }
@@ -221,7 +224,7 @@ func (svr *server) stop(s Server) {
 
 	// Stop the ticker.
 	if svr.opts.Ticker {
-		close(svr.ticktock)
+		svr.cancelTicker()
 	}
 
 	atomic.StoreInt32(&svr.inShutdown, 1)
@@ -252,7 +255,7 @@ func serve(eventHandler EventHandler, listener *listener, options *Options, prot
 	}
 
 	svr.cond = sync.NewCond(&sync.Mutex{})
-	svr.ticktock = make(chan time.Duration, channelBuffer)
+	svr.tickerCtx, svr.cancelTicker = context.WithCancel(context.Background())
 	svr.logger = logging.DefaultLogger
 	svr.codec = func() ICodec {
 		if options.Codec == nil {
