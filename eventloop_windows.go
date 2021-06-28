@@ -22,6 +22,7 @@
 package gnet
 
 import (
+	"context"
 	"runtime"
 	"sync/atomic"
 	"time"
@@ -164,24 +165,36 @@ func (el *eventloop) loopEgress() {
 	}
 }
 
-func (el *eventloop) loopTicker() {
+func (el *eventloop) loopTicker(ctx context.Context) {
+	if el == nil {
+		return
+	}
 	var (
-		delay time.Duration
-		open  bool
+		action Action
+		delay  time.Duration
+		timer  *time.Timer
 	)
-	for {
-		el.ch <- func() (err error) {
-			delay, action := el.eventHandler.Tick()
-			el.svr.ticktock <- delay
-			if action == Shutdown {
-				err = errors.ErrServerShutdown
-			}
-			return
+	defer func() {
+		if timer != nil {
+			timer.Stop()
 		}
-		if delay, open = <-el.svr.ticktock; open {
-			time.Sleep(delay)
+	}()
+	for {
+		delay, action = el.eventHandler.Tick()
+		if action == Shutdown {
+			el.ch <- func() error { return errors.ErrServerShutdown }
+			el.svr.logger.Debugf("stopping ticker in event-loop(%d) from Tick()", el.idx)
+		}
+		if timer == nil {
+			timer = time.NewTimer(delay)
 		} else {
-			break
+			timer.Reset(delay)
+		}
+		select {
+		case <-ctx.Done():
+			el.svr.logger.Debugf("stopping ticker in event-loop(%d) from Server, error:%v", el.idx, ctx.Err())
+			return
+		case <-timer.C:
 		}
 	}
 }

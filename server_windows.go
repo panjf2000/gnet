@@ -22,11 +22,11 @@
 package gnet
 
 import (
+	"context"
 	"errors"
 	"runtime"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	errors2 "github.com/panjf2000/gnet/errors"
 	"github.com/panjf2000/gnet/internal/logging"
@@ -44,9 +44,10 @@ type server struct {
 	codec        ICodec             // codec for TCP stream
 	loopWG       sync.WaitGroup     // loop close WaitGroup
 	logger       logging.Logger     // customized logger for logging info
-	ticktock     chan time.Duration // ticker channel
 	listenerWG   sync.WaitGroup     // listener close WaitGroup
 	inShutdown   int32              // whether the server is in shutdown
+	tickerCtx    context.Context    // context for ticker
+	cancelTicker context.CancelFunc // function to stop the ticker
 	eventHandler EventHandler       // user eventHandler
 }
 
@@ -87,6 +88,7 @@ func (svr *server) startListener() {
 }
 
 func (svr *server) startEventLoops(numEventLoop int) {
+	var striker *eventloop
 	for i := 0; i < numEventLoop; i++ {
 		el := new(eventloop)
 		el.ch = make(chan interface{}, channelBuffer)
@@ -94,10 +96,8 @@ func (svr *server) startEventLoops(numEventLoop int) {
 		el.connections = make(map[*stdConn]struct{})
 		el.eventHandler = svr.eventHandler
 		svr.lb.register(el)
-
-		// Start the ticker.
 		if el.idx == 0 && svr.opts.Ticker {
-			go el.loopTicker()
+			striker = el
 		}
 	}
 
@@ -106,6 +106,9 @@ func (svr *server) startEventLoops(numEventLoop int) {
 		go el.loopRun(svr.opts.LockOSThread)
 		return true
 	})
+
+	// Start the ticker.
+	go striker.loopTicker(svr.tickerCtx)
 }
 
 func (svr *server) stop(s Server) {
@@ -137,7 +140,7 @@ func (svr *server) stop(s Server) {
 
 	// Stop the ticker.
 	if svr.opts.Ticker {
-		close(svr.ticktock)
+		svr.cancelTicker()
 	}
 
 	atomic.StoreInt32(&svr.inShutdown, 1)
@@ -167,7 +170,9 @@ func serve(eventHandler EventHandler, listener *listener, options *Options, prot
 		svr.lb = new(sourceAddrHashLoadBalancer)
 	}
 
-	svr.ticktock = make(chan time.Duration, 1)
+	if svr.opts.Ticker {
+		svr.tickerCtx, svr.cancelTicker = context.WithCancel(context.Background())
+	}
 	svr.cond = sync.NewCond(&sync.Mutex{})
 	svr.logger = logging.DefaultLogger
 	svr.codec = func() ICodec {
