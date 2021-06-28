@@ -26,6 +26,7 @@ import (
 	"sync"
 
 	"github.com/panjf2000/gnet/errors"
+	"github.com/panjf2000/gnet/internal/logging"
 	"github.com/panjf2000/gnet/internal/netpoll"
 )
 
@@ -44,7 +45,7 @@ func (ln *listener) Dup() (int, string, error) {
 func (ln *listener) normalize() (err error) {
 	switch ln.network {
 	case "unix":
-		sniffErrorAndLog(os.RemoveAll(ln.addr))
+		logging.LogErr(os.RemoveAll(ln.addr))
 		fallthrough
 	case "tcp", "tcp4", "tcp6":
 		if ln.ln, err = net.Listen(ln.network, ln.addr); err != nil {
@@ -65,13 +66,13 @@ func (ln *listener) normalize() (err error) {
 func (ln *listener) close() {
 	ln.once.Do(func() {
 		if ln.ln != nil {
-			sniffErrorAndLog(ln.ln.Close())
+			logging.LogErr(ln.ln.Close())
 		}
 		if ln.pconn != nil {
-			sniffErrorAndLog(ln.pconn.Close())
+			logging.LogErr(ln.pconn.Close())
 		}
 		if ln.network == "unix" {
-			sniffErrorAndLog(os.RemoveAll(ln.addr))
+			logging.LogErr(os.RemoveAll(ln.addr))
 		}
 	})
 }

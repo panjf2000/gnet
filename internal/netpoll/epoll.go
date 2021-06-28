@@ -106,7 +106,7 @@ func (p *Poller) Polling(callback func(fd int, ev uint32) error) error {
 			runtime.Gosched()
 			continue
 		} else if err != nil {
-			logging.DefaultLogger.Warnf("Error occurs in epoll: %v", os.NewSyscallError("epoll_wait", err))
+			logging.Warnf("Error occurs in epoll: %v", os.NewSyscallError("epoll_wait", err))
 			return err
 		}
 		msec = 0
@@ -118,7 +118,7 @@ func (p *Poller) Polling(callback func(fd int, ev uint32) error) error {
 				case errors.ErrAcceptSocket, errors.ErrServerShutdown:
 					return err
 				default:
-					logging.DefaultLogger.Warnf("Error occurs in event-loop: %v", err)
+					logging.Warnf("Error occurs in event-loop: %v", err)
 				}
 			} else {
 				wakenUp = true
@@ -138,7 +138,7 @@ func (p *Poller) Polling(callback func(fd int, ev uint32) error) error {
 				case errors.ErrServerShutdown:
 					return err
 				default:
-					logging.DefaultLogger.Warnf("Error occurs in user-defined function, %v", err)
+					logging.Warnf("Error occurs in user-defined function, %v", err)
 				}
 			}
 			atomic.StoreInt32(&p.netpollWakeSig, 0)

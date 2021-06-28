@@ -42,7 +42,6 @@ type server struct {
 	once         sync.Once          // make sure only signalShutdown once
 	cond         *sync.Cond         // shutdown signaler
 	codec        ICodec             // codec for TCP stream
-	logger       logging.Logger     // customized logger for logging info
 	mainLoop     *eventloop         // main event-loop for accepting connections
 	inShutdown   int32              // whether the server is in shutdown
 	tickerCtx    context.Context    // context for ticker
@@ -202,7 +201,7 @@ func (svr *server) stop(s Server) {
 
 	// Notify all loops to close by closing all listeners
 	svr.lb.iterate(func(i int, el *eventloop) bool {
-		sniffErrorAndLog(el.poller.Trigger(func() error {
+		logging.LogErr(el.poller.Trigger(func() error {
 			return errors.ErrServerShutdown
 		}))
 		return true
@@ -210,7 +209,7 @@ func (svr *server) stop(s Server) {
 
 	if svr.mainLoop != nil {
 		svr.ln.close()
-		sniffErrorAndLog(svr.mainLoop.poller.Trigger(func() error {
+		logging.LogErr(svr.mainLoop.poller.Trigger(func() error {
 			return errors.ErrServerShutdown
 		}))
 	}
@@ -221,7 +220,7 @@ func (svr *server) stop(s Server) {
 	svr.closeEventLoops()
 
 	if svr.mainLoop != nil {
-		sniffErrorAndLog(svr.mainLoop.poller.Close())
+		logging.LogErr(svr.mainLoop.poller.Close())
 	}
 
 	// Stop the ticker.
@@ -260,7 +259,6 @@ func serve(eventHandler EventHandler, listener *listener, options *Options, prot
 	if svr.opts.Ticker {
 		svr.tickerCtx, svr.cancelTicker = context.WithCancel(context.Background())
 	}
-	svr.logger = logging.DefaultLogger
 	svr.codec = func() ICodec {
 		if options.Codec == nil {
 			return new(BuiltInFrameCodec)
@@ -284,7 +282,7 @@ func serve(eventHandler EventHandler, listener *listener, options *Options, prot
 
 	if err := svr.start(numEventLoop); err != nil {
 		svr.closeEventLoops()
-		svr.logger.Errorf("gnet server is stopping with error: %v", err)
+		logging.Errorf("gnet server is stopping with error: %v", err)
 		return err
 	}
 	defer svr.stop(server)

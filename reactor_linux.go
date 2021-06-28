@@ -23,6 +23,7 @@ package gnet
 import (
 	"runtime"
 
+	"github.com/panjf2000/gnet/internal/logging"
 	"github.com/panjf2000/gnet/internal/netpoll"
 )
 
@@ -35,7 +36,7 @@ func (svr *server) activateMainReactor(lockOSThread bool) {
 	defer svr.signalShutdown()
 
 	err := svr.mainLoop.poller.Polling(func(fd int, ev uint32) error { return svr.acceptNewConnection(fd) })
-	svr.logger.Infof("Main reactor is exiting due to error: %v", err)
+	logging.Infof("Main reactor is exiting due to error: %v", err)
 }
 
 func (svr *server) activateSubReactor(el *eventloop, lockOSThread bool) {
@@ -80,5 +81,5 @@ func (svr *server) activateSubReactor(el *eventloop, lockOSThread bool) {
 		}
 		return nil
 	})
-	svr.logger.Infof("Event-loop(%d) is exiting normally on the signal error: %v", el.idx, err)
+	logging.Infof("Event-loop(%d) is exiting normally on the signal error: %v", el.idx, err)
 }

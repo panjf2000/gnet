@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/panjf2000/gnet/errors"
+	"github.com/panjf2000/gnet/internal/logging"
 	"github.com/panjf2000/gnet/internal/netpoll"
 	"github.com/panjf2000/gnet/internal/socket"
 	"golang.org/x/sys/unix"
@@ -67,10 +68,10 @@ func (ln *listener) close() {
 	ln.once.Do(
 		func() {
 			if ln.fd > 0 {
-				sniffErrorAndLog(os.NewSyscallError("close", unix.Close(ln.fd)))
+				logging.LogErr(os.NewSyscallError("close", unix.Close(ln.fd)))
 			}
 			if ln.network == "unix" {
-				sniffErrorAndLog(os.RemoveAll(ln.addr))
+				logging.LogErr(os.RemoveAll(ln.addr))
 			}
 		})
 }

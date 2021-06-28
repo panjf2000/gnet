@@ -34,6 +34,7 @@ import (
 	"unsafe"
 
 	gerrors "github.com/panjf2000/gnet/errors"
+	"github.com/panjf2000/gnet/internal/logging"
 	"github.com/panjf2000/gnet/internal/netpoll"
 	"github.com/panjf2000/gnet/internal/socket"
 	"golang.org/x/sys/unix"
@@ -87,7 +88,7 @@ func (el *eventloop) loopRun(lockOSThread bool) {
 	}()
 
 	err := el.poller.Polling(el.handleEvent)
-	el.svr.logger.Infof("Event-loop(%d) is exiting due to error: %v", el.idx, err)
+	logging.Infof("Event-loop(%d) is exiting due to error: %v", el.idx, err)
 }
 
 func (el *eventloop) loopAccept(fd int) error {
@@ -285,7 +286,7 @@ func (el *eventloop) loopTicker(ctx context.Context) {
 		case None:
 		case Shutdown:
 			err := el.poller.Trigger(func() error { return gerrors.ErrServerShutdown })
-			el.svr.logger.Debugf("stopping ticker in event-loop(%d) from Tick(), Trigger:%v", el.idx, err)
+			logging.Debugf("stopping ticker in event-loop(%d) from Tick(), Trigger:%v", el.idx, err)
 		}
 		if timer == nil {
 			timer = time.NewTimer(delay)
@@ -294,7 +295,7 @@ func (el *eventloop) loopTicker(ctx context.Context) {
 		}
 		select {
 		case <-ctx.Done():
-			el.svr.logger.Debugf("stopping ticker in event-loop(%d) from Server, error:%v", el.idx, ctx.Err())
+			logging.Debugf("stopping ticker in event-loop(%d) from Server, error:%v", el.idx, ctx.Err())
 			return
 		case <-timer.C:
 		}

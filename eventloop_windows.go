@@ -28,6 +28,7 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/panjf2000/gnet/internal/logging"
 	"github.com/panjf2000/gnet/pool/bytebuffer"
 
 	"github.com/panjf2000/gnet/errors"
@@ -95,7 +96,7 @@ func (el *eventloop) loopRun(lockOSThread bool) {
 		if err == errors.ErrServerShutdown {
 			break
 		} else if err != nil {
-			el.svr.logger.Infof("Event-loop(%d) is exiting due to the error: %v", el.idx, err)
+			logging.Infof("Event-loop(%d) is exiting due to the error: %v", el.idx, err)
 		}
 	}
 }
@@ -183,7 +184,7 @@ func (el *eventloop) loopTicker(ctx context.Context) {
 		delay, action = el.eventHandler.Tick()
 		if action == Shutdown {
 			el.ch <- func() error { return errors.ErrServerShutdown }
-			el.svr.logger.Debugf("stopping ticker in event-loop(%d) from Tick()", el.idx)
+			logging.Debugf("stopping ticker in event-loop(%d) from Tick()", el.idx)
 		}
 		if timer == nil {
 			timer = time.NewTimer(delay)
@@ -192,7 +193,7 @@ func (el *eventloop) loopTicker(ctx context.Context) {
 		}
 		select {
 		case <-ctx.Done():
-			el.svr.logger.Debugf("stopping ticker in event-loop(%d) from Server, error:%v", el.idx, ctx.Err())
+			logging.Debugf("stopping ticker in event-loop(%d) from Server, error:%v", el.idx, ctx.Err())
 			return
 		case <-timer.C:
 		}
@@ -206,7 +207,7 @@ func (el *eventloop) loopError(c *stdConn, err error) (e error) {
 		}
 
 		if err = c.conn.Close(); err != nil {
-			el.svr.logger.Warnf("Failed to close connection(%s), error: %v", c.remoteAddr.String(), err)
+			logging.Warnf("Failed to close connection(%s), error: %v", c.remoteAddr.String(), err)
 			if e == nil {
 				e = err
 			}

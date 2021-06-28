@@ -39,6 +39,7 @@ import (
 	"github.com/panjf2000/gnet/pool/bytebuffer"
 	"github.com/panjf2000/gnet/pool/goroutine"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 func TestCodecServe(t *testing.T) {
@@ -258,7 +259,7 @@ func testCodecServe(network, addr string, multicore, async bool, nclients int, r
 		network: network, addr: addr, multicore: multicore, async: async, nclients: nclients,
 		codec: codec, workerPool: goroutine.Default(),
 	}
-	err = Serve(ts, network+"://"+addr, WithMulticore(multicore), WithTicker(true),
+	err = Serve(ts, network+"://"+addr, WithMulticore(multicore), WithTicker(true), WithLogLevel(zapcore.DebugLevel),
 		WithTCPKeepAlive(time.Minute*5), WithSocketRecvBuffer(8*1024), WithSocketSendBuffer(8*1024), WithCodec(codec), WithReusePort(reuseport))
 	if err != nil {
 		panic(err)

@@ -43,7 +43,6 @@ type server struct {
 	once         sync.Once          // make sure only signalShutdown once
 	codec        ICodec             // codec for TCP stream
 	loopWG       sync.WaitGroup     // loop close WaitGroup
-	logger       logging.Logger     // customized logger for logging info
 	listenerWG   sync.WaitGroup     // listener close WaitGroup
 	inShutdown   int32              // whether the server is in shutdown
 	tickerCtx    context.Context    // context for ticker
@@ -113,7 +112,7 @@ func (svr *server) startEventLoops(numEventLoop int) {
 
 func (svr *server) stop(s Server) {
 	// Wait on a signal for shutdown.
-	svr.logger.Infof("Server is being shutdown on the signal error: %v", svr.waitForShutdown())
+	logging.Infof("Server is being shutdown on the signal error: %v", svr.waitForShutdown())
 
 	svr.eventHandler.OnShutdown(s)
 
@@ -174,7 +173,6 @@ func serve(eventHandler EventHandler, listener *listener, options *Options, prot
 		svr.tickerCtx, svr.cancelTicker = context.WithCancel(context.Background())
 	}
 	svr.cond = sync.NewCond(&sync.Mutex{})
-	svr.logger = logging.DefaultLogger
 	svr.codec = func() ICodec {
 		if options.Codec == nil {
 			return new(BuiltInFrameCodec)
