@@ -211,7 +211,7 @@ func (el *eventloop) loopWrite(c *conn) error {
 
 func (el *eventloop) loopCloseConn(c *conn, err error) (rerr error) {
 	if !c.opened {
-		return nil
+		return
 	}
 
 	// Send residual data in buffer back to client before actually closing the connection.
@@ -285,7 +285,7 @@ func (el *eventloop) loopTicker(ctx context.Context) {
 		switch action {
 		case None:
 		case Shutdown:
-			_ = el.poller.Trigger(func() error { return gerrors.ErrServerShutdown })
+			_ = el.poller.Trigger(func(_ []byte) error { return gerrors.ErrServerShutdown })
 			// logging.Debugf("stopping ticker in event-loop(%d) from Tick(), Trigger:%v", el.idx, err)
 		}
 		if timer == nil {
