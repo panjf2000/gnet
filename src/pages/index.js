@@ -230,7 +230,7 @@ function UseCases() {
         <a href="https://www.tencent.com"><img src="https://img.taohuawu.club/gallery/tencent_logo.png" width="300" align="middle"/></a>
         <a href="https://www.iqiyi.com" target="_blank"><img src="https://img.taohuawu.club/gallery/iqiyi-logo.png" width="300" align="middle"/></a>
         <a href="https://www.mi.com" target="_blank"><img src="https://img.taohuawu.club/gallery/mi-logo.png" width="300" align="middle"/></a>
-        <a href="https://www.360.cn" target="_blank"><img src="https://img.taohuawu.club/gallery/360-logo.png" width="300" align="middle"/></a>
+        <a href="https://www.360.com" target="_blank"><img src="https://img.taohuawu.club/gallery/360-logo.png" width="300" align="middle"/></a>
         <a href="https://tieba.baidu.com" target="_blank"><img src="https://img.taohuawu.club/gallery/baidu-tieba-logo.png" width="300" align="middle"/></a>
         <a href="https://game.qq.com" target="_blank"><img src="https://img.taohuawu.club/gallery/tencent-games-logo.png" width="300" align="middle"/></a>
         <br />
