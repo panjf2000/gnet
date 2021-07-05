@@ -5,8 +5,7 @@
 package internal
 
 const (
-	bitsize = 32 << (^uint(0) >> 63)
-	// maxint        = int(1<<(bitsize-1) - 1)
+	bitsize       = 32 << (^uint(0) >> 63)
 	maxintHeadBit = 1 << (bitsize - 2)
 )
 
