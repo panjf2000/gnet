@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - master
-      - reduce-gc
     paths-ignore:
       - '**.md'
   pull_request:
