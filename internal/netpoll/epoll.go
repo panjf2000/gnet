@@ -29,10 +29,11 @@ import (
 	"sync/atomic"
 	"unsafe"
 
+	"golang.org/x/sys/unix"
+
 	"github.com/panjf2000/gnet/errors"
 	"github.com/panjf2000/gnet/internal/logging"
 	"github.com/panjf2000/gnet/internal/netpoll/queue"
-	"golang.org/x/sys/unix"
 )
 
 // Poller represents a poller which is in charge of monitoring file-descriptors.
@@ -157,7 +158,7 @@ func (p *Poller) Polling(callback func(fd int, ev uint32) error) error {
 				}
 				queue.PutTask(task)
 			}
-			for i := 0; i < AsyncTasks; i++ {
+			for i := 0; i < MaxAsyncTasksAtOneTime; i++ {
 				if task = p.asyncTaskQueue.Dequeue(); task == nil {
 					break
 				}
