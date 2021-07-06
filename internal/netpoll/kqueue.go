@@ -79,6 +79,9 @@ var wakeChanges = []unix.Kevent_t{{
 
 // Trigger puts task into priorAsyncTaskQueue and wakes up the poller which is waiting for network-events,
 // then the poller will get tasks from priorAsyncTaskQueue and run them.
+//
+// priorAsyncTaskQueue is a queue with high-priority and its size is expected to be small,
+// so only those urgent tasks should be put into this queue.
 func (p *Poller) Trigger(f queue.TaskFunc) (err error) {
 	task := queue.GetTask()
 	task.Run = f
@@ -90,9 +93,11 @@ func (p *Poller) Trigger(f queue.TaskFunc) (err error) {
 	return os.NewSyscallError("kevent trigger", err)
 }
 
-// TriggerData is exclusive method only for writing data back to client,
-// it is like Trigger but it puts task into asyncTaskQueue.
-func (p *Poller) TriggerData(f queue.TaskFunc, buf []byte) (err error) {
+// TriggerLag is like Trigger but it puts task into asyncTaskQueue, call this method when the task is no so urgent
+// like writing data back to client.
+//
+// asyncTaskQueue is a queue with low-priority whose size may grow large and tasks in it may backlog.
+func (p *Poller) TriggerLag(f queue.TaskFunc, buf []byte) (err error) {
 	task := queue.GetTask()
 	task.Run, task.Buf = f, buf
 	p.asyncTaskQueue.Enqueue(task)

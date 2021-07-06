@@ -27,11 +27,12 @@ import (
 	"net"
 	"os"
 
+	"golang.org/x/sys/unix"
+
 	"github.com/panjf2000/gnet/internal/socket"
 	"github.com/panjf2000/gnet/pool/bytebuffer"
 	prb "github.com/panjf2000/gnet/pool/ringbuffer"
 	"github.com/panjf2000/gnet/ringbuffer"
-	"golang.org/x/sys/unix"
 )
 
 type conn struct {
@@ -221,7 +222,7 @@ func (c *conn) BufferLength() int {
 }
 
 func (c *conn) AsyncWrite(buf []byte) error {
-	return c.loop.poller.TriggerData(c.write, buf)
+	return c.loop.poller.TriggerLag(c.write, buf)
 }
 
 func (c *conn) SendTo(buf []byte) error {
@@ -235,9 +236,9 @@ func (c *conn) Wake() error {
 }
 
 func (c *conn) Close() error {
-	return c.loop.poller.Trigger(func(_ []byte) error {
+	return c.loop.poller.TriggerLag(func(_ []byte) error {
 		return c.loop.loopCloseConn(c, nil)
-	})
+	}, nil)
 }
 
 func (c *conn) Context() interface{}       { return c.ctx }
