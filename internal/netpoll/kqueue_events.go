@@ -28,7 +28,7 @@ const (
 	// InitEvents represents the initial length of poller event-list.
 	InitEvents = 64
 	// MaxAsyncTasksAtOneTime is the maximum amount of asynchronous tasks that the event-loop will process at one time.
-	MaxAsyncTasksAtOneTime = 256
+	MaxAsyncTasksAtOneTime = 128
 	// EVFilterWrite represents writeable events from sockets.
 	EVFilterWrite = unix.EVFILT_WRITE
 	// EVFilterRead represents readable events from sockets.
