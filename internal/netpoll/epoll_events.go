@@ -28,7 +28,7 @@ const (
 	// InitEvents represents the initial length of poller event-list.
 	InitEvents = 128
 	// AsyncTasks is the maximum number of asynchronous tasks that the event-loop will process at one time.
-	AsyncTasks = 64
+	AsyncTasks = 512
 	// ErrEvents represents exceptional events that are not read/write, like socket being closed,
 	// reading/writing from/to a closed socket, etc.
 	ErrEvents = unix.EPOLLERR | unix.EPOLLHUP | unix.EPOLLRDHUP
