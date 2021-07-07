@@ -86,12 +86,12 @@ var (
 	b        = (*(*[8]byte)(unsafe.Pointer(&u)))[:]
 )
 
-// Trigger puts task into priorAsyncTaskQueue and wakes up the poller which is waiting for network-events,
+// UrgentTrigger puts task into priorAsyncTaskQueue and wakes up the poller which is waiting for network-events,
 // then the poller will get tasks from priorAsyncTaskQueue and run them.
 //
-// priorAsyncTaskQueue is a queue with high-priority and its size is expected to be small,
+// Note that priorAsyncTaskQueue is a queue with high-priority and its size is expected to be small,
 // so only those urgent tasks should be put into this queue.
-func (p *Poller) Trigger(f queue.TaskFunc) (err error) {
+func (p *Poller) UrgentTrigger(f queue.TaskFunc) (err error) {
 	task := queue.GetTask()
 	task.Run = f
 	p.priorAsyncTaskQueue.Enqueue(task)
@@ -102,11 +102,11 @@ func (p *Poller) Trigger(f queue.TaskFunc) (err error) {
 	return os.NewSyscallError("write", err)
 }
 
-// TriggerLag is like Trigger but it puts task into asyncTaskQueue,
+// Trigger is like UrgentTrigger but it puts task into asyncTaskQueue,
 // call this method when the task is not so urgent, for instance writing data back to client.
 //
 // Note that asyncTaskQueue is a queue with low-priority whose size may grow large and tasks in it may backlog.
-func (p *Poller) TriggerLag(f queue.TaskFunc, buf []byte) (err error) {
+func (p *Poller) Trigger(f queue.TaskFunc, buf []byte) (err error) {
 	task := queue.GetTask()
 	task.Run, task.Buf = f, buf
 	p.asyncTaskQueue.Enqueue(task)

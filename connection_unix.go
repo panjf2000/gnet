@@ -222,7 +222,7 @@ func (c *conn) BufferLength() int {
 }
 
 func (c *conn) AsyncWrite(buf []byte) error {
-	return c.loop.poller.TriggerLag(c.write, buf)
+	return c.loop.poller.Trigger(c.write, buf)
 }
 
 func (c *conn) SendTo(buf []byte) error {
@@ -230,13 +230,13 @@ func (c *conn) SendTo(buf []byte) error {
 }
 
 func (c *conn) Wake() error {
-	return c.loop.poller.Trigger(func(_ []byte) error {
+	return c.loop.poller.UrgentTrigger(func(_ []byte) error {
 		return c.loop.loopWake(c)
 	})
 }
 
 func (c *conn) Close() error {
-	return c.loop.poller.TriggerLag(func(_ []byte) error {
+	return c.loop.poller.Trigger(func(_ []byte) error {
 		return c.loop.loopCloseConn(c, nil)
 	}, nil)
 }

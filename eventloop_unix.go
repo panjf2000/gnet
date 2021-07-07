@@ -285,8 +285,8 @@ func (el *eventloop) loopTicker(ctx context.Context) {
 		switch action {
 		case None:
 		case Shutdown:
-			_ = el.poller.Trigger(func(_ []byte) error { return gerrors.ErrServerShutdown })
-			// logging.Debugf("stopping ticker in event-loop(%d) from Tick(), Trigger:%v", el.idx, err)
+			_ = el.poller.UrgentTrigger(func(_ []byte) error { return gerrors.ErrServerShutdown })
+			// logging.Debugf("stopping ticker in event-loop(%d) from Tick(), UrgentTrigger:%v", el.idx, err)
 		}
 		if timer == nil {
 			timer = time.NewTimer(delay)
