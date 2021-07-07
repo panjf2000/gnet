@@ -41,10 +41,8 @@ var (
 	ErrUnsupportedUDSProtocol = errors.New("only unix is supported")
 	// ErrUnsupportedPlatform occurs when running gnet on an unsupported platform.
 	ErrUnsupportedPlatform = errors.New("unsupported platform in gnet")
-	// ErrConnectionClosed occurs when trying to operate a closed connection.
-	ErrConnectionClosed = errors.New("connection is already closed")
 
-	// ================================================= codec errors =================================================
+	// ================================================= codec errors =================================================.
 
 	// ErrInvalidFixedLength occurs when the output data have invalid fixed length.
 	ErrInvalidFixedLength = errors.New("invalid fixed length of bytes")

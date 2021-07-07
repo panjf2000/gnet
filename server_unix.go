@@ -201,7 +201,7 @@ func (svr *server) stop(s Server) {
 
 	// Notify all loops to close by closing all listeners
 	svr.lb.iterate(func(i int, el *eventloop) bool {
-		logging.LogErr(el.poller.Trigger(func() error {
+		logging.LogErr(el.poller.UrgentTrigger(func(_ []byte) error {
 			return errors.ErrServerShutdown
 		}))
 		return true
@@ -209,7 +209,7 @@ func (svr *server) stop(s Server) {
 
 	if svr.mainLoop != nil {
 		svr.ln.close()
-		logging.LogErr(svr.mainLoop.poller.Trigger(func() error {
+		logging.LogErr(svr.mainLoop.poller.UrgentTrigger(func(_ []byte) error {
 			return errors.ErrServerShutdown
 		}))
 	}

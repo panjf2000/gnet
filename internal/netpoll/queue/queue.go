@@ -20,12 +20,33 @@
 
 package queue
 
-// Task is a asynchronous function.
-type Task func() error
+import "sync"
+
+// TaskFunc is the callback function executed by poller.
+type TaskFunc func([]byte) error
+
+// Task is a wrapper that contains function and its argument.
+type Task struct {
+	Run TaskFunc
+	Buf []byte
+}
+
+var taskPool = sync.Pool{New: func() interface{} { return &Task{} }}
+
+// GetTask gets a cached Task from pool.
+func GetTask() *Task {
+	return taskPool.Get().(*Task)
+}
+
+// PutTask puts the trashy Task back in pool.
+func PutTask(task *Task) {
+	task.Run, task.Buf = nil, nil
+	taskPool.Put(task)
+}
 
 // AsyncTaskQueue is a queue storing asynchronous tasks.
 type AsyncTaskQueue interface {
-	Enqueue(Task)
-	Dequeue() Task
+	Enqueue(*Task)
+	Dequeue() *Task
 	Empty() bool
 }

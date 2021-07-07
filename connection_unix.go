@@ -27,11 +27,12 @@ import (
 	"net"
 	"os"
 
+	"golang.org/x/sys/unix"
+
 	"github.com/panjf2000/gnet/internal/socket"
 	"github.com/panjf2000/gnet/pool/bytebuffer"
 	prb "github.com/panjf2000/gnet/pool/ringbuffer"
 	"github.com/panjf2000/gnet/ringbuffer"
-	"golang.org/x/sys/unix"
 )
 
 type conn struct {
@@ -109,6 +110,9 @@ func (c *conn) read() ([]byte, error) {
 }
 
 func (c *conn) write(buf []byte) (err error) {
+	if !c.opened {
+		return
+	}
 	var outFrame []byte
 	if outFrame, err = c.codec.Encode(c, buf); err != nil {
 		return
@@ -218,12 +222,7 @@ func (c *conn) BufferLength() int {
 }
 
 func (c *conn) AsyncWrite(buf []byte) error {
-	return c.loop.poller.Trigger(func() error {
-		if c.opened {
-			return c.write(buf)
-		}
-		return nil
-	})
+	return c.loop.poller.Trigger(c.write, buf)
 }
 
 func (c *conn) SendTo(buf []byte) error {
@@ -231,15 +230,15 @@ func (c *conn) SendTo(buf []byte) error {
 }
 
 func (c *conn) Wake() error {
-	return c.loop.poller.Trigger(func() error {
+	return c.loop.poller.UrgentTrigger(func(_ []byte) error {
 		return c.loop.loopWake(c)
 	})
 }
 
 func (c *conn) Close() error {
-	return c.loop.poller.Trigger(func() error {
+	return c.loop.poller.Trigger(func(_ []byte) error {
 		return c.loop.loopCloseConn(c, nil)
-	})
+	}, nil)
 }
 
 func (c *conn) Context() interface{}       { return c.ctx }

@@ -27,8 +27,8 @@ import "golang.org/x/sys/unix"
 const (
 	// InitEvents represents the initial length of poller event-list.
 	InitEvents = 64
-	// AsyncTasks is the maximum number of asynchronous tasks that the event-loop will process at one time.
-	AsyncTasks = 48
+	// MaxAsyncTasksAtOneTime is the maximum amount of asynchronous tasks that the event-loop will process at one time.
+	MaxAsyncTasksAtOneTime = 128
 	// EVFilterWrite represents writeable events from sockets.
 	EVFilterWrite = unix.EVFILT_WRITE
 	// EVFilterRead represents readable events from sockets.

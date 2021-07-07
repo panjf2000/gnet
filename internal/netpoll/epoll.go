@@ -29,19 +29,21 @@ import (
 	"sync/atomic"
 	"unsafe"
 
+	"golang.org/x/sys/unix"
+
 	"github.com/panjf2000/gnet/errors"
 	"github.com/panjf2000/gnet/internal/logging"
 	"github.com/panjf2000/gnet/internal/netpoll/queue"
-	"golang.org/x/sys/unix"
 )
 
 // Poller represents a poller which is in charge of monitoring file-descriptors.
 type Poller struct {
-	fd             int    // epoll fd
-	wfd            int    // wake fd
-	wfdBuf         []byte // wfd buffer to read packet
-	netpollWakeSig int32
-	asyncTaskQueue queue.AsyncTaskQueue
+	fd                  int    // epoll fd
+	wfd                 int    // wake fd
+	wfdBuf              []byte // wfd buffer to read packet
+	netpollWakeSig      int32
+	asyncTaskQueue      queue.AsyncTaskQueue // queue with low priority
+	priorAsyncTaskQueue queue.AsyncTaskQueue // queue with high priority
 }
 
 // OpenPoller instantiates a poller.
@@ -65,6 +67,7 @@ func OpenPoller() (poller *Poller, err error) {
 		return
 	}
 	poller.asyncTaskQueue = queue.NewLockFreeQueue()
+	poller.priorAsyncTaskQueue = queue.NewLockFreeQueue()
 	return
 }
 
@@ -83,8 +86,29 @@ var (
 	b        = (*(*[8]byte)(unsafe.Pointer(&u)))[:]
 )
 
-// Trigger wakes up the poller blocked in waiting for network-events and runs jobs in asyncTaskQueue.
-func (p *Poller) Trigger(task queue.Task) (err error) {
+// UrgentTrigger puts task into priorAsyncTaskQueue and wakes up the poller which is waiting for network-events,
+// then the poller will get tasks from priorAsyncTaskQueue and run them.
+//
+// Note that priorAsyncTaskQueue is a queue with high-priority and its size is expected to be small,
+// so only those urgent tasks should be put into this queue.
+func (p *Poller) UrgentTrigger(f queue.TaskFunc) (err error) {
+	task := queue.GetTask()
+	task.Run = f
+	p.priorAsyncTaskQueue.Enqueue(task)
+	if atomic.CompareAndSwapInt32(&p.netpollWakeSig, 0, 1) {
+		for _, err = unix.Write(p.wfd, b); err == unix.EINTR || err == unix.EAGAIN; _, err = unix.Write(p.wfd, b) {
+		}
+	}
+	return os.NewSyscallError("write", err)
+}
+
+// Trigger is like UrgentTrigger but it puts task into asyncTaskQueue,
+// call this method when the task is not so urgent, for instance writing data back to client.
+//
+// Note that asyncTaskQueue is a queue with low-priority whose size may grow large and tasks in it may backlog.
+func (p *Poller) Trigger(f queue.TaskFunc, buf []byte) (err error) {
+	task := queue.GetTask()
+	task.Run, task.Buf = f, buf
 	p.asyncTaskQueue.Enqueue(task)
 	if atomic.CompareAndSwapInt32(&p.netpollWakeSig, 0, 1) {
 		for _, err = unix.Write(p.wfd, b); err == unix.EINTR || err == unix.EAGAIN; _, err = unix.Write(p.wfd, b) {
@@ -120,7 +144,7 @@ func (p *Poller) Polling(callback func(fd int, ev uint32) error) error {
 				default:
 					logging.Warnf("Error occurs in event-loop: %v", err)
 				}
-			} else {
+			} else { // poller is awaken to run tasks in queues.
 				wakenUp = true
 				_, _ = unix.Read(p.wfd, p.wfdBuf)
 			}
@@ -128,21 +152,32 @@ func (p *Poller) Polling(callback func(fd int, ev uint32) error) error {
 
 		if wakenUp {
 			wakenUp = false
-			var task queue.Task
-			for i := 0; i < AsyncTasks; i++ {
-				if task = p.asyncTaskQueue.Dequeue(); task == nil {
-					break
-				}
-				switch err = task(); err {
+			task := p.priorAsyncTaskQueue.Dequeue()
+			for ; task != nil; task = p.priorAsyncTaskQueue.Dequeue() {
+				switch err = task.Run(task.Buf); err {
 				case nil:
 				case errors.ErrServerShutdown:
 					return err
 				default:
 					logging.Warnf("Error occurs in user-defined function, %v", err)
 				}
+				queue.PutTask(task)
+			}
+			for i := 0; i < MaxAsyncTasksAtOneTime; i++ {
+				if task = p.asyncTaskQueue.Dequeue(); task == nil {
+					break
+				}
+				switch err = task.Run(task.Buf); err {
+				case nil:
+				case errors.ErrServerShutdown:
+					return err
+				default:
+					logging.Warnf("Error occurs in user-defined function, %v", err)
+				}
+				queue.PutTask(task)
 			}
 			atomic.StoreInt32(&p.netpollWakeSig, 0)
-			if !p.asyncTaskQueue.Empty() {
+			if !p.asyncTaskQueue.Empty() || !p.priorAsyncTaskQueue.Empty() {
 				for _, err = unix.Write(p.wfd, b); err == unix.EINTR || err == unix.EAGAIN; _, err = unix.Write(p.wfd, b) {
 				}
 			}

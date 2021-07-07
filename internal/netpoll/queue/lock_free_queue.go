@@ -21,7 +21,7 @@
 // Package queue delivers an implementation of lock-free concurrent queue based on
 // the algorithm presented by Maged M. Michael and Michael L. Scot. in 1996: https://dl.acm.org/doi/10.1145/248052.248106
 //
-// Pseudocode of non-Blocking concurrent queue algorithm:
+// Pseudocode of non-blocking concurrent queue algorithm:
 /*
 	structure pointer_t {ptr: pointer to node_t, count: unsigned integer}
 	structure node_t {value: data type, next: pointer_t}
@@ -90,13 +90,13 @@ import (
 
 // lockFreeQueue is a simple, fast, and practical non-blocking and concurrent queue with no lock.
 type lockFreeQueue struct {
-	head unsafe.Pointer
-	tail unsafe.Pointer
-	len  int32
+	head   unsafe.Pointer
+	tail   unsafe.Pointer
+	length int32
 }
 
 type node struct {
-	value Task
+	value *Task
 	next  unsafe.Pointer
 }
 
@@ -107,33 +107,33 @@ func NewLockFreeQueue() AsyncTaskQueue {
 }
 
 // Enqueue puts the given value v at the tail of the queue.
-func (q *lockFreeQueue) Enqueue(task Task) {
+func (q *lockFreeQueue) Enqueue(task *Task) {
 	n := &node{value: task}
-loop:
+retry:
 	tail := load(&q.tail)
 	next := load(&tail.next)
 	// Are tail and next consistent?
 	if tail == load(&q.tail) {
 		if next == nil {
 			// Try to link node at the end of the linked list.
-			if cas(&tail.next, next, n) {
-				// Enqueue is done. Try to swing tail to the inserted node.
+			if cas(&tail.next, next, n) { // enqueue is done.
+				// Try to swing tail to the inserted node.
 				cas(&q.tail, tail, n)
-				atomic.AddInt32(&q.len, 1)
+				atomic.AddInt32(&q.length, 1)
 				return
 			}
 		} else { // tail was not pointing to the last node
-			// Try to swing Tail to the next node.
+			// Try to swing tail to the next node.
 			cas(&q.tail, tail, next)
 		}
 	}
-	goto loop
+	goto retry
 }
 
 // Dequeue removes and returns the value at the head of the queue.
 // It returns nil if the queue is empty.
-func (q *lockFreeQueue) Dequeue() Task {
-loop:
+func (q *lockFreeQueue) Dequeue() *Task {
+retry:
 	head := load(&q.head)
 	tail := load(&q.tail)
 	next := load(&head.next)
@@ -145,23 +145,22 @@ loop:
 			if next == nil {
 				return nil
 			}
-			cas(&q.tail, tail, next) // tail is falling behind. Try to advance it.
+			cas(&q.tail, tail, next) // tail is falling behind, try to advance it.
 		} else {
 			// Read value before CAS, otherwise another dequeue might free the next node.
 			task := next.value
-			if cas(&q.head, head, next) {
-				// Dequeue is done. return value.
-				atomic.AddInt32(&q.len, -1)
+			if cas(&q.head, head, next) { // dequeue is done, return value.
+				atomic.AddInt32(&q.length, -1)
 				return task
 			}
 		}
 	}
-	goto loop
+	goto retry
 }
 
 // Empty indicates whether this queue is empty or not.
 func (q *lockFreeQueue) Empty() bool {
-	return atomic.LoadInt32(&q.len) == 0
+	return atomic.LoadInt32(&q.length) == 0
 }
 
 func load(p *unsafe.Pointer) (n *node) {
