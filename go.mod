@@ -14,4 +14,4 @@ require (
 )
 
 // Go module checksum mismatch, see https://github.com/panjf2000/gnet/issues/219
-retract v1.4.5
+// retract v1.4.5
