@@ -93,10 +93,10 @@ func (p *Poller) Trigger(f queue.TaskFunc) (err error) {
 	return os.NewSyscallError("kevent trigger", err)
 }
 
-// TriggerLag is like Trigger but it puts task into asyncTaskQueue, call this method when the task is no so urgent
-// like writing data back to client.
+// TriggerLag is like Trigger but it puts task into asyncTaskQueue,
+// call this method when the task is not so urgent, for instance writing data back to client.
 //
-// asyncTaskQueue is a queue with low-priority whose size may grow large and tasks in it may backlog.
+// Note that asyncTaskQueue is a queue with low-priority whose size may grow large and tasks in it may backlog.
 func (p *Poller) TriggerLag(f queue.TaskFunc, buf []byte) (err error) {
 	task := queue.GetTask()
 	task.Run, task.Buf = f, buf
