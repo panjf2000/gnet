@@ -35,11 +35,12 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+
 	"github.com/panjf2000/gnet/errors"
 	"github.com/panjf2000/gnet/pool/bytebuffer"
 	"github.com/panjf2000/gnet/pool/goroutine"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 func TestCodecServe(t *testing.T) {

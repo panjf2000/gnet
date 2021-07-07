@@ -33,11 +33,13 @@ import (
 	"time"
 	"unsafe"
 
+	"golang.org/x/sys/unix"
+
 	gerrors "github.com/panjf2000/gnet/errors"
+	"github.com/panjf2000/gnet/internal/io"
 	"github.com/panjf2000/gnet/internal/logging"
 	"github.com/panjf2000/gnet/internal/netpoll"
 	"github.com/panjf2000/gnet/internal/socket"
-	"golang.org/x/sys/unix"
 )
 
 type eventloop struct {
@@ -180,24 +182,14 @@ func (el *eventloop) loopWrite(c *conn) error {
 	el.eventHandler.PreWrite()
 
 	head, tail := c.outboundBuffer.LazyReadAll()
-	n, err := unix.Write(c.fd, head)
-	if err != nil {
-		if err == unix.EAGAIN {
-			return nil
-		}
-		return el.loopCloseConn(c, os.NewSyscallError("write", err))
-	}
+	n, err := io.Writev(c.fd, [][]byte{head, tail})
 	c.outboundBuffer.Shift(n)
-
-	if n == len(head) && tail != nil {
-		n, err = unix.Write(c.fd, tail)
-		if err != nil {
-			if err == unix.EAGAIN {
-				return nil
-			}
-			return el.loopCloseConn(c, os.NewSyscallError("write", err))
-		}
-		c.outboundBuffer.Shift(n)
+	switch err {
+	case nil, gerrors.ErrShortWritev: // do nothing, just go on
+	case unix.EAGAIN:
+		return nil
+	default:
+		return el.loopCloseConn(c, os.NewSyscallError("write", err))
 	}
 
 	// All data have been drained, it's no need to monitor the writable events,
