@@ -23,6 +23,7 @@
 package gnet
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/panjf2000/gnet/errors"
@@ -36,7 +37,7 @@ func (svr *server) acceptNewConnection(fd int) error {
 		if err == unix.EAGAIN {
 			return nil
 		}
-		return errors.ErrAcceptSocket
+		return fmt.Errorf("%w: %s", errors.ErrAcceptSocket, err.Error())
 	}
 	if err = os.NewSyscallError("fcntl nonblock", unix.SetNonblock(nfd, true)); err != nil {
 		return err
