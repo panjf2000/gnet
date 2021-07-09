@@ -31,7 +31,7 @@ type Task struct {
 	Buf []byte
 }
 
-var taskPool = sync.Pool{New: func() interface{} { return &Task{} }}
+var taskPool = sync.Pool{New: func() interface{} { return new(Task) }}
 
 // GetTask gets a cached Task from pool.
 func GetTask() *Task {

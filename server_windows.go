@@ -29,7 +29,6 @@ import (
 	"sync/atomic"
 
 	gerrors "github.com/panjf2000/gnet/errors"
-	"github.com/panjf2000/gnet/internal/logging"
 )
 
 var errCloseAllConns = errors.New("close all connections in event-loop")
@@ -114,7 +113,7 @@ func (svr *server) startEventLoops(numEventLoop int) {
 
 func (svr *server) stop(s Server) {
 	// Wait on a signal for shutdown.
-	logging.Infof("Server is being shutdown on the signal error: %v", svr.waitForShutdown())
+	svr.opts.Logger.Infof("Server is being shutdown on the signal error: %v", svr.waitForShutdown())
 
 	svr.eventHandler.OnShutdown(s)
 

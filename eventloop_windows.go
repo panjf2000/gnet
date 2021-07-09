@@ -52,6 +52,10 @@ type internalEventloop struct {
 	eventHandler EventHandler          // user eventHandler
 }
 
+func (el *eventloop) getLogger() logging.Logger {
+	return el.svr.opts.Logger
+}
+
 func (el *eventloop) addConn(delta int32) {
 	atomic.AddInt32(&el.connCount, delta)
 }
@@ -96,9 +100,10 @@ func (el *eventloop) loopRun(lockOSThread bool) {
 		}
 
 		if err == errors.ErrServerShutdown {
+			el.getLogger().Infof("Event-loop(%d) is exiting in terms of the demand from user, %v", el.idx, err)
 			break
 		} else if err != nil {
-			logging.Infof("Event-loop(%d) is exiting due to the error: %v", el.idx, err)
+			el.getLogger().Errorf("Event-loop(%d) is exiting due to the error: %v", el.idx, err)
 		}
 	}
 }
@@ -186,7 +191,7 @@ func (el *eventloop) loopTicker(ctx context.Context) {
 		delay, action = el.eventHandler.Tick()
 		if action == Shutdown {
 			el.ch <- errors.ErrServerShutdown
-			// logging.Debugf("stopping ticker in event-loop(%d) from Tick()", el.idx)
+			el.getLogger().Debugf("stopping ticker in event-loop(%d) from Tick()", el.idx)
 		}
 		if timer == nil {
 			timer = time.NewTimer(delay)
@@ -195,7 +200,7 @@ func (el *eventloop) loopTicker(ctx context.Context) {
 		}
 		select {
 		case <-ctx.Done():
-			// logging.Debugf("stopping ticker in event-loop(%d) from Server, error:%v", el.idx, ctx.Err())
+			el.getLogger().Debugf("stopping ticker in event-loop(%d) from Server, error:%v", el.idx, ctx.Err())
 			return
 		case <-timer.C:
 		}
@@ -209,7 +214,7 @@ func (el *eventloop) loopError(c *stdConn, err error) (e error) {
 		}
 
 		if err = c.conn.Close(); err != nil {
-			logging.Warnf("Failed to close connection(%s), error: %v", c.remoteAddr.String(), err)
+			el.getLogger().Warnf("Failed to close connection(%s), error: %v", c.remoteAddr.String(), err)
 			if e == nil {
 				e = err
 			}
