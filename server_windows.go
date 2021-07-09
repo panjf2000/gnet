@@ -28,7 +28,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	errors2 "github.com/panjf2000/gnet/errors"
+	gerrors "github.com/panjf2000/gnet/errors"
 	"github.com/panjf2000/gnet/internal/logging"
 )
 
@@ -124,7 +124,7 @@ func (svr *server) stop(s Server) {
 
 	// Notify all loops to close.
 	svr.lb.iterate(func(i int, el *eventloop) bool {
-		el.ch <- errors2.ErrServerShutdown
+		el.ch <- gerrors.ErrServerShutdown
 		return true
 	})
 

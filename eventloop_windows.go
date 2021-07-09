@@ -74,8 +74,8 @@ func (el *eventloop) loopRun(lockOSThread bool) {
 		el.svr.loopWG.Done()
 	}()
 
-	for v := range el.ch {
-		switch v := v.(type) {
+	for i := range el.ch {
+		switch v := i.(type) {
 		case error:
 			err = v
 		case *stdConn:
@@ -87,10 +87,12 @@ func (el *eventloop) loopRun(lockOSThread bool) {
 			err = el.loopReadUDP(v.c)
 		case *stderr:
 			err = el.loopError(v.c, v.err)
-		case wakeReq:
-			err = el.loopWake(v.c)
-		case func() error:
-			err = v()
+		case *signalTask:
+			err = v.run(v.c)
+			signalTaskPool.Put(i)
+		case *dataTask:
+			_, err = v.run(v.buf)
+			dataTaskPool.Put(i)
 		}
 
 		if err == errors.ErrServerShutdown {
@@ -183,7 +185,7 @@ func (el *eventloop) loopTicker(ctx context.Context) {
 	for {
 		delay, action = el.eventHandler.Tick()
 		if action == Shutdown {
-			el.ch <- func() error { return errors.ErrServerShutdown }
+			el.ch <- errors.ErrServerShutdown
 			// logging.Debugf("stopping ticker in event-loop(%d) from Tick()", el.idx)
 		}
 		if timer == nil {
