@@ -248,6 +248,8 @@ func (es *EventServer) Tick() (delay time.Duration, action Action) {
 func Serve(eventHandler EventHandler, protoAddr string, opts ...Option) (err error) {
 	options := loadOptions(opts...)
 
+	logging.Debugf("default logging level is %s", logging.LogLevel())
+
 	var (
 		logger logging.Logger
 		flush  func() error
@@ -257,7 +259,7 @@ func Serve(eventHandler EventHandler, protoAddr string, opts ...Option) (err err
 			return
 		}
 	} else {
-		logger = logging.DefaultLogger
+		logger = logging.GetDefaultLogger()
 	}
 	if options.Logger == nil {
 		options.Logger = logger

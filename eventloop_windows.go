@@ -213,7 +213,7 @@ func (el *eventloop) loopError(c *stdConn, err error) (e error) {
 		}
 
 		if err = c.conn.Close(); err != nil {
-			el.getLogger().Warnf("failed to close connection(%s), error: %v", c.remoteAddr.String(), err)
+			el.getLogger().Errorf("failed to close connection(%s), error: %v", c.remoteAddr.String(), err)
 			if e == nil {
 				e = err
 			}
