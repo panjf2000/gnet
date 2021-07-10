@@ -29,8 +29,6 @@ import (
 	"sync/atomic"
 	"unsafe"
 
-	gerrors "errors"
-
 	"golang.org/x/sys/unix"
 
 	"github.com/panjf2000/gnet/errors"
@@ -139,12 +137,12 @@ func (p *Poller) Polling(callback func(fd int, ev uint32) error) error {
 
 		for i := 0; i < n; i++ {
 			if fd := int(el.events[i].Fd); fd != p.wfd {
-				if err = callback(fd, el.events[i].Events); err != nil {
-					if gerrors.Is(err, errors.ErrAcceptSocket) || gerrors.Is(err, errors.ErrServerShutdown) {
-						return err
-					} else {
-						logging.DefaultLogger.Warnf("Error occurs in event-loop: %v", err)
-					}
+				switch err = callback(fd, el.events[i].Events); err {
+				case nil:
+				case errors.ErrAcceptSocket, errors.ErrServerShutdown:
+					return err
+				default:
+					logging.Warnf("Error occurs in event-loop: %v", err)
 				}
 			} else { // poller is awaken to run tasks in queues.
 				wakenUp = true
