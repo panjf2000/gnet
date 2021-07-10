@@ -37,9 +37,9 @@ import (
 
 	gerrors "github.com/panjf2000/gnet/errors"
 	"github.com/panjf2000/gnet/internal/io"
-	"github.com/panjf2000/gnet/internal/logging"
 	"github.com/panjf2000/gnet/internal/netpoll"
 	"github.com/panjf2000/gnet/internal/socket"
+	"github.com/panjf2000/gnet/logging"
 )
 
 type eventloop struct {

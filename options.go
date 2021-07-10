@@ -23,8 +23,9 @@ package gnet
 import (
 	"time"
 
-	"github.com/panjf2000/gnet/internal/logging"
 	"go.uber.org/zap/zapcore"
+
+	"github.com/panjf2000/gnet/logging"
 )
 
 // Option is a function that will set up option.
