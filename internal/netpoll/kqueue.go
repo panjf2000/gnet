@@ -124,7 +124,7 @@ func (p *Poller) Polling(callback func(fd int, filter int16) error) error {
 			runtime.Gosched()
 			continue
 		} else if err != nil {
-			logging.Warnf("Error occurs in kqueue: %v", os.NewSyscallError("kevent wait", err))
+			logging.Errorf("error occurs in kqueue: %v", os.NewSyscallError("kevent wait", err))
 			return err
 		}
 		tsp = &ts
@@ -141,7 +141,7 @@ func (p *Poller) Polling(callback func(fd int, filter int16) error) error {
 				case errors.ErrAcceptSocket, errors.ErrServerShutdown:
 					return err
 				default:
-					logging.Warnf("Error occurs in event-loop: %v", err)
+					logging.Warnf("error occurs in event-loop: %v", err)
 				}
 			} else { // poller is awaken to run tasks in queues.
 				wakenUp = true
@@ -157,7 +157,7 @@ func (p *Poller) Polling(callback func(fd int, filter int16) error) error {
 				case errors.ErrServerShutdown:
 					return err
 				default:
-					logging.Warnf("Error occurs in user-defined function, %v", err)
+					logging.Warnf("error occurs in user-defined function, %v", err)
 				}
 				queue.PutTask(task)
 			}
@@ -170,7 +170,7 @@ func (p *Poller) Polling(callback func(fd int, filter int16) error) error {
 				case errors.ErrServerShutdown:
 					return err
 				default:
-					logging.Warnf("Error occurs in user-defined function, %v", err)
+					logging.Warnf("error occurs in user-defined function, %v", err)
 				}
 				queue.PutTask(task)
 			}

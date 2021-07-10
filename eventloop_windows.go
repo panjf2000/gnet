@@ -99,10 +99,10 @@ func (el *eventloop) loopRun(lockOSThread bool) {
 		}
 
 		if err == errors.ErrServerShutdown {
-			el.getLogger().Infof("Event-loop(%d) is exiting in terms of the demand from user, %v", el.idx, err)
+			el.getLogger().Infof("event-loop(%d) is exiting in terms of the demand from user, %v", el.idx, err)
 			break
 		} else if err != nil {
-			el.getLogger().Errorf("Event-loop(%d) is exiting due to the error: %v", el.idx, err)
+			el.getLogger().Errorf("event-loop(%d) is exiting due to the error: %v", el.idx, err)
 		}
 	}
 }
@@ -213,7 +213,7 @@ func (el *eventloop) loopError(c *stdConn, err error) (e error) {
 		}
 
 		if err = c.conn.Close(); err != nil {
-			el.getLogger().Warnf("Failed to close connection(%s), error: %v", c.remoteAddr.String(), err)
+			el.getLogger().Warnf("failed to close connection(%s), error: %v", c.remoteAddr.String(), err)
 			if e == nil {
 				e = err
 			}

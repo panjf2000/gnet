@@ -86,8 +86,8 @@ func (svr *server) activateSubReactor(el *eventloop, lockOSThread bool) {
 		return nil
 	})
 	if err == errors.ErrServerShutdown {
-		svr.opts.Logger.Debugf("Event-loop(%d) is exiting in terms of the demand from user, %v", el.idx, err)
+		svr.opts.Logger.Debugf("event-loop(%d) is exiting in terms of the demand from user, %v", el.idx, err)
 	} else if err != nil {
-		svr.opts.Logger.Errorf("Event-loop(%d) is exiting normally on the signal error: %v", el.idx, err)
+		svr.opts.Logger.Errorf("event-loop(%d) is exiting normally on the signal error: %v", el.idx, err)
 	}
 }
