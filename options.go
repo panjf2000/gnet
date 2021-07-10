@@ -63,7 +63,7 @@ type Options struct {
 	LockOSThread bool
 
 	// ReadBufferCap is the maximum number of bytes that can be read from the client when the readable event comes.
-	// The default value is 16KB, it can be reduced to avoid starving subsequent client connections.
+	// The default value is 64KB, it can be reduced to avoid starving subsequent client connections.
 	//
 	// Note that ReadBufferCap will be always converted to the least power of two integer value greater than
 	// or equal to its real amount.
