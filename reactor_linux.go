@@ -39,7 +39,7 @@ func (svr *server) activateMainReactor(lockOSThread bool) {
 	if err == errors.ErrServerShutdown {
 		svr.opts.Logger.Debugf("main reactor is exiting in terms of the demand from user, %v", err)
 	} else if err != nil {
-		svr.opts.Logger.Infof("main reactor is exiting due to error: %v", err)
+		svr.opts.Logger.Errorf("main reactor is exiting due to error: %v", err)
 	}
 }
 
