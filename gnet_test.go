@@ -25,7 +25,6 @@ import (
 	"bufio"
 	"context"
 	"encoding/binary"
-	"fmt"
 	"io"
 	"math/rand"
 	"net"
@@ -40,6 +39,7 @@ import (
 	"go.uber.org/zap/zapcore"
 
 	"github.com/panjf2000/gnet/errors"
+	"github.com/panjf2000/gnet/logging"
 	"github.com/panjf2000/gnet/pool/bytebuffer"
 	"github.com/panjf2000/gnet/pool/goroutine"
 )
@@ -459,7 +459,7 @@ func (s *testServer) OnOpened(c Conn) (out []byte, action Action) {
 
 func (s *testServer) OnClosed(c Conn, err error) (action Action) {
 	if err != nil {
-		fmt.Printf("error occurred on closed, %v\n", err)
+		logging.Debugf("error occurred on closed, %v\n", err)
 	}
 	require.Equal(s.tester, c.Context(), c, "invalid context")
 
@@ -512,7 +512,6 @@ func (s *testServer) Tick() (delay time.Duration, action Action) {
 		}
 		atomic.StoreInt32(&s.started, 1)
 	}
-	fmt.Printf("active connections: %d\n", s.svr.CountConnections())
 	if s.network == "udp" && atomic.LoadInt32(&s.clientActive) == 0 {
 		action = Shutdown
 		return
@@ -687,7 +686,6 @@ func (t *testWakeConnServer) Tick() (delay time.Duration, action Action) {
 			r := make([]byte, 10)
 			_, err = conn.Read(r)
 			require.NoError(t.tester, err)
-			fmt.Println(string(r))
 		}()
 		return
 	}
@@ -791,7 +789,6 @@ func (t *testCloseActionErrorServer) Tick() (delay time.Duration, action Action)
 			_, _ = conn.Write(data)
 			_, err = conn.Read(data)
 			require.NoError(t.tester, err)
-			fmt.Println(string(data))
 		}()
 		return
 	}
@@ -835,7 +832,6 @@ func (t *testShutdownActionErrorServer) Tick() (delay time.Duration, action Acti
 			_, _ = conn.Write(data)
 			_, err = conn.Read(data)
 			require.NoError(t.tester, err)
-			fmt.Println(string(data))
 		}()
 		return
 	}
@@ -909,7 +905,7 @@ func (t *testShutdownActionOnOpenServer) OnOpened(c Conn) (out []byte, action Ac
 
 func (t *testShutdownActionOnOpenServer) OnShutdown(s Server) {
 	dupFD, err := s.DupFd()
-	fmt.Printf("dup fd: %d with error: %v\n", dupFD, err)
+	logging.Debugf("dup fd: %d with error: %v\n", dupFD, err)
 }
 
 func (t *testShutdownActionOnOpenServer) Tick() (delay time.Duration, action Action) {
@@ -964,7 +960,6 @@ func (t *testUDPShutdownServer) Tick() (delay time.Duration, action Action) {
 			require.NoError(t.tester, err)
 			_, err = conn.Read(data)
 			require.NoError(t.tester, err)
-			fmt.Println(string(data))
 		}()
 		return
 	}
@@ -1015,7 +1010,6 @@ func (t *testCloseConnectionServer) Tick() (delay time.Duration, action Action) 
 			_, _ = conn.Write(data)
 			_, err = conn.Read(data)
 			require.NoError(t.tester, err)
-			fmt.Println(string(data))
 			// waiting the server shutdown.
 			_, err = conn.Read(data)
 			require.Error(t.tester, err)
@@ -1048,7 +1042,7 @@ type testStopServer struct {
 }
 
 func (t *testStopServer) OnClosed(c Conn, err error) (action Action) {
-	fmt.Println("closing connection...")
+	logging.Debugf("closing connection...")
 	return
 }
 
@@ -1069,12 +1063,11 @@ func (t *testStopServer) Tick() (delay time.Duration, action Action) {
 			_, _ = conn.Write(data)
 			_, err = conn.Read(data)
 			require.NoError(t.tester, err)
-			fmt.Println(string(data))
 
 			go func() {
 				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 				defer cancel()
-				fmt.Println("stop server...", Stop(ctx, t.protoAddr))
+				logging.Debugf("stop server...", Stop(ctx, t.protoAddr))
 			}()
 
 			// waiting the server shutdown.
@@ -1131,7 +1124,7 @@ func (tes *testClosedWakeUpServer) OnInitComplete(_ Server) (action Action) {
 		close(tes.clientClosed)
 		<-tes.serverClosed
 
-		fmt.Println("stop server...", Stop(context.TODO(), tes.protoAddr))
+		logging.Debugf("stop server...", Stop(context.TODO(), tes.protoAddr))
 	}()
 
 	return None
