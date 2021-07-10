@@ -62,6 +62,10 @@ type internalEventloop struct {
 	eventHandler EventHandler    // user eventHandler
 }
 
+func (el *eventloop) getLogger() logging.Logger {
+	return el.svr.opts.Logger
+}
+
 func (el *eventloop) addConn(delta int32) {
 	atomic.AddInt32(&el.connCount, delta)
 }
@@ -90,7 +94,7 @@ func (el *eventloop) loopRun(lockOSThread bool) {
 	}()
 
 	err := el.poller.Polling(el.handleEvent)
-	logging.Infof("Event-loop(%d) is exiting due to error: %v", el.idx, err)
+	el.getLogger().Infof("Event-loop(%d) is exiting due to error: %v", el.idx, err)
 }
 
 func (el *eventloop) loopAccept(fd int) error {
@@ -277,8 +281,8 @@ func (el *eventloop) loopTicker(ctx context.Context) {
 		switch action {
 		case None:
 		case Shutdown:
-			_ = el.poller.UrgentTrigger(func(_ []byte) error { return gerrors.ErrServerShutdown })
-			// logging.Debugf("stopping ticker in event-loop(%d) from Tick(), UrgentTrigger:%v", el.idx, err)
+			err := el.poller.UrgentTrigger(func(_ []byte) error { return gerrors.ErrServerShutdown })
+			el.getLogger().Debugf("stopping ticker in event-loop(%d) from Tick(), UrgentTrigger:%v", el.idx, err)
 		}
 		if timer == nil {
 			timer = time.NewTimer(delay)
@@ -287,7 +291,7 @@ func (el *eventloop) loopTicker(ctx context.Context) {
 		}
 		select {
 		case <-ctx.Done():
-			// logging.Debugf("stopping ticker in event-loop(%d) from Server, error:%v", el.idx, ctx.Err())
+			el.getLogger().Debugf("stopping ticker in event-loop(%d) from Server, error:%v", el.idx, ctx.Err())
 			return
 		case <-timer.C:
 		}

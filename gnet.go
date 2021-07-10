@@ -248,18 +248,26 @@ func (es *EventServer) Tick() (delay time.Duration, action Action) {
 func Serve(eventHandler EventHandler, protoAddr string, opts ...Option) (err error) {
 	options := loadOptions(opts...)
 
-	logging.Init(options.LogLevel)
-
+	var (
+		logger logging.Logger
+		flush  func() error
+	)
 	if options.LogPath != "" {
-		err = logging.SetupLoggerWithPath(options.LogPath, options.LogLevel)
+		if logger, flush, err = logging.CreateLoggerAsLocalFile(options.LogPath, options.LogLevel); err != nil {
+			return
+		}
+	} else {
+		logger = logging.DefaultLogger
 	}
-	if err != nil {
-		return
+	if options.Logger == nil {
+		options.Logger = logger
 	}
-	if options.Logger != nil {
-		logging.SetupLogger(options.Logger, options.LogLevel)
-	}
-	defer logging.Cleanup()
+	defer func() {
+		if flush != nil {
+			_ = flush()
+		}
+		logging.Cleanup()
+	}()
 
 	// The maximum number of operating system threads that the Go program can use is initially set to 10000,
 	// which should be the maximum amount of I/O event-loops locked to OS threads users can start up.

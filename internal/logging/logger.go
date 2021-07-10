@@ -43,15 +43,16 @@ import (
 var (
 	// DefaultLogger is the default logger inside the tbuspp client.
 	DefaultLogger Logger
-	zapLogger     *zap.Logger
-	loggingLevel  zapcore.Level
+	// LogLevel is for the default logger.
+	LogLevel  zapcore.Level
+	zapLogger *zap.Logger
 )
 
-// Init initializes the inside default logger of client.
-func Init(logLevel zapcore.Level) {
+func init() {
+	// Initializes the inside default logger of client.
 	cfg := zap.NewDevelopmentConfig()
-	loggingLevel = logLevel
-	cfg.Level = zap.NewAtomicLevelAt(logLevel)
+	LogLevel = zapcore.DebugLevel
+	cfg.Level = zap.NewAtomicLevelAt(LogLevel)
 	zapLogger, _ = cfg.Build()
 	DefaultLogger = zapLogger.Sugar()
 }
@@ -63,21 +64,20 @@ func getEncoder() zapcore.Encoder {
 	return zapcore.NewConsoleEncoder(encoderConfig)
 }
 
-// SetupLoggerWithPath setups the logger by local file path.
-func SetupLoggerWithPath(localPath string, logLevel zapcore.Level) (err error) {
-	if len(localPath) == 0 {
-		return errors.New("invalid local logger path")
+// CreateLoggerAsLocalFile setups the logger by local file path.
+func CreateLoggerAsLocalFile(localFilePath string, logLevel zapcore.Level) (logger Logger, flush func() error, err error) {
+	if len(localFilePath) == 0 {
+		return nil, nil, errors.New("invalid local logger path")
 	}
 
 	// lumberjack.Logger is already safe for concurrent use, so we don't need to lock it.
 	w := &lumberjack.Logger{
-		Filename:   localPath,
+		Filename:   localFilePath,
 		MaxSize:    100, // megabytes
 		MaxBackups: 3,
 		MaxAge:     28, // days
 	}
 
-	loggingLevel = logLevel
 	encoder := getEncoder()
 	syncer := zapcore.AddSync(w)
 	highPriority := zap.LevelEnablerFunc(func(level zapcore.Level) bool {
@@ -85,18 +85,9 @@ func SetupLoggerWithPath(localPath string, logLevel zapcore.Level) (err error) {
 	})
 	core := zapcore.NewCore(encoder, syncer, highPriority)
 	zapLogger := zap.New(core, zap.AddCaller())
-	DefaultLogger = zapLogger.Sugar()
-	return nil
-}
-
-// SetupLogger setups the logger by the Logger interface.
-func SetupLogger(logger Logger, logLevel zapcore.Level) {
-	if logger == nil {
-		return
-	}
-	loggingLevel = logLevel
-	zapLogger = nil
-	DefaultLogger = logger
+	logger = zapLogger.Sugar()
+	flush = zapLogger.Sync
+	return
 }
 
 // Cleanup does something windup for logger, like closing, flushing, etc.
@@ -111,11 +102,6 @@ func LogErr(err error) {
 	if err != nil {
 		DefaultLogger.Errorf("error occurs during runtime, %v", err)
 	}
-}
-
-// Level returns the logging level.
-func Level() zapcore.Level {
-	return loggingLevel
 }
 
 // Debugf logs messages at DEBUG level.

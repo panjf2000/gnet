@@ -30,7 +30,6 @@ import (
 	"sync/atomic"
 
 	"github.com/panjf2000/gnet/errors"
-	"github.com/panjf2000/gnet/internal/logging"
 	"github.com/panjf2000/gnet/internal/netpoll"
 )
 
@@ -201,17 +200,23 @@ func (svr *server) stop(s Server) {
 
 	// Notify all loops to close by closing all listeners
 	svr.lb.iterate(func(i int, el *eventloop) bool {
-		logging.LogErr(el.poller.UrgentTrigger(func(_ []byte) error {
+		err := el.poller.UrgentTrigger(func(_ []byte) error {
 			return errors.ErrServerShutdown
-		}))
+		})
+		if err != nil {
+			svr.opts.Logger.Errorf("failed to call UrgentTrigger on sub event-loop when stopping server")
+		}
 		return true
 	})
 
 	if svr.mainLoop != nil {
 		svr.ln.close()
-		logging.LogErr(svr.mainLoop.poller.UrgentTrigger(func(_ []byte) error {
+		err := svr.mainLoop.poller.UrgentTrigger(func(_ []byte) error {
 			return errors.ErrServerShutdown
-		}))
+		})
+		if err != nil {
+			svr.opts.Logger.Errorf("failed to call UrgentTrigger on main event-loop when stopping server")
+		}
 	}
 
 	// Wait on all loops to complete reading events
@@ -220,7 +225,10 @@ func (svr *server) stop(s Server) {
 	svr.closeEventLoops()
 
 	if svr.mainLoop != nil {
-		logging.LogErr(svr.mainLoop.poller.Close())
+		err := svr.mainLoop.poller.Close()
+		if err != nil {
+			svr.opts.Logger.Errorf("failed to close poller when stopping server")
+		}
 	}
 
 	// Stop the ticker.
@@ -282,7 +290,7 @@ func serve(eventHandler EventHandler, listener *listener, options *Options, prot
 
 	if err := svr.start(numEventLoop); err != nil {
 		svr.closeEventLoops()
-		logging.Errorf("gnet server is stopping with error: %v", err)
+		svr.opts.Logger.Errorf("gnet server is stopping with error: %v", err)
 		return err
 	}
 	defer svr.stop(server)

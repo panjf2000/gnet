@@ -28,11 +28,12 @@ import (
 	"sync"
 	"sync/atomic"
 
-	errors2 "github.com/panjf2000/gnet/errors"
-	"github.com/panjf2000/gnet/internal/logging"
+	gerrors "github.com/panjf2000/gnet/errors"
 )
 
 var errCloseAllConns = errors.New("close all connections in event-loop")
+
+const TaskBufferCap = 256
 
 type server struct {
 	ln           *listener          // the listeners for accepting new connections
@@ -90,7 +91,7 @@ func (svr *server) startEventLoops(numEventLoop int) {
 	var striker *eventloop
 	for i := 0; i < numEventLoop; i++ {
 		el := new(eventloop)
-		el.ch = make(chan interface{}, channelBuffer)
+		el.ch = make(chan interface{}, channelBuffer(TaskBufferCap))
 		el.svr = svr
 		el.connections = make(map[*stdConn]struct{})
 		el.eventHandler = svr.eventHandler
@@ -112,7 +113,7 @@ func (svr *server) startEventLoops(numEventLoop int) {
 
 func (svr *server) stop(s Server) {
 	// Wait on a signal for shutdown.
-	logging.Infof("Server is being shutdown on the signal error: %v", svr.waitForShutdown())
+	svr.opts.Logger.Infof("Server is being shutdown on the signal error: %v", svr.waitForShutdown())
 
 	svr.eventHandler.OnShutdown(s)
 
@@ -122,7 +123,7 @@ func (svr *server) stop(s Server) {
 
 	// Notify all loops to close.
 	svr.lb.iterate(func(i int, el *eventloop) bool {
-		el.ch <- errors2.ErrServerShutdown
+		el.ch <- gerrors.ErrServerShutdown
 		return true
 	})
 
@@ -208,12 +209,11 @@ func serve(eventHandler EventHandler, listener *listener, options *Options, prot
 }
 
 // channelBuffer determines whether the channel should be a buffered channel to get the best performance.
-var channelBuffer = func() int {
+func channelBuffer(n int) int {
 	// Use blocking channel if GOMAXPROCS=1.
 	// This switches context from sender to receiver immediately,
 	// which results in higher performance.
-	var n int
-	if n = runtime.GOMAXPROCS(0); n == 1 {
+	if runtime.GOMAXPROCS(0) == 1 {
 		return 0
 	}
 
@@ -223,4 +223,4 @@ var channelBuffer = func() int {
 	// GOMAXPROCS determines how many goroutines can run in parallel,
 	// which makes it the best choice as the channel capacity,
 	return n
-}()
+}
