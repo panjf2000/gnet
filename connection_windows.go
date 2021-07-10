@@ -181,7 +181,7 @@ func (c *stdConn) ReadN(n int) (size int, buf []byte) {
 		buf = c.buffer.B[:n]
 		return
 	}
-	head, tail := c.inboundBuffer.LazyRead(n)
+	head, tail := c.inboundBuffer.Peek(n)
 	c.byteBuffer = bytebuffer.Get()
 	_, _ = c.byteBuffer.Write(head)
 	_, _ = c.byteBuffer.Write(tail)
@@ -214,7 +214,7 @@ func (c *stdConn) ShiftN(n int) (size int) {
 	c.byteBuffer = nil
 
 	if inBufferLen >= n {
-		c.inboundBuffer.Shift(n)
+		c.inboundBuffer.Discard(n)
 		return
 	}
 	c.inboundBuffer.Reset()

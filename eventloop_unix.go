@@ -185,9 +185,9 @@ func (el *eventloop) loopRead(c *conn) error {
 func (el *eventloop) loopWrite(c *conn) error {
 	el.eventHandler.PreWrite()
 
-	head, tail := c.outboundBuffer.LazyReadAll()
+	head, tail := c.outboundBuffer.PeekAll()
 	n, err := io.Writev(c.fd, [][]byte{head, tail})
-	c.outboundBuffer.Shift(n)
+	c.outboundBuffer.Discard(n)
 	switch err {
 	case nil, gerrors.ErrShortWritev: // do nothing, just go on
 	case unix.EAGAIN:
@@ -214,7 +214,7 @@ func (el *eventloop) loopCloseConn(c *conn, err error) (rerr error) {
 	if !c.outboundBuffer.IsEmpty() {
 		el.eventHandler.PreWrite()
 
-		head, tail := c.outboundBuffer.LazyReadAll()
+		head, tail := c.outboundBuffer.PeekAll()
 		if n, err := unix.Write(c.fd, head); err == nil {
 			if n == len(head) && tail != nil {
 				_, _ = unix.Write(c.fd, tail)

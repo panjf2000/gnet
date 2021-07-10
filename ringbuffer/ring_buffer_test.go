@@ -192,11 +192,11 @@ func TestRingBuffer_Write(t *testing.T) {
 
 func TestZeroRingBuffer(t *testing.T) {
 	rb := New(0)
-	head, tail := rb.LazyRead(1)
+	head, tail := rb.Peek(1)
 	if !(head == nil && tail == nil) {
 		t.Fatal("expect head and tail are all nil")
 	}
-	head, tail = rb.LazyReadAll()
+	head, tail = rb.PeekAll()
 	if !(head == nil && tail == nil) {
 		t.Fatal("expect head and tail are all nil")
 	}
@@ -218,7 +218,7 @@ func TestZeroRingBuffer(t *testing.T) {
 	if !bytes.Equal(rb.ByteBuffer().Bytes(), buf) {
 		t.Fatal("expect it is equal")
 	}
-	rb.Shift(48)
+	rb.Discard(48)
 	if !(rb.IsEmpty() && rb.r == 0 && rb.w == 0) {
 		t.Fatalf("expect rb is empty and rb.r=rb.w=0, but got rb.r=%d and rb.w=%d", rb.r, rb.w)
 	}
@@ -314,7 +314,7 @@ func TestRingBuffer_Read(t *testing.T) {
 	if rb.w != 0 {
 		t.Fatalf("expect r.2=0 but got %d. r.r=%d", rb.w, rb.r)
 	}
-	head, tail := rb.LazyRead(64)
+	head, tail := rb.Peek(64)
 	if !(len(head) == 64 && tail == nil) {
 		t.Fatalf("expect len(head)=64 and tail=nil, yet len(head)=%d and tail != nil", len(head))
 	}
@@ -324,7 +324,7 @@ func TestRingBuffer_Read(t *testing.T) {
 	if !bytes.Equal(head, []byte(strings.Repeat("1234", 16))) {
 		t.Fatal("should be equal")
 	}
-	rb.Shift(64)
+	rb.Discard(64)
 	if rb.r != 64 {
 		t.Fatalf("expect r.r=64 but got %d", rb.r)
 	}
@@ -332,7 +332,7 @@ func TestRingBuffer_Read(t *testing.T) {
 	if rb.w != 16 {
 		t.Fatalf("expect r.w=16 but got %d", rb.w)
 	}
-	head, tail = rb.LazyRead(128)
+	head, tail = rb.Peek(128)
 	if !(len(head) == 64 && len(tail) == 16) {
 		t.Fatalf("expect len(head)=64 and len(tail)=16, yet len(head)=%d and len(tail)=%d", len(head), len(tail))
 	}
@@ -340,7 +340,7 @@ func TestRingBuffer_Read(t *testing.T) {
 		t.Fatalf("head: %s, tail: %s", string(head), string(tail))
 	}
 
-	head, tail = rb.LazyReadAll()
+	head, tail = rb.PeekAll()
 	if !(len(head) == 64 && len(tail) == 16) {
 		t.Fatalf("expect len(head)=64 and len(tail)=16, yet len(head)=%d and len(tail)=%d", len(head), len(tail))
 	}
@@ -348,8 +348,8 @@ func TestRingBuffer_Read(t *testing.T) {
 		t.Fatalf("head: %s, tail: %s", string(head), string(tail))
 	}
 
-	rb.Shift(64)
-	rb.Shift(16)
+	rb.Discard(64)
+	rb.Discard(16)
 	if !rb.isEmpty {
 		t.Fatal("should be empty")
 	}
@@ -482,14 +482,14 @@ func TestShrinkBuffer(t *testing.T) {
 
 	rb := New(testCap)
 	_, _ = rb.WriteString(testStr)
-	rb.LazyReadAll()
-	rb.Shift(len(testStr))
+	rb.PeekAll()
+	rb.Discard(len(testStr))
 	if rb.Cap() != testCap/2 {
 		t.Fatalf("expect buffer capacity %d, but got %d", testCap/2, rb.Cap())
 	}
 
 	_, _ = rb.WriteString(testStr)
-	rb.LazyReadAll()
+	rb.PeekAll()
 	rb.Reset()
 	if rb.Cap() != testCap/4 {
 		t.Fatalf("expect buffer capacity %d, but got %d", testCap/4, rb.Cap())
