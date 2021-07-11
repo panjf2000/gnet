@@ -126,6 +126,17 @@ func (el *eventloop) loopAccept(fd int) error {
 	return nil
 }
 
+func (el *eventloop) loopInsert(itf interface{}) error {
+	c := itf.(*conn)
+	if err := el.poller.AddRead(c.fd); err != nil {
+		_ = unix.Close(c.fd)
+		c.releaseTCP()
+		return nil
+	}
+	el.connections[c.fd] = c
+	return el.loopOpen(c)
+}
+
 func (el *eventloop) loopOpen(c *conn) error {
 	c.opened = true
 	el.addConn(1)
@@ -281,7 +292,7 @@ func (el *eventloop) loopTicker(ctx context.Context) {
 		switch action {
 		case None:
 		case Shutdown:
-			err := el.poller.UrgentTrigger(func(_ []byte) error { return gerrors.ErrServerShutdown })
+			err := el.poller.UrgentTrigger(func(_ interface{}) error { return gerrors.ErrServerShutdown }, nil)
 			el.getLogger().Debugf("stopping ticker in event-loop(%d) from Tick(), UrgentTrigger:%v", el.idx, err)
 		}
 		if timer == nil {

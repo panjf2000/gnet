@@ -91,9 +91,9 @@ var (
 //
 // Note that priorAsyncTaskQueue is a queue with high-priority and its size is expected to be small,
 // so only those urgent tasks should be put into this queue.
-func (p *Poller) UrgentTrigger(f queue.TaskFunc) (err error) {
+func (p *Poller) UrgentTrigger(fn queue.TaskFunc, arg interface{}) (err error) {
 	task := queue.GetTask()
-	task.Run = f
+	task.Run, task.Arg = fn, arg
 	p.priorAsyncTaskQueue.Enqueue(task)
 	if atomic.CompareAndSwapInt32(&p.netpollWakeSig, 0, 1) {
 		for _, err = unix.Write(p.wfd, b); err == unix.EINTR || err == unix.EAGAIN; _, err = unix.Write(p.wfd, b) {
@@ -106,9 +106,9 @@ func (p *Poller) UrgentTrigger(f queue.TaskFunc) (err error) {
 // call this method when the task is not so urgent, for instance writing data back to client.
 //
 // Note that asyncTaskQueue is a queue with low-priority whose size may grow large and tasks in it may backlog.
-func (p *Poller) Trigger(f queue.TaskFunc, buf []byte) (err error) {
+func (p *Poller) Trigger(fn queue.TaskFunc, arg interface{}) (err error) {
 	task := queue.GetTask()
-	task.Run, task.Buf = f, buf
+	task.Run, task.Arg = fn, arg
 	p.asyncTaskQueue.Enqueue(task)
 	if atomic.CompareAndSwapInt32(&p.netpollWakeSig, 0, 1) {
 		for _, err = unix.Write(p.wfd, b); err == unix.EINTR || err == unix.EAGAIN; _, err = unix.Write(p.wfd, b) {
@@ -154,7 +154,7 @@ func (p *Poller) Polling(callback func(fd int, ev uint32) error) error {
 			wakenUp = false
 			task := p.priorAsyncTaskQueue.Dequeue()
 			for ; task != nil; task = p.priorAsyncTaskQueue.Dequeue() {
-				switch err = task.Run(task.Buf); err {
+				switch err = task.Run(task.Arg); err {
 				case nil:
 				case errors.ErrServerShutdown:
 					return err
@@ -167,7 +167,7 @@ func (p *Poller) Polling(callback func(fd int, ev uint32) error) error {
 				if task = p.asyncTaskQueue.Dequeue(); task == nil {
 					break
 				}
-				switch err = task.Run(task.Buf); err {
+				switch err = task.Run(task.Arg); err {
 				case nil:
 				case errors.ErrServerShutdown:
 					return err

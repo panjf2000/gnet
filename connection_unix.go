@@ -110,9 +110,6 @@ func (c *conn) read() ([]byte, error) {
 }
 
 func (c *conn) write(buf []byte) (err error) {
-	if !c.opened {
-		return
-	}
 	var outFrame []byte
 	if outFrame, err = c.codec.Encode(c, buf); err != nil {
 		return
@@ -140,6 +137,13 @@ func (c *conn) write(buf []byte) (err error) {
 		err = c.loop.poller.ModReadWrite(c.fd)
 	}
 	return
+}
+
+func (c *conn) asyncWrite(itf interface{}) error {
+	if !c.opened {
+		return nil
+	}
+	return c.write(itf.([]byte))
 }
 
 func (c *conn) sendTo(buf []byte) error {
@@ -222,7 +226,7 @@ func (c *conn) BufferLength() int {
 }
 
 func (c *conn) AsyncWrite(buf []byte) error {
-	return c.loop.poller.Trigger(c.write, buf)
+	return c.loop.poller.Trigger(c.asyncWrite, buf)
 }
 
 func (c *conn) SendTo(buf []byte) error {
@@ -230,15 +234,11 @@ func (c *conn) SendTo(buf []byte) error {
 }
 
 func (c *conn) Wake() error {
-	return c.loop.poller.UrgentTrigger(func(_ []byte) error {
-		return c.loop.loopWake(c)
-	})
+	return c.loop.poller.UrgentTrigger(func(_ interface{}) error { return c.loop.loopWake(c) }, nil)
 }
 
 func (c *conn) Close() error {
-	return c.loop.poller.Trigger(func(_ []byte) error {
-		return c.loop.loopCloseConn(c, nil)
-	}, nil)
+	return c.loop.poller.Trigger(func(_ interface{}) error { return c.loop.loopCloseConn(c, nil) }, nil)
 }
 
 func (c *conn) Context() interface{}       { return c.ctx }
