@@ -27,8 +27,9 @@ import (
 	"net"
 	"os"
 
-	"github.com/panjf2000/gnet/errors"
 	"golang.org/x/sys/unix"
+
+	"github.com/panjf2000/gnet/errors"
 )
 
 func getUDPSockaddr(proto, addr string) (sa unix.Sockaddr, family int, udpAddr *net.UDPAddr, ipv6only bool, err error) {
