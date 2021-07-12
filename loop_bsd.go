@@ -32,7 +32,7 @@ func (el *eventloop) handleEvent(fd int, filter int16) (err error) {
 		case netpoll.EVFilterWrite:
 			err = el.loopWrite(c)
 		case netpoll.EVFilterRead:
-			err = el.loopRead(c, false)
+			err = el.loopRead(c)
 		}
 		return
 	}
