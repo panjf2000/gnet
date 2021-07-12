@@ -30,7 +30,9 @@ func (el *eventloop) handleEvent(fd int, filter int16) (err error) {
 		case netpoll.EVFilterSock:
 			err = el.loopCloseConn(c, nil)
 		case netpoll.EVFilterWrite:
-			err = el.loopWrite(c)
+			if !c.outboundBuffer.IsEmpty() {
+				err = el.loopWrite(c)
+			}
 		case netpoll.EVFilterRead:
 			err = el.loopRead(c)
 		}

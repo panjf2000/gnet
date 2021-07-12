@@ -67,7 +67,7 @@ func (svr *server) activateSubReactor(el *eventloop, lockOSThread bool) {
 			// In either case loopWrite() should take care of it properly:
 			// 1) writing data back,
 			// 2) closing the connection.
-			if ev&netpoll.OutEvents != 0 {
+			if ev&netpoll.OutEvents != 0 && !c.outboundBuffer.IsEmpty() {
 				if err := el.loopWrite(c); err != nil {
 					return err
 				}

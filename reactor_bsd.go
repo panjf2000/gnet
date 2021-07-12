@@ -62,7 +62,9 @@ func (svr *server) activateSubReactor(el *eventloop, lockOSThread bool) {
 			case netpoll.EVFilterSock:
 				err = el.loopCloseConn(c, nil)
 			case netpoll.EVFilterWrite:
-				err = el.loopWrite(c)
+				if !c.outboundBuffer.IsEmpty() {
+					err = el.loopWrite(c)
+				}
 			case netpoll.EVFilterRead:
 				err = el.loopRead(c)
 			}

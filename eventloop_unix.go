@@ -196,7 +196,15 @@ func (el *eventloop) loopWrite(c *conn) error {
 	el.eventHandler.PreWrite()
 
 	head, tail := c.outboundBuffer.PeekAll()
-	n, err := io.Writev(c.fd, [][]byte{head, tail})
+	var (
+		n   int
+		err error
+	)
+	if len(tail) > 0 {
+		n, err = io.Writev(c.fd, [][]byte{head, tail})
+	} else {
+		n, err = unix.Write(c.fd, head)
+	}
 	c.outboundBuffer.Discard(n)
 	switch err {
 	case nil, gerrors.ErrShortWritev: // do nothing, just go on
