@@ -64,7 +64,7 @@ func (svr *server) activateSubReactor(el *eventloop, lockOSThread bool) {
 			case netpoll.EVFilterWrite:
 				err = el.loopWrite(c)
 			case netpoll.EVFilterRead:
-				err = el.loopRead(c)
+				err = el.loopRead(c, false)
 			}
 		}
 		return

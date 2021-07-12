@@ -153,7 +153,10 @@ func (el *eventloop) loopOpen(c *conn) error {
 	return el.handleAction(c, action)
 }
 
-func (el *eventloop) loopRead(c *conn) error {
+func (el *eventloop) loopRead(c *conn, writeable bool) error {
+	if writeable && !c.outboundBuffer.IsEmpty() {
+		return nil
+	}
 	n, err := unix.Read(c.fd, el.buffer)
 	if n == 0 || err != nil {
 		if err == unix.EAGAIN {
@@ -170,7 +173,7 @@ func (el *eventloop) loopRead(c *conn) error {
 			// Encode data and try to write it back to the client, this attempt is based on a fact:
 			// a client socket waits for the response data after sending request data to the server,
 			// which makes the client socket writable.
-			if err = c.write(out); err != nil {
+			if err = c.write(out, writeable); err != nil {
 				return err
 			}
 		}
@@ -265,7 +268,7 @@ func (el *eventloop) loopWake(c *conn) error {
 
 	out, action := el.eventHandler.React(nil, c)
 	if out != nil {
-		if err := c.write(out); err != nil {
+		if err := c.write(out, true); err != nil {
 			return err
 		}
 	}

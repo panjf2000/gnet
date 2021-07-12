@@ -109,7 +109,7 @@ func (c *conn) read() ([]byte, error) {
 	return c.codec.Decode(c)
 }
 
-func (c *conn) write(buf []byte) (err error) {
+func (c *conn) write(buf []byte, writeable bool) (err error) {
 	var outFrame []byte
 	if outFrame, err = c.codec.Encode(c, buf); err != nil {
 		return
@@ -118,6 +118,11 @@ func (c *conn) write(buf []byte) (err error) {
 	// for maintaining the sequence of network packets.
 	if !c.outboundBuffer.IsEmpty() {
 		_, _ = c.outboundBuffer.Write(outFrame)
+		return
+	}
+	if !writeable {
+		_, _ = c.outboundBuffer.Write(outFrame)
+		err = c.loop.poller.ModReadWrite(c.fd)
 		return
 	}
 
@@ -143,7 +148,7 @@ func (c *conn) asyncWrite(itf interface{}) error {
 	if !c.opened {
 		return nil
 	}
-	return c.write(itf.([]byte))
+	return c.write(itf.([]byte), true)
 }
 
 func (c *conn) sendTo(buf []byte) error {

@@ -47,8 +47,8 @@ func (el *eventloop) handleEvent(fd int, ev uint32) error {
 		// resulting in that it won't receive any responses before the server read all data from client,
 		// in which case if the socket send buffer is full, we need to let it go and continue reading the data
 		// to prevent blocking forever.
-		if ev&netpoll.InEvents != 0 && (ev&netpoll.OutEvents == 0 || c.outboundBuffer.IsEmpty()) {
-			return el.loopRead(c)
+		if ev&netpoll.InEvents != 0 {
+			return el.loopRead(c, ev&netpoll.OutEvents != 0)
 		}
 		return nil
 	}

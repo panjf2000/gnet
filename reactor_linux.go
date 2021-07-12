@@ -79,8 +79,8 @@ func (svr *server) activateSubReactor(el *eventloop, lockOSThread bool) {
 			// resulting in that it won't receive any responses before the server reads all data from client,
 			// in which case if the server socket send buffer is full, we need to let it go and continue reading
 			// the data to prevent blocking forever.
-			if ev&netpoll.InEvents != 0 && (ev&netpoll.OutEvents == 0 || c.outboundBuffer.IsEmpty()) {
-				return el.loopRead(c)
+			if ev&netpoll.InEvents != 0 {
+				return el.loopRead(c, ev&netpoll.OutEvents != 0)
 			}
 		}
 		return nil
