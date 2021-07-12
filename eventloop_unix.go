@@ -166,7 +166,6 @@ func (el *eventloop) loopRead(c *conn) error {
 	for inFrame, _ := c.read(); inFrame != nil; inFrame, _ = c.read() {
 		out, action := el.eventHandler.React(inFrame, c)
 		if out != nil {
-			el.eventHandler.PreWrite()
 			// Encode data and try to write it back to the client, this attempt is based on a fact:
 			// a client socket waits for the response data after sending request data to the server,
 			// which makes the client socket writable.

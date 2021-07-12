@@ -120,7 +120,7 @@ func (c *conn) write(buf []byte) (err error) {
 		_, _ = c.outboundBuffer.Write(outFrame)
 		return
 	}
-
+	c.loop.eventHandler.PreWrite() // call PreWrite() only before server writes data to socket
 	var n int
 	if n, err = unix.Write(c.fd, outFrame); err != nil {
 		// A temporary error occurs, append the data to outbound buffer, writing it back to client in the next round.
