@@ -1,4 +1,4 @@
-// Copyright (c) 2019 Andy Pan
+// Copyright (c) 2021 Andy Pan
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -18,45 +18,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-package gnet
+package netpoll
 
-import (
-	"runtime"
-
-	"github.com/panjf2000/gnet/errors"
-)
-
-func (svr *server) activateMainReactor(lockOSThread bool) {
-	if lockOSThread {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-	}
-
-	defer svr.signalShutdown()
-
-	err := svr.mainLoop.poller.Polling()
-	if err == errors.ErrServerShutdown {
-		svr.opts.Logger.Debugf("main reactor is exiting in terms of the demand from user, %v", err)
-	} else if err != nil {
-		svr.opts.Logger.Errorf("main reactor is exiting due to error: %v", err)
-	}
-}
-
-func (svr *server) activateSubReactor(el *eventloop, lockOSThread bool) {
-	if lockOSThread {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-	}
-
-	defer func() {
-		el.closeAllConns()
-		svr.signalShutdown()
-	}()
-
-	err := el.poller.Polling()
-	if err == errors.ErrServerShutdown {
-		svr.opts.Logger.Debugf("event-loop(%d) is exiting in terms of the demand from user, %v", el.idx, err)
-	} else if err != nil {
-		svr.opts.Logger.Errorf("event-loop(%d) is exiting normally on the signal error: %v", el.idx, err)
-	}
-}
+type PollEventHandler func(uint32) error

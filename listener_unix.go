@@ -44,6 +44,14 @@ type listener struct {
 	sockopts      []socket.Option
 }
 
+func (ln *listener) PackListenerPollAttachment(el *eventloop) *netpoll.PollAttachment {
+	return &netpoll.PollAttachment{FD: ln.fd, Callback: el.loopAccept}
+}
+
+func (ln *listener) PackListenerPollAttachmentForMainReactor(svr *server) *netpoll.PollAttachment {
+	return &netpoll.PollAttachment{FD: ln.fd, Callback: svr.acceptNewConnection}
+}
+
 func (ln *listener) Dup() (int, string, error) {
 	return netpoll.Dup(ln.fd)
 }

@@ -24,30 +24,6 @@ package netpoll
 
 import "golang.org/x/sys/unix"
 
-// Do the interface allocations only once for common
-// Errno values.
-var (
-	errEAGAIN error = unix.EAGAIN
-	errEINVAL error = unix.EINVAL
-	errENOENT error = unix.ENOENT
-)
-
-// errnoErr returns common boxed Errno values, to prevent
-// allocations at runtime.
-func errnoErr(e unix.Errno) error {
-	switch e {
-	case unix.EAGAIN:
-		return errEAGAIN
-	case unix.EINVAL:
-		return errEINVAL
-	case unix.ENOENT:
-		return errENOENT
-	}
-	return e
-}
-
-var zero uintptr
-
 const (
 	// InitEvents represents the initial length of poller event-list.
 	InitEvents = 128
@@ -64,19 +40,19 @@ const (
 
 type eventList struct {
 	size   int
-	events []unix.EpollEvent
+	events []epollevent
 }
 
 func newEventList(size int) *eventList {
-	return &eventList{size, make([]unix.EpollEvent, size)}
+	return &eventList{size, make([]epollevent, size)}
 }
 
 func (el *eventList) expand() {
 	el.size <<= 1
-	el.events = make([]unix.EpollEvent, el.size)
+	el.events = make([]epollevent, el.size)
 }
 
 func (el *eventList) shrink() {
 	el.size >>= 1
-	el.events = make([]unix.EpollEvent, el.size)
+	el.events = make([]epollevent, el.size)
 }

@@ -38,9 +38,9 @@ import (
 
 // Poller represents a poller which is in charge of monitoring file-descriptors.
 type Poller struct {
-	fd                  int    // epoll fd
-	wfd                 int    // wake fd
-	wfdBuf              []byte // wfd buffer to read packet
+	fd                  int             // epoll fd
+	wpa                 *PollAttachment // PollAttachment for wake events
+	wfdBuf              []byte          // wfd buffer to read packet
 	netpollWakeSig      int32
 	asyncTaskQueue      queue.AsyncTaskQueue // queue with low priority
 	priorAsyncTaskQueue queue.AsyncTaskQueue // queue with high priority
@@ -54,14 +54,16 @@ func OpenPoller() (poller *Poller, err error) {
 		err = os.NewSyscallError("epoll_create1", err)
 		return
 	}
-	if poller.wfd, err = unix.Eventfd(0, unix.EFD_NONBLOCK|unix.EFD_CLOEXEC); err != nil {
+	var wfd int
+	if wfd, err = unix.Eventfd(0, unix.EFD_NONBLOCK|unix.EFD_CLOEXEC); err != nil {
 		_ = poller.Close()
 		poller = nil
 		err = os.NewSyscallError("eventfd", err)
 		return
 	}
 	poller.wfdBuf = make([]byte, 8)
-	if err = poller.AddRead(poller.wfd); err != nil {
+	poller.wpa = &PollAttachment{FD: wfd}
+	if err = poller.AddRead(poller.wpa); err != nil {
 		_ = poller.Close()
 		poller = nil
 		return
@@ -76,7 +78,7 @@ func (p *Poller) Close() error {
 	if err := os.NewSyscallError("close", unix.Close(p.fd)); err != nil {
 		return err
 	}
-	return os.NewSyscallError("close", unix.Close(p.wfd))
+	return os.NewSyscallError("close", unix.Close(p.wpa.FD))
 }
 
 // Make the endianness of bytes compatible with more linux OSs under different processor-architectures,
@@ -96,7 +98,7 @@ func (p *Poller) UrgentTrigger(fn queue.TaskFunc, arg interface{}) (err error) {
 	task.Run, task.Arg = fn, arg
 	p.priorAsyncTaskQueue.Enqueue(task)
 	if atomic.CompareAndSwapInt32(&p.netpollWakeSig, 0, 1) {
-		for _, err = unix.Write(p.wfd, b); err == unix.EINTR || err == unix.EAGAIN; _, err = unix.Write(p.wfd, b) {
+		for _, err = unix.Write(p.wpa.FD, b); err == unix.EINTR || err == unix.EAGAIN; _, err = unix.Write(p.wpa.FD, b) {
 		}
 	}
 	return os.NewSyscallError("write", err)
@@ -111,20 +113,20 @@ func (p *Poller) Trigger(fn queue.TaskFunc, arg interface{}) (err error) {
 	task.Run, task.Arg = fn, arg
 	p.asyncTaskQueue.Enqueue(task)
 	if atomic.CompareAndSwapInt32(&p.netpollWakeSig, 0, 1) {
-		for _, err = unix.Write(p.wfd, b); err == unix.EINTR || err == unix.EAGAIN; _, err = unix.Write(p.wfd, b) {
+		for _, err = unix.Write(p.wpa.FD, b); err == unix.EINTR || err == unix.EAGAIN; _, err = unix.Write(p.wpa.FD, b) {
 		}
 	}
 	return os.NewSyscallError("write", err)
 }
 
 // Polling blocks the current goroutine, waiting for network-events.
-func (p *Poller) Polling(callback func(fd int, ev uint32) error) error {
+func (p *Poller) Polling() error {
 	el := newEventList(InitEvents)
 	var wakenUp bool
 
 	msec := -1
 	for {
-		n, err := unix.EpollWait(p.fd, el.events, msec)
+		n, err := epollWait(p.fd, el.events, msec)
 		if n == 0 || (n < 0 && err == unix.EINTR) {
 			msec = -1
 			runtime.Gosched()
@@ -136,8 +138,9 @@ func (p *Poller) Polling(callback func(fd int, ev uint32) error) error {
 		msec = 0
 
 		for i := 0; i < n; i++ {
-			if fd := int(el.events[i].Fd); fd != p.wfd {
-				switch err = callback(fd, el.events[i].Events); err {
+			pollAttachment := *(**PollAttachment)(unsafe.Pointer(&el.events[i].data))
+			if pollAttachment.FD != p.wpa.FD {
+				switch err = pollAttachment.Callback(el.events[i].events); err {
 				case nil:
 				case errors.ErrAcceptSocket, errors.ErrServerShutdown:
 					return err
@@ -146,7 +149,7 @@ func (p *Poller) Polling(callback func(fd int, ev uint32) error) error {
 				}
 			} else { // poller is awaken to run tasks in queues.
 				wakenUp = true
-				_, _ = unix.Read(p.wfd, p.wfdBuf)
+				_, _ = unix.Read(p.wpa.FD, p.wfdBuf)
 			}
 		}
 
@@ -178,7 +181,7 @@ func (p *Poller) Polling(callback func(fd int, ev uint32) error) error {
 			}
 			atomic.StoreInt32(&p.netpollWakeSig, 0)
 			if !p.asyncTaskQueue.Empty() || !p.priorAsyncTaskQueue.Empty() {
-				for _, err = unix.Write(p.wfd, b); err == unix.EINTR || err == unix.EAGAIN; _, err = unix.Write(p.wfd, b) {
+				for _, err = unix.Write(p.wpa.FD, b); err == unix.EINTR || err == unix.EAGAIN; _, err = unix.Write(p.wpa.FD, b) {
 				}
 			}
 		}
@@ -198,36 +201,46 @@ const (
 )
 
 // AddReadWrite registers the given file-descriptor with readable and writable events to the poller.
-func (p *Poller) AddReadWrite(fd int) error {
-	return os.NewSyscallError("epoll_ctl add",
-		unix.EpollCtl(p.fd, unix.EPOLL_CTL_ADD, fd, &unix.EpollEvent{Fd: int32(fd), Events: readWriteEvents}))
+func (p *Poller) AddReadWrite(pa *PollAttachment) error {
+	var ev epollevent
+	ev.events = readWriteEvents
+	*(**PollAttachment)(unsafe.Pointer(&ev.data)) = pa
+	return os.NewSyscallError("epoll_ctl add", epollCtl(p.fd, unix.EPOLL_CTL_ADD, pa.FD, &ev))
 }
 
 // AddRead registers the given file-descriptor with readable event to the poller.
-func (p *Poller) AddRead(fd int) error {
-	return os.NewSyscallError("epoll_ctl add",
-		unix.EpollCtl(p.fd, unix.EPOLL_CTL_ADD, fd, &unix.EpollEvent{Fd: int32(fd), Events: readEvents}))
+func (p *Poller) AddRead(pa *PollAttachment) error {
+	var ev epollevent
+	ev.events = readEvents
+	*(**PollAttachment)(unsafe.Pointer(&ev.data)) = pa
+	return os.NewSyscallError("epoll_ctl add", epollCtl(p.fd, unix.EPOLL_CTL_ADD, pa.FD, &ev))
 }
 
 // AddWrite registers the given file-descriptor with writable event to the poller.
-func (p *Poller) AddWrite(fd int) error {
-	return os.NewSyscallError("epoll_ctl add",
-		unix.EpollCtl(p.fd, unix.EPOLL_CTL_ADD, fd, &unix.EpollEvent{Fd: int32(fd), Events: writeEvents}))
+func (p *Poller) AddWrite(pa *PollAttachment) error {
+	var ev epollevent
+	ev.events = writeEvents
+	*(**PollAttachment)(unsafe.Pointer(&ev.data)) = pa
+	return os.NewSyscallError("epoll_ctl add", epollCtl(p.fd, unix.EPOLL_CTL_ADD, pa.FD, &ev))
 }
 
 // ModRead renews the given file-descriptor with readable event in the poller.
-func (p *Poller) ModRead(fd int) error {
-	return os.NewSyscallError("epoll_ctl mod",
-		unix.EpollCtl(p.fd, unix.EPOLL_CTL_MOD, fd, &unix.EpollEvent{Fd: int32(fd), Events: readEvents}))
+func (p *Poller) ModRead(pa *PollAttachment) error {
+	var ev epollevent
+	ev.events = readEvents
+	*(**PollAttachment)(unsafe.Pointer(&ev.data)) = pa
+	return os.NewSyscallError("epoll_ctl mod", epollCtl(p.fd, unix.EPOLL_CTL_MOD, pa.FD, &ev))
 }
 
 // ModReadWrite renews the given file-descriptor with readable and writable events in the poller.
-func (p *Poller) ModReadWrite(fd int) error {
-	return os.NewSyscallError("epoll_ctl mod",
-		unix.EpollCtl(p.fd, unix.EPOLL_CTL_MOD, fd, &unix.EpollEvent{Fd: int32(fd), Events: readWriteEvents}))
+func (p *Poller) ModReadWrite(pa *PollAttachment) error {
+	var ev epollevent
+	ev.events = readWriteEvents
+	*(**PollAttachment)(unsafe.Pointer(&ev.data)) = pa
+	return os.NewSyscallError("epoll_ctl mod", epollCtl(p.fd, unix.EPOLL_CTL_MOD, pa.FD, &ev))
 }
 
 // Delete removes the given file-descriptor from the poller.
 func (p *Poller) Delete(fd int) error {
-	return os.NewSyscallError("epoll_ctl del", unix.EpollCtl(p.fd, unix.EPOLL_CTL_DEL, fd, nil))
+	return os.NewSyscallError("epoll_ctl del", epollCtl(p.fd, unix.EPOLL_CTL_DEL, fd, nil))
 }
