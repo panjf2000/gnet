@@ -132,12 +132,13 @@ func (p *Poller) Polling() error {
 
 		var evFilter int16
 		for i := 0; i < n; i++ {
-			if fd := el.events[i].Ident; fd != 0 {
-				pollAttachment := *(**PollAttachment)(unsafe.Pointer(&el.events[i].Udata))
-				evFilter = el.events[i].Filter
-				if (el.events[i].Flags&unix.EV_EOF != 0) || (el.events[i].Flags&unix.EV_ERROR != 0) {
+			ev := &el.events[i]
+			if ev.Ident != 0 {
+				evFilter = ev.Filter
+				if (ev.Flags&unix.EV_EOF != 0) || (ev.Flags&unix.EV_ERROR != 0) {
 					evFilter = EVFilterSock
 				}
+				pollAttachment := (*PollAttachment)(unsafe.Pointer(ev.Udata))
 				switch err = pollAttachment.Callback(evFilter); err {
 				case nil:
 				case errors.ErrAcceptSocket, errors.ErrServerShutdown:
@@ -197,11 +198,9 @@ func (p *Poller) AddReadWrite(pa *PollAttachment) error {
 	evs[0].Ident = uint64(pa.FD)
 	evs[0].Flags = unix.EV_ADD
 	evs[0].Filter = unix.EVFILT_READ
-	*(**PollAttachment)(unsafe.Pointer(&evs[0].Udata)) = pa
-	evs[1].Ident = uint64(pa.FD)
-	evs[1].Flags = unix.EV_ADD
+	evs[0].Udata = (*byte)(unsafe.Pointer(pa))
+	evs[1] = evs[0]
 	evs[1].Filter = unix.EVFILT_WRITE
-	*(**PollAttachment)(unsafe.Pointer(&evs[1].Udata)) = pa
 	_, err := unix.Kevent(p.fd, evs[:], nil, nil)
 	return os.NewSyscallError("kevent add", err)
 }
@@ -212,7 +211,7 @@ func (p *Poller) AddRead(pa *PollAttachment) error {
 	evs[0].Ident = uint64(pa.FD)
 	evs[0].Flags = unix.EV_ADD
 	evs[0].Filter = unix.EVFILT_READ
-	*(**PollAttachment)(unsafe.Pointer(&evs[0].Udata)) = pa
+	evs[0].Udata = (*byte)(unsafe.Pointer(pa))
 	_, err := unix.Kevent(p.fd, evs[:], nil, nil)
 	return os.NewSyscallError("kevent add", err)
 }
@@ -223,7 +222,7 @@ func (p *Poller) AddWrite(pa *PollAttachment) error {
 	evs[0].Ident = uint64(pa.FD)
 	evs[0].Flags = unix.EV_ADD
 	evs[0].Filter = unix.EVFILT_WRITE
-	*(**PollAttachment)(unsafe.Pointer(&evs[0].Udata)) = pa
+	evs[0].Udata = (*byte)(unsafe.Pointer(pa))
 	_, err := unix.Kevent(p.fd, evs[:], nil, nil)
 	return os.NewSyscallError("kevent add", err)
 }
@@ -234,7 +233,7 @@ func (p *Poller) ModRead(pa *PollAttachment) error {
 	evs[0].Ident = uint64(pa.FD)
 	evs[0].Flags = unix.EV_DELETE
 	evs[0].Filter = unix.EVFILT_WRITE
-	*(**PollAttachment)(unsafe.Pointer(&evs[0].Udata)) = pa
+	evs[0].Udata = (*byte)(unsafe.Pointer(pa))
 	_, err := unix.Kevent(p.fd, evs[:], nil, nil)
 	return os.NewSyscallError("kevent delete", err)
 }
@@ -245,12 +244,12 @@ func (p *Poller) ModReadWrite(pa *PollAttachment) error {
 	evs[0].Ident = uint64(pa.FD)
 	evs[0].Flags = unix.EV_ADD
 	evs[0].Filter = unix.EVFILT_WRITE
-	*(**PollAttachment)(unsafe.Pointer(&evs[0].Udata)) = pa
+	evs[0].Udata = (*byte)(unsafe.Pointer(pa))
 	_, err := unix.Kevent(p.fd, evs[:], nil, nil)
 	return os.NewSyscallError("kevent add", err)
 }
 
 // Delete removes the given file-descriptor from the poller.
-func (p *Poller) Delete(fd int) error {
+func (p *Poller) Delete(_ int) error {
 	return nil
 }
