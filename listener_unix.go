@@ -37,19 +37,17 @@ import (
 )
 
 type listener struct {
-	once          sync.Once
-	fd            int
-	lnaddr        net.Addr
-	addr, network string
-	sockopts      []socket.Option
+	once           sync.Once
+	fd             int
+	lnaddr         net.Addr
+	addr, network  string
+	sockopts       []socket.Option
+	pollAttachment *netpoll.PollAttachment // listener attachment for poller
 }
 
-func (ln *listener) PackListenerPollAttachment(el *eventloop) *netpoll.PollAttachment {
-	return &netpoll.PollAttachment{FD: ln.fd, Callback: el.loopAccept}
-}
-
-func (ln *listener) PackListenerPollAttachmentForMainReactor(svr *server) *netpoll.PollAttachment {
-	return &netpoll.PollAttachment{FD: ln.fd, Callback: svr.acceptNewConnection}
+func (ln *listener) PackListenerPollAttachment(handler netpoll.PollEventHandler) *netpoll.PollAttachment {
+	ln.pollAttachment = &netpoll.PollAttachment{FD: ln.fd, Callback: handler}
+	return ln.pollAttachment
 }
 
 func (ln *listener) Dup() (int, string, error) {
