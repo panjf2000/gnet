@@ -85,7 +85,7 @@ func (s Server) CountConnections() (count int) {
 // It is the caller's responsibility to close dupFD when finished.
 // Closing listener does not affect dupFD, and closing dupFD does not affect listener.
 func (s Server) DupFd() (dupFD int, err error) {
-	dupFD, sc, err := s.svr.ln.Dup()
+	dupFD, sc, err := s.svr.ln.dup()
 	if err != nil {
 		logging.Warnf("%s failed when duplicating new fd\n", sc)
 	}

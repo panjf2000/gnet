@@ -45,12 +45,12 @@ type listener struct {
 	pollAttachment *netpoll.PollAttachment // listener attachment for poller
 }
 
-func (ln *listener) PackListenerPollAttachment(handler netpoll.PollEventHandler) *netpoll.PollAttachment {
+func (ln *listener) packPollAttachment(handler netpoll.PollEventHandler) *netpoll.PollAttachment {
 	ln.pollAttachment = &netpoll.PollAttachment{FD: ln.fd, Callback: handler}
 	return ln.pollAttachment
 }
 
-func (ln *listener) Dup() (int, string, error) {
+func (ln *listener) dup() (int, string, error) {
 	return netpoll.Dup(ln.fd)
 }
 
