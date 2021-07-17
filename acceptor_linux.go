@@ -58,10 +58,10 @@ func (svr *server) acceptNewConnection(_ uint32) error {
 
 func (el *eventloop) loopAccept(_ uint32) error {
 	if el.ln.network == "udp" {
-		return el.loopReadUDP(el.svr.ln.fd)
+		return el.loopReadUDP(el.ln.fd)
 	}
 
-	nfd, sa, err := unix.Accept(el.svr.ln.fd)
+	nfd, sa, err := unix.Accept(el.ln.fd)
 	if err != nil {
 		if err == unix.EAGAIN {
 			return nil
