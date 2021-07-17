@@ -26,7 +26,7 @@ import (
 	"github.com/panjf2000/gnet/pool/bytebuffer"
 )
 
-const initSize = 1 << 12 // 4096 bytes for the first-time allocation on ring-buffer.
+const defaultBufferSize = 1 << 12 // 4096 bytes for the first-time allocation on ring-buffer.
 
 // ErrIsEmpty will be returned when trying to read a empty ring-buffer.
 var ErrIsEmpty = errors.New("ring-buffer is empty")
@@ -374,19 +374,19 @@ func (r *RingBuffer) Reset() {
 	r.r, r.w = 0, 0
 
 	// Shrink the internal buffer for saving memory.
-	newCap := r.size >> 1
-	newBuf := make([]byte, newCap)
-	r.buf = newBuf
-	r.size = newCap
-	r.mask = newCap - 1
+	// newCap := r.size >> 1
+	// newBuf := make([]byte, newCap)
+	// r.buf = newBuf
+	// r.size = newCap
+	// r.mask = newCap - 1
 }
 
-func (r *RingBuffer) malloc(cap int) {
+func (r *RingBuffer) malloc(n int) {
 	var newCap int
-	if r.size == 0 && cap < initSize {
-		newCap = initSize
+	if r.size == 0 && n < defaultBufferSize {
+		newCap = defaultBufferSize
 	} else {
-		newCap = internal.CeilToPowerOfTwo(r.size + cap)
+		newCap = internal.CeilToPowerOfTwo(r.size + n)
 	}
 	newBuf := make([]byte, newCap)
 	oldLen := r.Length()
