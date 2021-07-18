@@ -138,9 +138,10 @@ func (p *Poller) Polling() error {
 		msec = 0
 
 		for i := 0; i < n; i++ {
-			pollAttachment := *(**PollAttachment)(unsafe.Pointer(&el.events[i].data))
+			ev := &el.events[i]
+			pollAttachment := *(**PollAttachment)(unsafe.Pointer(&ev.data))
 			if pollAttachment.FD != p.wpa.FD {
-				switch err = pollAttachment.Callback(el.events[i].events); err {
+				switch err = pollAttachment.Callback(ev.events); err {
 				case nil:
 				case errors.ErrAcceptSocket, errors.ErrServerShutdown:
 					return err
