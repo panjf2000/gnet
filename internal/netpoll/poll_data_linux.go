@@ -1,4 +1,4 @@
-// Copyright (c) 2019 Andy Pan
+// Copyright (c) 2021 Andy Pan
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -18,25 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-// +build freebsd dragonfly darwin
+package netpoll
 
-package gnet
-
-import "github.com/panjf2000/gnet/internal/netpoll"
-
-func (el *eventloop) handleEvent(fd int, filter int16) (err error) {
-	if c, ok := el.connections[fd]; ok {
-		switch filter {
-		case netpoll.EVFilterSock:
-			err = el.loopCloseConn(c, nil)
-		case netpoll.EVFilterWrite:
-			if !c.outboundBuffer.IsEmpty() {
-				err = el.loopWrite(c)
-			}
-		case netpoll.EVFilterRead:
-			err = el.loopRead(c)
-		}
-		return
-	}
-	return el.loopAccept(fd)
-}
+// PollEventHandler is the callback for I/O events notified by the poller.
+type PollEventHandler func(uint32) error

@@ -1,4 +1,4 @@
-// Copyright (c) 2019 Andy Pan
+// Copyright (c) 2021 Andy Pan
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -20,38 +20,10 @@
 
 // +build linux freebsd dragonfly darwin
 
-package gnet
+package netpoll
 
-import (
-	"os"
-
-	"golang.org/x/sys/unix"
-
-	"github.com/panjf2000/gnet/errors"
-	"github.com/panjf2000/gnet/internal/socket"
-)
-
-func (svr *server) acceptNewConnection(fd int) error {
-	nfd, sa, err := unix.Accept(fd)
-	if err != nil {
-		if err == unix.EAGAIN {
-			return nil
-		}
-		svr.opts.Logger.Errorf("Accept() fails due to error: %v", err)
-		return errors.ErrAcceptSocket
-	}
-	if err = os.NewSyscallError("fcntl nonblock", unix.SetNonblock(nfd, true)); err != nil {
-		return err
-	}
-
-	netAddr := socket.SockaddrToTCPOrUnixAddr(sa)
-	el := svr.lb.next(netAddr)
-	c := newTCPConn(nfd, el, sa, netAddr)
-
-	err = el.poller.UrgentTrigger(el.loopInsert, c)
-	if err != nil {
-		_ = unix.Close(nfd)
-		c.releaseTCP()
-	}
-	return nil
+// PollAttachment is the user data which is about to be stored in "void *ptr" of epoll_data or "void *udata" of kevent.
+type PollAttachment struct {
+	FD       int
+	Callback PollEventHandler
 }

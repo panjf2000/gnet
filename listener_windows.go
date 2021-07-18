@@ -38,7 +38,7 @@ type listener struct {
 	addr, network string
 }
 
-func (ln *listener) Dup() (int, string, error) {
+func (ln *listener) dup() (int, string, error) {
 	return netpoll.Dup(0)
 }
 

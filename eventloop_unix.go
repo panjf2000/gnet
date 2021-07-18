@@ -28,7 +28,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"runtime"
 	"sync/atomic"
 	"time"
 	"unsafe"
@@ -38,7 +37,6 @@ import (
 	gerrors "github.com/panjf2000/gnet/errors"
 	"github.com/panjf2000/gnet/internal/io"
 	"github.com/panjf2000/gnet/internal/netpoll"
-	"github.com/panjf2000/gnet/internal/socket"
 	"github.com/panjf2000/gnet/logging"
 )
 
@@ -81,54 +79,9 @@ func (el *eventloop) closeAllConns() {
 	}
 }
 
-func (el *eventloop) loopRun(lockOSThread bool) {
-	if lockOSThread {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-	}
-
-	defer func() {
-		el.closeAllConns()
-		el.ln.close()
-		el.svr.signalShutdown()
-	}()
-
-	err := el.poller.Polling(el.handleEvent)
-	el.getLogger().Infof("event-loop(%d) is exiting due to error: %v", el.idx, err)
-}
-
-func (el *eventloop) loopAccept(fd int) error {
-	if fd == el.ln.fd {
-		if el.ln.network == "udp" {
-			return el.loopReadUDP(fd)
-		}
-
-		nfd, sa, err := unix.Accept(fd)
-		if err != nil {
-			if err == unix.EAGAIN {
-				return nil
-			}
-			return os.NewSyscallError("accept", err)
-		}
-		if err = os.NewSyscallError("fcntl nonblock", unix.SetNonblock(nfd, true)); err != nil {
-			return err
-		}
-
-		netAddr := socket.SockaddrToTCPOrUnixAddr(sa)
-		c := newTCPConn(nfd, el, sa, netAddr)
-		if err = el.poller.AddRead(c.fd); err == nil {
-			el.connections[c.fd] = c
-			return el.loopOpen(c)
-		}
-		return err
-	}
-
-	return nil
-}
-
-func (el *eventloop) loopInsert(itf interface{}) error {
+func (el *eventloop) loopRegister(itf interface{}) error {
 	c := itf.(*conn)
-	if err := el.poller.AddRead(c.fd); err != nil {
+	if err := el.poller.AddRead(c.pollAttachment); err != nil {
 		_ = unix.Close(c.fd)
 		c.releaseTCP()
 		return nil
@@ -147,7 +100,7 @@ func (el *eventloop) loopOpen(c *conn) error {
 	}
 
 	if !c.outboundBuffer.IsEmpty() {
-		_ = el.poller.AddWrite(c.fd)
+		_ = el.poller.AddWrite(c.pollAttachment)
 	}
 
 	return el.handleAction(c, action)
@@ -217,7 +170,7 @@ func (el *eventloop) loopWrite(c *conn) error {
 	// All data have been drained, it's no need to monitor the writable events,
 	// remove the writable event from poller to help the future event-loops.
 	if c.outboundBuffer.IsEmpty() {
-		_ = el.poller.ModRead(c.fd)
+		_ = el.poller.ModRead(c.pollAttachment)
 	}
 
 	return nil

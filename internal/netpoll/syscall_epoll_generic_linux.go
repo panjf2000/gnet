@@ -1,4 +1,4 @@
-// Copyright (c) 2019 Andy Pan
+// Copyright (c) 2021 Andy Pan
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -18,41 +18,35 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-// +build freebsd dragonfly darwin
+// +build linux,!arm64,!riscv64
+// +build poll_opt
 
 package netpoll
 
-import "golang.org/x/sys/unix"
+import (
+	"unsafe"
 
-const (
-	// InitPollEventsCap represents the initial capacity of poller event-list.
-	InitPollEventsCap = 64
-	// MaxAsyncTasksAtOneTime is the maximum amount of asynchronous tasks that the event-loop will process at one time.
-	MaxAsyncTasksAtOneTime = 128
-	// EVFilterWrite represents writeable events from sockets.
-	EVFilterWrite = unix.EVFILT_WRITE
-	// EVFilterRead represents readable events from sockets.
-	EVFilterRead = unix.EVFILT_READ
-	// EVFilterSock represents exceptional events that are not read/write, like socket being closed,
-	// reading/writing from/to a closed socket, etc.
-	EVFilterSock = -0xd
+	"golang.org/x/sys/unix"
 )
 
-type eventList struct {
-	size   int
-	events []unix.Kevent_t
-}
-
-func newEventList(size int) *eventList {
-	return &eventList{size, make([]unix.Kevent_t, size)}
-}
-
-func (el *eventList) expand() {
-	el.size <<= 1
-	el.events = make([]unix.Kevent_t, el.size)
-}
-
-func (el *eventList) shrink() {
-	el.size >>= 1
-	el.events = make([]unix.Kevent_t, el.size)
+func epollWait(epfd int, events []epollevent, msec int) (int, error) {
+	var ep unsafe.Pointer
+	if len(events) > 0 {
+		ep = unsafe.Pointer(&events[0])
+	} else {
+		ep = unsafe.Pointer(&zero)
+	}
+	var (
+		np    uintptr
+		errno unix.Errno
+	)
+	if msec == 0 { // non-block system call, use RawSyscall6 to avoid getting preempted by runtime
+		np, _, errno = unix.RawSyscall6(unix.SYS_EPOLL_WAIT, uintptr(epfd), uintptr(ep), uintptr(len(events)), 0, 0, 0)
+	} else {
+		np, _, errno = unix.Syscall6(unix.SYS_EPOLL_WAIT, uintptr(epfd), uintptr(ep), uintptr(len(events)), uintptr(msec), 0, 0)
+	}
+	if errno != 0 {
+		return int(np), errnoErr(errno)
+	}
+	return int(np), nil
 }

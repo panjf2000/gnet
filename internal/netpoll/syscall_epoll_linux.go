@@ -1,4 +1,4 @@
-// Copyright (c) 2019 Andy Pan
+// Copyright (c) 2021 Andy Pan
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -19,40 +19,20 @@
 // SOFTWARE.
 
 // +build linux
+// +build poll_opt
 
 package netpoll
 
-import "golang.org/x/sys/unix"
+import (
+	"unsafe"
 
-const (
-	// InitPollEventsCap represents the initial capacity of poller event-list.
-	InitPollEventsCap = 128
-	// MaxAsyncTasksAtOneTime is the maximum amount of asynchronous tasks that the event-loop will process at one time.
-	MaxAsyncTasksAtOneTime = 256
-	// ErrEvents represents exceptional events that are not read/write, like socket being closed,
-	// reading/writing from/to a closed socket, etc.
-	ErrEvents = unix.EPOLLERR | unix.EPOLLHUP | unix.EPOLLRDHUP
-	// OutEvents combines EPOLLOUT event and some exceptional events.
-	OutEvents = ErrEvents | unix.EPOLLOUT
-	// InEvents combines EPOLLIN/EPOLLPRI events and some exceptional events.
-	InEvents = ErrEvents | unix.EPOLLIN | unix.EPOLLPRI
+	"golang.org/x/sys/unix"
 )
 
-type eventList struct {
-	size   int
-	events []epollevent
-}
-
-func newEventList(size int) *eventList {
-	return &eventList{size, make([]epollevent, size)}
-}
-
-func (el *eventList) expand() {
-	el.size <<= 1
-	el.events = make([]epollevent, el.size)
-}
-
-func (el *eventList) shrink() {
-	el.size >>= 1
-	el.events = make([]epollevent, el.size)
+func epollCtl(epfd int, op int, fd int, event *epollevent) error {
+	_, _, errno := unix.RawSyscall6(unix.SYS_EPOLL_CTL, uintptr(epfd), uintptr(op), uintptr(fd), uintptr(unsafe.Pointer(event)), 0, 0)
+	if errno != 0 {
+		return errnoErr(errno)
+	}
+	return nil
 }

@@ -1,4 +1,4 @@
-// Copyright (c) 2019 Andy Pan
+// Copyright (c) 2021 Andy Pan
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -20,39 +20,20 @@
 
 // +build freebsd dragonfly darwin
 
-package netpoll
+package gnet
 
-import "golang.org/x/sys/unix"
+import "github.com/panjf2000/gnet/internal/netpoll"
 
-const (
-	// InitPollEventsCap represents the initial capacity of poller event-list.
-	InitPollEventsCap = 64
-	// MaxAsyncTasksAtOneTime is the maximum amount of asynchronous tasks that the event-loop will process at one time.
-	MaxAsyncTasksAtOneTime = 128
-	// EVFilterWrite represents writeable events from sockets.
-	EVFilterWrite = unix.EVFILT_WRITE
-	// EVFilterRead represents readable events from sockets.
-	EVFilterRead = unix.EVFILT_READ
-	// EVFilterSock represents exceptional events that are not read/write, like socket being closed,
-	// reading/writing from/to a closed socket, etc.
-	EVFilterSock = -0xd
-)
-
-type eventList struct {
-	size   int
-	events []unix.Kevent_t
-}
-
-func newEventList(size int) *eventList {
-	return &eventList{size, make([]unix.Kevent_t, size)}
-}
-
-func (el *eventList) expand() {
-	el.size <<= 1
-	el.events = make([]unix.Kevent_t, el.size)
-}
-
-func (el *eventList) shrink() {
-	el.size >>= 1
-	el.events = make([]unix.Kevent_t, el.size)
+func (c *conn) handleEvents(filter int16) (err error) {
+	switch filter {
+	case netpoll.EVFilterSock:
+		err = c.loop.loopCloseConn(c, nil)
+	case netpoll.EVFilterWrite:
+		if !c.outboundBuffer.IsEmpty() {
+			err = c.loop.loopWrite(c)
+		}
+	case netpoll.EVFilterRead:
+		err = c.loop.loopRead(c)
+	}
+	return
 }

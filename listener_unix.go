@@ -37,14 +37,20 @@ import (
 )
 
 type listener struct {
-	once          sync.Once
-	fd            int
-	lnaddr        net.Addr
-	addr, network string
-	sockopts      []socket.Option
+	once           sync.Once
+	fd             int
+	lnaddr         net.Addr
+	addr, network  string
+	sockopts       []socket.Option
+	pollAttachment *netpoll.PollAttachment // listener attachment for poller
 }
 
-func (ln *listener) Dup() (int, string, error) {
+func (ln *listener) packPollAttachment(handler netpoll.PollEventHandler) *netpoll.PollAttachment {
+	ln.pollAttachment = &netpoll.PollAttachment{FD: ln.fd, Callback: handler}
+	return ln.pollAttachment
+}
+
+func (ln *listener) dup() (int, string, error) {
 	return netpoll.Dup(ln.fd)
 }
 
@@ -79,7 +85,7 @@ func (ln *listener) close() {
 
 func initListener(network, addr string, options *Options) (l *listener, err error) {
 	var sockopts []socket.Option
-	if options.ReusePort {
+	if options.ReusePort || network == "udp" {
 		sockopt := socket.Option{SetSockopt: socket.SetReuseport, Opt: 1}
 		sockopts = append(sockopts, sockopt)
 	}
