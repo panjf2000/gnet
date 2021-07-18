@@ -19,6 +19,7 @@
 // SOFTWARE.
 
 // +build linux,arm64 linux,riscv64
+// +build poll_opt
 
 package netpoll
 
