@@ -25,8 +25,8 @@ package netpoll
 import "golang.org/x/sys/unix"
 
 const (
-	// InitEvents represents the initial length of poller event-list.
-	InitEvents = 128
+	// InitPollEventsCap represents the initial capacity of poller event-list.
+	InitPollEventsCap = 128
 	// MaxAsyncTasksAtOneTime is the maximum amount of asynchronous tasks that the event-loop will process at one time.
 	MaxAsyncTasksAtOneTime = 256
 	// ErrEvents represents exceptional events that are not read/write, like socket being closed,

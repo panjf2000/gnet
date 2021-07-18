@@ -121,7 +121,7 @@ func (p *Poller) Trigger(fn queue.TaskFunc, arg interface{}) (err error) {
 
 // Polling blocks the current goroutine, waiting for network-events.
 func (p *Poller) Polling() error {
-	el := newEventList(InitEvents)
+	el := newEventList(InitPollEventsCap)
 	var wakenUp bool
 
 	msec := -1
