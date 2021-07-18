@@ -41,7 +41,6 @@ func epollWait(epfd int, events []epollevent, msec int) (int, error) {
 	)
 	if msec == 0 { // non-block system call, use RawSyscall6 to avoid getting preempted by runtime
 		np, _, errno = unix.RawSyscall6(unix.SYS_EPOLL_PWAIT, uintptr(epfd), uintptr(ep), uintptr(len(events)), 0, 0, 0)
-
 	} else {
 		np, _, errno = unix.Syscall6(unix.SYS_EPOLL_PWAIT, uintptr(epfd), uintptr(ep), uintptr(len(events)), uintptr(msec), 0, 0)
 	}
