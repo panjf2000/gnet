@@ -23,7 +23,7 @@ jobs:
       fail-fast: false
       matrix:
         go: [1.16.x]
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os}}
     steps:
       - name: Installing Go
