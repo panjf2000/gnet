@@ -22,6 +22,20 @@
 
 package netpoll
 
+import "sync"
+
+var pollAttachmentPool = sync.Pool{New: func() interface{} { return new(PollAttachment) }}
+
+// GetPollAttachment attempts to get a cached PollAttachment from pool.
+func GetPollAttachment() *PollAttachment {
+	return pollAttachmentPool.Get().(*PollAttachment)
+}
+
+// PutPollAttachment put a unused PollAttachment back to pool.
+func PutPollAttachment(pa *PollAttachment) {
+	pollAttachmentPool.Put(pa)
+}
+
 // PollAttachment is the user data which is about to be stored in "void *ptr" of epoll_data or "void *udata" of kevent.
 type PollAttachment struct {
 	FD       int

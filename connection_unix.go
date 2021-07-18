@@ -63,7 +63,8 @@ func newTCPConn(fd int, el *eventloop, sa unix.Sockaddr, remoteAddr net.Addr) (c
 		inboundBuffer:  prb.Get(),
 		outboundBuffer: prb.Get(),
 	}
-	c.pollAttachment = &netpoll.PollAttachment{FD: fd, Callback: c.handleEvents}
+	c.pollAttachment = netpoll.GetPollAttachment()
+	c.pollAttachment.FD, c.pollAttachment.Callback = fd, c.handleEvents
 	return
 }
 
@@ -80,6 +81,7 @@ func (c *conn) releaseTCP() {
 	c.outboundBuffer = ringbuffer.EmptyRingBuffer
 	bytebuffer.Put(c.byteBuffer)
 	c.byteBuffer = nil
+	netpoll.PutPollAttachment(c.pollAttachment)
 }
 
 func newUDPConn(fd int, el *eventloop, sa unix.Sockaddr) *conn {
