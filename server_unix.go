@@ -102,7 +102,7 @@ func (svr *server) activateEventLoops(numEventLoop int) (err error) {
 	// Create loops locally and bind the listeners.
 	for i := 0; i < numEventLoop; i++ {
 		ln := svr.ln
-		if i > 0 && svr.opts.ReusePort {
+		if i > 0 && (svr.opts.ReusePort || ln.network == "udp") {
 			if ln, err = initListener(svr.ln.network, svr.ln.addr, svr.opts); err != nil {
 				return
 			}

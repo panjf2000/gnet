@@ -20,4 +20,5 @@
 
 package netpoll
 
+// PollEventHandler is the callback for I/O events notified by the poller.
 type PollEventHandler func(uint32) error

@@ -85,7 +85,7 @@ func (ln *listener) close() {
 
 func initListener(network, addr string, options *Options) (l *listener, err error) {
 	var sockopts []socket.Option
-	if options.ReusePort {
+	if options.ReusePort || network == "udp" {
 		sockopt := socket.Option{SetSockopt: socket.SetReuseport, Opt: 1}
 		sockopts = append(sockopts, sockopt)
 	}
