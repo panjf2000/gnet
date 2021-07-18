@@ -137,8 +137,9 @@ func (p *Poller) Polling(callback func(fd int, ev uint32) error) error {
 		msec = 0
 
 		for i := 0; i < n; i++ {
-			if fd := int(el.events[i].Fd); fd != p.wfd {
-				switch err = callback(fd, el.events[i].Events); err {
+			ev := &el.events[i]
+			if fd := int(ev.Fd); fd != p.wfd {
+				switch err = callback(fd, ev.Events); err {
 				case nil:
 				case errors.ErrAcceptSocket, errors.ErrServerShutdown:
 					return err

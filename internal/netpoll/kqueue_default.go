@@ -132,9 +132,10 @@ func (p *Poller) Polling(callback func(fd int, filter int16) error) error {
 
 		var evFilter int16
 		for i := 0; i < n; i++ {
-			if fd := int(el.events[i].Ident); fd != 0 {
+			ev := &el.events[i]
+			if fd := int(ev.Ident); fd != 0 {
 				evFilter = el.events[i].Filter
-				if (el.events[i].Flags&unix.EV_EOF != 0) || (el.events[i].Flags&unix.EV_ERROR != 0) {
+				if (ev.Flags&unix.EV_EOF != 0) || (ev.Flags&unix.EV_ERROR != 0) {
 					evFilter = EVFilterSock
 				}
 				switch err = callback(fd, evFilter); err {
