@@ -19,7 +19,7 @@
 // SOFTWARE.
 
 // +build freebsd dragonfly darwin
-// +build poll_opt
+// +build !poll_opt
 
 package gnet
 
@@ -27,6 +27,7 @@ import (
 	"runtime"
 
 	"github.com/panjf2000/gnet/errors"
+	"github.com/panjf2000/gnet/internal/netpoll"
 )
 
 func (svr *server) activateMainReactor(lockOSThread bool) {
@@ -37,7 +38,7 @@ func (svr *server) activateMainReactor(lockOSThread bool) {
 
 	defer svr.signalShutdown()
 
-	err := svr.mainLoop.poller.Polling()
+	err := svr.mainLoop.poller.Polling(func(fd int, filter int16) error { return svr.acceptNewConnection(filter) })
 	if err == errors.ErrServerShutdown {
 		svr.opts.Logger.Debugf("main reactor is exiting in terms of the demand from user, %v", err)
 	} else if err != nil {
@@ -56,7 +57,21 @@ func (svr *server) activateSubReactor(el *eventloop, lockOSThread bool) {
 		svr.signalShutdown()
 	}()
 
-	err := el.poller.Polling()
+	err := el.poller.Polling(func(fd int, filter int16) (err error) {
+		if c, ack := el.connections[fd]; ack {
+			switch filter {
+			case netpoll.EVFilterSock:
+				err = el.loopCloseConn(c, nil)
+			case netpoll.EVFilterWrite:
+				if !c.outboundBuffer.IsEmpty() {
+					err = el.loopWrite(c)
+				}
+			case netpoll.EVFilterRead:
+				err = el.loopRead(c)
+			}
+		}
+		return
+	})
 	if err == errors.ErrServerShutdown {
 		svr.opts.Logger.Debugf("event-loop(%d) is exiting in terms of the demand from user, %v", el.idx, err)
 	} else if err != nil {
@@ -76,6 +91,21 @@ func (el *eventloop) loopRun(lockOSThread bool) {
 		el.svr.signalShutdown()
 	}()
 
-	err := el.poller.Polling()
+	err := el.poller.Polling(func(fd int, filter int16) (err error) {
+		if c, ack := el.connections[fd]; ack {
+			switch filter {
+			case netpoll.EVFilterSock:
+				err = el.loopCloseConn(c, nil)
+			case netpoll.EVFilterWrite:
+				if !c.outboundBuffer.IsEmpty() {
+					err = el.loopWrite(c)
+				}
+			case netpoll.EVFilterRead:
+				err = el.loopRead(c)
+			}
+			return
+		}
+		return el.loopAccept(filter)
+	})
 	el.getLogger().Infof("event-loop(%d) is exiting due to error: %v", el.idx, err)
 }

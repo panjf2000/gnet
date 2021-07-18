@@ -32,10 +32,12 @@ jobs:
           go-version: ${{ matrix.go }}
       - name: Checkout code
         uses: actions/checkout@v2
-      - name: Run unit tests for utils
+      - name: Run unit tests for packages
         run: go test $(go list ./... | tail -n +2)
-      - name: Run unit tests for server
+      - name: Run integration testing
         run: go test -v -race -coverprofile=coverage -covermode=atomic -timeout 60s
+      - name: Run integration testing with poll_opt build tag
+        run: go test -v -tags=poll_opt -timeout 60s
       - name: Upload code coverage report to Codecov
         uses: codecov/codecov-action@v1.2.1
         with:

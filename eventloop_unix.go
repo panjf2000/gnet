@@ -28,7 +28,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"runtime"
 	"sync/atomic"
 	"time"
 	"unsafe"
@@ -78,22 +77,6 @@ func (el *eventloop) closeAllConns() {
 	for _, c := range el.connections {
 		_ = el.loopCloseConn(c, nil)
 	}
-}
-
-func (el *eventloop) loopRun(lockOSThread bool) {
-	if lockOSThread {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-	}
-
-	defer func() {
-		el.closeAllConns()
-		el.ln.close()
-		el.svr.signalShutdown()
-	}()
-
-	err := el.poller.Polling()
-	el.getLogger().Infof("event-loop(%d) is exiting due to error: %v", el.idx, err)
 }
 
 func (el *eventloop) loopRegister(itf interface{}) error {

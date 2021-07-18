@@ -1,4 +1,5 @@
-// Copyright (c) 2021 Andy Pan
+// Copyright (c) 2019 Andy Pan
+// Copyright (c) 2017 Joshua J Baker
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -19,7 +20,7 @@
 // SOFTWARE.
 
 // +build freebsd dragonfly darwin
-// +build poll_opt
+// +build !poll_opt
 
 package netpoll
 
@@ -27,7 +28,6 @@ import (
 	"os"
 	"runtime"
 	"sync/atomic"
-	"unsafe"
 
 	"golang.org/x/sys/unix"
 
@@ -110,7 +110,7 @@ func (p *Poller) Trigger(fn queue.TaskFunc, arg interface{}) (err error) {
 }
 
 // Polling blocks the current goroutine, waiting for network-events.
-func (p *Poller) Polling() error {
+func (p *Poller) Polling(callback func(fd int, filter int16) error) error {
 	el := newEventList(InitPollEventsCap)
 
 	var (
@@ -132,14 +132,12 @@ func (p *Poller) Polling() error {
 
 		var evFilter int16
 		for i := 0; i < n; i++ {
-			ev := &el.events[i]
-			if ev.Ident != 0 {
-				evFilter = ev.Filter
-				if (ev.Flags&unix.EV_EOF != 0) || (ev.Flags&unix.EV_ERROR != 0) {
+			if fd := int(el.events[i].Ident); fd != 0 {
+				evFilter = el.events[i].Filter
+				if (el.events[i].Flags&unix.EV_EOF != 0) || (el.events[i].Flags&unix.EV_ERROR != 0) {
 					evFilter = EVFilterSock
 				}
-				pollAttachment := (*PollAttachment)(unsafe.Pointer(ev.Udata))
-				switch err = pollAttachment.Callback(evFilter); err {
+				switch err = callback(fd, evFilter); err {
 				case nil:
 				case errors.ErrAcceptSocket, errors.ErrServerShutdown:
 					return err
@@ -194,58 +192,42 @@ func (p *Poller) Polling() error {
 
 // AddReadWrite registers the given file-descriptor with readable and writable events to the poller.
 func (p *Poller) AddReadWrite(pa *PollAttachment) error {
-	var evs [2]unix.Kevent_t
-	evs[0].Ident = uint64(pa.FD)
-	evs[0].Flags = unix.EV_ADD
-	evs[0].Filter = unix.EVFILT_READ
-	evs[0].Udata = (*byte)(unsafe.Pointer(pa))
-	evs[1] = evs[0]
-	evs[1].Filter = unix.EVFILT_WRITE
-	_, err := unix.Kevent(p.fd, evs[:], nil, nil)
+	_, err := unix.Kevent(p.fd, []unix.Kevent_t{
+		{Ident: uint64(pa.FD), Flags: unix.EV_ADD, Filter: unix.EVFILT_READ},
+		{Ident: uint64(pa.FD), Flags: unix.EV_ADD, Filter: unix.EVFILT_WRITE},
+	}, nil, nil)
 	return os.NewSyscallError("kevent add", err)
 }
 
 // AddRead registers the given file-descriptor with readable event to the poller.
 func (p *Poller) AddRead(pa *PollAttachment) error {
-	var evs [1]unix.Kevent_t
-	evs[0].Ident = uint64(pa.FD)
-	evs[0].Flags = unix.EV_ADD
-	evs[0].Filter = unix.EVFILT_READ
-	evs[0].Udata = (*byte)(unsafe.Pointer(pa))
-	_, err := unix.Kevent(p.fd, evs[:], nil, nil)
+	_, err := unix.Kevent(p.fd, []unix.Kevent_t{
+		{Ident: uint64(pa.FD), Flags: unix.EV_ADD, Filter: unix.EVFILT_READ},
+	}, nil, nil)
 	return os.NewSyscallError("kevent add", err)
 }
 
 // AddWrite registers the given file-descriptor with writable event to the poller.
 func (p *Poller) AddWrite(pa *PollAttachment) error {
-	var evs [1]unix.Kevent_t
-	evs[0].Ident = uint64(pa.FD)
-	evs[0].Flags = unix.EV_ADD
-	evs[0].Filter = unix.EVFILT_WRITE
-	evs[0].Udata = (*byte)(unsafe.Pointer(pa))
-	_, err := unix.Kevent(p.fd, evs[:], nil, nil)
+	_, err := unix.Kevent(p.fd, []unix.Kevent_t{
+		{Ident: uint64(pa.FD), Flags: unix.EV_ADD, Filter: unix.EVFILT_WRITE},
+	}, nil, nil)
 	return os.NewSyscallError("kevent add", err)
 }
 
 // ModRead renews the given file-descriptor with readable event in the poller.
 func (p *Poller) ModRead(pa *PollAttachment) error {
-	var evs [1]unix.Kevent_t
-	evs[0].Ident = uint64(pa.FD)
-	evs[0].Flags = unix.EV_DELETE
-	evs[0].Filter = unix.EVFILT_WRITE
-	evs[0].Udata = (*byte)(unsafe.Pointer(pa))
-	_, err := unix.Kevent(p.fd, evs[:], nil, nil)
+	_, err := unix.Kevent(p.fd, []unix.Kevent_t{
+		{Ident: uint64(pa.FD), Flags: unix.EV_DELETE, Filter: unix.EVFILT_WRITE},
+	}, nil, nil)
 	return os.NewSyscallError("kevent delete", err)
 }
 
 // ModReadWrite renews the given file-descriptor with readable and writable events in the poller.
 func (p *Poller) ModReadWrite(pa *PollAttachment) error {
-	var evs [1]unix.Kevent_t
-	evs[0].Ident = uint64(pa.FD)
-	evs[0].Flags = unix.EV_ADD
-	evs[0].Filter = unix.EVFILT_WRITE
-	evs[0].Udata = (*byte)(unsafe.Pointer(pa))
-	_, err := unix.Kevent(p.fd, evs[:], nil, nil)
+	_, err := unix.Kevent(p.fd, []unix.Kevent_t{
+		{Ident: uint64(pa.FD), Flags: unix.EV_ADD, Filter: unix.EVFILT_WRITE},
+	}, nil, nil)
 	return os.NewSyscallError("kevent add", err)
 }
 

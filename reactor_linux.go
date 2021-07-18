@@ -18,6 +18,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+// +build poll_opt
+
 package gnet
 
 import (
@@ -59,4 +61,20 @@ func (svr *server) activateSubReactor(el *eventloop, lockOSThread bool) {
 	} else if err != nil {
 		svr.opts.Logger.Errorf("event-loop(%d) is exiting normally on the signal error: %v", el.idx, err)
 	}
+}
+
+func (el *eventloop) loopRun(lockOSThread bool) {
+	if lockOSThread {
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+	}
+
+	defer func() {
+		el.closeAllConns()
+		el.ln.close()
+		el.svr.signalShutdown()
+	}()
+
+	err := el.poller.Polling()
+	el.getLogger().Infof("event-loop(%d) is exiting due to error: %v", el.idx, err)
 }
