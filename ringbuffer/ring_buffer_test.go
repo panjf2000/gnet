@@ -23,6 +23,8 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestRingBuffer_Write(t *testing.T) {
@@ -192,7 +194,7 @@ func TestRingBuffer_Write(t *testing.T) {
 
 func TestZeroRingBuffer(t *testing.T) {
 	rb := New(0)
-	head, tail := rb.Peek(1)
+	head, tail := rb.Peek(2)
 	if !(head == nil && tail == nil) {
 		t.Fatal("expect head and tail are all nil")
 	}
@@ -211,9 +213,9 @@ func TestZeroRingBuffer(t *testing.T) {
 	if !(rb.Len() == defaultBufferSize && rb.Cap() == defaultBufferSize) {
 		t.Fatalf("expect rb.Len()=64 and rb.Cap=64, but got rb.Len()=%d and rb.Cap()=%d", rb.Len(), rb.Cap())
 	}
-	if !(rb.r == 0 && rb.w == 48 && rb.size == defaultBufferSize && rb.mask == defaultBufferSize-1) {
-		t.Fatalf("expect rb.r=0, rb.w=48, rb.size=64, rb.mask=63, but got rb.r=%d, rb.w=%d, rb.size=%d, rb.mask=%d",
-			rb.r, rb.w, rb.size, rb.mask)
+	if !(rb.r == 0 && rb.w == 48 && rb.size == defaultBufferSize) {
+		t.Fatalf("expect rb.r=0, rb.w=48, rb.size=64, rb.mask=63, but got rb.r=%d, rb.w=%d, rb.size=%d",
+			rb.r, rb.w, rb.size)
 	}
 	if !bytes.Equal(rb.ByteBuffer().Bytes(), buf) {
 		t.Fatal("expect it is equal")
@@ -222,6 +224,49 @@ func TestZeroRingBuffer(t *testing.T) {
 	if !(rb.IsEmpty() && rb.r == 0 && rb.w == 0) {
 		t.Fatalf("expect rb is empty and rb.r=rb.w=0, but got rb.r=%d and rb.w=%d", rb.r, rb.w)
 	}
+}
+
+func TestRingBufferGrow(t *testing.T) {
+	rb := New(0)
+	head, tail := rb.Peek(2)
+	assert.Empty(t, head, "head should be empty")
+	assert.Empty(t, tail, "tail should be empty")
+	buf := []byte(strings.Repeat("a", defaultBufferSize) + "b")
+	n, err := rb.Write(buf)
+	assert.NoError(t, err)
+	assert.EqualValues(t, defaultBufferSize+1, n)
+	assert.EqualValues(t, defaultBufferSize+1, rb.Cap())
+	assert.EqualValues(t, defaultBufferSize+1, rb.Len())
+	assert.EqualValues(t, defaultBufferSize+1, rb.Length())
+	assert.EqualValues(t, 0, rb.Free())
+
+	rb = New(1024)
+	buf = []byte(strings.Repeat("abc", 512))
+	n, err = rb.Write(buf)
+	assert.NoError(t, err)
+	assert.EqualValues(t, 3*512, n)
+	assert.EqualValues(t, 2048, rb.Cap())
+	assert.EqualValues(t, 2048, rb.Len())
+	assert.EqualValues(t, 3*512, rb.Length())
+	assert.EqualValues(t, 512, rb.Free())
+
+	rb.Reset()
+	buf = []byte(strings.Repeat("a", bufferGrowThreshold))
+	n, err = rb.Write(buf)
+	assert.NoError(t, err)
+	assert.EqualValues(t, bufferGrowThreshold, n)
+	assert.EqualValues(t, bufferGrowThreshold, rb.Cap())
+	assert.EqualValues(t, bufferGrowThreshold, rb.Len())
+	assert.EqualValues(t, bufferGrowThreshold, rb.Length())
+	assert.EqualValues(t, 0, rb.Free())
+	buf = []byte(strings.Repeat("a", bufferGrowThreshold/2+1))
+	n, err = rb.Write(buf)
+	assert.NoError(t, err)
+	assert.EqualValues(t, bufferGrowThreshold/2+1, n)
+	assert.EqualValues(t, 1.25*(1.25*bufferGrowThreshold), rb.Cap())
+	assert.EqualValues(t, 1.25*(1.25*bufferGrowThreshold), rb.Len())
+	assert.EqualValues(t, 1.5*bufferGrowThreshold+1, rb.Length())
+	assert.EqualValues(t, 1.25*(1.25*bufferGrowThreshold)-rb.Length(), rb.Free())
 }
 
 func TestRingBuffer_Read(t *testing.T) {
