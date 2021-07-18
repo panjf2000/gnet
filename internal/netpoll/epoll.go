@@ -19,7 +19,7 @@
 // SOFTWARE.
 
 // +build linux
-// +build poll_opt,!race
+// +build poll_opt
 
 package netpoll
 
