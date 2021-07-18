@@ -101,9 +101,9 @@ func (svr *server) activateEventLoops(numEventLoop int) (err error) {
 	var striker *eventloop
 	// Create loops locally and bind the listeners.
 	for i := 0; i < numEventLoop; i++ {
-		l := svr.ln
+		ln := svr.ln
 		if i > 0 && svr.opts.ReusePort {
-			if l, err = initListener(svr.ln.network, svr.ln.addr, svr.opts); err != nil {
+			if ln, err = initListener(svr.ln.network, svr.ln.addr, svr.opts); err != nil {
 				return
 			}
 		}
@@ -111,7 +111,7 @@ func (svr *server) activateEventLoops(numEventLoop int) (err error) {
 		var p *netpoll.Poller
 		if p, err = netpoll.OpenPoller(); err == nil {
 			el := new(eventloop)
-			el.ln = l
+			el.ln = ln
 			el.svr = svr
 			el.poller = p
 			el.buffer = make([]byte, svr.opts.ReadBufferCap)
