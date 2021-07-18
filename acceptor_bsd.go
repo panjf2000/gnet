@@ -66,6 +66,7 @@ func (el *eventloop) loopAccept(_ int16) error {
 		if err == unix.EAGAIN {
 			return nil
 		}
+		el.getLogger().Errorf("Accept() fails due to error: %v", err)
 		return os.NewSyscallError("accept", err)
 	}
 	if err = os.NewSyscallError("fcntl nonblock", unix.SetNonblock(nfd, true)); err != nil {
