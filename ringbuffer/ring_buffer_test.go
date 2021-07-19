@@ -20,7 +20,7 @@
 package ringbuffer
 
 import (
-	"bytes"
+	"math/rand"
 	"strings"
 	"testing"
 
@@ -30,200 +30,109 @@ import (
 func TestRingBuffer_Write(t *testing.T) {
 	rb := New(64)
 
-	if _, err := rb.ReadByte(); err == nil {
-		t.Fatal("expect empty err, but got nil")
-	}
+	_, err := rb.ReadByte()
+	assert.ErrorIs(t, err, ErrIsEmpty, "expect nil err, but got nil")
 	// check empty or full
-	if !rb.IsEmpty() {
-		t.Fatalf("expect IsEmpty is true but got false")
-	}
-	if rb.IsFull() {
-		t.Fatalf("expect IsFull is false but got true")
-	}
-	if rb.Length() != 0 {
-		t.Fatalf("expect len 0 bytes but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
-	}
-	if rb.Free() != 64 {
-		t.Fatalf("expect free 64 bytes but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
-	}
+	assert.True(t, rb.IsEmpty(), "expect IsEmpty is true but got false")
+	assert.False(t, rb.IsFull(), "expect IsFull is false but got true")
+	assert.EqualValuesf(t, 0, rb.Length(), "expect len 0 bytes but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
+	assert.EqualValuesf(t, 64, rb.Free(), "expect free 64 bytes but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
 
 	// write 4 * 4 = 16 bytes
-	n, _ := rb.Write([]byte(strings.Repeat("abcd", 4)))
-	if n != 16 {
-		t.Fatalf("expect write 16 bytes but got %d", n)
-	}
-	if rb.Length() != 16 {
-		t.Fatalf("expect len 16 bytes but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
-	}
-	if rb.Free() != 48 {
-		t.Fatalf("expect free 48 bytes but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
-	}
-	if !bytes.Equal(rb.ByteBuffer().Bytes(), []byte(strings.Repeat("abcd", 4))) {
-		t.Fatalf("expect 4 abcd but got %s. r.w=%d, r.r=%d", rb.ByteBuffer().Bytes(), rb.w, rb.r)
-	}
+	data := []byte(strings.Repeat("abcd", 4))
+	n, _ := rb.Write(data)
+	assert.EqualValuesf(t, 16, n, "expect write 16 bytes but got %d", n)
+	assert.EqualValuesf(t, 16, rb.Length(), "expect len 16 bytes but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
+	assert.EqualValuesf(t, 48, rb.Free(), "expect free 48 bytes but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
+	assert.EqualValuesf(t, data, rb.ByteBuffer().Bytes(), "expect 4 abcd but got %s. r.w=%d, r.r=%d", rb.ByteBuffer().Bytes(), rb.w, rb.r)
 
 	// check empty or full
-	if rb.IsEmpty() {
-		t.Fatalf("expect IsEmpty is false but got true")
-	}
-	if rb.IsFull() {
-		t.Fatalf("expect IsFull is false but got true")
-	}
+	assert.False(t, rb.IsEmpty(), "expect IsEmpty is false but got true")
+	assert.False(t, rb.IsFull(), "expect IsFull is false but got true")
 
 	// write 48 bytes, should full
-	n, _ = rb.Write([]byte(strings.Repeat("abcd", 12)))
-	if n != 48 {
-		t.Fatalf("expect write 48 bytes but got %d", n)
-	}
-	if rb.Length() != 64 {
-		t.Fatalf("expect len 64 bytes but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
-	}
-	if rb.Free() != 0 {
-		t.Fatalf("expect free 0 bytes but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
-	}
-	if rb.w != 0 {
-		t.Fatalf("expect r.w=0 but got %d. r.r=%d", rb.w, rb.r)
-	}
-	if !bytes.Equal(rb.ByteBuffer().Bytes(), []byte(strings.Repeat("abcd", 16))) {
-		t.Fatalf("expect 16 abcd but got %s. r.w=%d, r.r=%d", rb.ByteBuffer().Bytes(), rb.w, rb.r)
-	}
+	data = []byte(strings.Repeat("abcd", 12))
+	n, _ = rb.Write(data)
+	assert.EqualValuesf(t, 48, n, "expect write 48 bytes but got %d", n)
+	assert.EqualValuesf(t, 64, rb.Length(), "expect len 64 bytes but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
+	assert.EqualValuesf(t, 0, rb.Free(), "expect free 0 bytes but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
+	assert.EqualValuesf(t, 0, rb.w, "expect r.w=0 but got %d. r.r=%d", rb.w, rb.r)
+	assert.EqualValuesf(t, []byte(strings.Repeat("abcd", 16)), rb.ByteBuffer().Bytes(), "expect 16 abcd but got %s. r.w=%d, r.r=%d", rb.ByteBuffer().Bytes(), rb.w, rb.r)
 
 	// check empty or full
-	if rb.IsEmpty() {
-		t.Fatalf("expect IsEmpty is false but got true")
-	}
-	if !rb.IsFull() {
-		t.Fatalf("expect IsFull is true but got false")
-	}
+	assert.False(t, rb.IsEmpty(), "expect IsEmpty is false but got true")
+	assert.True(t, rb.IsFull(), "expect IsFull is true but got false")
+	assert.True(t, rb.IsFull(), "expect IsFull is true but got false")
 
 	// write more 4 bytes, should scale from 64 to 128 bytes.
 	n, _ = rb.Write([]byte(strings.Repeat("abcd", 1)))
+	assert.EqualValuesf(t, 4, n, "expect write 4 bytes but got %d", n)
 	size := rb.Cap()
-	if n != 4 {
-		t.Fatalf("expect write 4 bytes but got %d", n)
-	}
-	if rb.Length() != 68 {
-		t.Fatalf("expect len 68 bytes but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
-	}
-	if rb.Free() != size-68 {
-		t.Fatalf("expect free 60 bytes but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
-	}
+	assert.EqualValuesf(t, 68, rb.Length(), "expect len 68 bytes but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
+	assert.EqualValuesf(t, size-68, rb.Free(), "expect free 60 bytes but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
 
 	// check empty or full
-	if rb.IsEmpty() {
-		t.Fatalf("expect IsEmpty is false but got true")
-	}
-	if rb.IsFull() {
-		t.Fatalf("expect IsFull is false but got true")
-	}
+	assert.False(t, rb.IsEmpty(), "expect IsEmpty is false but got true")
+	assert.False(t, rb.IsFull(), "expect IsFull is false but got true")
 
 	// reset this ringbuffer and set a long slice
 	rb.Reset()
 	n, _ = rb.Write([]byte(strings.Repeat("abcd", 20)))
-	if n != 80 {
-		t.Fatalf("expect write 80 bytes but got %d", n)
-	}
-	if rb.Length() != 80 {
-		t.Fatalf("expect len 80 bytes but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
-	}
-	if rb.Free() != size-80 {
-		t.Fatalf("expect free 48 bytes but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
-	}
-	if rb.w == 0 {
-		t.Fatalf("expect r.w!=0 but got %d. r.r=%d", rb.w, rb.r)
-	}
+	assert.EqualValuesf(t, 80, n, "expect write 80 bytes but got %d", n)
+	assert.EqualValuesf(t, 80, rb.Length(), "expect len 80 bytes but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
+	assert.EqualValuesf(t, size-80, rb.Free(), "expect free 48 bytes but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
+	assert.Greaterf(t, rb.w, 0, "expect r.w>=0 but got %d. r.r=%d", rb.w, rb.r)
 
 	// check empty or full
-	if rb.IsEmpty() {
-		t.Fatalf("expect IsEmpty is false but got true")
-	}
-	if rb.IsFull() {
-		t.Fatalf("expect IsFull is false but got true")
-	}
+	assert.False(t, rb.IsEmpty(), "expect IsEmpty is false but got true")
+	assert.False(t, rb.IsFull(), "expect IsFull is false but got true")
 
-	if !bytes.Equal(rb.ByteBuffer().Bytes(), []byte(strings.Repeat("abcd", 20))) {
-		t.Fatalf("expect 16 abcd but got %s. r.w=%d, r.r=%d", rb.ByteBuffer().Bytes(), rb.w, rb.r)
-	}
+	assert.EqualValuesf(t, []byte(strings.Repeat("abcd", 20)), rb.ByteBuffer().Bytes(), "expect 16 abcd but got %s. r.w=%d, r.r=%d", rb.ByteBuffer().Bytes(), rb.w, rb.r)
 
 	rb.Reset()
 	size = rb.Cap()
 	// write 4 * 2 = 8 bytes
 	n, _ = rb.Write([]byte(strings.Repeat("abcd", 2)))
-	if n != 8 {
-		t.Fatalf("expect write 16 bytes but got %d", n)
-	}
-	if rb.Length() != 8 {
-		t.Fatalf("expect len 16 bytes but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
-	}
-	if rb.Free() != size-8 {
-		t.Fatalf("expect free 48 bytes but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
-	}
+	assert.EqualValuesf(t, 8, n, "expect write 16 bytes but got %d", n)
+	assert.EqualValuesf(t, 8, rb.Length(), "expect len 16 bytes but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
+	assert.EqualValuesf(t, size-8, rb.Free(), "expect free 48 bytes but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
 	buf := make([]byte, 5)
 	_, _ = rb.Read(buf)
-	if rb.Length() != 3 {
-		t.Fatalf("expect len 3 bytes but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
-	}
+	assert.EqualValuesf(t, 3, rb.Length(), "expect len 3 bytes but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
 	_, _ = rb.Write([]byte(strings.Repeat("abcd", 15)))
 
-	if !bytes.Equal(rb.ByteBuffer().Bytes(), []byte("bcd"+strings.Repeat("abcd", 15))) {
-		t.Fatalf("expect 63 ... but got %s. r.w=%d, r.r=%d", rb.ByteBuffer().Bytes(), rb.w, rb.r)
-	}
+	assert.EqualValuesf(t, []byte("bcd"+strings.Repeat("abcd", 15)), rb.ByteBuffer().Bytes(), "expect 63 ... but got %s. r.w=%d, r.r=%d", rb.ByteBuffer().Bytes(), rb.w, rb.r)
 
 	rb.Reset()
 	n, _ = rb.Write([]byte(strings.Repeat("abcd", 32)))
-	if n != 128 {
-		t.Fatalf("expect write 128 bytes but got %d", n)
-	}
-	if rb.Free() != 0 {
-		t.Fatalf("expect free 0 bytes but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
-	}
+	assert.EqualValuesf(t, 128, n, "expect write 128 bytes but got %d", n)
+	assert.EqualValuesf(t, 0, rb.Free(), "expect free 0 bytes but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
 	buf = make([]byte, 16)
 	_, _ = rb.Read(buf)
 	n, _ = rb.Write([]byte(strings.Repeat("1234", 4)))
-	if n != 16 {
-		t.Fatalf("expect write 16 bytes but got %d", n)
-	}
-	if rb.Free() != 0 {
-		t.Fatalf("expect free 0 bytes but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
-	}
-	if !bytes.Equal(append(buf, rb.ByteBuffer().Bytes()...),
-		[]byte(strings.Repeat("abcd", 32)+strings.Repeat("1234", 4))) {
-		t.Fatalf("expect 16 abcd and 4 1234 but got %s. r.w=%d, r.r=%d", rb.ByteBuffer().Bytes(), rb.w, rb.r)
-	}
+	assert.EqualValuesf(t, 16, n, "expect write 16 bytes but got %d", n)
+	assert.EqualValuesf(t, 0, rb.Free(), "expect free 0 bytes but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
+	assert.EqualValuesf(t, []byte(strings.Repeat("abcd", 32)+strings.Repeat("1234", 4)), append(buf, rb.ByteBuffer().Bytes()...), "expect 16 abcd and 4 1234 but got %s. r.w=%d, r.r=%d", rb.ByteBuffer().Bytes(), rb.w, rb.r)
 }
 
 func TestZeroRingBuffer(t *testing.T) {
 	rb := New(0)
 	head, tail := rb.Peek(2)
-	if !(head == nil && tail == nil) {
-		t.Fatal("expect head and tail are all nil")
-	}
+	assert.Empty(t, head, "head should be empty")
+	assert.Empty(t, tail, "tail should be empty")
 	head, tail = rb.PeekAll()
-	if !(head == nil && tail == nil) {
-		t.Fatal("expect head and tail are all nil")
-	}
-	if rb.Length() != 0 {
-		t.Fatal("expect length is 0")
-	}
-	if rb.Free() != 0 {
-		t.Fatal("expect free is 0")
-	}
+	assert.Empty(t, head, "head should be empty")
+	assert.Empty(t, tail, "tail should be empty")
+	assert.EqualValues(t, 0, rb.Length(), "expect length is 0")
+	assert.EqualValues(t, 0, rb.Free(), "expect free is 0")
 	buf := []byte(strings.Repeat("1234", 12))
 	_, _ = rb.Write(buf)
-	if !(rb.Len() == defaultBufferSize && rb.Cap() == defaultBufferSize) {
-		t.Fatalf("expect rb.Len()=64 and rb.Cap=64, but got rb.Len()=%d and rb.Cap()=%d", rb.Len(), rb.Cap())
-	}
-	if !(rb.r == 0 && rb.w == 48 && rb.size == defaultBufferSize) {
-		t.Fatalf("expect rb.r=0, rb.w=48, rb.size=64, rb.mask=63, but got rb.r=%d, rb.w=%d, rb.size=%d",
-			rb.r, rb.w, rb.size)
-	}
-	if !bytes.Equal(rb.ByteBuffer().Bytes(), buf) {
-		t.Fatal("expect it is equal")
-	}
+	assert.EqualValuesf(t, defaultBufferSize, rb.Len(), "expect rb.Len()=%d, but got rb.Len()=%d", defaultBufferSize, rb.Len())
+	assert.EqualValuesf(t, defaultBufferSize, rb.Cap(), "expect rb.Cap()=%d, but got rb.Cap()=%d", defaultBufferSize, rb.Cap())
+	assert.Truef(t, rb.r == 0 && rb.w == 48 && rb.size == defaultBufferSize, "expect rb.r=0, rb.w=48, rb.size=64, rb.mask=63, but got rb.r=%d, rb.w=%d, rb.size=%d", rb.r, rb.w, rb.size)
+	assert.EqualValues(t, buf, rb.ByteBuffer().Bytes(), "expect it is equal")
 	rb.Discard(48)
-	if !(rb.IsEmpty() && rb.r == 0 && rb.w == 0) {
-		t.Fatalf("expect rb is empty and rb.r=rb.w=0, but got rb.r=%d and rb.w=%d", rb.r, rb.w)
-	}
+	assert.Truef(t, rb.IsEmpty() && rb.r == 0 && rb.w == 0, "expect rb is empty and rb.r=rb.w=0, but got rb.r=%d and rb.w=%d", rb.r, rb.w)
 }
 
 func TestRingBufferGrow(t *testing.T) {
@@ -231,173 +140,124 @@ func TestRingBufferGrow(t *testing.T) {
 	head, tail := rb.Peek(2)
 	assert.Empty(t, head, "head should be empty")
 	assert.Empty(t, tail, "tail should be empty")
-	buf := []byte(strings.Repeat("a", defaultBufferSize) + "b")
-	n, err := rb.Write(buf)
+	data := make([]byte, defaultBufferSize+1)
+	n, err := rand.Read(data)
+	assert.NoError(t, err, "failed to generate random data")
+	assert.EqualValuesf(t, defaultBufferSize+1, n, "expect random data length is %d but got %d", defaultBufferSize+1, n)
+	n, err = rb.Write(data)
 	assert.NoError(t, err)
 	assert.EqualValues(t, defaultBufferSize+1, n)
 	assert.EqualValues(t, 2*defaultBufferSize, rb.Cap())
 	assert.EqualValues(t, 2*defaultBufferSize, rb.Len())
 	assert.EqualValues(t, defaultBufferSize+1, rb.Length())
 	assert.EqualValues(t, defaultBufferSize-1, rb.Free())
+	assert.EqualValues(t, data, rb.ByteBuffer().Bytes())
 
 	rb = New(defaultBufferSize)
-	buf = []byte(strings.Repeat("abc", 512))
-	n, err = rb.Write(buf)
+	newData := make([]byte, 3*512)
+	n, err = rand.Read(newData)
+	assert.NoError(t, err, "failed to generate random data")
+	assert.EqualValuesf(t, 3*512, n, "expect random data length is %d but got %d", 3*512, n)
+	n, err = rb.Write(newData)
 	assert.NoError(t, err)
 	assert.EqualValues(t, 3*512, n)
 	assert.EqualValues(t, 2*defaultBufferSize, rb.Cap())
 	assert.EqualValues(t, 2*defaultBufferSize, rb.Len())
 	assert.EqualValues(t, 3*512, rb.Length())
 	assert.EqualValues(t, 512, rb.Free())
+	assert.EqualValues(t, newData, rb.ByteBuffer().Bytes())
 
 	rb.Reset()
-	buf = []byte(strings.Repeat("a", bufferGrowThreshold))
-	n, err = rb.Write(buf)
+	data = make([]byte, bufferGrowThreshold)
+	n, err = rand.Read(data)
+	assert.NoError(t, err, "failed to generate random data")
+	assert.EqualValuesf(t, bufferGrowThreshold, n, "expect random data length is %d but got %d", bufferGrowThreshold, n)
+	n, err = rb.Write(data)
 	assert.NoError(t, err)
 	assert.EqualValues(t, bufferGrowThreshold, n)
 	assert.EqualValues(t, bufferGrowThreshold, rb.Cap())
 	assert.EqualValues(t, bufferGrowThreshold, rb.Len())
 	assert.EqualValues(t, bufferGrowThreshold, rb.Length())
 	assert.EqualValues(t, 0, rb.Free())
-	buf = []byte(strings.Repeat("a", bufferGrowThreshold/2+1))
-	n, err = rb.Write(buf)
+	assert.EqualValues(t, data, rb.ByteBuffer().Bytes())
+	newData = make([]byte, bufferGrowThreshold/2+1)
+	n, err = rand.Read(newData)
+	assert.NoError(t, err, "failed to generate random data")
+	assert.EqualValuesf(t, bufferGrowThreshold/2+1, n, "expect random data length is %d but got %d", bufferGrowThreshold, n)
+	n, err = rb.Write(newData)
 	assert.NoError(t, err)
 	assert.EqualValues(t, bufferGrowThreshold/2+1, n)
 	assert.EqualValues(t, 1.25*(1.25*bufferGrowThreshold), rb.Cap())
 	assert.EqualValues(t, 1.25*(1.25*bufferGrowThreshold), rb.Len())
 	assert.EqualValues(t, 1.5*bufferGrowThreshold+1, rb.Length())
 	assert.EqualValues(t, 1.25*(1.25*bufferGrowThreshold)-rb.Length(), rb.Free())
+	assert.EqualValues(t, append(data, newData...), rb.ByteBuffer().Bytes())
 }
 
 func TestRingBuffer_Read(t *testing.T) {
 	rb := New(64)
 
 	// check empty or full
-	if !rb.IsEmpty() {
-		t.Fatalf("expect IsEmpty is true but got false")
-	}
-	if rb.IsFull() {
-		t.Fatalf("expect IsFull is false but got true")
-	}
-	if rb.Length() != 0 {
-		t.Fatalf("expect len 0 bytes but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
-	}
-	if rb.Free() != 64 {
-		t.Fatalf("expect free 64 bytes but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
-	}
+	assert.True(t, rb.IsEmpty(), "expect IsEmpty is true but got false")
+	assert.False(t, rb.IsFull(), "expect isfull is false but got true")
+	assert.EqualValuesf(t, 0, rb.Length(), "expect len 0 bytes but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
+	assert.EqualValuesf(t, 64, rb.Free(), "expect free 64 bytes but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
 
 	// read empty
 	buf := make([]byte, 1024)
 	n, err := rb.Read(buf)
-	if err == nil {
-		t.Fatalf("expect an error but got nil")
-	}
-	if err != ErrIsEmpty {
-		t.Fatalf("expect ErrIsEmpty but got nil")
-	}
-	if n != 0 {
-		t.Fatalf("expect read 0 bytes but got %d", n)
-	}
-	if rb.Length() != 0 {
-		t.Fatalf("expect len 0 bytes but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
-	}
-	if rb.Free() != 64 {
-		t.Fatalf("expect free 64 bytes but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
-	}
-	if rb.r != 0 {
-		t.Fatalf("expect r.r=0 but got %d. r.w=%d", rb.r, rb.w)
-	}
+	assert.ErrorIs(t, err, ErrIsEmpty, "expect ErrIsEmpty but got nil")
+	assert.EqualValuesf(t, 0, n, "expect read 0 bytes but got %d", n)
+	assert.EqualValuesf(t, 0, rb.Length(), "expect len 0 bytes but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
+	assert.EqualValuesf(t, 64, rb.Free(), "expect free 64 bytes but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
+	assert.EqualValuesf(t, 0, rb.r, "expect r.r=0 but got %d. r.w=%d", rb.r, rb.w)
 
 	// write 16 bytes to read
 	_, _ = rb.Write([]byte(strings.Repeat("abcd", 4)))
 	// read all data from buffer, it will be shrunk from 64 to 32.
 	n, err = rb.Read(buf)
-	if err != nil {
-		t.Fatalf("read failed: %v", err)
-	}
-	if n != 16 {
-		t.Fatalf("expect read 16 bytes but got %d", n)
-	}
-	if rb.Length() != 0 {
-		t.Fatalf("expect len 0 bytes but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
-	}
-	if rb.Free() != 64 {
-		t.Fatalf("expect free 64 bytes but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
-	}
-	if rb.r != 0 {
-		t.Fatalf("expect r.r=0 but got %d. r.w=%d", rb.r, rb.w)
-	}
+	assert.NoErrorf(t, err, "read failed: %v", err)
+	assert.EqualValuesf(t, 16, n, "expect read 16 bytes but got %d", n)
+	assert.EqualValuesf(t, 0, rb.Length(), "expect len 0 bytes but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
+	assert.EqualValuesf(t, 64, rb.Free(), "expect free 64 bytes but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
+	assert.EqualValuesf(t, 0, rb.r, "expect r.r=0 but got %d. r.w=%d", rb.r, rb.w)
 
 	// write long slice to read, it will scale from 32 to 128 bytes.
 	_, _ = rb.Write([]byte(strings.Repeat("abcd", 20)))
 	// read all data from buffer, it will be shrunk from 128 to 64.
 	n, err = rb.Read(buf)
-	if err != nil {
-		t.Fatalf("read failed: %v", err)
-	}
-	if n != 80 {
-		t.Fatalf("expect read 80 bytes but got %d", n)
-	}
-	if rb.Length() != 0 {
-		t.Fatalf("expect len 0 bytes but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
-	}
-	if rb.Free() != 128 {
-		t.Fatalf("expect free 128 bytes but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
-	}
-	if rb.r != 0 {
-		t.Fatalf("expect r.r=0 but got %d. r.w=%d", rb.r, rb.w)
-	}
+	assert.NoErrorf(t, err, "read failed: %v", err)
+	assert.EqualValuesf(t, 80, n, "expect read 80 bytes but got %d", n)
+	assert.EqualValuesf(t, 0, rb.Length(), "expect len 0 bytes but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
+	assert.EqualValuesf(t, 128, rb.Free(), "expect free 128 bytes but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
+	assert.EqualValuesf(t, 0, rb.r, "expect r.r=0 but got %d. r.w=%d", rb.r, rb.w)
 
 	rb.Reset()
 	_, _ = rb.Write([]byte(strings.Repeat("1234", 32)))
-	if !rb.IsFull() {
-		t.Fatal("ring buffer should be full")
-	}
-	if rb.Free() != 0 {
-		t.Fatalf("expect free 0 bytes but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
-	}
-	if rb.w != 0 {
-		t.Fatalf("expect r.2=0 but got %d. r.r=%d", rb.w, rb.r)
-	}
+	assert.True(t, rb.IsFull(), "ring buffer should be full")
+	assert.EqualValuesf(t, 0, rb.Free(), "expect free 0 bytes but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
+	assert.EqualValuesf(t, 0, rb.w, "expect r.2=0 but got %d. r.r=%d", rb.w, rb.r)
 	head, tail := rb.Peek(64)
-	if !(len(head) == 64 && tail == nil) {
-		t.Fatalf("expect len(head)=64 and tail=nil, yet len(head)=%d and tail != nil", len(head))
-	}
-	if rb.r != 0 {
-		t.Fatalf("expect r.r=0 but got %d", rb.r)
-	}
-	if !bytes.Equal(head, []byte(strings.Repeat("1234", 16))) {
-		t.Fatal("should be equal")
-	}
+	assert.Truef(t, len(head) == 64 && tail == nil, "expect len(head)=64 and tail=nil, yet len(head)=%d and tail != nil", len(head))
+	assert.EqualValuesf(t, 0, rb.r, "expect r.r=0 but got %d", rb.r)
+	assert.EqualValues(t, []byte(strings.Repeat("1234", 16)), head)
 	rb.Discard(64)
-	if rb.r != 64 {
-		t.Fatalf("expect r.r=64 but got %d", rb.r)
-	}
+	assert.EqualValuesf(t, 64, rb.r, "expect r.r=64 but got %d", rb.r)
 	_, _ = rb.Write([]byte(strings.Repeat("1234", 4)))
-	if rb.w != 16 {
-		t.Fatalf("expect r.w=16 but got %d", rb.w)
-	}
+	assert.EqualValuesf(t, 16, rb.w, "expect r.w=16 but got %d", rb.w)
 	head, tail = rb.Peek(128)
-	if !(len(head) == 64 && len(tail) == 16) {
-		t.Fatalf("expect len(head)=64 and len(tail)=16, yet len(head)=%d and len(tail)=%d", len(head), len(tail))
-	}
-	if !(bytes.Equal(head, []byte(strings.Repeat("1234", 16))) && bytes.Equal(tail, []byte(strings.Repeat("1234", 4)))) {
-		t.Fatalf("head: %s, tail: %s", string(head), string(tail))
-	}
+	assert.Truef(t, len(head) == 64 && len(tail) == 16, "expect len(head)=64 and len(tail)=16, yet len(head)=%d and len(tail)=%d", len(head), len(tail))
+	assert.EqualValues(t, []byte(strings.Repeat("1234", 16)), head)
+	assert.EqualValues(t, []byte(strings.Repeat("1234", 4)), tail)
 
 	head, tail = rb.PeekAll()
-	if !(len(head) == 64 && len(tail) == 16) {
-		t.Fatalf("expect len(head)=64 and len(tail)=16, yet len(head)=%d and len(tail)=%d", len(head), len(tail))
-	}
-	if !(bytes.Equal(head, []byte(strings.Repeat("1234", 16))) && bytes.Equal(tail, []byte(strings.Repeat("1234", 4)))) {
-		t.Fatalf("head: %s, tail: %s", string(head), string(tail))
-	}
+	assert.Truef(t, len(head) == 64 && len(tail) == 16, "expect len(head)=64 and len(tail)=16, yet len(head)=%d and len(tail)=%d", len(head), len(tail))
+	assert.EqualValues(t, []byte(strings.Repeat("1234", 16)), head)
+	assert.EqualValues(t, []byte(strings.Repeat("1234", 4)), tail)
 
 	rb.Discard(64)
 	rb.Discard(16)
-	if !rb.isEmpty {
-		t.Fatal("should be empty")
-	}
+	assert.True(t, rb.IsEmpty(), "should be empty")
 }
 
 func TestRingBuffer_ByteInterface(t *testing.T) {
@@ -405,138 +265,56 @@ func TestRingBuffer_ByteInterface(t *testing.T) {
 
 	// write one
 	_ = rb.WriteByte('a')
-	if rb.Length() != 1 {
-		t.Fatalf("expect len 1 byte but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
-	}
-	if rb.Free() != 1 {
-		t.Fatalf("expect free 1 byte but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
-	}
-	if !bytes.Equal(rb.ByteBuffer().Bytes(), []byte{'a'}) {
-		t.Fatalf("expect a but got %s. r.w=%d, r.r=%d", rb.ByteBuffer().Bytes(), rb.w, rb.r)
-	}
+	assert.EqualValuesf(t, 1, rb.Length(), "expect len 1 byte but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
+	assert.EqualValuesf(t, 1, rb.Free(), "expect free 1 byte but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
+	assert.EqualValuesf(t, []byte{'a'}, rb.ByteBuffer().Bytes(), "expect a but got %s. r.w=%d, r.r=%d", rb.ByteBuffer().Bytes(), rb.w, rb.r)
 	// check empty or full
-	if rb.IsEmpty() {
-		t.Fatalf("expect IsEmpty is false but got true")
-	}
-	if rb.IsFull() {
-		t.Fatalf("expect IsFull is false but got true")
-	}
+	assert.Falsef(t, rb.IsEmpty(), "expect IsEmpty is false but got true")
+	assert.False(t, rb.IsFull(), "expect IsFull is false but got true")
 
 	// write two, isFull
 	_ = rb.WriteByte('b')
-	if rb.Length() != 2 {
-		t.Fatalf("expect len 2 bytes but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
-	}
-	if rb.Free() != 0 {
-		t.Fatalf("expect free 0 byte but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
-	}
-	if !bytes.Equal(rb.ByteBuffer().Bytes(), []byte{'a', 'b'}) {
-		t.Fatalf("expect a but got %s. r.w=%d, r.r=%d", rb.ByteBuffer().Bytes(), rb.w, rb.r)
-	}
+	assert.EqualValuesf(t, 2, rb.Length(), "expect len 2 bytes but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
+	assert.EqualValuesf(t, 0, rb.Free(), "expect free 0 byte but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
+	assert.EqualValuesf(t, []byte{'a', 'b'}, rb.ByteBuffer().Bytes(), "expect a but got %s. r.w=%d, r.r=%d", rb.ByteBuffer().Bytes(), rb.w, rb.r)
 	// check empty or full
-	if rb.IsEmpty() {
-		t.Fatalf("expect IsEmpty is false but got true")
-	}
-	if !rb.IsFull() {
-		t.Fatalf("expect IsFull is true but got false")
-	}
+	assert.False(t, rb.IsEmpty(), "expect IsEmpty is false but got true")
+	assert.True(t, rb.IsFull(), "expect IsFull is true but got false")
 
 	// write, it will scale from 2 to 4 bytes.
 	_ = rb.WriteByte('c')
-	if rb.Length() != 3 {
-		t.Fatalf("expect len 3 bytes but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
-	}
-	if rb.Free() != 1 {
-		t.Fatalf("expect free 1 byte but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
-	}
-	if !bytes.Equal(rb.ByteBuffer().Bytes(), []byte{'a', 'b', 'c'}) {
-		t.Fatalf("expect a but got %s. r.w=%d, r.r=%d", rb.ByteBuffer().Bytes(), rb.w, rb.r)
-	}
+	assert.EqualValuesf(t, 3, rb.Length(), "expect len 3 bytes but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
+	assert.EqualValuesf(t, 1, rb.Free(), "expect free 1 byte but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
+	assert.EqualValuesf(t, []byte{'a', 'b', 'c'}, rb.ByteBuffer().Bytes(), "expect a but got %s. r.w=%d, r.r=%d", rb.ByteBuffer().Bytes(), rb.w, rb.r)
 	// check empty or full
-	if rb.IsEmpty() {
-		t.Fatalf("expect IsEmpty is false but got true")
-	}
-	if rb.IsFull() {
-		t.Fatalf("expect IsFull is false but got true ")
-	}
+	assert.False(t, rb.IsEmpty(), "expect IsEmpty is false but got true")
+	assert.False(t, rb.IsFull(), "expect IsFull is false but got true")
 
 	// read one
 	b, err := rb.ReadByte()
-	if err != nil {
-		t.Fatalf("ReadByte failed: %v", err)
-	}
-	if b != 'a' {
-		t.Fatalf("expect a but got %c. r.w=%d, r.r=%d", b, rb.w, rb.r)
-	}
-	if rb.Length() != 2 {
-		t.Fatalf("expect len 2 byte but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
-	}
-	if rb.Free() != 2 {
-		t.Fatalf("expect free 2 byte but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
-	}
-	if !bytes.Equal(rb.ByteBuffer().Bytes(), []byte{'b', 'c'}) {
-		t.Fatalf("expect a but got %s. r.w=%d, r.r=%d", rb.ByteBuffer().Bytes(), rb.w, rb.r)
-	}
+	assert.NoErrorf(t, err, "ReadByte failed: %v", err)
+	assert.EqualValuesf(t, 'a', b, "expect a but got %c. r.w=%d, r.r=%d", b, rb.w, rb.r)
+	assert.EqualValuesf(t, 2, rb.Length(), "expect len 2 byte but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
+	assert.EqualValuesf(t, 2, rb.Free(), "expect free 2 byte but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
+	assert.EqualValuesf(t, []byte{'b', 'c'}, rb.ByteBuffer().Bytes(), "expect a but got %s. r.w=%d, r.r=%d", rb.ByteBuffer().Bytes(), rb.w, rb.r)
 	// check empty or full
-	if rb.IsEmpty() {
-		t.Fatalf("expect IsEmpty is false but got true")
-	}
-	if rb.IsFull() {
-		t.Fatalf("expect IsFull is false but got true")
-	}
+	assert.False(t, rb.IsEmpty(), "expect IsEmpty is false but got true")
+	assert.False(t, rb.IsFull(), "expect IsFull is false but got true")
 
 	// read two
 	b, _ = rb.ReadByte()
-	if b != 'b' {
-		t.Fatalf("expect b but got %c. r.w=%d, r.r=%d", b, rb.w, rb.r)
-	}
-	if rb.Length() != 1 {
-		t.Fatalf("expect len 1 byte but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
-	}
-	if rb.Free() != 3 {
-		t.Fatalf("expect free 3 byte but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
-	}
+	assert.EqualValuesf(t, 'b', b, "expect b but got %c. r.w=%d, r.r=%d", b, rb.w, rb.r)
+	assert.EqualValuesf(t, 1, rb.Length(), "expect len 1 byte but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
+	assert.EqualValuesf(t, 3, rb.Free(), "expect free 3 byte but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
 	// check empty or full
-	if rb.IsEmpty() {
-		t.Fatalf("expect IsEmpty is false but got true ")
-	}
-	if rb.IsFull() {
-		t.Fatalf("expect IsFull is false but got true")
-	}
+	assert.False(t, rb.IsEmpty(), "expect IsEmpty is false but got true")
+	assert.False(t, rb.IsFull(), "expect IsFull is false but got true")
 
 	// read three
 	_, _ = rb.ReadByte()
-	if rb.Length() != 0 {
-		t.Fatalf("expect len 0 byte but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
-	}
-	if rb.Free() != 4 {
-		t.Fatalf("expect free 4 byte but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
-	}
+	assert.EqualValuesf(t, 0, rb.Length(), "expect len 0 byte but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
+	assert.EqualValuesf(t, 4, rb.Free(), "expect free 4 byte but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
 	// check empty or full
-	if !rb.IsEmpty() {
-		t.Fatalf("expect IsEmpty is true but got false")
-	}
-	if rb.IsFull() {
-		t.Fatalf("expect IsFull is false but got true")
-	}
+	assert.True(t, rb.IsEmpty(), "expect IsEmpty is true but got false")
+	assert.False(t, rb.IsFull(), "expect IsFull is false but got true")
 }
-
-// func TestShrinkBuffer(t *testing.T) {
-// 	testStr := "Hello World!"
-// 	testCap := 1024
-//
-// 	rb := New(testCap)
-// 	_, _ = rb.WriteString(testStr)
-// 	rb.PeekAll()
-// 	rb.Discard(len(testStr))
-// 	if rb.Cap() != testCap/2 {
-// 		t.Fatalf("expect buffer capacity %d, but got %d", testCap/2, rb.Cap())
-// 	}
-//
-// 	_, _ = rb.WriteString(testStr)
-// 	rb.PeekAll()
-// 	rb.Reset()
-// 	if rb.Cap() != testCap/4 {
-// 		t.Fatalf("expect buffer capacity %d, but got %d", testCap/4, rb.Cap())
-// 	}
-// }

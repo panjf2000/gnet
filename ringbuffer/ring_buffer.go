@@ -373,13 +373,6 @@ func (r *RingBuffer) IsEmpty() bool {
 func (r *RingBuffer) Reset() {
 	r.isEmpty = true
 	r.r, r.w = 0, 0
-
-	// Shrink the internal buffer for saving memory.
-	// newCap := r.size >> 1
-	// newBuf := make([]byte, newCap)
-	// r.buf = newBuf
-	// r.size = newCap
-	// r.mask = newCap - 1
 }
 
 func (r *RingBuffer) grow(newCap int) {
