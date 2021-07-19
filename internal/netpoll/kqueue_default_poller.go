@@ -20,6 +20,7 @@
 // SOFTWARE.
 
 // +build freebsd dragonfly darwin
+// +build !poll_opt
 
 package netpoll
 
@@ -110,7 +111,7 @@ func (p *Poller) Trigger(fn queue.TaskFunc, arg interface{}) (err error) {
 
 // Polling blocks the current goroutine, waiting for network-events.
 func (p *Poller) Polling(callback func(fd int, filter int16) error) error {
-	el := newEventList(InitEvents)
+	el := newEventList(InitPollEventsCap)
 
 	var (
 		ts      unix.Timespec
@@ -131,9 +132,10 @@ func (p *Poller) Polling(callback func(fd int, filter int16) error) error {
 
 		var evFilter int16
 		for i := 0; i < n; i++ {
-			if fd := int(el.events[i].Ident); fd != 0 {
+			ev := &el.events[i]
+			if fd := int(ev.Ident); fd != 0 {
 				evFilter = el.events[i].Filter
-				if (el.events[i].Flags&unix.EV_EOF != 0) || (el.events[i].Flags&unix.EV_ERROR != 0) {
+				if (ev.Flags&unix.EV_EOF != 0) || (ev.Flags&unix.EV_ERROR != 0) {
 					evFilter = EVFilterSock
 				}
 				switch err = callback(fd, evFilter); err {
@@ -190,47 +192,47 @@ func (p *Poller) Polling(callback func(fd int, filter int16) error) error {
 }
 
 // AddReadWrite registers the given file-descriptor with readable and writable events to the poller.
-func (p *Poller) AddReadWrite(fd int) error {
+func (p *Poller) AddReadWrite(pa *PollAttachment) error {
 	_, err := unix.Kevent(p.fd, []unix.Kevent_t{
-		{Ident: uint64(fd), Flags: unix.EV_ADD, Filter: unix.EVFILT_READ},
-		{Ident: uint64(fd), Flags: unix.EV_ADD, Filter: unix.EVFILT_WRITE},
+		{Ident: uint64(pa.FD), Flags: unix.EV_ADD, Filter: unix.EVFILT_READ},
+		{Ident: uint64(pa.FD), Flags: unix.EV_ADD, Filter: unix.EVFILT_WRITE},
 	}, nil, nil)
 	return os.NewSyscallError("kevent add", err)
 }
 
 // AddRead registers the given file-descriptor with readable event to the poller.
-func (p *Poller) AddRead(fd int) error {
+func (p *Poller) AddRead(pa *PollAttachment) error {
 	_, err := unix.Kevent(p.fd, []unix.Kevent_t{
-		{Ident: uint64(fd), Flags: unix.EV_ADD, Filter: unix.EVFILT_READ},
+		{Ident: uint64(pa.FD), Flags: unix.EV_ADD, Filter: unix.EVFILT_READ},
 	}, nil, nil)
 	return os.NewSyscallError("kevent add", err)
 }
 
 // AddWrite registers the given file-descriptor with writable event to the poller.
-func (p *Poller) AddWrite(fd int) error {
+func (p *Poller) AddWrite(pa *PollAttachment) error {
 	_, err := unix.Kevent(p.fd, []unix.Kevent_t{
-		{Ident: uint64(fd), Flags: unix.EV_ADD, Filter: unix.EVFILT_WRITE},
+		{Ident: uint64(pa.FD), Flags: unix.EV_ADD, Filter: unix.EVFILT_WRITE},
 	}, nil, nil)
 	return os.NewSyscallError("kevent add", err)
 }
 
 // ModRead renews the given file-descriptor with readable event in the poller.
-func (p *Poller) ModRead(fd int) error {
+func (p *Poller) ModRead(pa *PollAttachment) error {
 	_, err := unix.Kevent(p.fd, []unix.Kevent_t{
-		{Ident: uint64(fd), Flags: unix.EV_DELETE, Filter: unix.EVFILT_WRITE},
+		{Ident: uint64(pa.FD), Flags: unix.EV_DELETE, Filter: unix.EVFILT_WRITE},
 	}, nil, nil)
 	return os.NewSyscallError("kevent delete", err)
 }
 
 // ModReadWrite renews the given file-descriptor with readable and writable events in the poller.
-func (p *Poller) ModReadWrite(fd int) error {
+func (p *Poller) ModReadWrite(pa *PollAttachment) error {
 	_, err := unix.Kevent(p.fd, []unix.Kevent_t{
-		{Ident: uint64(fd), Flags: unix.EV_ADD, Filter: unix.EVFILT_WRITE},
+		{Ident: uint64(pa.FD), Flags: unix.EV_ADD, Filter: unix.EVFILT_WRITE},
 	}, nil, nil)
 	return os.NewSyscallError("kevent add", err)
 }
 
 // Delete removes the given file-descriptor from the poller.
-func (p *Poller) Delete(fd int) error {
+func (p *Poller) Delete(_ int) error {
 	return nil
 }

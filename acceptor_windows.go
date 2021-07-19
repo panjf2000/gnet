@@ -41,6 +41,7 @@ func (svr *server) listenerRun(lockOSThread bool) {
 			n, addr, e := svr.ln.pconn.ReadFrom(buffer[:])
 			if e != nil {
 				err = e
+				svr.opts.Logger.Errorf("failed to receive data from UDP fd due to error:%v", err)
 				return
 			}
 
@@ -52,6 +53,7 @@ func (svr *server) listenerRun(lockOSThread bool) {
 			conn, e := svr.ln.ln.Accept()
 			if e != nil {
 				err = e
+				svr.opts.Logger.Errorf("Accept() fails due to error: %v", err)
 				return
 			}
 			el := svr.lb.next(conn.RemoteAddr())

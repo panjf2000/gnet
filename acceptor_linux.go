@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-// +build linux freebsd dragonfly darwin
+// +build linux
 
 package gnet
 
@@ -31,8 +31,8 @@ import (
 	"github.com/panjf2000/gnet/internal/socket"
 )
 
-func (svr *server) acceptNewConnection(fd int) error {
-	nfd, sa, err := unix.Accept(fd)
+func (svr *server) acceptNewConnection(_ uint32) error {
+	nfd, sa, err := unix.Accept(svr.ln.fd)
 	if err != nil {
 		if err == unix.EAGAIN {
 			return nil
@@ -48,10 +48,36 @@ func (svr *server) acceptNewConnection(fd int) error {
 	el := svr.lb.next(netAddr)
 	c := newTCPConn(nfd, el, sa, netAddr)
 
-	err = el.poller.UrgentTrigger(el.loopInsert, c)
+	err = el.poller.UrgentTrigger(el.loopRegister, c)
 	if err != nil {
 		_ = unix.Close(nfd)
 		c.releaseTCP()
 	}
 	return nil
+}
+
+func (el *eventloop) loopAccept(_ uint32) error {
+	if el.ln.network == "udp" {
+		return el.loopReadUDP(el.ln.fd)
+	}
+
+	nfd, sa, err := unix.Accept(el.ln.fd)
+	if err != nil {
+		if err == unix.EAGAIN {
+			return nil
+		}
+		el.getLogger().Errorf("Accept() fails due to error: %v", err)
+		return os.NewSyscallError("accept", err)
+	}
+	if err = os.NewSyscallError("fcntl nonblock", unix.SetNonblock(nfd, true)); err != nil {
+		return err
+	}
+
+	netAddr := socket.SockaddrToTCPOrUnixAddr(sa)
+	c := newTCPConn(nfd, el, sa, netAddr)
+	if err = el.poller.AddRead(c.pollAttachment); err == nil {
+		el.connections[c.fd] = c
+		return el.loopOpen(c)
+	}
+	return err
 }

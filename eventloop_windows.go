@@ -99,7 +99,7 @@ func (el *eventloop) loopRun(lockOSThread bool) {
 		}
 
 		if err == errors.ErrServerShutdown {
-			el.getLogger().Infof("event-loop(%d) is exiting in terms of the demand from user, %v", el.idx, err)
+			el.getLogger().Debugf("event-loop(%d) is exiting in terms of the demand from user, %v", el.idx, err)
 			break
 		} else if err != nil {
 			el.getLogger().Errorf("event-loop(%d) is exiting due to the error: %v", el.idx, err)

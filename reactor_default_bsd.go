@@ -19,6 +19,7 @@
 // SOFTWARE.
 
 // +build freebsd dragonfly darwin
+// +build !poll_opt
 
 package gnet
 
@@ -37,7 +38,7 @@ func (svr *server) activateMainReactor(lockOSThread bool) {
 
 	defer svr.signalShutdown()
 
-	err := svr.mainLoop.poller.Polling(func(fd int, filter int16) error { return svr.acceptNewConnection(fd) })
+	err := svr.mainLoop.poller.Polling(func(fd int, filter int16) error { return svr.acceptNewConnection(filter) })
 	if err == errors.ErrServerShutdown {
 		svr.opts.Logger.Debugf("main reactor is exiting in terms of the demand from user, %v", err)
 	} else if err != nil {
@@ -76,4 +77,35 @@ func (svr *server) activateSubReactor(el *eventloop, lockOSThread bool) {
 	} else if err != nil {
 		svr.opts.Logger.Errorf("event-loop(%d) is exiting normally on the signal error: %v", el.idx, err)
 	}
+}
+
+func (el *eventloop) loopRun(lockOSThread bool) {
+	if lockOSThread {
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+	}
+
+	defer func() {
+		el.closeAllConns()
+		el.ln.close()
+		el.svr.signalShutdown()
+	}()
+
+	err := el.poller.Polling(func(fd int, filter int16) (err error) {
+		if c, ack := el.connections[fd]; ack {
+			switch filter {
+			case netpoll.EVFilterSock:
+				err = el.loopCloseConn(c, nil)
+			case netpoll.EVFilterWrite:
+				if !c.outboundBuffer.IsEmpty() {
+					err = el.loopWrite(c)
+				}
+			case netpoll.EVFilterRead:
+				err = el.loopRead(c)
+			}
+			return
+		}
+		return el.loopAccept(filter)
+	})
+	el.getLogger().Debugf("event-loop(%d) is exiting due to error: %v", el.idx, err)
 }

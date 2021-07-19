@@ -1,4 +1,4 @@
-// Copyright (c) 2019 Andy Pan
+// Copyright (c) 2021 Andy Pan
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -18,41 +18,26 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-// +build linux
+// +build linux freebsd dragonfly darwin
 
 package netpoll
 
-import "golang.org/x/sys/unix"
+import "sync"
 
-const (
-	// InitPollEventsCap represents the initial capacity of poller event-list.
-	InitPollEventsCap = 128
-	// MaxAsyncTasksAtOneTime is the maximum amount of asynchronous tasks that the event-loop will process at one time.
-	MaxAsyncTasksAtOneTime = 256
-	// ErrEvents represents exceptional events that are not read/write, like socket being closed,
-	// reading/writing from/to a closed socket, etc.
-	ErrEvents = unix.EPOLLERR | unix.EPOLLHUP | unix.EPOLLRDHUP
-	// OutEvents combines EPOLLOUT event and some exceptional events.
-	OutEvents = ErrEvents | unix.EPOLLOUT
-	// InEvents combines EPOLLIN/EPOLLPRI events and some exceptional events.
-	InEvents = ErrEvents | unix.EPOLLIN | unix.EPOLLPRI
-)
+var pollAttachmentPool = sync.Pool{New: func() interface{} { return new(PollAttachment) }}
 
-type eventList struct {
-	size   int
-	events []epollevent
+// GetPollAttachment attempts to get a cached PollAttachment from pool.
+func GetPollAttachment() *PollAttachment {
+	return pollAttachmentPool.Get().(*PollAttachment)
 }
 
-func newEventList(size int) *eventList {
-	return &eventList{size, make([]epollevent, size)}
+// PutPollAttachment put a unused PollAttachment back to pool.
+func PutPollAttachment(pa *PollAttachment) {
+	pollAttachmentPool.Put(pa)
 }
 
-func (el *eventList) expand() {
-	el.size <<= 1
-	el.events = make([]epollevent, el.size)
-}
-
-func (el *eventList) shrink() {
-	el.size >>= 1
-	el.events = make([]epollevent, el.size)
+// PollAttachment is the user data which is about to be stored in "void *ptr" of epoll_data or "void *udata" of kevent.
+type PollAttachment struct {
+	FD       int
+	Callback PollEventHandler
 }

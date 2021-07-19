@@ -29,6 +29,7 @@ import (
 
 	"golang.org/x/sys/unix"
 
+	"github.com/panjf2000/gnet/internal/netpoll"
 	"github.com/panjf2000/gnet/internal/socket"
 	"github.com/panjf2000/gnet/pool/bytebuffer"
 	prb "github.com/panjf2000/gnet/pool/ringbuffer"
@@ -36,22 +37,23 @@ import (
 )
 
 type conn struct {
-	fd             int                    // file descriptor
-	sa             unix.Sockaddr          // remote socket address
-	ctx            interface{}            // user-defined context
-	loop           *eventloop             // connected event-loop
-	codec          ICodec                 // codec for TCP
-	buffer         []byte                 // reuse memory of inbound data as a temporary buffer
-	opened         bool                   // connection opened event fired
-	localAddr      net.Addr               // local addr
-	remoteAddr     net.Addr               // remote addr
-	byteBuffer     *bytebuffer.ByteBuffer // bytes buffer for buffering current packet and data in ring-buffer
-	inboundBuffer  *ringbuffer.RingBuffer // buffer for data from client
-	outboundBuffer *ringbuffer.RingBuffer // buffer for data that is ready to write to client
+	fd             int                     // file descriptor
+	sa             unix.Sockaddr           // remote socket address
+	ctx            interface{}             // user-defined context
+	loop           *eventloop              // connected event-loop
+	codec          ICodec                  // codec for TCP
+	buffer         []byte                  // reuse memory of inbound data as a temporary buffer
+	opened         bool                    // connection opened event fired
+	localAddr      net.Addr                // local addr
+	remoteAddr     net.Addr                // remote addr
+	byteBuffer     *bytebuffer.ByteBuffer  // bytes buffer for buffering current packet and data in ring-buffer
+	inboundBuffer  *ringbuffer.RingBuffer  // buffer for data from client
+	outboundBuffer *ringbuffer.RingBuffer  // buffer for data that is ready to write to client
+	pollAttachment *netpoll.PollAttachment // connection attachment for poller
 }
 
 func newTCPConn(fd int, el *eventloop, sa unix.Sockaddr, remoteAddr net.Addr) (c *conn) {
-	return &conn{
+	c = &conn{
 		fd:             fd,
 		sa:             sa,
 		loop:           el,
@@ -61,6 +63,9 @@ func newTCPConn(fd int, el *eventloop, sa unix.Sockaddr, remoteAddr net.Addr) (c
 		inboundBuffer:  prb.Get(),
 		outboundBuffer: prb.Get(),
 	}
+	c.pollAttachment = netpoll.GetPollAttachment()
+	c.pollAttachment.FD, c.pollAttachment.Callback = fd, c.handleEvents
+	return
 }
 
 func (c *conn) releaseTCP() {
@@ -76,6 +81,7 @@ func (c *conn) releaseTCP() {
 	c.outboundBuffer = ringbuffer.EmptyRingBuffer
 	bytebuffer.Put(c.byteBuffer)
 	c.byteBuffer = nil
+	netpoll.PutPollAttachment(c.pollAttachment)
 }
 
 func newUDPConn(fd int, el *eventloop, sa unix.Sockaddr) *conn {
@@ -126,7 +132,7 @@ func (c *conn) write(buf []byte) (err error) {
 		// A temporary error occurs, append the data to outbound buffer, writing it back to client in the next round.
 		if err == unix.EAGAIN {
 			_, _ = c.outboundBuffer.Write(outFrame)
-			err = c.loop.poller.ModReadWrite(c.fd)
+			err = c.loop.poller.ModReadWrite(c.pollAttachment)
 			return
 		}
 		return c.loop.loopCloseConn(c, os.NewSyscallError("write", err))
@@ -134,7 +140,7 @@ func (c *conn) write(buf []byte) (err error) {
 	// Fail to send all data back to client, buffer the leftover data for the next round.
 	if n < len(outFrame) {
 		_, _ = c.outboundBuffer.Write(outFrame[n:])
-		err = c.loop.poller.ModReadWrite(c.fd)
+		err = c.loop.poller.ModReadWrite(c.pollAttachment)
 	}
 	return
 }
