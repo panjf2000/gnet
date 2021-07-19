@@ -383,8 +383,12 @@ func (r *RingBuffer) Reset() {
 }
 
 func (r *RingBuffer) grow(newCap int) {
-	if n := r.size; n == 0 && newCap < defaultBufferSize {
-		newCap = defaultBufferSize
+	if n := r.size; n == 0 {
+		if newCap <= defaultBufferSize {
+			newCap = defaultBufferSize
+		} else {
+			newCap = internal.CeilToPowerOfTwo(newCap)
+		}
 	} else {
 		doubleCap := n + n
 		if newCap <= doubleCap {
