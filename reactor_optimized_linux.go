@@ -76,5 +76,5 @@ func (el *eventloop) loopRun(lockOSThread bool) {
 	}()
 
 	err := el.poller.Polling()
-	el.getLogger().Infof("event-loop(%d) is exiting due to error: %v", el.idx, err)
+	el.getLogger().Debugf("event-loop(%d) is exiting due to error: %v", el.idx, err)
 }
