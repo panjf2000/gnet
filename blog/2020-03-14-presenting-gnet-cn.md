@@ -953,6 +953,11 @@ func (cc *CustomLengthFieldProtocol) Decode(c gnet.Conn) ([]byte, error) {
 - `EventHandler.Tick` 服务器启动的时候会调用一次，之后就以给定的时间间隔定时调用一次，是一个定时器方法。
 - `EventHandler.PreWrite` 预先写数据方法，在 server 端写数据回 client 端之前调用。
 
+## poll_opt 模式
+
+默认情况下，`gnet` 使用官方包 `golang.org/x/sys/unix` 实现基于 `epoll` 和 `kqueue` 的网络轮询器 poller，这种实现需要引入一个 `fd->conn` 哈希表，通过它可以用文件描述符 `fd` 找到对应的 `connection` 结构体，但现在用户可以在 `go build` 编译项目的时候加入构建标签 `poll_opt`，像这样：`go build -tags=poll_opt`，然后 `gnet` 会切换到另一种优化的实现，直接调用 `epoll` 或 `kqueue` 的系统调用，将文件描述符添加到监控列表中，同时将相应的 connection 结构体指针存储到 `epoll_data` 或 `kevent` 中，在这种情况下，`gnet` 就能在 I/O 事件循环中摆脱掉 `fd->conn` 哈希表，将 `void*` 指针转换成 `connection` 结构体指针，通过这种优化，理论上应该可以得到更高的性能。
+
+代码细节请浏览 [#230](https://github.com/panjf2000/gnet/pull/230)。
 
 ## 定时器
 

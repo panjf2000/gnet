@@ -1,16 +1,16 @@
 module.exports = {
   "latest_highlight": {
     "author_github": "https://github.com/panjf2000",
-    "date": "2021-07-11",
-    "description": "Released v1.5.0",
+    "date": "2021-07-20",
+    "description": "Released v1.5.2",
     "hide_on_release_notes": false,
-    "id": "2021-02-17-released-1-5-0",
-    "path": "website/highlights/2021-07-11-released-1-5-0.md",
-    "permalink": "/highlights/2021-07-11-released-1-5-0/",
+    "id": "2021-07-20-released-1-5-2",
+    "path": "website/highlights/2021-07-20-released-1-5-2.md",
+    "permalink": "/highlights/2021-07-20-released-1-5-2/",
     "tags": [
       "release",
     ],
-    "title": "Released v1.5.0"
+    "title": "Released v1.5.2"
   },
   "latest_post": {
     "author_github": "https://github.com/panjf2000",
