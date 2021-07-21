@@ -24,6 +24,9 @@ package netpoll
 
 import "golang.org/x/sys/unix"
 
+// IOEvent is the integer type of I/O events on Linux.
+type IOEvent = uint32
+
 const (
 	// InitPollEventsCap represents the initial capacity of poller event-list.
 	InitPollEventsCap = 128

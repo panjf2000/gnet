@@ -1,4 +1,4 @@
-// Copyright (c) 2019 Andy Pan
+// Copyright (c) 2021 Andy Pan
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-// +build linux
+// +build linux freebsd dragonfly darwin
 
 package gnet
 
@@ -28,10 +28,11 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/panjf2000/gnet/errors"
+	"github.com/panjf2000/gnet/internal/netpoll"
 	"github.com/panjf2000/gnet/internal/socket"
 )
 
-func (svr *server) acceptNewConnection(_ uint32) error {
+func (svr *server) acceptNewConnection(_ netpoll.IOEvent) error {
 	nfd, sa, err := unix.Accept(svr.ln.fd)
 	if err != nil {
 		if err == unix.EAGAIN {
@@ -56,7 +57,7 @@ func (svr *server) acceptNewConnection(_ uint32) error {
 	return nil
 }
 
-func (el *eventloop) loopAccept(_ uint32) error {
+func (el *eventloop) loopAccept(_ netpoll.IOEvent) error {
 	if el.ln.network == "udp" {
 		return el.loopReadUDP(el.ln.fd)
 	}
