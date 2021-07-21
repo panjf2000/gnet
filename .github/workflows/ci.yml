@@ -22,27 +22,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: [1.16.x]
+        go: [1.15.x, 1.16.x]
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os}}
     steps:
       - name: Installing Go
-        uses: actions/setup-go@v1
+        uses: actions/setup-go@v2
         with:
           go-version: ${{ matrix.go }}
+
       - name: Checkout code
         uses: actions/checkout@v2
-      - name: Run unit tests for packages
-        run: go test $(go list ./... | tail -n +2)
-      - name: Run integration testing
-        run: go test -v -race -coverprofile=coverage -covermode=atomic -timeout 60s
-      - name: Upload code coverage report to Codecov
-        uses: codecov/codecov-action@v1.2.1
-        with:
-          file: ./coverage
-          flags: unittests
-          verbose: true
-          name: codecov-gnet
+
       - name: Print Go environment
         id: vars
         run: |
@@ -55,10 +46,27 @@ jobs:
           # Calculate the short SHA1 hash of the git commit
           echo "::set-output name=short_sha::$(git rev-parse --short HEAD)"
           echo "::set-output name=go_cache::$(go env GOCACHE)"
+
       - name: Cache go modules
         uses: actions/cache@v2
         with:
-          path: ${{ steps.vars.outputs.go_cache }}
+          path: |
+            ${{ steps.vars.outputs.go_cache }}
+            ~/go/pkg/mod
           key: ${{ runner.os }}-${{ matrix.go }}-go-ci-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-${{ matrix.go }}-go-ci
+
+      - name: Run unit tests for packages
+        run: go test $(go list ./... | tail -n +2)
+
+      - name: Run integration testing
+        run: go test -v -race -coverprofile="coverage.report" -covermode=atomic -timeout 60s
+
+      - name: Upload the code coverage report to codecov.io
+        uses: codecov/codecov-action@v2
+        with:
+          files: ./coverage.report
+          flags: unittests
+          name: codecov-gnet
+          verbose: true
