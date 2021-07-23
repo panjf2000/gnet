@@ -212,11 +212,13 @@ func (el *eventloop) loopError(c *stdConn, err error) (e error) {
 			return // ignore stale wakes.
 		}
 
-		if err = c.conn.Close(); err != nil {
+		if errOnClose := c.conn.Close(); errOnClose != nil {
 			el.getLogger().Errorf("failed to close connection(%s), error: %v", c.remoteAddr.String(), err)
-			if e == nil {
-				e = err
-			}
+			err = errOnClose
+		}
+
+		if e == nil {
+			e = err
 		}
 		delete(el.connections, c)
 		el.addConn(-1)
