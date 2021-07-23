@@ -22,18 +22,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: [1.16.x]
+        go: [1.15.x, 1.16.x]
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os}}
     steps:
       - name: Installing Go
-        uses: actions/setup-go@v1
+        uses: actions/setup-go@v2
         with:
           go-version: ${{ matrix.go }}
+
       - name: Checkout code
         uses: actions/checkout@v2
-      - name: Run integration testing with poll_opt build tag
-        run: go test -v -tags=poll_opt -timeout 60s
+
       - name: Print Go environment
         id: vars
         run: |
@@ -46,10 +46,16 @@ jobs:
           # Calculate the short SHA1 hash of the git commit
           echo "::set-output name=short_sha::$(git rev-parse --short HEAD)"
           echo "::set-output name=go_cache::$(go env GOCACHE)"
+
       - name: Cache go modules
         uses: actions/cache@v2
         with:
-          path: ${{ steps.vars.outputs.go_cache }}
+          path: |
+            ${{ steps.vars.outputs.go_cache }}
+            ~/go/pkg/mod
           key: ${{ runner.os }}-${{ matrix.go }}-go-ci-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-${{ matrix.go }}-go-ci
+
+      - name: Run integration testing with poll_opt build tag
+        run: go test -v -tags=poll_opt -timeout 60s

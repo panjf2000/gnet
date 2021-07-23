@@ -1,4 +1,4 @@
-// Copyright (c) 2019 Andy Pan
+// Copyright (c) 2021 Andy Pan
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -18,20 +18,23 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-// +build linux
+// +build linux freebsd dragonfly darwin
 
 package gnet
 
 import (
 	"os"
+	"time"
 
 	"golang.org/x/sys/unix"
 
 	"github.com/panjf2000/gnet/errors"
+	"github.com/panjf2000/gnet/internal/netpoll"
 	"github.com/panjf2000/gnet/internal/socket"
+	"github.com/panjf2000/gnet/logging"
 )
 
-func (svr *server) acceptNewConnection(_ uint32) error {
+func (svr *server) acceptNewConnection(_ netpoll.IOEvent) error {
 	nfd, sa, err := unix.Accept(svr.ln.fd)
 	if err != nil {
 		if err == unix.EAGAIN {
@@ -45,6 +48,11 @@ func (svr *server) acceptNewConnection(_ uint32) error {
 	}
 
 	netAddr := socket.SockaddrToTCPOrUnixAddr(sa)
+	if svr.opts.TCPKeepAlive > 0 && svr.ln.network == "tcp" {
+		err = socket.SetKeepAlive(nfd, int(svr.opts.TCPKeepAlive/time.Second))
+		logging.LogErr(err)
+	}
+
 	el := svr.lb.next(netAddr)
 	c := newTCPConn(nfd, el, sa, netAddr)
 
@@ -56,7 +64,7 @@ func (svr *server) acceptNewConnection(_ uint32) error {
 	return nil
 }
 
-func (el *eventloop) loopAccept(_ uint32) error {
+func (el *eventloop) loopAccept(_ netpoll.IOEvent) error {
 	if el.ln.network == "udp" {
 		return el.loopReadUDP(el.ln.fd)
 	}
@@ -74,6 +82,11 @@ func (el *eventloop) loopAccept(_ uint32) error {
 	}
 
 	netAddr := socket.SockaddrToTCPOrUnixAddr(sa)
+	if el.svr.opts.TCPKeepAlive > 0 && el.svr.ln.network == "tcp" {
+		err = socket.SetKeepAlive(nfd, int(el.svr.opts.TCPKeepAlive/time.Second))
+		logging.LogErr(err)
+	}
+
 	c := newTCPConn(nfd, el, sa, netAddr)
 	if err = el.poller.AddRead(c.pollAttachment); err == nil {
 		el.connections[c.fd] = c

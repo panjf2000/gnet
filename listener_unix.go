@@ -25,8 +25,8 @@ package gnet
 import (
 	"net"
 	"os"
+	"strings"
 	"sync"
-	"time"
 
 	"golang.org/x/sys/unix"
 
@@ -85,16 +85,12 @@ func (ln *listener) close() {
 
 func initListener(network, addr string, options *Options) (l *listener, err error) {
 	var sockopts []socket.Option
-	if options.ReusePort || network == "udp" {
+	if options.ReusePort || strings.HasPrefix(network, "udp") {
 		sockopt := socket.Option{SetSockopt: socket.SetReuseport, Opt: 1}
 		sockopts = append(sockopts, sockopt)
 	}
-	if network == "tcp" && options.TCPNoDelay == TCPNoDelay {
+	if options.TCPNoDelay == TCPNoDelay && strings.HasPrefix(network, "tcp") {
 		sockopt := socket.Option{SetSockopt: socket.SetNoDelay, Opt: 1}
-		sockopts = append(sockopts, sockopt)
-	}
-	if network == "tcp" && options.TCPKeepAlive > 0 {
-		sockopt := socket.Option{SetSockopt: socket.SetKeepAlive, Opt: int(options.TCPKeepAlive / time.Second)}
 		sockopts = append(sockopts, sockopt)
 	}
 	if options.SocketRecvBuffer > 0 {
