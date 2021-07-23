@@ -24,12 +24,14 @@ package gnet
 
 import (
 	"os"
+	"time"
 
 	"golang.org/x/sys/unix"
 
 	"github.com/panjf2000/gnet/errors"
 	"github.com/panjf2000/gnet/internal/netpoll"
 	"github.com/panjf2000/gnet/internal/socket"
+	"github.com/panjf2000/gnet/logging"
 )
 
 func (svr *server) acceptNewConnection(_ netpoll.IOEvent) error {
@@ -46,6 +48,11 @@ func (svr *server) acceptNewConnection(_ netpoll.IOEvent) error {
 	}
 
 	netAddr := socket.SockaddrToTCPOrUnixAddr(sa)
+	if svr.opts.TCPKeepAlive > 0 && svr.ln.network == "tcp" {
+		err = socket.SetKeepAlive(nfd, int(svr.opts.TCPKeepAlive/time.Second))
+		logging.LogErr(err)
+	}
+
 	el := svr.lb.next(netAddr)
 	c := newTCPConn(nfd, el, sa, netAddr)
 
@@ -75,6 +82,11 @@ func (el *eventloop) loopAccept(_ netpoll.IOEvent) error {
 	}
 
 	netAddr := socket.SockaddrToTCPOrUnixAddr(sa)
+	if el.svr.opts.TCPKeepAlive > 0 && el.svr.ln.network == "tcp" {
+		err = socket.SetKeepAlive(nfd, int(el.svr.opts.TCPKeepAlive/time.Second))
+		logging.LogErr(err)
+	}
+
 	c := newTCPConn(nfd, el, sa, netAddr)
 	if err = el.poller.AddRead(c.pollAttachment); err == nil {
 		el.connections[c.fd] = c
