@@ -85,9 +85,9 @@ Go : go1.14.x linux/amd64
 Go Version : go1.16.5 linux/amd64
 GOMAXPROCS : 8
 
-# Netwokr settings
+# Network settings
 TCP connections : 500/1000/5000/10000
-Packet size     : 512/1024/2048/4096/8192/16384/32768/65536
+Packet size     : 512/1024/2048/4096/8192/16384/32768/65536 bytes
 Test duration   : 15s
 ```
 
