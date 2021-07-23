@@ -1054,48 +1054,20 @@ Go : go1.14.x linux/amd64
     Memory : 16.0 GiB
 
 # Go version and settings
-Go Version : go1.15.7 linux/amd64
+Go Version : go1.16.5 linux/amd64
 GOMAXPROCS : 8
 
-# Netwokr settings
-TCP connections : 300
-Test duration   : 30s
+# Network settings
+TCP connections : 500/1000/5000/10000
+Packet size     : 512/1024/2048/4096/8192/16384/32768/65536 bytes
+Test duration   : 15s
 ```
 
-#### Echo Server
+#### [Echo 性能压测](https://github.com/gnet-io/gnet-benchmarks)
 
-![](https://github.com/panjf2000/gnet_benchmarks/raw/master/results/echo_linux.png)
+![](https://github.com/panjf2000/gnet_benchmarks/raw/master/results/echo_conn_linux.png)
 
-#### HTTP Server
-
-![](https://github.com/panjf2000/gnet_benchmarks/raw/master/results/http_linux.png)
-
-## FreeBSD (kqueue)
-
-### 系统参数
-
-```powershell
-# Machine information
-        OS : macOS Catalina 10.15.7/x86_64
-       CPU : 6-Core Intel Core i7
-    Memory : 16.0 GiB
-
-# Go version and configurations
-Go Version : go1.15.7 darwin/amd64
-GOMAXPROCS : 12
-
-# Netwokr settings
-TCP connections : 100
-Test duration   : 20s
-```
-
-#### Echo Server
-
-![](https://github.com/panjf2000/gnet_benchmarks/raw/master/results/echo_mac.png)
-
-#### HTTP Server
-
-![](https://github.com/panjf2000/gnet_benchmarks/raw/master/results/http_mac.png)
+![](https://github.com/panjf2000/gnet_benchmarks/raw/master/results/echo_packet_linux.png)
 
 # ️🚨 证书
 
