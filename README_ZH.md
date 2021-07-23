@@ -87,12 +87,15 @@ GOMAXPROCS : 8
 
 # Netwokr settings
 TCP connections : 500/1000/5000/10000
+Packet size     : 512/1024/2048/4096/8192/16384/32768/65536
 Test duration   : 15s
 ```
 
 #### Echo Server
 
-![](https://github.com/panjf2000/gnet_benchmarks/raw/master/results/echo_linux.png)
+![](https://github.com/panjf2000/gnet_benchmarks/raw/master/results/echo_conn_linux.png)
+
+![](https://github.com/panjf2000/gnet_benchmarks/raw/master/results/echo_packet_linux.png)
 
 # 🏛 官网
 
