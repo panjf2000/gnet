@@ -76,19 +76,19 @@ Go : go1.14.x linux/amd64
 ### 系统参数
 
 ```powershell
-# Machine information
-        OS : Ubuntu 20.04/x86_64
-       CPU : 8 processors, AMD EPYC 7K62 48-Core Processor
-    Memory : 16.0 GiB
+# 机器信息
+    OS : Ubuntu 20.04/x86_64
+   CPU : 8 processors, AMD EPYC 7K62 48-Core Processor
+Memory : 16.0 GiB
 
-# Go version and settings
+# Go 版本和配置
 Go Version : go1.16.5 linux/amd64
 GOMAXPROCS : 8
 
-# Network settings
+# 压测参数
+    Packet size : 512/1024/2048/4096/8192/16384/32768/65536 bytes
+  Test duration : 15s
 TCP connections : 500/1000/5000/10000
-Packet size     : 512/1024/2048/4096/8192/16384/32768/65536 bytes
-Test duration   : 15s
 ```
 
 #### [Echo 性能压测](https://github.com/gnet-io/gnet-benchmarks)
@@ -103,7 +103,7 @@ Test duration   : 15s
 
 # ⚠️ 证书
 
-`gnet` 的源码允许用户在遵循 [MIT 开源证书](/LICENSE) 规则的前提下使用。
+`gnet` 的源码文件需在遵循 MIT 开源证书的前提下使用。
 
 # 👏 贡献者
 

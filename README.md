@@ -78,18 +78,18 @@ To see the full ranking list, visit [TechEmpower Plaintext Benchmark](https://ww
 
 ```powershell
 # Machine information
-        OS : Ubuntu 20.04/x86_64
-       CPU : 8 processors, AMD EPYC 7K62 48-Core Processor
-    Memory : 16.0 GiB
+    OS : Ubuntu 20.04/x86_64
+   CPU : 8 processors, AMD EPYC 7K62 48-Core Processor
+Memory : 16.0 GiB
 
 # Go version and settings
 Go Version : go1.16.5 linux/amd64
 GOMAXPROCS : 8
 
-# Network settings
+# Benchmark parameters
+    Packet size : 512/1024/2048/4096/8192/16384/32768/65536 bytes
+  Test duration : 15s
 TCP connections : 500/1000/5000/10000
-Packet size     : 512/1024/2048/4096/8192/16384/32768/65536 bytes
-Test duration   : 15s
 ```
 
 #### [Echo Benchmark](https://github.com/gnet-io/gnet-benchmarks)
@@ -104,7 +104,7 @@ Please visit the [official website](https://gnet.host/blog/presenting-gnet/) for
 
 # ⚠️ License
 
-Source code in `gnet` is available under the [MIT License](/LICENSE).
+Source files of `gnet` are distributed under the MIT license found in the LICENSE file.
 
 # 👏 Contributors
 
