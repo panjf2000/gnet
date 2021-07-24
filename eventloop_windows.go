@@ -84,6 +84,10 @@ func (el *eventloop) loopRun(lockOSThread bool) {
 		case *stdConn:
 			err = el.loopAccept(v)
 		case *tcpConn:
+			if v.c.conn == nil {
+				err = errors.ErrConnectionClosed
+				break
+			}
 			v.c.buffer = v.bb
 			err = el.loopRead(v.c)
 		case *udpConn:
@@ -102,7 +106,7 @@ func (el *eventloop) loopRun(lockOSThread bool) {
 			el.getLogger().Debugf("event-loop(%d) is exiting in terms of the demand from user, %v", el.idx, err)
 			break
 		} else if err != nil {
-			el.getLogger().Errorf("event-loop(%d) is exiting due to the error: %v", el.idx, err)
+			el.getLogger().Debugf("event-loop(%d) got a nonlethal error: %v", el.idx, err)
 		}
 	}
 }
