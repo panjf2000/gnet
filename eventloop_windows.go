@@ -85,7 +85,7 @@ func (el *eventloop) loopRun(lockOSThread bool) {
 			err = el.loopAccept(v)
 		case *tcpConn:
 			if v.c.conn == nil {
-				break
+				continue
 			}
 			v.c.buffer = v.bb
 			err = el.loopRead(v.c)
