@@ -105,7 +105,7 @@ func (el *eventloop) loopRun(lockOSThread bool) {
 			el.getLogger().Debugf("event-loop(%d) is exiting in terms of the demand from user, %v", el.idx, err)
 			break
 		} else if err != nil {
-			el.getLogger().Errorf("event-loop(%d) is exiting due to the error: %v", el.idx, err)
+			el.getLogger().Debugf("event-loop(%d) got a nonlethal error: %v", el.idx, err)
 		}
 	}
 }
