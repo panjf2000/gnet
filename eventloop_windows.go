@@ -130,8 +130,7 @@ func (el *eventloop) loopRead(c *stdConn) error {
 			outFrame, _ := c.codec.Encode(c, out)
 			el.eventHandler.PreWrite()
 			if _, err := c.conn.Write(outFrame); err != nil {
-				err = el.loopError(c, err)
-				return err
+				return el.loopError(c, err)
 			}
 		}
 		switch action {
