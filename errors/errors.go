@@ -41,6 +41,8 @@ var (
 	ErrUnsupportedUDSProtocol = errors.New("only unix is supported")
 	// ErrUnsupportedPlatform occurs when running gnet on an unsupported platform.
 	ErrUnsupportedPlatform = errors.New("unsupported platform in gnet")
+	// ErrConnectionClosed occurs when connection is closed but eventloop.ch still receive this connection.
+	ErrConnectionClosed = errors.New("connection is closed")
 
 	// ================================================= codec errors =================================================.
 
