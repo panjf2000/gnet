@@ -24,7 +24,6 @@ package gnet
 import (
 	"context"
 	"runtime"
-	"sync"
 	"sync/atomic"
 	"time"
 	"unsafe"
@@ -44,7 +43,6 @@ type eventloop struct {
 
 //nolint:structcheck
 type internalEventloop struct {
-	connLock     sync.RWMutex
 	ch           chan interface{}      // command channel
 	idx          int                   // loop index
 	svr          *server               // server in loop
@@ -132,9 +130,7 @@ func (el *eventloop) loopRead(c *stdConn) error {
 			outFrame, _ := c.codec.Encode(c, out)
 			el.eventHandler.PreWrite()
 			if _, err := c.conn.Write(outFrame); err != nil {
-				el.connLock.Lock()
 				err = el.loopError(c, err)
-				el.connLock.Unlock()
 				return err
 			}
 		}

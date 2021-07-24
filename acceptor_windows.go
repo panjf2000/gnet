@@ -62,20 +62,12 @@ func (svr *server) listenerRun(lockOSThread bool) {
 			go func() {
 				var buffer [0x10000]byte
 				for {
-					el.connLock.RLock()
-					if c.conn == nil {
-						el.connLock.RUnlock()
-						return
-					}
-
-					n, err := c.conn.Read(buffer[:])
+					n, err := conn.Read(buffer[:])
 					if err != nil {
-						_ = c.conn.SetReadDeadline(time.Time{})
-						el.connLock.RUnlock()
+						_ = conn.SetReadDeadline(time.Time{})
 						el.ch <- &stderr{c, err}
 						return
 					}
-					el.connLock.RUnlock()
 					el.ch <- packTCPConn(c, buffer[:n])
 				}
 			}()
