@@ -78,53 +78,25 @@ To see the full ranking list, visit [TechEmpower Plaintext Benchmark](https://ww
 
 ```powershell
 # Machine information
-        OS : Ubuntu 20.04/x86_64
-       CPU : 8 processors, AMD EPYC 7K62 48-Core Processor
-    Memory : 16.0 GiB
+    OS : Ubuntu 20.04/x86_64
+   CPU : 8 processors, AMD EPYC 7K62 48-Core Processor
+Memory : 16.0 GiB
 
 # Go version and settings
-Go Version : go1.15.7 linux/amd64
+Go Version : go1.16.5 linux/amd64
 GOMAXPROCS : 8
 
-# Netwokr settings
-TCP connections : 300
-Test duration   : 30s
+# Benchmark parameters
+    Packet size : 512/1024/2048/4096/8192/16384/32768/65536 bytes
+  Test duration : 15s
+TCP connections : 500/1000/5000/10000
 ```
 
-#### Echo Server
+#### [Echo Benchmark](https://github.com/gnet-io/gnet-benchmarks)
 
-![](https://github.com/panjf2000/gnet_benchmarks/raw/master/results/echo_linux.png)
+![](https://github.com/panjf2000/gnet_benchmarks/raw/master/results/echo_conn_linux.png)
 
-#### HTTP Server
-
-![](https://github.com/panjf2000/gnet_benchmarks/raw/master/results/http_linux.png)
-
-## On FreeBSD (kqueue)
-
-### Test Environment
-
-```powershell
-# Machine information
-        OS : macOS Catalina 10.15.7/x86_64
-       CPU : 6-Core Intel Core i7
-    Memory : 16.0 GiB
-
-# Go version and configurations
-Go Version : go1.15.7 darwin/amd64
-GOMAXPROCS : 12
-
-# Netwokr settings
-TCP connections : 100
-Test duration   : 20s
-```
-
-#### Echo Server
-
-![](https://github.com/panjf2000/gnet_benchmarks/raw/master/results/echo_mac.png)
-
-#### HTTP Server
-
-![](https://github.com/panjf2000/gnet_benchmarks/raw/master/results/http_mac.png)
+![](https://github.com/panjf2000/gnet_benchmarks/raw/master/results/echo_packet_linux.png)
 
 # 🏛 Website
 
@@ -132,7 +104,7 @@ Please visit the [official website](https://gnet.host/blog/presenting-gnet/) for
 
 # ⚠️ License
 
-Source code in `gnet` is available under the [MIT License](/LICENSE).
+Source files of `gnet` are distributed under the MIT license found in the LICENSE file.
 
 # 👏 Contributors
 

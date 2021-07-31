@@ -62,9 +62,9 @@ func (svr *server) listenerRun(lockOSThread bool) {
 			go func() {
 				var buffer [0x10000]byte
 				for {
-					n, err := c.conn.Read(buffer[:])
+					n, err := conn.Read(buffer[:])
 					if err != nil {
-						_ = c.conn.SetReadDeadline(time.Time{})
+						_ = conn.SetReadDeadline(time.Time{})
 						el.ch <- &stderr{c, err}
 						return
 					}
