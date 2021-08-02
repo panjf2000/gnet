@@ -191,12 +191,13 @@ func (cc *LengthFieldBasedFrameCodec) Encode(c Conn, buf []byte) (out []byte, er
 		if length >= 256 {
 			return nil, fmt.Errorf("length does not fit into a byte: %d", length)
 		}
-		out = []byte{byte(length)}
+		out = make([]byte,1, length + 1)
+		out[0] = byte(length)
 	case 2:
 		if length >= 65536 {
 			return nil, fmt.Errorf("length does not fit into a short integer: %d", length)
 		}
-		out = make([]byte, 2)
+		out = make([]byte,2, length + 2)
 		cc.encoderConfig.ByteOrder.PutUint16(out, uint16(length))
 	case 3:
 		if length >= 16777216 {
@@ -204,10 +205,10 @@ func (cc *LengthFieldBasedFrameCodec) Encode(c Conn, buf []byte) (out []byte, er
 		}
 		out = writeUint24(cc.encoderConfig.ByteOrder, length)
 	case 4:
-		out = make([]byte, 4)
+		out = make([]byte,4, length + 4)
 		cc.encoderConfig.ByteOrder.PutUint32(out, uint32(length))
 	case 8:
-		out = make([]byte, 8)
+		out = make([]byte,8, length + 8)
 		cc.encoderConfig.ByteOrder.PutUint64(out, uint64(length))
 	default:
 		return nil, errorset.ErrUnsupportedLength
@@ -315,7 +316,7 @@ func readUint24(byteOrder binary.ByteOrder, b []byte) uint64 {
 }
 
 func writeUint24(byteOrder binary.ByteOrder, v int) []byte {
-	b := make([]byte, 3)
+	b := make([]byte, 3, v + 3)
 	if byteOrder == binary.LittleEndian {
 		b[0] = byte(v)
 		b[1] = byte(v >> 8)
