@@ -179,7 +179,7 @@ func (p *Poller) Polling(callback func(fd int, ev uint32) error) error {
 				queue.PutTask(task)
 			}
 			atomic.StoreInt32(&p.netpollWakeSig, 0)
-			if !p.asyncTaskQueue.Empty() || !p.priorAsyncTaskQueue.Empty() {
+			if (!p.asyncTaskQueue.Empty() || !p.priorAsyncTaskQueue.Empty()) && atomic.CompareAndSwapInt32(&p.netpollWakeSig, 0, 1) {
 				for _, err = unix.Write(p.wfd, b); err == unix.EINTR || err == unix.EAGAIN; _, err = unix.Write(p.wfd, b) {
 				}
 			}
