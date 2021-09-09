@@ -30,6 +30,10 @@ type IOEvent = uint32
 const (
 	// InitPollEventsCap represents the initial capacity of poller event-list.
 	InitPollEventsCap = 128
+	// MaxPollEventsCap is the maximum limitation of events that the poller can process.
+	MaxPollEventsCap = 1024
+	// MinPollEventsCap is the minimum limitation of events that the poller can process.
+	MinPollEventsCap = 32
 	// MaxAsyncTasksAtOneTime is the maximum amount of asynchronous tasks that the event-loop will process at one time.
 	MaxAsyncTasksAtOneTime = 256
 	// ErrEvents represents exceptional events that are not read/write, like socket being closed,
@@ -51,11 +55,15 @@ func newEventList(size int) *eventList {
 }
 
 func (el *eventList) expand() {
-	el.size <<= 1
-	el.events = make([]epollevent, el.size)
+	if newSize := el.size << 1; newSize <= MaxPollEventsCap {
+		el.size = newSize
+		el.events = make([]epollevent, newSize)
+	}
 }
 
 func (el *eventList) shrink() {
-	el.size >>= 1
-	el.events = make([]epollevent, el.size)
+	if newSize := el.size >> 1; newSize >= MinPollEventsCap {
+		el.size = newSize
+		el.events = make([]epollevent, newSize)
+	}
 }
