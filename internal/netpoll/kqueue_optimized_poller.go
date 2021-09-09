@@ -177,10 +177,11 @@ func (p *Poller) Polling() error {
 				}
 				queue.PutTask(task)
 			}
-			atomic.StoreInt32(&p.netpollWakeSig, 0)
 			if !p.asyncTaskQueue.Empty() || !p.priorAsyncTaskQueue.Empty() {
 				for _, err = unix.Kevent(p.fd, wakeChanges, nil, nil); err == unix.EINTR || err == unix.EAGAIN; _, err = unix.Kevent(p.fd, wakeChanges, nil, nil) {
 				}
+			} else {
+				atomic.StoreInt32(&p.netpollWakeSig, 0)
 			}
 		}
 
