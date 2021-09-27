@@ -88,6 +88,7 @@ func newUDPConn(fd int, el *eventloop, sa unix.Sockaddr) *conn {
 	return &conn{
 		fd:         fd,
 		sa:         sa,
+		loop:       el,
 		localAddr:  el.ln.lnaddr,
 		remoteAddr: socket.SockaddrToUDPAddr(sa),
 	}
@@ -99,16 +100,21 @@ func (c *conn) releaseUDP() {
 	c.remoteAddr = nil
 }
 
-func (c *conn) open(buf []byte) {
+func (c *conn) open(buf []byte) error {
+	defer c.loop.eventHandler.AfterWrite(c, buf)
+
+	c.loop.eventHandler.PreWrite(c)
 	n, err := unix.Write(c.fd, buf)
-	if err != nil {
+	if err != nil && err == unix.EAGAIN {
 		_, _ = c.outboundBuffer.Write(buf)
-		return
+		return nil
 	}
 
-	if n < len(buf) {
+	if err == nil && n < len(buf) {
 		_, _ = c.outboundBuffer.Write(buf[n:])
 	}
+
+	return err
 }
 
 func (c *conn) read() ([]byte, error) {
@@ -116,17 +122,22 @@ func (c *conn) read() ([]byte, error) {
 }
 
 func (c *conn) write(buf []byte) (err error) {
+	defer c.loop.eventHandler.AfterWrite(c, buf)
+
 	var outFrame []byte
 	if outFrame, err = c.codec.Encode(c, buf); err != nil {
 		return
 	}
+
+	c.loop.eventHandler.PreWrite(c)
+
 	// If there is pending data in outbound buffer, the current data ought to be appended to the outbound buffer
 	// for maintaining the sequence of network packets.
 	if !c.outboundBuffer.IsEmpty() {
 		_, _ = c.outboundBuffer.Write(outFrame)
 		return
 	}
-	c.loop.eventHandler.PreWrite() // call PreWrite() only before server writes data to socket
+
 	var n int
 	if n, err = unix.Write(c.fd, outFrame); err != nil {
 		// A temporary error occurs, append the data to outbound buffer, writing it back to client in the next round.
@@ -153,6 +164,8 @@ func (c *conn) asyncWrite(itf interface{}) error {
 }
 
 func (c *conn) sendTo(buf []byte) error {
+	c.loop.eventHandler.PreWrite(c)
+	defer c.loop.eventHandler.AfterWrite(c, buf)
 	return unix.Sendto(c.fd, buf, 0, c.sa)
 }
 

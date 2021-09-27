@@ -117,8 +117,9 @@ func (el *eventloop) loopAccept(c *stdConn) error {
 
 	out, action := el.eventHandler.OnOpened(c)
 	if out != nil {
-		el.eventHandler.PreWrite()
+		el.eventHandler.PreWrite(c)
 		_, _ = c.conn.Write(out)
+		el.eventHandler.AfterWrite(c, out)
 	}
 
 	return el.handleAction(c, action)
@@ -128,9 +129,7 @@ func (el *eventloop) loopRead(c *stdConn) error {
 	for inFrame, _ := c.read(); inFrame != nil; inFrame, _ = c.read() {
 		out, action := el.eventHandler.React(inFrame, c)
 		if out != nil {
-			outFrame, _ := c.codec.Encode(c, out)
-			el.eventHandler.PreWrite()
-			if _, err := c.conn.Write(outFrame); err != nil {
+			if _, err := c.write(out); err != nil {
 				return el.loopError(c, err)
 			}
 		}
@@ -242,9 +241,7 @@ func (el *eventloop) loopWake(c *stdConn) error {
 
 	out, action := el.eventHandler.React(nil, c)
 	if out != nil {
-		if frame, err := c.codec.Encode(c, out); err != nil {
-			return err
-		} else if _, err = c.conn.Write(frame); err != nil {
+		if _, err := c.write(out); err != nil {
 			return err
 		}
 	}
@@ -268,8 +265,7 @@ func (el *eventloop) handleAction(c *stdConn, action Action) error {
 func (el *eventloop) loopReadUDP(c *stdConn) error {
 	out, action := el.eventHandler.React(c.buffer.Bytes(), c)
 	if out != nil {
-		el.eventHandler.PreWrite()
-		_, _ = el.svr.ln.pconn.WriteTo(out, c.remoteAddr)
+		_ = c.SendTo(out)
 	}
 	if action == Shutdown {
 		return errors.ErrServerShutdown

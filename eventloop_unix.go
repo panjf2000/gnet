@@ -54,7 +54,7 @@ type internalEventloop struct {
 	idx          int             // loop index in the server loops list
 	svr          *server         // server in loop
 	poller       *netpoll.Poller // epoll or kqueue
-	buffer       []byte          // read packet buffer whose capacity is 64KB
+	buffer       []byte          // read packet buffer whose capacity is set by user, default value is 64KB
 	connCount    int32           // number of active connections in event-loop
 	connections  map[int]*conn   // loop connections fd -> conn
 	eventHandler EventHandler    // user eventHandler
@@ -96,11 +96,15 @@ func (el *eventloop) loopOpen(c *conn) error {
 
 	out, action := el.eventHandler.OnOpened(c)
 	if out != nil {
-		c.open(out)
+		if err := c.open(out); err != nil {
+			return err
+		}
 	}
 
 	if !c.outboundBuffer.IsEmpty() {
-		_ = el.poller.AddWrite(c.pollAttachment)
+		if err := el.poller.AddWrite(c.pollAttachment); err != nil {
+			return err
+		}
 	}
 
 	return el.handleAction(c, action)
@@ -146,7 +150,7 @@ func (el *eventloop) loopRead(c *conn) error {
 }
 
 func (el *eventloop) loopWrite(c *conn) error {
-	el.eventHandler.PreWrite()
+	el.eventHandler.PreWrite(c)
 
 	head, tail := c.outboundBuffer.PeekAll()
 	var (
@@ -173,6 +177,8 @@ func (el *eventloop) loopWrite(c *conn) error {
 		_ = el.poller.ModRead(c.pollAttachment)
 	}
 
+	el.eventHandler.AfterWrite(c, nil)
+
 	return nil
 }
 
@@ -183,14 +189,14 @@ func (el *eventloop) loopCloseConn(c *conn, err error) (rerr error) {
 
 	// Send residual data in buffer back to client before actually closing the connection.
 	if !c.outboundBuffer.IsEmpty() {
-		el.eventHandler.PreWrite()
-
+		el.eventHandler.PreWrite(c)
 		head, tail := c.outboundBuffer.PeekAll()
 		if n, err := unix.Write(c.fd, head); err == nil {
 			if n == len(head) && tail != nil {
 				_, _ = unix.Write(c.fd, tail)
 			}
 		}
+		el.eventHandler.AfterWrite(c, nil)
 	}
 
 	if err0, err1 := el.poller.Delete(c.fd), unix.Close(c.fd); err0 == nil && err1 == nil {
@@ -295,7 +301,6 @@ func (el *eventloop) loopReadUDP(fd int) error {
 	c := newUDPConn(fd, el, sa)
 	out, action := el.eventHandler.React(el.buffer[:n], c)
 	if out != nil {
-		el.eventHandler.PreWrite()
 		_ = c.sendTo(out)
 	}
 	if action == Shutdown {

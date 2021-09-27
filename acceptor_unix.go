@@ -88,9 +88,9 @@ func (el *eventloop) loopAccept(_ netpoll.IOEvent) error {
 	}
 
 	c := newTCPConn(nfd, el, sa, netAddr)
-	if err = el.poller.AddRead(c.pollAttachment); err == nil {
-		el.connections[c.fd] = c
-		return el.loopOpen(c)
+	if err = el.poller.AddRead(c.pollAttachment); err != nil {
+		return err
 	}
-	return err
+	el.connections[c.fd] = c
+	return el.loopOpen(c)
 }

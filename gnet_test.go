@@ -197,17 +197,17 @@ func (s *testCodecServer) OnClosed(c Conn, err error) (action Action) {
 	return
 }
 
-func (s *testCodecServer) React(frame []byte, c Conn) (out []byte, action Action) {
+func (s *testCodecServer) React(packet []byte, c Conn) (out []byte, action Action) {
 	if s.async {
-		if frame != nil {
-			data := append([]byte{}, frame...)
+		if packet != nil {
+			data := append([]byte{}, packet...)
 			_ = s.workerPool.Submit(func() {
 				_ = c.AsyncWrite(data)
 			})
 		}
 		return
 	}
-	out = frame
+	out = packet
 	return
 }
 
@@ -473,10 +473,10 @@ func (s *testServer) OnClosed(c Conn, err error) (action Action) {
 	return
 }
 
-func (s *testServer) React(frame []byte, c Conn) (out []byte, action Action) {
+func (s *testServer) React(packet []byte, c Conn) (out []byte, action Action) {
 	if s.async {
 		buf := bytebuffer.Get()
-		_, _ = buf.Write(frame)
+		_, _ = buf.Write(packet)
 
 		if s.network == "tcp" || s.network == "unix" {
 			// just for test
@@ -497,7 +497,7 @@ func (s *testServer) React(frame []byte, c Conn) (out []byte, action Action) {
 		}
 		return
 	}
-	out = frame
+	out = packet
 	return
 }
 
@@ -591,7 +591,8 @@ func TestDefaultGnetServer(t *testing.T) {
 	svr.OnInitComplete(Server{})
 	svr.OnOpened(nil)
 	svr.OnClosed(nil, nil)
-	svr.PreWrite()
+	svr.PreWrite(nil)
+	svr.AfterWrite(nil, nil)
 	svr.React(nil, nil)
 	svr.Tick()
 }
@@ -669,7 +670,7 @@ func (t *testWakeConnServer) OnClosed(c Conn, err error) (action Action) {
 	return
 }
 
-func (t *testWakeConnServer) React(frame []byte, c Conn) (out []byte, action Action) {
+func (t *testWakeConnServer) React(packet []byte, c Conn) (out []byte, action Action) {
 	out = []byte("Waking up.")
 	action = -1
 	return
@@ -771,8 +772,8 @@ func (t *testCloseActionErrorServer) OnClosed(c Conn, err error) (action Action)
 	return
 }
 
-func (t *testCloseActionErrorServer) React(frame []byte, c Conn) (out []byte, action Action) {
-	out = frame
+func (t *testCloseActionErrorServer) React(packet []byte, c Conn) (out []byte, action Action) {
+	out = packet
 	action = Close
 	return
 }
@@ -813,9 +814,9 @@ type testShutdownActionErrorServer struct {
 	action        bool
 }
 
-func (t *testShutdownActionErrorServer) React(frame []byte, c Conn) (out []byte, action Action) {
+func (t *testShutdownActionErrorServer) React(packet []byte, c Conn) (out []byte, action Action) {
 	c.ReadN(-1) // just for test
-	out = frame
+	out = packet
 	action = Shutdown
 	return
 }
@@ -941,8 +942,8 @@ type testUDPShutdownServer struct {
 	tick    bool
 }
 
-func (t *testUDPShutdownServer) React(frame []byte, c Conn) (out []byte, action Action) {
-	out = frame
+func (t *testUDPShutdownServer) React(packet []byte, c Conn) (out []byte, action Action) {
+	out = packet
 	action = Shutdown
 	return
 }
@@ -989,8 +990,8 @@ func (t *testCloseConnectionServer) OnClosed(c Conn, err error) (action Action) 
 	return
 }
 
-func (t *testCloseConnectionServer) React(frame []byte, c Conn) (out []byte, action Action) {
-	out = frame
+func (t *testCloseConnectionServer) React(packet []byte, c Conn) (out []byte, action Action) {
+	out = packet
 	go func() {
 		time.Sleep(time.Second)
 		_ = c.Close()
@@ -1046,8 +1047,8 @@ func (t *testStopServer) OnClosed(c Conn, err error) (action Action) {
 	return
 }
 
-func (t *testStopServer) React(frame []byte, c Conn) (out []byte, action Action) {
-	out = frame
+func (t *testStopServer) React(packet []byte, c Conn) (out []byte, action Action) {
+	out = packet
 	return
 }
 

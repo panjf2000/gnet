@@ -117,7 +117,9 @@ func (svr *server) activateEventLoops(numEventLoop int) (err error) {
 			el.buffer = make([]byte, svr.opts.ReadBufferCap)
 			el.connections = make(map[int]*conn)
 			el.eventHandler = svr.eventHandler
-			_ = el.poller.AddRead(el.ln.packPollAttachment(el.loopAccept))
+			if err = el.poller.AddRead(el.ln.packPollAttachment(el.loopAccept)); err != nil {
+				return
+			}
 			svr.lb.register(el)
 
 			// Start the ticker.
@@ -163,7 +165,9 @@ func (svr *server) activateReactors(numEventLoop int) error {
 		el.svr = svr
 		el.poller = p
 		el.eventHandler = svr.eventHandler
-		_ = el.poller.AddRead(svr.ln.packPollAttachment(svr.acceptNewConnection))
+		if err = el.poller.AddRead(svr.ln.packPollAttachment(svr.acceptNewConnection)); err != nil {
+			return err
+		}
 		svr.mainLoop = el
 
 		// Start main reactor in background.

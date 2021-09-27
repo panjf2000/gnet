@@ -169,14 +169,18 @@ type (
 		// The parameter:err is the last known connection error.
 		OnClosed(c Conn, err error) (action Action)
 
-		// PreWrite fires just before any data is written to any client socket, this event function is usually used to
-		// put some code of logging/counting/reporting or any prepositive operations before writing data to client.
-		PreWrite()
+		// PreWrite fires just before a packet is written to the peer socket, this event function is usually where
+		// you put some code of logging/counting/reporting or any fore operations before writing data to client.
+		PreWrite(c Conn)
+
+		// AfterWrite fires right after a packet is written to the peer socket, this event function is usually where
+		// you put the []byte's back to your memory pool.
+		AfterWrite(c Conn, b []byte)
 
 		// React fires when a connection sends the server data.
 		// Call c.Read() or c.ReadN(n) within the parameter:c to read incoming data from client.
 		// Parameter:out is the return value which is going to be sent back to the client.
-		React(frame []byte, c Conn) (out []byte, action Action)
+		React(packet []byte, c Conn) (out []byte, action Action)
 
 		// Tick fires immediately after the server starts and will fire again
 		// following the duration specified by the delay return value.
@@ -213,15 +217,20 @@ func (es *EventServer) OnClosed(c Conn, err error) (action Action) {
 	return
 }
 
-// PreWrite fires just before any data is written to any client socket, this event function is usually used to
-// put some code of logging/counting/reporting or any prepositive operations before writing data to client.
-func (es *EventServer) PreWrite() {
+// PreWrite fires just before a packet is written to the peer socket, this event function is usually where
+// you put some code of logging/counting/reporting or any fore operations before writing data to client.
+func (es *EventServer) PreWrite(c Conn) {
+}
+
+// AfterWrite fires right after a packet is written to the peer socket, this event function is usually where
+// you put the []byte's back to your memory pool.
+func (es *EventServer) AfterWrite(c Conn, b []byte) {
 }
 
 // React fires when a connection sends the server data.
 // Call c.Read() or c.ReadN(n) within the parameter:c to read incoming data from client.
 // Parameter:out is the return value which is going to be sent back to the client.
-func (es *EventServer) React(frame []byte, c Conn) (out []byte, action Action) {
+func (es *EventServer) React(packet []byte, c Conn) (out []byte, action Action) {
 	return
 }
 

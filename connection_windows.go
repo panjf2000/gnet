@@ -148,7 +148,13 @@ func (c *stdConn) read() ([]byte, error) {
 
 func (c *stdConn) write(data []byte) (n int, err error) {
 	if c.conn != nil {
-		n, err = c.conn.Write(data)
+		var outFrame []byte
+		if outFrame, err = c.codec.Encode(c, data); err != nil {
+			return
+		}
+		c.loop.eventHandler.PreWrite(c)
+		n, err = c.conn.Write(outFrame)
+		c.loop.eventHandler.AfterWrite(c, data)
 	}
 	return
 }
@@ -240,7 +246,9 @@ func (c *stdConn) AsyncWrite(buf []byte) (err error) {
 }
 
 func (c *stdConn) SendTo(buf []byte) (err error) {
+	c.loop.eventHandler.PreWrite(c)
 	_, err = c.loop.svr.ln.pconn.WriteTo(buf, c.remoteAddr)
+	c.loop.eventHandler.AfterWrite(c, buf)
 	return
 }
 
