@@ -19,6 +19,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+//go:build linux || freebsd || dragonfly || darwin
 // +build linux freebsd dragonfly darwin
 
 package socket
@@ -34,7 +35,7 @@ import (
 
 var listenerBacklogMaxSize = maxListenerBacklog()
 
-func getTCPSockaddr(proto, addr string) (sa unix.Sockaddr, family int, tcpAddr *net.TCPAddr, ipv6only bool, err error) {
+func GetTCPSockAddr(proto, addr string) (sa unix.Sockaddr, family int, tcpAddr *net.TCPAddr, ipv6only bool, err error) {
 	var tcpVersion string
 
 	tcpAddr, err = net.ResolveTCPAddr(proto, addr)
@@ -118,7 +119,7 @@ func tcpSocket(proto, addr string, sockopts ...Option) (fd int, netAddr net.Addr
 		sockaddr unix.Sockaddr
 	)
 
-	if sockaddr, family, netAddr, ipv6only, err = getTCPSockaddr(proto, addr); err != nil {
+	if sockaddr, family, netAddr, ipv6only, err = GetTCPSockAddr(proto, addr); err != nil {
 		return
 	}
 

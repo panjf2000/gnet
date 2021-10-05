@@ -18,8 +18,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-// +build linux
-// +build poll_opt
+//go:build linux && poll_opt
+// +build linux,poll_opt
 
 package netpoll
 

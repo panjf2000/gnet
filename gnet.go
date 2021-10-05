@@ -92,7 +92,7 @@ func (s Server) DupFd() (dupFD int, err error) {
 	return
 }
 
-// Conn is a interface of gnet connection.
+// Conn is an interface of gnet connection.
 type Conn interface {
 	// Context returns a user-defined context.
 	Context() (ctx interface{})
@@ -137,7 +137,7 @@ type Conn interface {
 	// instead of the event-loop goroutines.
 	AsyncWrite(buf []byte) error
 
-	// Wake triggers a React event for this connection.
+	// Wake triggers a React event for the connection.
 	Wake() error
 
 	// Close closes the current connection.

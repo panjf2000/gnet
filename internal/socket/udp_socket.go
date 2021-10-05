@@ -19,6 +19,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+//go:build linux || freebsd || dragonfly || darwin
 // +build linux freebsd dragonfly darwin
 
 package socket
@@ -32,7 +33,7 @@ import (
 	"github.com/panjf2000/gnet/errors"
 )
 
-func getUDPSockaddr(proto, addr string) (sa unix.Sockaddr, family int, udpAddr *net.UDPAddr, ipv6only bool, err error) {
+func GetUDPSockAddr(proto, addr string) (sa unix.Sockaddr, family int, udpAddr *net.UDPAddr, ipv6only bool, err error) {
 	var udpVersion string
 
 	udpAddr, err = net.ResolveUDPAddr(proto, addr)
@@ -116,7 +117,7 @@ func udpSocket(proto, addr string, sockopts ...Option) (fd int, netAddr net.Addr
 		sockaddr unix.Sockaddr
 	)
 
-	if sockaddr, family, netAddr, ipv6only, err = getUDPSockaddr(proto, addr); err != nil {
+	if sockaddr, family, netAddr, ipv6only, err = GetUDPSockAddr(proto, addr); err != nil {
 		return
 	}
 

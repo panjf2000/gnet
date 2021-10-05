@@ -18,6 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+//go:build ((linux && arm64) || (linux && riscv64)) && poll_opt
 // +build linux,arm64 linux,riscv64
 // +build poll_opt
 

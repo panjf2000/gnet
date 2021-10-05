@@ -2,6 +2,7 @@
 // for the Go runtime.
 // go tool cgo -godefs defs_linux.go defs1_linux.go defs2_linux.go
 
+//go:build poll_opt
 // +build poll_opt
 
 package netpoll

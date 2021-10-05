@@ -19,6 +19,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+//go:build linux || freebsd || dragonfly || darwin
 // +build linux freebsd dragonfly darwin
 
 package gnet
@@ -120,8 +121,8 @@ func (el *eventloop) loopRead(c *conn) error {
 	}
 	c.buffer = el.buffer[:n]
 
-	for inFrame, _ := c.read(); inFrame != nil; inFrame, _ = c.read() {
-		out, action := el.eventHandler.React(inFrame, c)
+	for packet, _ := c.read(); packet != nil; packet, _ = c.read() {
+		out, action := el.eventHandler.React(packet, c)
 		if out != nil {
 			// Encode data and try to write it back to the client, this attempt is based on a fact:
 			// a client socket waits for the response data after sending request data to the server,
@@ -298,7 +299,7 @@ func (el *eventloop) loopReadUDP(fd int) error {
 			fd, el.idx, os.NewSyscallError("recvfrom", err))
 	}
 
-	c := newUDPConn(fd, el, sa)
+	c := newUDPConn(fd, el, el.ln.lnaddr, sa)
 	out, action := el.eventHandler.React(el.buffer[:n], c)
 	if out != nil {
 		_ = c.sendTo(out)

@@ -19,6 +19,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+//go:build linux || freebsd || dragonfly || darwin
 // +build linux freebsd dragonfly darwin
 
 package gnet
@@ -52,13 +53,13 @@ type conn struct {
 	pollAttachment *netpoll.PollAttachment // connection attachment for poller
 }
 
-func newTCPConn(fd int, el *eventloop, sa unix.Sockaddr, remoteAddr net.Addr) (c *conn) {
+func newTCPConn(fd int, el *eventloop, sa unix.Sockaddr, codec ICodec, localAddr, remoteAddr net.Addr) (c *conn) {
 	c = &conn{
 		fd:             fd,
 		sa:             sa,
 		loop:           el,
-		codec:          el.svr.codec,
-		localAddr:      el.ln.lnaddr,
+		codec:          codec,
+		localAddr:      localAddr,
 		remoteAddr:     remoteAddr,
 		inboundBuffer:  prb.Get(),
 		outboundBuffer: prb.Get(),
@@ -84,12 +85,12 @@ func (c *conn) releaseTCP() {
 	netpoll.PutPollAttachment(c.pollAttachment)
 }
 
-func newUDPConn(fd int, el *eventloop, sa unix.Sockaddr) *conn {
+func newUDPConn(fd int, el *eventloop, localAddr net.Addr, sa unix.Sockaddr) *conn {
 	return &conn{
 		fd:         fd,
 		sa:         sa,
 		loop:       el,
-		localAddr:  el.ln.lnaddr,
+		localAddr:  localAddr,
 		remoteAddr: socket.SockaddrToUDPAddr(sa),
 	}
 }
@@ -124,8 +125,8 @@ func (c *conn) read() ([]byte, error) {
 func (c *conn) write(buf []byte) (err error) {
 	defer c.loop.eventHandler.AfterWrite(c, buf)
 
-	var outFrame []byte
-	if outFrame, err = c.codec.Encode(c, buf); err != nil {
+	var packet []byte
+	if packet, err = c.codec.Encode(c, buf); err != nil {
 		return
 	}
 
@@ -134,23 +135,23 @@ func (c *conn) write(buf []byte) (err error) {
 	// If there is pending data in outbound buffer, the current data ought to be appended to the outbound buffer
 	// for maintaining the sequence of network packets.
 	if !c.outboundBuffer.IsEmpty() {
-		_, _ = c.outboundBuffer.Write(outFrame)
+		_, _ = c.outboundBuffer.Write(packet)
 		return
 	}
 
 	var n int
-	if n, err = unix.Write(c.fd, outFrame); err != nil {
+	if n, err = unix.Write(c.fd, packet); err != nil {
 		// A temporary error occurs, append the data to outbound buffer, writing it back to client in the next round.
 		if err == unix.EAGAIN {
-			_, _ = c.outboundBuffer.Write(outFrame)
+			_, _ = c.outboundBuffer.Write(packet)
 			err = c.loop.poller.ModReadWrite(c.pollAttachment)
 			return
 		}
 		return c.loop.loopCloseConn(c, os.NewSyscallError("write", err))
 	}
 	// Fail to send all data back to client, buffer the leftover data for the next round.
-	if n < len(outFrame) {
-		_, _ = c.outboundBuffer.Write(outFrame[n:])
+	if n < len(packet) {
+		_, _ = c.outboundBuffer.Write(packet[n:])
 		err = c.loop.poller.ModReadWrite(c.pollAttachment)
 	}
 	return

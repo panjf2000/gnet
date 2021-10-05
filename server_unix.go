@@ -19,6 +19,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+//go:build linux || freebsd || dragonfly || darwin
 // +build linux freebsd dragonfly darwin
 
 package gnet
@@ -40,7 +41,6 @@ type server struct {
 	opts         *Options           // options with server
 	once         sync.Once          // make sure only signalShutdown once
 	cond         *sync.Cond         // shutdown signaler
-	codec        ICodec             // codec for TCP stream
 	mainLoop     *eventloop         // main event-loop for accepting connections
 	inShutdown   int32              // whether the server is in shutdown
 	tickerCtx    context.Context    // context for ticker
@@ -267,12 +267,9 @@ func serve(eventHandler EventHandler, listener *listener, options *Options, prot
 	if svr.opts.Ticker {
 		svr.tickerCtx, svr.cancelTicker = context.WithCancel(context.Background())
 	}
-	svr.codec = func() ICodec {
-		if options.Codec == nil {
-			return new(BuiltInFrameCodec)
-		}
-		return options.Codec
-	}()
+	if options.Codec == nil {
+		svr.opts.Codec = new(BuiltInFrameCodec)
+	}
 
 	server := Server{
 		svr:          svr,

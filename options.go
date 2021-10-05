@@ -48,7 +48,7 @@ const (
 	TCPDelay
 )
 
-// Options are set when the client opens.
+// Options are configurations for the gnet application.
 type Options struct {
 	// Multicore indicates whether the server will be effectively created with multi-cores, if so,
 	// then you must take care with synchronizing memory between all event callbacks, otherwise,

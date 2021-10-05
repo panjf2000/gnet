@@ -18,6 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+//go:build linux || freebsd || dragonfly || darwin
 // +build linux freebsd dragonfly darwin
 
 package socket
@@ -31,7 +32,7 @@ import (
 	"github.com/panjf2000/gnet/errors"
 )
 
-func getUnixSockaddr(proto, addr string) (sa unix.Sockaddr, family int, unixAddr *net.UnixAddr, err error) {
+func GetUnixSockAddr(proto, addr string) (sa unix.Sockaddr, family int, unixAddr *net.UnixAddr, err error) {
 	unixAddr, err = net.ResolveUnixAddr(proto, addr)
 	if err != nil {
 		return
@@ -55,7 +56,7 @@ func udsSocket(proto, addr string, sockopts ...Option) (fd int, netAddr net.Addr
 		sockaddr unix.Sockaddr
 	)
 
-	if sockaddr, family, netAddr, err = getUnixSockaddr(proto, addr); err != nil {
+	if sockaddr, family, netAddr, err = GetUnixSockAddr(proto, addr); err != nil {
 		return
 	}
 

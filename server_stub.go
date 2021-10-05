@@ -19,6 +19,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+//go:build !linux && !freebsd && !dragonfly && !darwin && !windows
 // +build !linux,!freebsd,!dragonfly,!darwin,!windows
 
 package gnet

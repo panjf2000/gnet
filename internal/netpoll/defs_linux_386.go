@@ -1,6 +1,7 @@
 // created by cgo -cdefs and then converted to Go
 // cgo -cdefs defs2_linux.go
 
+//go:build poll_opt
 // +build poll_opt
 
 package netpoll

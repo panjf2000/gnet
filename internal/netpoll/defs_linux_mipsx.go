@@ -5,7 +5,6 @@
 //go:build (mips || mipsle) && linux
 // +build mips mipsle
 // +build linux
-// +build poll_opt
 
 package netpoll
 

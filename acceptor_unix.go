@@ -18,6 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+//go:build linux || freebsd || dragonfly || darwin
 // +build linux freebsd dragonfly darwin
 
 package gnet
@@ -54,7 +55,7 @@ func (svr *server) acceptNewConnection(_ netpoll.IOEvent) error {
 	}
 
 	el := svr.lb.next(netAddr)
-	c := newTCPConn(nfd, el, sa, netAddr)
+	c := newTCPConn(nfd, el, sa, svr.opts.Codec, el.ln.lnaddr, netAddr)
 
 	err = el.poller.UrgentTrigger(el.loopRegister, c)
 	if err != nil {
@@ -87,7 +88,7 @@ func (el *eventloop) loopAccept(_ netpoll.IOEvent) error {
 		logging.LogErr(err)
 	}
 
-	c := newTCPConn(nfd, el, sa, netAddr)
+	c := newTCPConn(nfd, el, sa, el.svr.opts.Codec, el.ln.lnaddr, netAddr)
 	if err = el.poller.AddRead(c.pollAttachment); err != nil {
 		return err
 	}

@@ -18,8 +18,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-// +build linux,!arm64,!riscv64
-// +build poll_opt
+//go:build linux && !arm64 && !riscv64 && poll_opt
+// +build linux,!arm64,!riscv64,poll_opt
 
 package netpoll
 
