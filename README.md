@@ -130,7 +130,7 @@ Please visit the [official website](https://gnet.host/blog/presenting-gnet/) for
 
 # ⚠️ License
 
-Source files of `gnet` are distributed under the MIT license found in the LICENSE file.
+Source code of `gnet` should be distributed under the Apache-2.0 license.
 
 # 👏 Contributors
 
