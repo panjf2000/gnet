@@ -1054,11 +1054,11 @@ Go : go1.14.x linux/amd64
     Memory : 16.0 GiB
 
 # Go version and settings
-Go Version : go1.16.5 linux/amd64
+Go Version : go1.17.2 linux/amd64
 GOMAXPROCS : 8
 
 # Benchmark parameters
-TCP connections : 500/1000/5000/10000
+TCP connections : 1000/2000/5000/10000
 Packet size     : 512/1024/2048/4096/8192/16384/32768/65536 bytes
 Test duration   : 15s
 ```
