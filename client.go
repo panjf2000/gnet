@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build linux || freebsd || dragonfly || darwin
+// +build linux freebsd dragonfly darwin
+
 package gnet
 
 import (
@@ -29,8 +32,8 @@ import (
 )
 
 type Client struct {
-	opts *Options
-	el   *eventloop
+	opts     *Options
+	el       *eventloop
 	logFlush func() error
 }
 
@@ -96,7 +99,7 @@ func (cli *Client) Stop() (err error) {
 	if cli.opts.Ticker {
 		cli.el.svr.cancelTicker()
 	}
-	if cli.logFlush != nil{
+	if cli.logFlush != nil {
 		err = cli.logFlush()
 	}
 	logging.Cleanup()
