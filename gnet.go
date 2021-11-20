@@ -94,6 +94,9 @@ type Conn interface {
 	// SetContext sets a user-defined context.
 	SetContext(ctx interface{})
 
+	// NetConn is the underlying connection.
+	NetConn() net.Conn
+
 	// LocalAddr is the connection's local socket address.
 	LocalAddr() (addr net.Addr)
 
