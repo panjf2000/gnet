@@ -127,7 +127,7 @@ type Conn interface {
 	// SendTo writes data for UDP sockets, it allows you to send data back to UDP socket in individual goroutines.
 	SendTo(buf []byte) error
 
-	// AsyncWrite writes data to client/connection asynchronously, usually you would call it in individual goroutines
+	// AsyncWrite writes data to peer asynchronously, usually you would call it in individual goroutines
 	// instead of the event-loop goroutines.
 	AsyncWrite(buf []byte) error
 
@@ -153,10 +153,10 @@ type (
 
 		// OnOpened fires when a new connection has been opened.
 		// The parameter:c has information about the connection such as it's local and remote address.
-		// Parameter:out is the return value which is going to be sent back to the client.
-		// It is generally not recommended to send large amounts of data back to the client in OnOpened.
+		// Parameter:out is the return value which is going to be sent back to the peer.
+		// It is generally not recommended to send large amounts of data back to the peer in OnOpened.
 		//
-		// Note that the bytes returned by OnOpened will be sent back to client without being encoded.
+		// Note that the bytes returned by OnOpened will be sent back to the peer without being encoded.
 		OnOpened(c Conn) (out []byte, action Action)
 
 		// OnClosed fires when a connection has been closed.
@@ -164,7 +164,7 @@ type (
 		OnClosed(c Conn, err error) (action Action)
 
 		// PreWrite fires just before a packet is written to the peer socket, this event function is usually where
-		// you put some code of logging/counting/reporting or any fore operations before writing data to client.
+		// you put some code of logging/counting/reporting or any fore operations before writing data to the peer.
 		PreWrite(c Conn)
 
 		// AfterWrite fires right after a packet is written to the peer socket, this event function is usually where
@@ -172,8 +172,8 @@ type (
 		AfterWrite(c Conn, b []byte)
 
 		// React fires when a connection sends the server data.
-		// Call c.Read() or c.ReadN(n) within the parameter:c to read incoming data from client.
-		// Parameter:out is the return value which is going to be sent back to the client.
+		// Call c.Read() or c.ReadN(n) within the parameter:c to read incoming data from the peer.
+		// Parameter:out is the return value which is going to be sent back to the peer.
 		React(packet []byte, c Conn) (out []byte, action Action)
 
 		// Tick fires immediately after the server starts and will fire again
@@ -200,7 +200,7 @@ func (es *EventServer) OnShutdown(svr Server) {
 
 // OnOpened fires when a new connection has been opened.
 // The parameter:c has information about the connection such as it's local and remote address.
-// Parameter:out is the return value which is going to be sent back to the client.
+// Parameter:out is the return value which is going to be sent back to the peer.
 func (es *EventServer) OnOpened(c Conn) (out []byte, action Action) {
 	return
 }
@@ -212,7 +212,7 @@ func (es *EventServer) OnClosed(c Conn, err error) (action Action) {
 }
 
 // PreWrite fires just before a packet is written to the peer socket, this event function is usually where
-// you put some code of logging/counting/reporting or any fore operations before writing data to client.
+// you put some code of logging/counting/reporting or any fore operations before writing data to the peer.
 func (es *EventServer) PreWrite(c Conn) {
 }
 
@@ -222,8 +222,8 @@ func (es *EventServer) AfterWrite(c Conn, b []byte) {
 }
 
 // React fires when a connection sends the server data.
-// Call c.Read() or c.ReadN(n) within the parameter:c to read incoming data from client.
-// Parameter:out is the return value which is going to be sent back to the client.
+// Call c.Read() or c.ReadN(n) within the parameter:c to read incoming data from the peer.
+// Parameter:out is the return value which is going to be sent back to the peer.
 func (es *EventServer) React(packet []byte, c Conn) (out []byte, action Action) {
 	return
 }

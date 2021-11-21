@@ -72,7 +72,7 @@ func init() {
 		defaultLoggingLevel = zapcore.Level(loggingLevel)
 	}
 
-	// Initializes the inside default logger of client.
+	// Initializes the inside default logger of gnet.
 	fileName := os.Getenv("GNET_LOGGING_FILE")
 	if len(fileName) > 0 {
 		var err error

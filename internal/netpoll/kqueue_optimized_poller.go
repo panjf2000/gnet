@@ -90,7 +90,7 @@ func (p *Poller) UrgentTrigger(fn queue.TaskFunc, arg interface{}) (err error) {
 }
 
 // Trigger is like UrgentTrigger but it puts task into asyncTaskQueue,
-// call this method when the task is not so urgent, for instance writing data back to client.
+// call this method when the task is not so urgent, for instance writing data back to the peer.
 //
 // Note that asyncTaskQueue is a queue with low-priority whose size may grow large and tasks in it may backlog.
 func (p *Poller) Trigger(fn queue.TaskFunc, arg interface{}) (err error) {

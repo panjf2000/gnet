@@ -56,8 +56,8 @@ type Options struct {
 	// potential higher performance.
 	LockOSThread bool
 
-	// ReadBufferCap is the maximum number of bytes that can be read from the client when the readable event comes.
-	// The default value is 64KB, it can be reduced to avoid starving subsequent client connections.
+	// ReadBufferCap is the maximum number of bytes that can be read from the peer when the readable event comes.
+	// The default value is 64KB, it can be reduced to avoid starving the subsequent connections.
 	//
 	// Note that ReadBufferCap will be always converted to the least power of two integer value greater than
 	// or equal to its real amount.
@@ -95,14 +95,14 @@ type Options struct {
 	// ICodec encodes and decodes TCP stream.
 	Codec ICodec
 
-	// LogPath the local path where logs will be written, this is the easiest way to set up client logs,
-	// the client instantiates a default uber-go/zap logger with this given log path, you are also allowed to employ
-	// you own logger during the client lifetime by implementing the following log.Logger interface.
+	// LogPath the local path where logs will be written, this is the easiest way to set up logging,
+	// gnet instantiates a default uber-go/zap logger with this given log path, you are also allowed to employ
+	// you own logger during the lifetime by implementing the following log.Logger interface.
 	//
 	// Note that this option can be overridden by the option Logger.
 	LogPath string
 
-	// LogLevel indicates the logging level inside client, it should be used along with LogPath.
+	// LogLevel indicates the logging level, it should be used along with LogPath.
 	LogLevel zapcore.Level
 
 	// Logger is the customized logger for logging info, if it is not set,

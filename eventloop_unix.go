@@ -118,9 +118,9 @@ func (el *eventloop) loopRead(c *conn) error {
 	for packet, _ := c.read(); packet != nil; packet, _ = c.read() {
 		out, action := el.eventHandler.React(packet, c)
 		if out != nil {
-			// Encode data and try to write it back to the client, this attempt is based on a fact:
-			// a client socket waits for the response data after sending request data to the server,
-			// which makes the client socket writable.
+			// Encode data and try to write it back to the peer, this attempt is based on a fact:
+			// the peer socket waits for the response data after sending request data to the server,
+			// which makes the peer socket writable.
 			if err = c.write(out); err != nil {
 				return err
 			}
@@ -133,8 +133,8 @@ func (el *eventloop) loopRead(c *conn) error {
 			return gerrors.ErrServerShutdown
 		}
 
-		// Check the status of connection every loop since it might be closed during writing data back to client due to
-		// some kind of system error.
+		// Check the status of connection every loop since it might be closed
+		// during writing data back to the peer due to some kind of system error.
 		if !c.opened {
 			return nil
 		}
@@ -182,7 +182,7 @@ func (el *eventloop) loopCloseConn(c *conn, err error) (rerr error) {
 		return
 	}
 
-	// Send residual data in buffer back to client before actually closing the connection.
+	// Send residual data in buffer back to the peer before actually closing the connection.
 	if !c.outboundBuffer.IsEmpty() {
 		el.eventHandler.PreWrite(c)
 		head, tail := c.outboundBuffer.PeekAll()
