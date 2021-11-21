@@ -69,7 +69,7 @@ func (el *eventloop) loopRegister(itf interface{}) error {
 	if err := el.poller.AddRead(c.pollAttachment); err != nil {
 		_ = unix.Close(c.fd)
 		c.releaseTCP()
-		return nil
+		return err
 	}
 	el.connections[c.fd] = c
 	return el.loopOpen(c)
