@@ -62,7 +62,7 @@ type stdConn struct {
 	localAddr     net.Addr               // local server addr
 	remoteAddr    net.Addr               // remote peer addr
 	byteBuffer    *bytebuffer.ByteBuffer // bytes buffer for buffering current packet and data in ring-buffer
-	inboundBuffer *ringbuffer.RingBuffer // buffer for data from client
+	inboundBuffer *ringbuffer.RingBuffer // buffer for data from the peer
 }
 
 func packTCPConn(c *stdConn, buf []byte) *tcpConn {

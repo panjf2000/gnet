@@ -42,8 +42,8 @@ type conn struct {
 	localAddr      net.Addr                // local addr
 	remoteAddr     net.Addr                // remote addr
 	byteBuffer     *bytebuffer.ByteBuffer  // bytes buffer for buffering current packet and data in ring-buffer
-	inboundBuffer  *ringbuffer.RingBuffer  // buffer for data from client
-	outboundBuffer *ringbuffer.RingBuffer  // buffer for data that is ready to write to client
+	inboundBuffer  *ringbuffer.RingBuffer  // buffer for data from the peer
+	outboundBuffer *ringbuffer.RingBuffer  // buffer for data that is ready to write to the peer
 	pollAttachment *netpoll.PollAttachment // connection attachment for poller
 }
 
@@ -135,7 +135,7 @@ func (c *conn) write(buf []byte) (err error) {
 
 	var n int
 	if n, err = unix.Write(c.fd, packet); err != nil {
-		// A temporary error occurs, append the data to outbound buffer, writing it back to client in the next round.
+		// A temporary error occurs, append the data to outbound buffer, writing it back to the peer in the next round.
 		if err == unix.EAGAIN {
 			_, _ = c.outboundBuffer.Write(packet)
 			err = c.loop.poller.ModReadWrite(c.pollAttachment)
@@ -143,7 +143,7 @@ func (c *conn) write(buf []byte) (err error) {
 		}
 		return c.loop.loopCloseConn(c, os.NewSyscallError("write", err))
 	}
-	// Fail to send all data back to client, buffer the leftover data for the next round.
+	// Fail to send all data back to the peer, buffer the leftover data for the next round.
 	if n < len(packet) {
 		_, _ = c.outboundBuffer.Write(packet[n:])
 		err = c.loop.poller.ModReadWrite(c.pollAttachment)

@@ -25,7 +25,7 @@ func (c *conn) handleEvents(ev uint32) error {
 	// Re-ordering can easily introduce bugs and bad side-effects, as I found out painfully in the past.
 
 	// We should always check for the EPOLLOUT event first, as we must try to send the leftover data back to
-	// client when any error occurs on a connection.
+	// the peer when any error occurs on a connection.
 	//
 	// Either an EPOLLOUT or EPOLLERR event may be fired when a connection is refused.
 	// In either case loopWrite() should take care of it properly:
@@ -39,8 +39,8 @@ func (c *conn) handleEvents(ev uint32) error {
 	// If there is pending data in outbound buffer, then we should omit this readable event
 	// and prioritize the writable events to achieve a higher performance.
 	//
-	// Note that the client may send massive amounts of data to server by write() under blocking mode,
-	// resulting in that it won't receive any responses before the server reads all data from client,
+	// Note that the peer may send massive amounts of data to server by write() under blocking mode,
+	// resulting in that it won't receive any responses before the server reads all data from the peer,
 	// in which case if the server socket send buffer is full, we need to let it go and continue reading
 	// the data to prevent blocking forever.
 	if ev&netpoll.InEvents != 0 && (ev&netpoll.OutEvents == 0 || c.outboundBuffer.IsEmpty()) {
