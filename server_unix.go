@@ -200,7 +200,7 @@ func (svr *server) stop(s Server) {
 	svr.lb.iterate(func(i int, el *eventloop) bool {
 		err := el.poller.UrgentTrigger(func(_ interface{}) error { return errors.ErrServerShutdown }, nil)
 		if err != nil {
-			svr.opts.Logger.Errorf("failed to call UrgentTrigger on sub event-loop when stopping server")
+			svr.opts.Logger.Errorf("failed to call UrgentTrigger on sub event-loop when stopping server: %v", err)
 		}
 		return true
 	})
@@ -209,7 +209,7 @@ func (svr *server) stop(s Server) {
 		svr.ln.close()
 		err := svr.mainLoop.poller.UrgentTrigger(func(_ interface{}) error { return errors.ErrServerShutdown }, nil)
 		if err != nil {
-			svr.opts.Logger.Errorf("failed to call UrgentTrigger on main event-loop when stopping server")
+			svr.opts.Logger.Errorf("failed to call UrgentTrigger on main event-loop when stopping server: %v", err)
 		}
 	}
 
@@ -221,7 +221,7 @@ func (svr *server) stop(s Server) {
 	if svr.mainLoop != nil {
 		err := svr.mainLoop.poller.Close()
 		if err != nil {
-			svr.opts.Logger.Errorf("failed to close poller when stopping server")
+			svr.opts.Logger.Errorf("failed to close poller when stopping server: %v", err)
 		}
 	}
 
