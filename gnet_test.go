@@ -206,13 +206,10 @@ func (s *testCodecServer) React(packet []byte, c Conn) (out []byte, action Actio
 }
 
 func (s *testCodecServer) Tick() (delay time.Duration, action Action) {
-	if atomic.LoadInt32(&s.started) == 0 {
+	if atomic.CompareAndSwapInt32(&s.started, 0, 1) {
 		for i := 0; i < s.nclients; i++ {
-			go func() {
-				startCodecClient(s.tester, s.network, s.addr, s.multicore, s.async, s.codec)
-			}()
+			go startCodecClient(s.tester, s.network, s.addr, s.multicore, s.async, s.codec)
 		}
-		atomic.StoreInt32(&s.started, 1)
 	}
 	delay = time.Second / 5
 	return
@@ -496,7 +493,7 @@ func (s *testServer) React(packet []byte, c Conn) (out []byte, action Action) {
 }
 
 func (s *testServer) Tick() (delay time.Duration, action Action) {
-	if atomic.LoadInt32(&s.started) == 0 {
+	if atomic.CompareAndSwapInt32(&s.started, 0, 1) {
 		for i := 0; i < s.nclients; i++ {
 			atomic.AddInt32(&s.clientActive, 1)
 			go func() {
@@ -504,7 +501,6 @@ func (s *testServer) Tick() (delay time.Duration, action Action) {
 				atomic.AddInt32(&s.clientActive, -1)
 			}()
 		}
-		atomic.StoreInt32(&s.started, 1)
 	}
 	if s.network == "udp" && atomic.LoadInt32(&s.clientActive) == 0 {
 		action = Shutdown
