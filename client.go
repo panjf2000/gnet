@@ -19,6 +19,7 @@ package gnet
 
 import (
 	"context"
+	"errors"
 	"net"
 	"sync"
 	"syscall"
@@ -31,12 +32,14 @@ import (
 	"github.com/panjf2000/gnet/logging"
 )
 
+// Client of gnet.
 type Client struct {
 	opts     *Options
 	el       *eventloop
 	logFlush func() error
 }
 
+// NewClient creates an instance of Client.
 func NewClient(eventHandler EventHandler, opts ...Option) (cli *Client, err error) {
 	options := loadOptions(opts...)
 	cli = new(Client)
@@ -119,15 +122,13 @@ func (cli *Client) Dial(network, address string) (Conn, error) {
 	}
 	defer c.Close()
 
-	sc, ok := c.(interface {
-		SyscallConn() (syscall.RawConn, error)
-	})
+	sc, ok := c.(syscall.Conn)
 	if !ok {
-		return nil, gerrors.ErrUnsupportedProtocol
+		return nil, errors.New("failed to convert net.Conn to syscall.Conn")
 	}
 	rc, err := sc.SyscallConn()
 	if err != nil {
-		return nil, gerrors.ErrUnsupportedProtocol
+		return nil, errors.New("failed to get syscall.RawConn from net.Conn")
 	}
 
 	var DupFD int
