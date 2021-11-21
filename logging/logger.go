@@ -169,7 +169,7 @@ func Errorf(format string, args ...interface{}) {
 
 // Fatalf logs messages at FATAL level.
 func Fatalf(format string, args ...interface{}) {
-	defaultLogger.Errorf(format, args...)
+	defaultLogger.Fatalf(format, args...)
 }
 
 // Logger is used for logging formatted messages.
