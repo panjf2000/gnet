@@ -20,8 +20,8 @@ package gnet
 import (
 	"context"
 	"net"
-	"os"
 	"sync"
+	"syscall"
 
 	"golang.org/x/sys/unix"
 
@@ -82,7 +82,11 @@ func NewClient(eventHandler EventHandler, opts ...Option) (cli *Client, err erro
 // Start starts the client event-loop, handing IO events.
 func (cli *Client) Start() error {
 	cli.el.eventHandler.OnInitComplete(Server{})
-	go cli.el.activateSubReactor(cli.opts.LockOSThread)
+	cli.el.svr.wg.Add(1)
+	go func() {
+		cli.el.activateSubReactor(cli.opts.LockOSThread)
+		cli.el.svr.wg.Done()
+	}()
 	// Start the ticker.
 	if cli.opts.Ticker {
 		go cli.el.loopTicker(cli.el.svr.tickerCtx)
@@ -93,7 +97,8 @@ func (cli *Client) Start() error {
 // Stop stops the client event-loop.
 func (cli *Client) Stop() (err error) {
 	err = cli.el.poller.UrgentTrigger(func(_ interface{}) error { return gerrors.ErrServerShutdown }, nil)
-	cli.el.svr.waitForShutdown()
+	cli.el.svr.wg.Wait()
+	cli.el.poller.Close()
 	cli.el.eventHandler.OnShutdown(Server{})
 	// Stop the ticker.
 	if cli.opts.Ticker {
@@ -107,43 +112,55 @@ func (cli *Client) Stop() (err error) {
 }
 
 // Dial is like net.Dial().
-func (cli *Client) Dial(network, address string) (gc Conn, err error) {
-	var c net.Conn
-	c, err = net.Dial(network, address)
+func (cli *Client) Dial(network, address string) (Conn, error) {
+	c, err := net.Dial(network, address)
 	if err != nil {
 		return nil, err
 	}
 	defer c.Close()
 
-	v, ok := c.(interface{ File() (*os.File, error) })
+	sc, ok := c.(interface {
+		SyscallConn() (syscall.RawConn, error)
+	})
 	if !ok {
 		return nil, gerrors.ErrUnsupportedProtocol
 	}
+	rc, err := sc.SyscallConn()
+	if err != nil {
+		return nil, gerrors.ErrUnsupportedProtocol
+	}
 
-	var file *os.File
-	file, err = v.File()
+	var DupFD int
+	e := rc.Control(func(fd uintptr) {
+		DupFD, err = unix.Dup(int(fd))
+	})
 	if err != nil {
 		return nil, err
 	}
-	fd := int(file.Fd())
+	if e != nil {
+		return nil, e
+	}
 
-	var sockAddr unix.Sockaddr
+	var (
+		sockAddr unix.Sockaddr
+		gc       Conn
+	)
 	switch c.(type) {
 	case *net.UnixConn:
 		if sockAddr, _, _, err = socket.GetUnixSockAddr(c.LocalAddr().Network(), c.LocalAddr().String()); err != nil {
-			return
+			return nil, err
 		}
-		gc = newTCPConn(fd, cli.el, sockAddr, cli.opts.Codec, c.LocalAddr(), c.RemoteAddr())
+		gc = newTCPConn(DupFD, cli.el, sockAddr, cli.opts.Codec, c.LocalAddr(), c.RemoteAddr())
 	case *net.TCPConn:
 		if sockAddr, _, _, _, err = socket.GetTCPSockAddr(c.LocalAddr().Network(), c.LocalAddr().String()); err != nil {
 			return nil, err
 		}
-		gc = newTCPConn(fd, cli.el, sockAddr, cli.opts.Codec, c.LocalAddr(), c.RemoteAddr())
+		gc = newTCPConn(DupFD, cli.el, sockAddr, cli.opts.Codec, c.LocalAddr(), c.RemoteAddr())
 	case *net.UDPConn:
 		if sockAddr, _, _, _, err = socket.GetUDPSockAddr(c.LocalAddr().Network(), c.LocalAddr().String()); err != nil {
-			return
+			return nil, err
 		}
-		gc = newUDPConn(fd, cli.el, c.LocalAddr(), sockAddr)
+		gc = newUDPConn(DupFD, cli.el, c.LocalAddr(), sockAddr)
 	default:
 		return nil, gerrors.ErrUnsupportedProtocol
 	}
@@ -151,5 +168,5 @@ func (cli *Client) Dial(network, address string) (gc Conn, err error) {
 	if err != nil {
 		gc.Close()
 	}
-	return
+	return gc, nil
 }

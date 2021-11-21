@@ -2,11 +2,15 @@ name: CodeQL
 
 on:
   push:
-    branches: [master]
+    branches:
+      - master
+      - dev
     paths-ignore:
       - '**.md'
   pull_request:
-    branches: [master]
+    branches:
+      - master
+      - dev
     paths-ignore:
       - '**.md'
   schedule:

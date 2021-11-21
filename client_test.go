@@ -176,7 +176,6 @@ func (s *testCodecClientServer) OnOpened(c Conn) (out []byte, action Action) {
 
 func (s *testCodecClientServer) OnClosed(c Conn, err error) (action Action) {
 	require.Equal(s.tester, c.Context(), c, "invalid context")
-
 	atomic.AddInt32(&s.disconnected, 1)
 	if atomic.LoadInt32(&s.connected) == atomic.LoadInt32(&s.disconnected) &&
 		atomic.LoadInt32(&s.disconnected) == 1 {
@@ -201,9 +200,8 @@ func (s *testCodecClientServer) React(packet []byte, c Conn) (out []byte, action
 }
 
 func (s *testCodecClientServer) Tick() (delay time.Duration, action Action) {
-	if atomic.LoadInt32(&s.started) == 0 {
+	if atomic.CompareAndSwapInt32(&s.started, 0, 1) {
 		go startCodecGnetClient(s.tester, s.client, s.clientEV, s.network, s.addr, s.multicore, s.async, s.codec)
-		atomic.StoreInt32(&s.started, 1)
 	}
 	delay = time.Second / 5
 	return
@@ -277,9 +275,6 @@ func testCodecServeWithGnetClient(
 		WithMulticore(multicore),
 		WithTicker(true),
 		WithLogLevel(zapcore.DebugLevel),
-		WithTCPKeepAlive(
-			time.Minute*5,
-		),
 		WithSocketRecvBuffer(8*1024),
 		WithSocketSendBuffer(8*1024),
 		WithCodec(codec),
