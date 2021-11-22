@@ -73,6 +73,9 @@ type Options struct {
 	// ReusePort indicates whether to set up the SO_REUSEPORT socket option.
 	ReusePort bool
 
+	// ReuseAddr indicates whether to set up the SO_REUSEADDR socket option.
+	ReuseAddr bool
+
 	// Ticker indicates whether the ticker has been set up.
 	Ticker bool
 
@@ -156,6 +159,13 @@ func WithNumEventLoop(numEventLoop int) Option {
 func WithReusePort(reusePort bool) Option {
 	return func(opts *Options) {
 		opts.ReusePort = reusePort
+	}
+}
+
+// WithReuseAddr sets up SO_REUSEADDR socket option.
+func WithReuseAddr(reuseAddr bool) Option {
+	return func(opts *Options) {
+		opts.ReuseAddr = reuseAddr
 	}
 }
 
