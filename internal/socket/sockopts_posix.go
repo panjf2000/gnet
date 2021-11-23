@@ -46,10 +46,12 @@ func SetSendBuffer(fd, size int) error {
 
 // SetReuseport enables SO_REUSEPORT option on socket.
 func SetReuseport(fd, reusePort int) error {
-	if err := os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_REUSEADDR, reusePort)); err != nil {
-		return err
-	}
 	return os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_REUSEPORT, reusePort))
+}
+
+// SetReuseAddr enables SO_REUSEADDR option on socket.
+func SetReuseAddr(fd, reuseAddr int) error {
+	return os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_REUSEADDR, reuseAddr))
 }
 
 // SetIPv6Only restricts a IPv6 socket to only process IPv6 requests or both IPv4 and IPv6 requests.
