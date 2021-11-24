@@ -143,24 +143,23 @@ func (cli *Client) Dial(network, address string) (Conn, error) {
 		return nil, e
 	}
 
-	opts := cli.el.svr.opts
-	if opts.TCPNoDelay == TCPNoDelay {
+	if cli.opts.TCPNoDelay == TCPNoDelay {
 		if err = socket.SetNoDelay(DupFD, 1); err != nil {
 			return nil, err
 		}
 	}
-	if opts.TCPKeepAlive > 0 {
-		if err = socket.SetKeepAlive(DupFD, int(opts.TCPKeepAlive/time.Second)); err != nil {
+	if cli.opts.TCPKeepAlive > 0 {
+		if err = socket.SetKeepAlive(DupFD, int(cli.opts.TCPKeepAlive/time.Second)); err != nil {
 			return nil, err
 		}
 	}
-	if opts.SocketSendBuffer > 0 {
-		if err = socket.SetSendBuffer(DupFD, opts.SocketSendBuffer); err != nil {
+	if cli.opts.SocketSendBuffer > 0 {
+		if err = socket.SetSendBuffer(DupFD, cli.opts.SocketSendBuffer); err != nil {
 			return nil, err
 		}
 	}
-	if opts.SocketRecvBuffer > 0 {
-		if err = socket.SetRecvBuffer(DupFD, opts.SocketRecvBuffer); err != nil {
+	if cli.opts.SocketRecvBuffer > 0 {
+		if err = socket.SetRecvBuffer(DupFD, cli.opts.SocketRecvBuffer); err != nil {
 			return nil, err
 		}
 	}

@@ -28,8 +28,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap/zapcore"
 
+	"github.com/panjf2000/gnet/logging"
 	"github.com/panjf2000/gnet/pool/goroutine"
 )
 
@@ -265,7 +265,7 @@ func testCodecServeWithGnetClient(
 		codec: codec, workerPool: goroutine.Default(),
 	}
 	ts.clientEV = &clientEvents{}
-	ts.client, err = NewClient(ts.clientEV, WithLogLevel(zapcore.DebugLevel), WithCodec(codec))
+	ts.client, err = NewClient(ts.clientEV, WithLogLevel(logging.DebugLevel), WithCodec(codec))
 	assert.NoError(t, err)
 	err = ts.client.Start()
 	assert.NoError(t, err)
@@ -274,7 +274,7 @@ func testCodecServeWithGnetClient(
 		network+"://"+addr,
 		WithMulticore(multicore),
 		WithTicker(true),
-		WithLogLevel(zapcore.DebugLevel),
+		WithLogLevel(logging.DebugLevel),
 		WithSocketRecvBuffer(8*1024),
 		WithSocketSendBuffer(8*1024),
 		WithCodec(codec),

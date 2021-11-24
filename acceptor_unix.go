@@ -45,7 +45,7 @@ func (svr *server) acceptNewConnection(_ netpoll.IOEvent) error {
 	netAddr := socket.SockaddrToTCPOrUnixAddr(sa)
 	if svr.opts.TCPKeepAlive > 0 && svr.ln.network == "tcp" {
 		err = socket.SetKeepAlive(nfd, int(svr.opts.TCPKeepAlive/time.Second))
-		logging.LogErr(err)
+		logging.Error(err)
 	}
 
 	el := svr.lb.next(netAddr)
@@ -79,7 +79,7 @@ func (el *eventloop) loopAccept(_ netpoll.IOEvent) error {
 	netAddr := socket.SockaddrToTCPOrUnixAddr(sa)
 	if el.svr.opts.TCPKeepAlive > 0 && el.svr.ln.network == "tcp" {
 		err = socket.SetKeepAlive(nfd, int(el.svr.opts.TCPKeepAlive/time.Second))
-		logging.LogErr(err)
+		logging.Error(err)
 	}
 
 	c := newTCPConn(nfd, el, sa, el.svr.opts.Codec, el.ln.lnaddr, netAddr)

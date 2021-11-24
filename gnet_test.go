@@ -30,7 +30,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 
 	"github.com/panjf2000/gnet/errors"
 	"github.com/panjf2000/gnet/logging"
@@ -259,7 +258,7 @@ func testCodecServe(
 		network+"://"+addr,
 		WithMulticore(multicore),
 		WithTicker(true),
-		WithLogLevel(zapcore.DebugLevel),
+		WithLogLevel(logging.DebugLevel),
 		WithTCPKeepAlive(
 			time.Minute*5,
 		),

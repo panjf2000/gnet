@@ -59,7 +59,30 @@ import (
 var (
 	flushLogs           func() error
 	defaultLogger       Logger
-	defaultLoggingLevel zapcore.Level
+	defaultLoggingLevel Level
+)
+
+type Level = zapcore.Level
+
+const (
+	// DebugLevel logs are typically voluminous, and are usually disabled in
+	// production.
+	DebugLevel Level = iota - 1
+	// InfoLevel is the default logging priority.
+	InfoLevel
+	// WarnLevel logs are more important than Info, but don't need individual
+	// human review.
+	WarnLevel
+	// ErrorLevel logs are high-priority. If an application is running smoothly,
+	// it shouldn't generate any error-level logs.
+	ErrorLevel
+	// DPanicLevel logs are particularly important errors. In development the
+	// logger panics after writing the message.
+	DPanicLevel
+	// PanicLevel logs a message, then panics.
+	PanicLevel
+	// FatalLevel logs a message, then calls os.Exit(1).
+	FatalLevel
 )
 
 func init() {
@@ -69,7 +92,7 @@ func init() {
 		if err != nil {
 			panic("invalid GNET_LOGGING_LEVEL, " + err.Error())
 		}
-		defaultLoggingLevel = zapcore.Level(loggingLevel)
+		defaultLoggingLevel = Level(loggingLevel)
 	}
 
 	// Initializes the inside default logger of gnet.
@@ -83,6 +106,7 @@ func init() {
 	} else {
 		cfg := zap.NewDevelopmentConfig()
 		cfg.Level = zap.NewAtomicLevelAt(defaultLoggingLevel)
+		cfg.EncoderConfig.EncodeTime = zapcore.RFC3339NanoTimeEncoder
 		zapLogger, _ := cfg.Build()
 		defaultLogger = zapLogger.Sugar()
 	}
@@ -90,7 +114,7 @@ func init() {
 
 func getEncoder() zapcore.Encoder {
 	encoderConfig := zap.NewProductionEncoderConfig()
-	encoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+	encoderConfig.EncodeTime = zapcore.RFC3339NanoTimeEncoder
 	encoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
 	return zapcore.NewConsoleEncoder(encoderConfig)
 }
@@ -106,7 +130,7 @@ func LogLevel() string {
 }
 
 // CreateLoggerAsLocalFile setups the logger by local file path.
-func CreateLoggerAsLocalFile(localFilePath string, logLevel zapcore.Level) (logger Logger, flush func() error, err error) {
+func CreateLoggerAsLocalFile(localFilePath string, logLevel Level) (logger Logger, flush func() error, err error) {
 	if len(localFilePath) == 0 {
 		return nil, nil, errors.New("invalid local logger path")
 	}
@@ -115,15 +139,15 @@ func CreateLoggerAsLocalFile(localFilePath string, logLevel zapcore.Level) (logg
 	lumberJackLogger := &lumberjack.Logger{
 		Filename:   localFilePath,
 		MaxSize:    100, // megabytes
-		MaxBackups: 3,
-		MaxAge:     28, // days
+		MaxBackups: 2,
+		MaxAge:     15, // days
 	}
 
 	encoder := getEncoder()
 	ws := zapcore.AddSync(lumberJackLogger)
 	zapcore.Lock(ws)
 
-	levelEnabler := zap.LevelEnablerFunc(func(level zapcore.Level) bool {
+	levelEnabler := zap.LevelEnablerFunc(func(level Level) bool {
 		return level >= logLevel
 	})
 	core := zapcore.NewCore(encoder, ws, levelEnabler)
@@ -140,8 +164,8 @@ func Cleanup() {
 	}
 }
 
-// LogErr prints err if it's not nil.
-func LogErr(err error) {
+// Error prints err if it's not nil.
+func Error(err error) {
 	if err != nil {
 		defaultLogger.Errorf("error occurs during runtime, %v", err)
 	}

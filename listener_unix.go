@@ -70,10 +70,10 @@ func (ln *listener) close() {
 	ln.once.Do(
 		func() {
 			if ln.fd > 0 {
-				logging.LogErr(os.NewSyscallError("close", unix.Close(ln.fd)))
+				logging.Error(os.NewSyscallError("close", unix.Close(ln.fd)))
 			}
 			if ln.network == "unix" {
-				logging.LogErr(os.RemoveAll(ln.addr))
+				logging.Error(os.RemoveAll(ln.addr))
 			}
 		})
 }

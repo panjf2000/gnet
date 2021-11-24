@@ -17,8 +17,6 @@ package gnet
 import (
 	"time"
 
-	"go.uber.org/zap/zapcore"
-
 	"github.com/panjf2000/gnet/logging"
 )
 
@@ -110,7 +108,7 @@ type Options struct {
 	LogPath string
 
 	// LogLevel indicates the logging level, it should be used along with LogPath.
-	LogLevel zapcore.Level
+	LogLevel logging.Level
 
 	// Logger is the customized logger for logging info, if it is not set,
 	// then gnet will use the default logger powered by go.uber.org/zap.
@@ -223,7 +221,7 @@ func WithLogPath(fileName string) Option {
 }
 
 // WithLogLevel is an option to set up the logging level.
-func WithLogLevel(lvl zapcore.Level) Option {
+func WithLogLevel(lvl logging.Level) Option {
 	return func(opts *Options) {
 		opts.LogLevel = lvl
 	}

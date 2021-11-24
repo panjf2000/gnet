@@ -39,7 +39,7 @@ func (ln *listener) dup() (int, string, error) {
 func (ln *listener) normalize() (err error) {
 	switch ln.network {
 	case "unix":
-		logging.LogErr(os.RemoveAll(ln.addr))
+		logging.Error(os.RemoveAll(ln.addr))
 		fallthrough
 	case "tcp", "tcp4", "tcp6":
 		if ln.ln, err = net.Listen(ln.network, ln.addr); err != nil {
@@ -60,13 +60,13 @@ func (ln *listener) normalize() (err error) {
 func (ln *listener) close() {
 	ln.once.Do(func() {
 		if ln.ln != nil {
-			logging.LogErr(ln.ln.Close())
+			logging.Error(ln.ln.Close())
 		}
 		if ln.pconn != nil {
-			logging.LogErr(ln.pconn.Close())
+			logging.Error(ln.pconn.Close())
 		}
 		if ln.network == "unix" {
-			logging.LogErr(os.RemoveAll(ln.addr))
+			logging.Error(os.RemoveAll(ln.addr))
 		}
 	})
 }
