@@ -23,6 +23,7 @@ import (
 	"net"
 	"sync"
 	"syscall"
+	"time"
 
 	"golang.org/x/sys/unix"
 
@@ -75,7 +76,7 @@ func NewClient(eventHandler EventHandler, opts ...Option) (cli *Client, err erro
 	el.ln = svr.ln
 	el.svr = svr
 	el.poller = p
-	el.buffer = make([]byte, 16*1024)
+	el.buffer = make([]byte, options.ReadBufferCap)
 	el.connections = make(map[int]*conn)
 	el.eventHandler = eventHandler
 	cli.el = el
@@ -140,6 +141,28 @@ func (cli *Client) Dial(network, address string) (Conn, error) {
 	}
 	if e != nil {
 		return nil, e
+	}
+
+	opts := cli.el.svr.opts
+	if opts.TCPNoDelay == TCPNoDelay {
+		if err = socket.SetNoDelay(DupFD, 1); err != nil {
+			return nil, err
+		}
+	}
+	if opts.TCPKeepAlive > 0 {
+		if err = socket.SetKeepAlive(DupFD, int(opts.TCPKeepAlive/time.Second)); err != nil {
+			return nil, err
+		}
+	}
+	if opts.SocketSendBuffer > 0 {
+		if err = socket.SetSendBuffer(DupFD, opts.SocketSendBuffer); err != nil {
+			return nil, err
+		}
+	}
+	if opts.SocketRecvBuffer > 0 {
+		if err = socket.SetRecvBuffer(DupFD, opts.SocketRecvBuffer); err != nil {
+			return nil, err
+		}
 	}
 
 	var (

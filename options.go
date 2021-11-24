@@ -44,37 +44,41 @@ const (
 
 // Options are configurations for the gnet application.
 type Options struct {
+	// ================================== Options for only server-side ==================================
+
 	// Multicore indicates whether the server will be effectively created with multi-cores, if so,
 	// then you must take care with synchronizing memory between all event callbacks, otherwise,
 	// it will run the server with single thread. The number of threads in the server will be automatically
 	// assigned to the value of logical CPUs usable by the current process.
 	Multicore bool
 
+	// NumEventLoop is set up to start the given number of event-loop goroutine.
+	// Note: Setting up NumEventLoop will override Multicore.
+	NumEventLoop int
+
+	// LB represents the load-balancing algorithm used when assigning new connections.
+	LB LoadBalancing
+
+	// ReuseAddr indicates whether to set up the SO_REUSEADDR socket option.
+	ReuseAddr bool
+
+	// ReusePort indicates whether to set up the SO_REUSEPORT socket option.
+	ReusePort bool
+
+	// ============================= Options for both server-side and client-side =============================
+
+	// ReadBufferCap is the maximum number of bytes that can be read from the peer when the readable event comes.
+	// The default value is 64KB, it can be reduced to avoid starving the subsequent connections.
+	//
+	// Note that ReadBufferCap will always be converted to the least power of two integer value greater than
+	// or equal to its real amount.
+	ReadBufferCap int
+
 	// LockOSThread is used to determine whether each I/O event-loop is associated to an OS thread, it is useful when you
 	// need some kind of mechanisms like thread local storage, or invoke certain C libraries (such as graphics lib: GLib)
 	// that require thread-level manipulation via cgo, or want all I/O event-loops to actually run in parallel for a
 	// potential higher performance.
 	LockOSThread bool
-
-	// ReadBufferCap is the maximum number of bytes that can be read from the peer when the readable event comes.
-	// The default value is 64KB, it can be reduced to avoid starving the subsequent connections.
-	//
-	// Note that ReadBufferCap will be always converted to the least power of two integer value greater than
-	// or equal to its real amount.
-	ReadBufferCap int
-
-	// LB represents the load-balancing algorithm used when assigning new connections.
-	LB LoadBalancing
-
-	// NumEventLoop is set up to start the given number of event-loop goroutine.
-	// Note: Setting up NumEventLoop will override Multicore.
-	NumEventLoop int
-
-	// ReusePort indicates whether to set up the SO_REUSEPORT socket option.
-	ReusePort bool
-
-	// ReuseAddr indicates whether to set up the SO_REUSEADDR socket option.
-	ReuseAddr bool
 
 	// Ticker indicates whether the ticker has been set up.
 	Ticker bool
@@ -86,7 +90,7 @@ type Options struct {
 	// packet transmission in hopes of sending fewer packets (Nagle's algorithm).
 	//
 	// The default is true (no delay), meaning that data is sent
-	// as soon as possible after a Write.
+	// as soon as possible after a write operation.
 	TCPNoDelay TCPSocketOpt
 
 	// SocketRecvBuffer sets the maximum socket receive buffer in bytes.
