@@ -283,8 +283,8 @@ func startCodecClient(t *testing.T, network, addr string, multicore, async bool,
 	start := time.Now()
 	for time.Since(start) < duration {
 		// data := []byte("Hello, World")
-		//data := make([]byte, 1024)
-		//rand.Read(data)
+		// data := make([]byte, 1024)
+		// rand.Read(data)
 		data := []byte(strings.Repeat("x", 1024))
 		reqData, _ := codec.Encode(nil, data)
 		_, err = c.Write(reqData)
