@@ -81,14 +81,15 @@ func (cc *LineBasedFrameCodec) Encode(c Conn, buf []byte) ([]byte, error) {
 }
 
 // Decode ...
-func (cc *LineBasedFrameCodec) Decode(c Conn) ([]byte, error) {
+func (cc *LineBasedFrameCodec) Decode(c Conn) (b []byte, err error) {
 	buf := c.Read()
 	idx := bytes.IndexByte(buf, CRLFByte)
 	if idx == -1 {
 		return nil, errorset.ErrCRLFNotFound
 	}
+	b = append(b, buf[:idx]...)
 	c.ShiftN(idx + 1)
-	return buf[:idx], nil
+	return
 }
 
 // NewDelimiterBasedFrameCodec instantiates and returns a codec with a specific delimiter.
@@ -102,14 +103,15 @@ func (cc *DelimiterBasedFrameCodec) Encode(c Conn, buf []byte) ([]byte, error) {
 }
 
 // Decode ...
-func (cc *DelimiterBasedFrameCodec) Decode(c Conn) ([]byte, error) {
+func (cc *DelimiterBasedFrameCodec) Decode(c Conn) (b []byte, err error) {
 	buf := c.Read()
 	idx := bytes.IndexByte(buf, cc.delimiter)
 	if idx == -1 {
 		return nil, errorset.ErrDelimiterNotFound
 	}
+	b = append(b, buf[:idx]...)
 	c.ShiftN(idx + 1)
-	return buf[:idx], nil
+	return
 }
 
 // NewFixedLengthFrameCodec instantiates and returns a codec with fixed length.
@@ -126,13 +128,14 @@ func (cc *FixedLengthFrameCodec) Encode(c Conn, buf []byte) ([]byte, error) {
 }
 
 // Decode ...
-func (cc *FixedLengthFrameCodec) Decode(c Conn) ([]byte, error) {
+func (cc *FixedLengthFrameCodec) Decode(c Conn) (b []byte, err error) {
 	size, buf := c.ReadN(cc.frameLength)
-	if size == 0 {
+	if size != cc.frameLength {
 		return nil, errorset.ErrUnexpectedEOF
 	}
+	b = append(b, buf...)
 	c.ShiftN(size)
-	return buf, nil
+	return
 }
 
 // NewLengthFieldBasedFrameCodec instantiates and returns a codec based on the length field.

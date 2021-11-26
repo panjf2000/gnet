@@ -171,7 +171,7 @@ func (c *conn) Read() []byte {
 		return c.buffer
 	}
 	c.byteBuffer = c.inboundBuffer.WithByteBuffer(c.buffer)
-	return c.byteBuffer.Bytes()
+	return c.byteBuffer.B
 }
 
 func (c *conn) ResetBuffer() {
@@ -197,13 +197,13 @@ func (c *conn) ReadN(n int) (size int, buf []byte) {
 	_, _ = c.byteBuffer.Write(head)
 	_, _ = c.byteBuffer.Write(tail)
 	if inBufferLen >= n {
-		buf = c.byteBuffer.Bytes()
+		buf = c.byteBuffer.B
 		return
 	}
 
 	restSize := n - inBufferLen
 	_, _ = c.byteBuffer.Write(c.buffer[:restSize])
-	buf = c.byteBuffer.Bytes()
+	buf = c.byteBuffer.B
 	return
 }
 

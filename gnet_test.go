@@ -23,6 +23,7 @@ import (
 	"math/rand"
 	"net"
 	"runtime"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -258,10 +259,9 @@ func testCodecServe(
 		network+"://"+addr,
 		WithMulticore(multicore),
 		WithTicker(true),
+		WithReadBufferCap(8*1024),
 		WithLogLevel(logging.DebugLevel),
-		WithTCPKeepAlive(
-			time.Minute*5,
-		),
+		WithTCPKeepAlive(time.Minute*5),
 		WithSocketRecvBuffer(8*1024),
 		WithSocketSendBuffer(8*1024),
 		WithCodec(codec),
@@ -283,8 +283,9 @@ func startCodecClient(t *testing.T, network, addr string, multicore, async bool,
 	start := time.Now()
 	for time.Since(start) < duration {
 		// data := []byte("Hello, World")
-		data := make([]byte, 1024)
-		rand.Read(data)
+		//data := make([]byte, 1024)
+		//rand.Read(data)
+		data := []byte(strings.Repeat("x", 1024))
 		reqData, _ := codec.Encode(nil, data)
 		_, err = c.Write(reqData)
 		require.NoError(t, err)
