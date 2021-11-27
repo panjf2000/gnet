@@ -168,7 +168,7 @@ type (
 		PreWrite(c Conn)
 
 		// AfterWrite fires right after a packet is written to the peer socket, this event function is usually where
-		// you put the []byte's back to your memory pool.
+		// you put the []byte returned from React() back to your memory pool.
 		AfterWrite(c Conn, b []byte)
 
 		// React fires when a connection sends the server data.
