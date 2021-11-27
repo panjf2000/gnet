@@ -19,6 +19,7 @@ package gnet
 
 import (
 	"encoding/binary"
+	"log"
 	"math/rand"
 	"strings"
 	"sync"
@@ -49,7 +50,7 @@ func TestCodecServeWithGnetClient(t *testing.T) {
 				testCodecServeWithGnetClient(t, "tcp", ":9992", false, false, 10, false, NewDelimiterBasedFrameCodec('|'))
 			})
 			t.Run("1-loop-FixedLengthFrameCodec", func(t *testing.T) {
-				testCodecServeWithGnetClient(t, "tcp", ":9993", false, false, 10, false, NewFixedLengthFrameCodec(64))
+				testCodecServeWithGnetClient(t, "tcp", ":9993", false, false, 10, false, NewFixedLengthFrameCodec(packetLen))
 			})
 			t.Run("1-loop-LengthFieldBasedFrameCodec", func(t *testing.T) {
 				testCodecServeWithGnetClient(t, "tcp", ":9994", false, false, 10, false, nil)
@@ -61,7 +62,7 @@ func TestCodecServeWithGnetClient(t *testing.T) {
 				testCodecServeWithGnetClient(t, "tcp", ":9996", true, false, 10, false, NewDelimiterBasedFrameCodec('|'))
 			})
 			t.Run("N-loop-FixedLengthFrameCodec", func(t *testing.T) {
-				testCodecServeWithGnetClient(t, "tcp", ":9997", true, false, 10, false, NewFixedLengthFrameCodec(64))
+				testCodecServeWithGnetClient(t, "tcp", ":9997", true, false, 10, false, NewFixedLengthFrameCodec(packetLen))
 			})
 			t.Run("N-loop-LengthFieldBasedFrameCodec", func(t *testing.T) {
 				testCodecServeWithGnetClient(t, "tcp", ":9998", true, false, 10, false, nil)
@@ -75,7 +76,7 @@ func TestCodecServeWithGnetClient(t *testing.T) {
 				testCodecServeWithGnetClient(t, "tcp", ":9992", false, true, 10, false, NewDelimiterBasedFrameCodec('|'))
 			})
 			t.Run("1-loop-FixedLengthFrameCodec", func(t *testing.T) {
-				testCodecServeWithGnetClient(t, "tcp", ":9993", false, true, 10, false, NewFixedLengthFrameCodec(64))
+				testCodecServeWithGnetClient(t, "tcp", ":9993", false, true, 10, false, NewFixedLengthFrameCodec(packetLen))
 			})
 			t.Run("1-loop-LengthFieldBasedFrameCodec", func(t *testing.T) {
 				testCodecServeWithGnetClient(t, "tcp", ":9994", false, true, 10, false, nil)
@@ -87,7 +88,7 @@ func TestCodecServeWithGnetClient(t *testing.T) {
 				testCodecServeWithGnetClient(t, "tcp", ":9996", true, true, 10, false, NewDelimiterBasedFrameCodec('|'))
 			})
 			t.Run("N-loop-FixedLengthFrameCodec", func(t *testing.T) {
-				testCodecServeWithGnetClient(t, "tcp", ":9997", true, true, 10, false, NewFixedLengthFrameCodec(64))
+				testCodecServeWithGnetClient(t, "tcp", ":9997", true, true, 10, false, NewFixedLengthFrameCodec(packetLen))
 			})
 			t.Run("N-loop-LengthFieldBasedFrameCodec", func(t *testing.T) {
 				testCodecServeWithGnetClient(t, "tcp", ":9998", true, true, 10, false, nil)
@@ -103,7 +104,7 @@ func TestCodecServeWithGnetClient(t *testing.T) {
 				testCodecServeWithGnetClient(t, "tcp", ":9992", false, false, 10, true, NewDelimiterBasedFrameCodec('|'))
 			})
 			t.Run("1-loop-FixedLengthFrameCodec", func(t *testing.T) {
-				testCodecServeWithGnetClient(t, "tcp", ":9993", false, false, 10, true, NewFixedLengthFrameCodec(64))
+				testCodecServeWithGnetClient(t, "tcp", ":9993", false, false, 10, true, NewFixedLengthFrameCodec(packetLen))
 			})
 			t.Run("1-loop-LengthFieldBasedFrameCodec", func(t *testing.T) {
 				testCodecServeWithGnetClient(t, "tcp", ":9994", false, false, 10, true, nil)
@@ -115,7 +116,7 @@ func TestCodecServeWithGnetClient(t *testing.T) {
 				testCodecServeWithGnetClient(t, "tcp", ":9996", true, false, 10, true, NewDelimiterBasedFrameCodec('|'))
 			})
 			t.Run("N-loop-FixedLengthFrameCodec", func(t *testing.T) {
-				testCodecServeWithGnetClient(t, "tcp", ":9997", true, false, 10, true, NewFixedLengthFrameCodec(64))
+				testCodecServeWithGnetClient(t, "tcp", ":9997", true, false, 10, true, NewFixedLengthFrameCodec(packetLen))
 			})
 			t.Run("N-loop-LengthFieldBasedFrameCodec", func(t *testing.T) {
 				testCodecServeWithGnetClient(t, "tcp", ":9998", true, false, 10, true, nil)
@@ -129,7 +130,7 @@ func TestCodecServeWithGnetClient(t *testing.T) {
 				testCodecServeWithGnetClient(t, "tcp", ":9992", false, true, 10, true, NewDelimiterBasedFrameCodec('|'))
 			})
 			t.Run("1-loop-FixedLengthFrameCodec", func(t *testing.T) {
-				testCodecServeWithGnetClient(t, "tcp", ":9993", false, true, 10, true, NewFixedLengthFrameCodec(64))
+				testCodecServeWithGnetClient(t, "tcp", ":9993", false, true, 10, true, NewFixedLengthFrameCodec(packetLen))
 			})
 			t.Run("1-loop-LengthFieldBasedFrameCodec", func(t *testing.T) {
 				testCodecServeWithGnetClient(t, "tcp", ":9994", false, true, 10, true, nil)
@@ -141,7 +142,7 @@ func TestCodecServeWithGnetClient(t *testing.T) {
 				testCodecServeWithGnetClient(t, "tcp", ":9996", true, true, 10, true, NewDelimiterBasedFrameCodec('|'))
 			})
 			t.Run("N-loop-FixedLengthFrameCodec", func(t *testing.T) {
-				testCodecServeWithGnetClient(t, "tcp", ":9997", true, true, 10, true, NewFixedLengthFrameCodec(64))
+				testCodecServeWithGnetClient(t, "tcp", ":9997", true, true, 10, true, NewFixedLengthFrameCodec(packetLen))
 			})
 			t.Run("N-loop-LengthFieldBasedFrameCodec", func(t *testing.T) {
 				testCodecServeWithGnetClient(t, "tcp", ":9998", true, true, 10, true, nil)
@@ -175,6 +176,7 @@ func (s *testCodecClientServer) OnOpened(c Conn) (out []byte, action Action) {
 }
 
 func (s *testCodecClientServer) OnClosed(c Conn, err error) (action Action) {
+	log.Println("close:", c.RemoteAddr(), err)
 	require.Equal(s.tester, c.Context(), c, "invalid context")
 	atomic.AddInt32(&s.disconnected, 1)
 	if atomic.LoadInt32(&s.connected) == atomic.LoadInt32(&s.disconnected) &&
@@ -225,10 +227,10 @@ func (cli *clientEvents) React(packet []byte, c Conn) (out []byte, action Action
 	return
 }
 
-var (
-	m               = 0
-	allFieldLengths = []int{1, 2, 3, 4, 8}
-)
+func (cli *clientEvents) Tick() (delay time.Duration, action Action) {
+	delay = 200 * time.Millisecond
+	return
+}
 
 func testCodecServeWithGnetClient(
 	t *testing.T,
@@ -240,32 +242,38 @@ func testCodecServeWithGnetClient(
 ) {
 	var err error
 	if codec == nil {
-		fieldLength := allFieldLengths[m]
 		encoderConfig := EncoderConfig{
 			ByteOrder:                       binary.BigEndian,
-			LengthFieldLength:               fieldLength,
+			LengthFieldLength:               2,
 			LengthAdjustment:                0,
 			LengthIncludesLengthFieldLength: false,
 		}
 		decoderConfig := DecoderConfig{
 			ByteOrder:           binary.BigEndian,
 			LengthFieldOffset:   0,
-			LengthFieldLength:   fieldLength,
+			LengthFieldLength:   2,
 			LengthAdjustment:    0,
-			InitialBytesToStrip: fieldLength,
+			InitialBytesToStrip: 2,
 		}
 		codec = NewLengthFieldBasedFrameCodec(encoderConfig, decoderConfig)
-	}
-	m++
-	if m > 4 {
-		m = 0
 	}
 	ts := &testCodecClientServer{
 		tester: t, network: network, addr: addr, multicore: multicore, async: async,
 		codec: codec, workerPool: goroutine.Default(),
 	}
 	ts.clientEV = &clientEvents{}
-	ts.client, err = NewClient(ts.clientEV, WithLogLevel(logging.DebugLevel), WithCodec(codec))
+	ts.client, err = NewClient(
+		ts.clientEV,
+		WithLogLevel(logging.DebugLevel),
+		WithCodec(codec),
+		WithReadBufferCap(8*1024),
+		WithLockOSThread(true),
+		WithTCPNoDelay(TCPNoDelay),
+		WithTCPKeepAlive(time.Minute),
+		WithSocketRecvBuffer(8*1024),
+		WithSocketSendBuffer(8*1024),
+		WithTicker(true),
+	)
 	assert.NoError(t, err)
 	err = ts.client.Start()
 	assert.NoError(t, err)
@@ -303,7 +311,9 @@ func startCodecGnetClient(t *testing.T, cli *Client, ev *clientEvents, network, 
 	duration := time.Duration((rand.Float64()*2+1)*float64(time.Second)) / 8
 	start := time.Now()
 	for time.Since(start) < duration {
-		reqData := []byte(strings.Repeat("abcd1234", 8)) // 64 bytes
+		// reqData := make([]byte, 1024)
+		// rand.Read(reqData)
+		reqData := []byte(strings.Repeat("x", packetLen))
 		err = c.AsyncWrite(reqData)
 		require.NoError(t, err)
 		respData := <-rspCh
