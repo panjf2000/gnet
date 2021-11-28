@@ -18,45 +18,57 @@
 package io
 
 import (
-	"golang.org/x/sys/unix"
+	"unsafe"
 
-	"github.com/panjf2000/gnet/errors"
+	"golang.org/x/sys/unix"
 )
 
-// Writev simply calls write() multiple times cuz writev() on BSD-like OS's is not yet implemented in Go.
-func Writev(fd int, iov [][]byte) (int, error) {
-	var sum int
-	for i := range iov {
-		n, err := unix.Write(fd, iov[i])
-		if err != nil {
-			if sum == 0 {
-				sum = n
-			}
-			return sum, err
-		}
-		sum += n
-		if n < len(iov[i]) {
-			return sum, errors.ErrShortWritev
-		}
+// Writev invokes the writev system call directly.
+//
+// Note that SYS_WRITEV is about to be deprecated on Darwin
+// and the Go team suggested to use libSystem wrappers instead of direct system-calls,
+// hence, this way to implement the writev might not be backward-compatible in the future.
+func Writev(fd int, bs [][]byte) (int, error) {
+	if len(bs) == 0 {
+		return 0, nil
 	}
-	return sum, nil
+	iov := bytes2iovec(bs)
+	n, _, err := unix.RawSyscall(unix.SYS_WRITEV, uintptr(fd), uintptr(unsafe.Pointer(&iov[0])), uintptr(len(iov)))
+	if err != 0 {
+		return int(n), err
+	}
+	return int(n), nil
 }
 
-// Readv simply calls read() multiple times cuz readv() on BSD-like OS's is not yet implemented in Go.
-func Readv(fd int, iov [][]byte) (int, error) {
-	var sum int
-	for i := range iov {
-		n, err := unix.Read(fd, iov[i])
-		if err != nil {
-			if sum == 0 {
-				sum = n
-			}
-			return sum, err
-		}
-		sum += n
-		if n < len(iov[i]) {
-			return sum, errors.ErrShortReadv
+// Readv invokes the readv system call directly.
+//
+// Note that SYS_READV is about to be deprecated on Darwin
+// and the Go team suggested to use libSystem wrappers instead of direct system-calls,
+// hence, this way to implement the readv might not be backward-compatible in the future.
+func Readv(fd int, bs [][]byte) (int, error) {
+	if len(bs) == 0 {
+		return 0, nil
+	}
+	iov := bytes2iovec(bs)
+	// syscall
+	n, _, err := unix.RawSyscall(unix.SYS_READV, uintptr(fd), uintptr(unsafe.Pointer(&iov[0])), uintptr(len(iov)))
+	if err != 0 {
+		return int(n), err
+	}
+	return int(n), nil
+}
+
+var _zero uintptr
+
+func bytes2iovec(bs [][]byte) []unix.Iovec {
+	iovecs := make([]unix.Iovec, len(bs))
+	for i, b := range bs {
+		iovecs[i].SetLen(len(b))
+		if len(b) > 0 {
+			iovecs[i].Base = &b[0]
+		} else {
+			iovecs[i].Base = (*byte)(unsafe.Pointer(&_zero))
 		}
 	}
-	return sum, nil
+	return iovecs
 }
