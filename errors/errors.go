@@ -52,11 +52,4 @@ var (
 	ErrUnsupportedLength = errors.New("unsupported lengthFieldLength. (expected: 1, 2, 3, 4, or 8)")
 	// ErrTooLessLength occurs when adjusted frame length is less than zero.
 	ErrTooLessLength = errors.New("adjusted frame length is less than zero")
-
-	// =============================================== internal errors ===============================================.
-
-	// ErrShortWritev occurs when internal/io.Writev fails to send all data.
-	ErrShortWritev = errors.New("short writev")
-	// ErrShortReadv occurs when internal/io.Readv fails to send all data.
-	ErrShortReadv = errors.New("short readv")
 )

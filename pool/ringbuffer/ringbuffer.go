@@ -67,12 +67,28 @@ func Get() *RingBuffer { return defaultPool.Get() }
 //
 // The byte buffer may be returned to the pool via Put after the use
 // in order to minimize GC overhead.
-func (p *Pool) Get() *ringbuffer.RingBuffer {
+func (p *Pool) Get() *RingBuffer {
 	v := p.pool.Get()
 	if v != nil {
 		return v.(*RingBuffer)
 	}
 	return ringbuffer.New(int(atomic.LoadUint64(&p.defaultSize)))
+}
+
+// GetWithSize is like Get(), but with initial size.
+func GetWithSize(size int) *RingBuffer { return defaultPool.GetWithSize(size) }
+
+// GetWithSize is like Pool.Get(), but with initial size.
+func (p *Pool) GetWithSize(size int) *RingBuffer {
+	v := p.pool.Get()
+	if v != nil {
+		rb := v.(*RingBuffer)
+		if rb.Cap() >= size {
+			return rb
+		}
+		p.pool.Put(v)
+	}
+	return ringbuffer.New(size)
 }
 
 // Put returns byte buffer to the pool.

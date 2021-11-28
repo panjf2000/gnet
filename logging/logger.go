@@ -62,6 +62,7 @@ var (
 	defaultLoggingLevel Level
 )
 
+// Level is the alias of zapcore.Level.
 type Level = zapcore.Level
 
 const (

@@ -27,6 +27,7 @@ import (
 	"github.com/panjf2000/gnet/errors"
 )
 
+// GetUDPSockAddr the structured addresses based on the protocol and raw address.
 func GetUDPSockAddr(proto, addr string) (sa unix.Sockaddr, family int, udpAddr *net.UDPAddr, ipv6only bool, err error) {
 	var udpVersion string
 

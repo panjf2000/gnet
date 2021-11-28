@@ -31,7 +31,10 @@ const (
 	bufferGrowThreshold = 4 * 1024 // 4KB
 )
 
-// ErrIsEmpty will be returned when trying to read a empty ring-buffer.
+// TCPReadBufferSize is the default read buffer size for each TCP socket.
+var TCPReadBufferSize = 64 * 1024 // 64KB
+
+// ErrIsEmpty will be returned when trying to read an empty ring-buffer.
 var ErrIsEmpty = errors.New("ring-buffer is empty")
 
 // RingBuffer is a circular buffer that implement io.ReaderWriter interface.
@@ -239,6 +242,42 @@ func (rb *RingBuffer) Write(p []byte) (n int, err error) {
 
 	return
 }
+
+// ========================= gnet specific APIs =========================
+
+// CopyFromSocket copies data from a socket fd into ring-buffer.
+func (rb *RingBuffer) CopyFromSocket(fd int, read func(int, []byte) (int, error)) (n int, err error) {
+	n, err = read(fd, rb.buf[rb.w:])
+	if n > 0 {
+		rb.isEmpty = false
+	}
+	rb.w += n
+	if rb.w == rb.size {
+		rb.w = 0
+	}
+	return
+}
+
+// MoveLeftoverToHead moves the data from its tail to head.
+func (rb *RingBuffer) MoveLeftoverToHead() int {
+	if rb.IsEmpty() {
+		rb.Reset()
+		return 0
+	}
+	if rb.w != 0 {
+		return 0
+	}
+	if rb.r < rb.Length() {
+		rb.grow(rb.Length() + TCPReadBufferSize)
+		return rb.Length()
+	}
+	n := copy(rb.buf, rb.buf[rb.r:])
+	rb.r = 0
+	rb.w = n
+	return n
+}
+
+// ========================= gnet specific APIs =========================
 
 // WriteByte writes one byte into buffer.
 func (rb *RingBuffer) WriteByte(c byte) error {

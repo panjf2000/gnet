@@ -29,6 +29,7 @@ import (
 
 var listenerBacklogMaxSize = maxListenerBacklog()
 
+// GetTCPSockAddr the structured addresses based on the protocol and raw address.
 func GetTCPSockAddr(proto, addr string) (sa unix.Sockaddr, family int, tcpAddr *net.TCPAddr, ipv6only bool, err error) {
 	var tcpVersion string
 

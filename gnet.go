@@ -25,6 +25,7 @@ import (
 	"github.com/panjf2000/gnet/errors"
 	"github.com/panjf2000/gnet/internal"
 	"github.com/panjf2000/gnet/logging"
+	"github.com/panjf2000/gnet/ringbuffer"
 )
 
 // Action is an action that occurs after the completion of an event.
@@ -283,9 +284,10 @@ func Serve(eventHandler EventHandler, protoAddr string, opts ...Option) (err err
 	}
 
 	if rbc := options.ReadBufferCap; rbc <= 0 {
-		options.ReadBufferCap = 0x10000
+		options.ReadBufferCap = ringbuffer.TCPReadBufferSize
 	} else {
 		options.ReadBufferCap = internal.CeilToPowerOfTwo(rbc)
+		ringbuffer.TCPReadBufferSize = options.ReadBufferCap
 	}
 
 	network, addr := parseProtoAddr(protoAddr)

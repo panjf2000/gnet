@@ -26,37 +26,36 @@ import (
 
 	"github.com/panjf2000/gnet/internal/netpoll"
 	"github.com/panjf2000/gnet/internal/socket"
+	"github.com/panjf2000/gnet/listbuffer"
 	"github.com/panjf2000/gnet/pool/bytebuffer"
-	prb "github.com/panjf2000/gnet/pool/ringbuffer"
+	rbPool "github.com/panjf2000/gnet/pool/ringbuffer"
 	"github.com/panjf2000/gnet/ringbuffer"
 )
 
 type conn struct {
-	fd             int                     // file descriptor
-	sa             unix.Sockaddr           // remote socket address
-	ctx            interface{}             // user-defined context
-	loop           *eventloop              // connected event-loop
-	codec          ICodec                  // codec for TCP
-	buffer         []byte                  // reuse memory of inbound data as a temporary buffer
-	opened         bool                    // connection opened event fired
-	localAddr      net.Addr                // local addr
-	remoteAddr     net.Addr                // remote addr
-	byteBuffer     *bytebuffer.ByteBuffer  // bytes buffer for buffering current packet and data in ring-buffer
-	inboundBuffer  *ringbuffer.RingBuffer  // buffer for data from the peer
-	outboundBuffer *ringbuffer.RingBuffer  // buffer for data that is ready to write to the peer
-	pollAttachment *netpoll.PollAttachment // connection attachment for poller
+	fd             int                       // file descriptor
+	sa             unix.Sockaddr             // remote socket address
+	ctx            interface{}               // user-defined context
+	loop           *eventloop                // connected event-loop
+	codec          ICodec                    // codec for TCP
+	opened         bool                      // connection opened event fired
+	localAddr      net.Addr                  // local addr
+	remoteAddr     net.Addr                  // remote addr
+	byteBuffer     *bytebuffer.ByteBuffer    // bytes buffer for buffering current packet and data in ring-buffer
+	inboundBuffer  *ringbuffer.RingBuffer    // buffer for data from the peer
+	outboundBuffer listbuffer.ByteBufferList // buffer for data that is ready to write to the peer
+	pollAttachment *netpoll.PollAttachment   // connection attachment for poller
 }
 
 func newTCPConn(fd int, el *eventloop, sa unix.Sockaddr, codec ICodec, localAddr, remoteAddr net.Addr) (c *conn) {
 	c = &conn{
-		fd:             fd,
-		sa:             sa,
-		loop:           el,
-		codec:          codec,
-		localAddr:      localAddr,
-		remoteAddr:     remoteAddr,
-		inboundBuffer:  prb.Get(),
-		outboundBuffer: prb.Get(),
+		fd:            fd,
+		sa:            sa,
+		loop:          el,
+		codec:         codec,
+		localAddr:     localAddr,
+		remoteAddr:    remoteAddr,
+		inboundBuffer: rbPool.GetWithSize(ringbuffer.TCPReadBufferSize),
 	}
 	c.pollAttachment = netpoll.GetPollAttachment()
 	c.pollAttachment.FD, c.pollAttachment.Callback = fd, c.handleEvents
@@ -67,13 +66,11 @@ func (c *conn) releaseTCP() {
 	c.opened = false
 	c.sa = nil
 	c.ctx = nil
-	c.buffer = nil
 	c.localAddr = nil
 	c.remoteAddr = nil
-	prb.Put(c.inboundBuffer)
-	prb.Put(c.outboundBuffer)
+	rbPool.Put(c.inboundBuffer)
 	c.inboundBuffer = ringbuffer.EmptyRingBuffer
-	c.outboundBuffer = ringbuffer.EmptyRingBuffer
+	c.outboundBuffer.Reset()
 	bytebuffer.Put(c.byteBuffer)
 	c.byteBuffer = nil
 	netpoll.PutPollAttachment(c.pollAttachment)
@@ -101,12 +98,12 @@ func (c *conn) open(buf []byte) error {
 	c.loop.eventHandler.PreWrite(c)
 	n, err := unix.Write(c.fd, buf)
 	if err != nil && err == unix.EAGAIN {
-		_, _ = c.outboundBuffer.Write(buf)
+		c.outboundBuffer.PushBytes(buf)
 		return nil
 	}
 
 	if err == nil && n < len(buf) {
-		_, _ = c.outboundBuffer.Write(buf[n:])
+		c.outboundBuffer.PushBytes(buf[n:])
 	}
 
 	return err
@@ -129,7 +126,7 @@ func (c *conn) write(buf []byte) (err error) {
 	// If there is pending data in outbound buffer, the current data ought to be appended to the outbound buffer
 	// for maintaining the sequence of network packets.
 	if !c.outboundBuffer.IsEmpty() {
-		_, _ = c.outboundBuffer.Write(packet)
+		c.outboundBuffer.PushBytes(packet)
 		return
 	}
 
@@ -137,15 +134,15 @@ func (c *conn) write(buf []byte) (err error) {
 	if n, err = unix.Write(c.fd, packet); err != nil {
 		// A temporary error occurs, append the data to outbound buffer, writing it back to the peer in the next round.
 		if err == unix.EAGAIN {
-			_, _ = c.outboundBuffer.Write(packet)
+			c.outboundBuffer.PushBytes(packet)
 			err = c.loop.poller.ModReadWrite(c.pollAttachment)
 			return
 		}
 		return c.loop.loopCloseConn(c, os.NewSyscallError("write", err))
 	}
-	// Fail to send all data back to the peer, buffer the leftover data for the next round.
+	// Failed to send all data back to the peer, buffer the leftover data for the next round.
 	if n < len(packet) {
-		_, _ = c.outboundBuffer.Write(packet[n:])
+		c.outboundBuffer.PushBytes(packet[n:])
 		err = c.loop.poller.ModReadWrite(c.pollAttachment)
 	}
 	return
@@ -167,76 +164,31 @@ func (c *conn) sendTo(buf []byte) error {
 // ================================= Public APIs of gnet.Conn =================================
 
 func (c *conn) Read() []byte {
-	if c.inboundBuffer.IsEmpty() {
-		return c.buffer
-	}
-	c.byteBuffer = c.inboundBuffer.WithByteBuffer(c.buffer)
-	return c.byteBuffer.B
+	buf, _ := c.inboundBuffer.PeekAll()
+	return buf
 }
 
 func (c *conn) ResetBuffer() {
-	c.buffer = c.buffer[:0]
 	c.inboundBuffer.Reset()
-	bytebuffer.Put(c.byteBuffer)
-	c.byteBuffer = nil
 }
 
-func (c *conn) ReadN(n int) (size int, buf []byte) {
+func (c *conn) ReadN(n int) (int, []byte) {
 	inBufferLen := c.inboundBuffer.Length()
-	tempBufferLen := len(c.buffer)
-	if totalLen := inBufferLen + tempBufferLen; totalLen < n || n <= 0 {
-		n = totalLen
+	if inBufferLen < n || n <= 0 {
+		buf, _ := c.inboundBuffer.PeekAll()
+		return inBufferLen, buf
 	}
-	size = n
-	if c.inboundBuffer.IsEmpty() {
-		buf = c.buffer[:n]
-		return
-	}
-	head, tail := c.inboundBuffer.Peek(n)
-	c.byteBuffer = bytebuffer.Get()
-	_, _ = c.byteBuffer.Write(head)
-	_, _ = c.byteBuffer.Write(tail)
-	if inBufferLen >= n {
-		buf = c.byteBuffer.B
-		return
-	}
-
-	restSize := n - inBufferLen
-	_, _ = c.byteBuffer.Write(c.buffer[:restSize])
-	buf = c.byteBuffer.B
-	return
+	buf, _ := c.inboundBuffer.Peek(n)
+	return n, buf
 }
 
-func (c *conn) ShiftN(n int) (size int) {
-	inBufferLen := c.inboundBuffer.Length()
-	tempBufferLen := len(c.buffer)
-	if inBufferLen+tempBufferLen < n || n <= 0 {
-		c.ResetBuffer()
-		size = inBufferLen + tempBufferLen
-		return
-	}
-	size = n
-	if c.inboundBuffer.IsEmpty() {
-		c.buffer = c.buffer[n:]
-		return
-	}
-
-	bytebuffer.Put(c.byteBuffer)
-	c.byteBuffer = nil
-
-	if inBufferLen >= n {
-		c.inboundBuffer.Discard(n)
-		return
-	}
-	c.inboundBuffer.Reset()
-
-	restSize := n - inBufferLen
-	c.buffer = c.buffer[restSize:]
-	return
+func (c *conn) ShiftN(n int) int {
+	c.inboundBuffer.Discard(n)
+	return n
 }
 
 func (c *conn) BufferLength() int {
-	return c.inboundBuffer.Length() + len(c.buffer)
+	return c.inboundBuffer.Length()
 }
 
 func (c *conn) AsyncWrite(buf []byte) error {

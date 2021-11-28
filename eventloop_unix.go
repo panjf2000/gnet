@@ -96,15 +96,13 @@ func (el *eventloop) loopOpen(c *conn) error {
 }
 
 func (el *eventloop) loopRead(c *conn) error {
-	n, err := unix.Read(c.fd, el.buffer)
+	n, err := c.inboundBuffer.CopyFromSocket(c.fd, unix.Read)
 	if n == 0 || err != nil {
 		if err == unix.EAGAIN {
 			return nil
 		}
 		return el.loopCloseConn(c, os.NewSyscallError("read", err))
 	}
-	c.buffer = el.buffer[:n]
-
 	for packet, _ := c.read(); packet != nil; packet, _ = c.read() {
 		out, action := el.eventHandler.React(packet, c)
 		if out != nil {
@@ -129,27 +127,18 @@ func (el *eventloop) loopRead(c *conn) error {
 			return nil
 		}
 	}
-	_, _ = c.inboundBuffer.Write(c.buffer)
-
+	_ = c.inboundBuffer.MoveLeftoverToHead()
 	return nil
 }
 
 func (el *eventloop) loopWrite(c *conn) error {
 	el.eventHandler.PreWrite(c)
 
-	head, tail := c.outboundBuffer.PeekAll()
-	var (
-		n   int
-		err error
-	)
-	if len(tail) > 0 {
-		n, err = io.Writev(c.fd, [][]byte{head, tail})
-	} else {
-		n, err = unix.Write(c.fd, head)
-	}
-	c.outboundBuffer.Discard(n)
+	iov := c.outboundBuffer.PeekBytesList()
+	n, err := io.Writev(c.fd, iov)
+	c.outboundBuffer.DiscardBytes(n)
 	switch err {
-	case nil, gerrors.ErrShortWritev: // do nothing, just go on
+	case nil:
 	case unix.EAGAIN:
 		return nil
 	default:
@@ -162,8 +151,6 @@ func (el *eventloop) loopWrite(c *conn) error {
 		_ = el.poller.ModRead(c.pollAttachment)
 	}
 
-	el.eventHandler.AfterWrite(c, nil)
-
 	return nil
 }
 
@@ -175,13 +162,9 @@ func (el *eventloop) loopCloseConn(c *conn, err error) (rerr error) {
 	// Send residual data in buffer back to the peer before actually closing the connection.
 	if !c.outboundBuffer.IsEmpty() {
 		el.eventHandler.PreWrite(c)
-		head, tail := c.outboundBuffer.PeekAll()
-		if n, err := unix.Write(c.fd, head); err == nil {
-			if n == len(head) && tail != nil {
-				_, _ = unix.Write(c.fd, tail)
-			}
-		}
-		el.eventHandler.AfterWrite(c, nil)
+		iov := c.outboundBuffer.PeekBytesList()
+		_, _ = io.Writev(c.fd, iov)
+		c.outboundBuffer.Reset()
 	}
 
 	if err0, err1 := el.poller.Delete(c.fd), unix.Close(c.fd); err0 == nil && err1 == nil {

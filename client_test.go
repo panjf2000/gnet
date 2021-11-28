@@ -19,7 +19,6 @@ package gnet
 
 import (
 	"encoding/binary"
-	"log"
 	"math/rand"
 	"strings"
 	"sync"
@@ -176,7 +175,6 @@ func (s *testCodecClientServer) OnOpened(c Conn) (out []byte, action Action) {
 }
 
 func (s *testCodecClientServer) OnClosed(c Conn, err error) (action Action) {
-	log.Println("close:", c.RemoteAddr(), err)
 	require.Equal(s.tester, c.Context(), c, "invalid context")
 	atomic.AddInt32(&s.disconnected, 1)
 	if atomic.LoadInt32(&s.connected) == atomic.LoadInt32(&s.disconnected) &&

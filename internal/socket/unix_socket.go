@@ -26,6 +26,7 @@ import (
 	"github.com/panjf2000/gnet/errors"
 )
 
+// GetUnixSockAddr the structured addresses based on the protocol and raw address.
 func GetUnixSockAddr(proto, addr string) (sa unix.Sockaddr, family int, unixAddr *net.UnixAddr, err error) {
 	unixAddr, err = net.ResolveUnixAddr(proto, addr)
 	if err != nil {
