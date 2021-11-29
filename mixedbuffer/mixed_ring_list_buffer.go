@@ -21,7 +21,7 @@ import (
 )
 
 // MaxStackingBytes is the maximum amount which is allowed to be piled up in the ring-buffer.
-const MaxStackingBytes = 256 * 1024 // 256KB
+const MaxStackingBytes = 32 * 1024 // 32KB
 
 // Buffer combines ring-buffer and list-buffer.
 // Ring-buffer is the top-priority buffer to store response data, gnet will only switch to
