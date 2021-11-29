@@ -89,6 +89,8 @@ func (s Server) DupFd() (dupFD int, err error) {
 
 // Conn is an interface of gnet connection.
 type Conn interface {
+	// ================================== Non-concurrency-safe API's ==================================
+
 	// Context returns a user-defined context.
 	Context() (ctx interface{})
 
@@ -122,8 +124,7 @@ type Conn interface {
 	// BufferLength returns the length of available data in the internal buffers.
 	BufferLength() (size int)
 
-	// InboundBuffer returns the inbound ring-buffer.
-	// InboundBuffer() *ringbuffer.RingBuffer
+	// ==================================== Concurrency-safe API's ====================================
 
 	// SendTo writes data for UDP sockets, it allows you to send data back to UDP socket in individual goroutines.
 	SendTo(buf []byte) error

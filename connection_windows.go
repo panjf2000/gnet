@@ -20,7 +20,7 @@ import (
 	"sync"
 
 	"github.com/panjf2000/gnet/pool/bytebuffer"
-	prb "github.com/panjf2000/gnet/pool/ringbuffer"
+	rbPool "github.com/panjf2000/gnet/pool/ringbuffer"
 	"github.com/panjf2000/gnet/ringbuffer"
 )
 
@@ -83,7 +83,7 @@ func newTCPConn(conn net.Conn, el *eventloop) (c *stdConn) {
 		conn:          conn,
 		loop:          el,
 		codec:         el.svr.codec,
-		inboundBuffer: prb.Get(),
+		inboundBuffer: rbPool.Get(),
 	}
 	c.localAddr = el.svr.ln.lnaddr
 	c.remoteAddr = c.conn.RemoteAddr()
@@ -114,7 +114,7 @@ func (c *stdConn) releaseTCP() {
 	c.localAddr = nil
 	c.remoteAddr = nil
 	c.conn = nil
-	prb.Put(c.inboundBuffer)
+	rbPool.Put(c.inboundBuffer)
 	c.inboundBuffer = ringbuffer.EmptyRingBuffer
 	bytebuffer.Put(c.buffer)
 	c.buffer = nil
@@ -153,7 +153,7 @@ func (c *stdConn) write(data []byte) (n int, err error) {
 	return
 }
 
-// ================================= Public APIs of gnet.Conn =================================
+// ================================== Non-concurrency-safe API's ==================================
 
 func (c *stdConn) Read() []byte {
 	if c.inboundBuffer.IsEmpty() {
@@ -228,6 +228,13 @@ func (c *stdConn) BufferLength() int {
 	return c.inboundBuffer.Length() + c.buffer.Len()
 }
 
+func (c *stdConn) Context() interface{}       { return c.ctx }
+func (c *stdConn) SetContext(ctx interface{}) { c.ctx = ctx }
+func (c *stdConn) LocalAddr() net.Addr        { return c.localAddr }
+func (c *stdConn) RemoteAddr() net.Addr       { return c.remoteAddr }
+
+// ==================================== Concurrency-safe API's ====================================
+
 func (c *stdConn) AsyncWrite(buf []byte) (err error) {
 	var encodedBuf []byte
 	if encodedBuf, err = c.codec.Encode(c, buf); err == nil {
@@ -261,8 +268,3 @@ func (c *stdConn) Close() error {
 	c.loop.ch <- task
 	return nil
 }
-
-func (c *stdConn) Context() interface{}       { return c.ctx }
-func (c *stdConn) SetContext(ctx interface{}) { c.ctx = ctx }
-func (c *stdConn) LocalAddr() net.Addr        { return c.localAddr }
-func (c *stdConn) RemoteAddr() net.Addr       { return c.remoteAddr }

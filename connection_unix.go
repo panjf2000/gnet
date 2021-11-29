@@ -158,7 +158,7 @@ func (c *conn) sendTo(buf []byte) error {
 	return unix.Sendto(c.fd, buf, 0, c.sa)
 }
 
-// ================================= Public APIs of gnet.Conn =================================
+// ================================== Non-concurrency-safe API's ==================================
 
 func (c *conn) Read() []byte {
 	buf, _ := c.inboundBuffer.PeekAll()
@@ -188,6 +188,13 @@ func (c *conn) BufferLength() int {
 	return c.inboundBuffer.Length()
 }
 
+func (c *conn) Context() interface{}       { return c.ctx }
+func (c *conn) SetContext(ctx interface{}) { c.ctx = ctx }
+func (c *conn) LocalAddr() net.Addr        { return c.localAddr }
+func (c *conn) RemoteAddr() net.Addr       { return c.remoteAddr }
+
+// ==================================== Concurrency-safe API's ====================================
+
 func (c *conn) AsyncWrite(buf []byte) error {
 	return c.loop.poller.Trigger(c.asyncWrite, buf)
 }
@@ -203,8 +210,3 @@ func (c *conn) Wake() error {
 func (c *conn) Close() error {
 	return c.loop.poller.Trigger(func(_ interface{}) error { return c.loop.loopCloseConn(c, nil) }, nil)
 }
-
-func (c *conn) Context() interface{}       { return c.ctx }
-func (c *conn) SetContext(ctx interface{}) { c.ctx = ctx }
-func (c *conn) LocalAddr() net.Addr        { return c.localAddr }
-func (c *conn) RemoteAddr() net.Addr       { return c.remoteAddr }
