@@ -250,10 +250,10 @@ func (rb *RingBuffer) CopyFromSocket(fd int, read func(int, []byte) (int, error)
 	n, err = read(fd, rb.buf[rb.w:])
 	if n > 0 {
 		rb.isEmpty = false
-	}
-	rb.w += n
-	if rb.w == rb.size {
-		rb.w = 0
+		rb.w += n
+		if rb.w == rb.size {
+			rb.w = 0
+		}
 	}
 	return
 }
