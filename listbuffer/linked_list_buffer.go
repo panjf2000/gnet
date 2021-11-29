@@ -111,10 +111,8 @@ func (l *ByteBufferList) PushBytes(p []byte) {
 // it won't remove these nodes from l until DiscardBytes() is called.
 func (l *ByteBufferList) PeekBytesList() [][]byte {
 	l.bs = l.bs[:0]
-	iter := l.head
-	for iter != nil {
+	for iter := l.head; iter != nil; iter = iter.next {
 		l.bs = append(l.bs, iter.Buf.B)
-		iter = iter.next
 	}
 	return l.bs
 }
