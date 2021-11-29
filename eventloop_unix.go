@@ -134,9 +134,9 @@ func (el *eventloop) loopRead(c *conn) error {
 func (el *eventloop) loopWrite(c *conn) error {
 	el.eventHandler.PreWrite(c)
 
-	iov := c.outboundBuffer.PeekBytesList()
+	iov := c.outboundBuffer.Peek()
 	n, err := io.Writev(c.fd, iov)
-	c.outboundBuffer.DiscardBytes(n)
+	c.outboundBuffer.Discard(n)
 	switch err {
 	case nil:
 	case unix.EAGAIN:
@@ -162,9 +162,9 @@ func (el *eventloop) loopCloseConn(c *conn, err error) (rerr error) {
 	// Send residual data in buffer back to the peer before actually closing the connection.
 	if !c.outboundBuffer.IsEmpty() {
 		el.eventHandler.PreWrite(c)
-		iov := c.outboundBuffer.PeekBytesList()
+		iov := c.outboundBuffer.Peek()
 		_, _ = io.Writev(c.fd, iov)
-		c.outboundBuffer.Reset()
+		c.outboundBuffer.Release()
 	}
 
 	if err0, err1 := el.poller.Delete(c.fd), unix.Close(c.fd); err0 == nil && err1 == nil {

@@ -26,36 +26,35 @@ import (
 
 	"github.com/panjf2000/gnet/internal/netpoll"
 	"github.com/panjf2000/gnet/internal/socket"
-	"github.com/panjf2000/gnet/listbuffer"
-	"github.com/panjf2000/gnet/pool/bytebuffer"
+	"github.com/panjf2000/gnet/mixedbuffer"
 	rbPool "github.com/panjf2000/gnet/pool/ringbuffer"
 	"github.com/panjf2000/gnet/ringbuffer"
 )
 
 type conn struct {
-	fd             int                       // file descriptor
-	sa             unix.Sockaddr             // remote socket address
-	ctx            interface{}               // user-defined context
-	loop           *eventloop                // connected event-loop
-	codec          ICodec                    // codec for TCP
-	opened         bool                      // connection opened event fired
-	localAddr      net.Addr                  // local addr
-	remoteAddr     net.Addr                  // remote addr
-	byteBuffer     *bytebuffer.ByteBuffer    // bytes buffer for buffering current packet and data in ring-buffer
-	inboundBuffer  *ringbuffer.RingBuffer    // buffer for data from the peer
-	outboundBuffer listbuffer.ByteBufferList // buffer for data that is ready to write to the peer
-	pollAttachment *netpoll.PollAttachment   // connection attachment for poller
+	fd             int                     // file descriptor
+	sa             unix.Sockaddr           // remote socket address
+	ctx            interface{}             // user-defined context
+	loop           *eventloop              // connected event-loop
+	codec          ICodec                  // codec for TCP
+	opened         bool                    // connection opened event fired
+	localAddr      net.Addr                // local addr
+	remoteAddr     net.Addr                // remote addr
+	inboundBuffer  *ringbuffer.RingBuffer  // buffer for data from the peer
+	outboundBuffer *mixedbuffer.Buffer     // buffer for data that is ready to write to the peer
+	pollAttachment *netpoll.PollAttachment // connection attachment for poller
 }
 
 func newTCPConn(fd int, el *eventloop, sa unix.Sockaddr, codec ICodec, localAddr, remoteAddr net.Addr) (c *conn) {
 	c = &conn{
-		fd:            fd,
-		sa:            sa,
-		loop:          el,
-		codec:         codec,
-		localAddr:     localAddr,
-		remoteAddr:    remoteAddr,
-		inboundBuffer: rbPool.GetWithSize(ringbuffer.TCPReadBufferSize),
+		fd:             fd,
+		sa:             sa,
+		loop:           el,
+		codec:          codec,
+		localAddr:      localAddr,
+		remoteAddr:     remoteAddr,
+		inboundBuffer:  rbPool.GetWithSize(ringbuffer.TCPReadBufferSize),
+		outboundBuffer: mixedbuffer.New(),
 	}
 	c.pollAttachment = netpoll.GetPollAttachment()
 	c.pollAttachment.FD, c.pollAttachment.Callback = fd, c.handleEvents
@@ -70,9 +69,7 @@ func (c *conn) releaseTCP() {
 	c.remoteAddr = nil
 	rbPool.Put(c.inboundBuffer)
 	c.inboundBuffer = ringbuffer.EmptyRingBuffer
-	c.outboundBuffer.Reset()
-	bytebuffer.Put(c.byteBuffer)
-	c.byteBuffer = nil
+	c.outboundBuffer.Release()
 	netpoll.PutPollAttachment(c.pollAttachment)
 }
 
@@ -98,12 +95,12 @@ func (c *conn) open(buf []byte) error {
 	c.loop.eventHandler.PreWrite(c)
 	n, err := unix.Write(c.fd, buf)
 	if err != nil && err == unix.EAGAIN {
-		c.outboundBuffer.PushBytes(buf)
+		_, _ = c.outboundBuffer.Write(buf)
 		return nil
 	}
 
 	if err == nil && n < len(buf) {
-		c.outboundBuffer.PushBytes(buf[n:])
+		_, _ = c.outboundBuffer.Write(buf[n:])
 	}
 
 	return err
@@ -126,7 +123,7 @@ func (c *conn) write(buf []byte) (err error) {
 	// If there is pending data in outbound buffer, the current data ought to be appended to the outbound buffer
 	// for maintaining the sequence of network packets.
 	if !c.outboundBuffer.IsEmpty() {
-		c.outboundBuffer.PushBytes(packet)
+		_, _ = c.outboundBuffer.Write(packet)
 		return
 	}
 
@@ -134,7 +131,7 @@ func (c *conn) write(buf []byte) (err error) {
 	if n, err = unix.Write(c.fd, packet); err != nil {
 		// A temporary error occurs, append the data to outbound buffer, writing it back to the peer in the next round.
 		if err == unix.EAGAIN {
-			c.outboundBuffer.PushBytes(packet)
+			_, _ = c.outboundBuffer.Write(packet)
 			err = c.loop.poller.ModReadWrite(c.pollAttachment)
 			return
 		}
@@ -142,7 +139,7 @@ func (c *conn) write(buf []byte) (err error) {
 	}
 	// Failed to send all data back to the peer, buffer the leftover data for the next round.
 	if n < len(packet) {
-		c.outboundBuffer.PushBytes(packet[n:])
+		_, _ = c.outboundBuffer.Write(packet[n:])
 		err = c.loop.poller.ModReadWrite(c.pollAttachment)
 	}
 	return
