@@ -14,9 +14,7 @@
 
 package listbuffer
 
-import (
-	bPool "github.com/panjf2000/gnet/pkg/pool/bytebuffer"
-)
+import bPool "github.com/panjf2000/gnet/pkg/pool/bytebuffer"
 
 // ByteBuffer is the node of the linked list of bytes.
 type ByteBuffer struct {
