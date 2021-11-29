@@ -22,8 +22,8 @@ package ringbuffer
 import (
 	"errors"
 
-	"github.com/panjf2000/gnet/internal"
-	"github.com/panjf2000/gnet/pool/bytebuffer"
+	"github.com/panjf2000/gnet/internal/toolkit"
+	"github.com/panjf2000/gnet/pkg/pool/bytebuffer"
 )
 
 const (
@@ -54,7 +54,7 @@ func New(size int) *RingBuffer {
 	if size == 0 {
 		return &RingBuffer{isEmpty: true}
 	}
-	size = internal.CeilToPowerOfTwo(size)
+	size = toolkit.CeilToPowerOfTwo(size)
 	return &RingBuffer{
 		buf:     make([]byte, size),
 		size:    size,
@@ -339,7 +339,7 @@ func (rb *RingBuffer) Free() int {
 
 // WriteString writes the contents of the string s to buffer, which accepts a slice of bytes.
 func (rb *RingBuffer) WriteString(s string) (int, error) {
-	return rb.Write(internal.StringToBytes(s))
+	return rb.Write(toolkit.StringToBytes(s))
 }
 
 // ByteBuffer returns all available read bytes. It does not move the read pointer and only copy the available data.
@@ -419,7 +419,7 @@ func (rb *RingBuffer) grow(newCap int) {
 		if newCap <= defaultBufferSize {
 			newCap = defaultBufferSize
 		} else {
-			newCap = internal.CeilToPowerOfTwo(newCap)
+			newCap = toolkit.CeilToPowerOfTwo(newCap)
 		}
 	} else {
 		doubleCap := n + n

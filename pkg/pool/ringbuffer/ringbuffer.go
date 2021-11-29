@@ -23,7 +23,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/panjf2000/gnet/ringbuffer"
+	"github.com/panjf2000/gnet/pkg/ringbuffer"
 )
 
 const (

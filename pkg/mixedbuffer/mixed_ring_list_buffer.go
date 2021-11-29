@@ -15,9 +15,9 @@
 package mixedbuffer
 
 import (
-	"github.com/panjf2000/gnet/listbuffer"
-	rbPool "github.com/panjf2000/gnet/pool/ringbuffer"
-	"github.com/panjf2000/gnet/ringbuffer"
+	"github.com/panjf2000/gnet/pkg/listbuffer"
+	rbPool "github.com/panjf2000/gnet/pkg/pool/ringbuffer"
+	"github.com/panjf2000/gnet/pkg/ringbuffer"
 )
 
 // MaxStackingBytes is the maximum amount which is allowed to be piled up in the ring-buffer.

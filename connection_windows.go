@@ -19,9 +19,9 @@ import (
 	"net"
 	"sync"
 
-	"github.com/panjf2000/gnet/pool/bytebuffer"
-	rbPool "github.com/panjf2000/gnet/pool/ringbuffer"
-	"github.com/panjf2000/gnet/ringbuffer"
+	"github.com/panjf2000/gnet/pkg/pool/bytebuffer"
+	rbPool "github.com/panjf2000/gnet/pkg/pool/ringbuffer"
+	"github.com/panjf2000/gnet/pkg/ringbuffer"
 )
 
 type stderr struct {

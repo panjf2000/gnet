@@ -21,9 +21,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/panjf2000/gnet/errors"
-	"github.com/panjf2000/gnet/logging"
-	"github.com/panjf2000/gnet/pool/bytebuffer"
+	"github.com/panjf2000/gnet/pkg/errors"
+	"github.com/panjf2000/gnet/pkg/logging"
+	"github.com/panjf2000/gnet/pkg/pool/bytebuffer"
 )
 
 type eventloop struct {

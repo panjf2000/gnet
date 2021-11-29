@@ -29,8 +29,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/panjf2000/gnet/logging"
-	"github.com/panjf2000/gnet/pool/goroutine"
+	"github.com/panjf2000/gnet/pkg/logging"
+	"github.com/panjf2000/gnet/pkg/pool/goroutine"
 )
 
 func TestCodecServeWithGnetClient(t *testing.T) {

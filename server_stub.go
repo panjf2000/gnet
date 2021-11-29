@@ -18,7 +18,9 @@
 
 package gnet
 
-import "github.com/panjf2000/gnet/errors"
+import (
+	"github.com/panjf2000/gnet/pkg/errors"
+)
 
 type server struct {
 	subEventLoopSet loadBalancer // event-loops for handling events

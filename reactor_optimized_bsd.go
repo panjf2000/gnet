@@ -21,7 +21,7 @@ package gnet
 import (
 	"runtime"
 
-	"github.com/panjf2000/gnet/errors"
+	"github.com/panjf2000/gnet/pkg/errors"
 )
 
 func (el *eventloop) activateMainReactor(lockOSThread bool) {

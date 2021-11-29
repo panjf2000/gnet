@@ -28,10 +28,10 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	gerrors "github.com/panjf2000/gnet/errors"
 	"github.com/panjf2000/gnet/internal/io"
 	"github.com/panjf2000/gnet/internal/netpoll"
-	"github.com/panjf2000/gnet/logging"
+	gerrors "github.com/panjf2000/gnet/pkg/errors"
+	"github.com/panjf2000/gnet/pkg/logging"
 )
 
 type eventloop struct {

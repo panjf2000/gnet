@@ -22,10 +22,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/panjf2000/gnet/errors"
-	"github.com/panjf2000/gnet/internal"
-	"github.com/panjf2000/gnet/logging"
-	"github.com/panjf2000/gnet/ringbuffer"
+	"github.com/panjf2000/gnet/internal/toolkit"
+	"github.com/panjf2000/gnet/pkg/errors"
+	"github.com/panjf2000/gnet/pkg/logging"
+	"github.com/panjf2000/gnet/pkg/ringbuffer"
 )
 
 // Action is an action that occurs after the completion of an event.
@@ -287,7 +287,7 @@ func Serve(eventHandler EventHandler, protoAddr string, opts ...Option) (err err
 	if rbc := options.ReadBufferCap; rbc <= 0 {
 		options.ReadBufferCap = ringbuffer.TCPReadBufferSize
 	} else {
-		options.ReadBufferCap = internal.CeilToPowerOfTwo(rbc)
+		options.ReadBufferCap = toolkit.CeilToPowerOfTwo(rbc)
 		ringbuffer.TCPReadBufferSize = options.ReadBufferCap
 	}
 

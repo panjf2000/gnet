@@ -15,7 +15,7 @@
 package listbuffer
 
 import (
-	bPool "github.com/panjf2000/gnet/pool/bytebuffer"
+	bPool "github.com/panjf2000/gnet/pkg/pool/bytebuffer"
 )
 
 // ByteBuffer is the node of the linked list of bytes.

@@ -23,10 +23,10 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"github.com/panjf2000/gnet/errors"
 	"github.com/panjf2000/gnet/internal/netpoll"
 	"github.com/panjf2000/gnet/internal/socket"
-	"github.com/panjf2000/gnet/logging"
+	"github.com/panjf2000/gnet/pkg/errors"
+	"github.com/panjf2000/gnet/pkg/logging"
 )
 
 func (svr *server) acceptNewConnection(_ netpoll.IOEvent) error {

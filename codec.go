@@ -20,7 +20,7 @@ import (
 	"errors"
 	"fmt"
 
-	errorset "github.com/panjf2000/gnet/errors"
+	errorset "github.com/panjf2000/gnet/pkg/errors"
 )
 
 // CRLFByte represents a byte of CRLF.

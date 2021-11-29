@@ -20,7 +20,7 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/panjf2000/gnet/errors"
+	"github.com/panjf2000/gnet/pkg/errors"
 )
 
 type mockConn struct {

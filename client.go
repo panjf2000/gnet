@@ -27,11 +27,11 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	gerrors "github.com/panjf2000/gnet/errors"
-	"github.com/panjf2000/gnet/internal"
 	"github.com/panjf2000/gnet/internal/netpoll"
 	"github.com/panjf2000/gnet/internal/socket"
-	"github.com/panjf2000/gnet/logging"
+	"github.com/panjf2000/gnet/internal/toolkit"
+	gerrors "github.com/panjf2000/gnet/pkg/errors"
+	"github.com/panjf2000/gnet/pkg/logging"
 )
 
 // Client of gnet.
@@ -80,7 +80,7 @@ func NewClient(eventHandler EventHandler, opts ...Option) (cli *Client, err erro
 	if rbc := options.ReadBufferCap; rbc <= 0 {
 		options.ReadBufferCap = 0x10000
 	} else {
-		options.ReadBufferCap = internal.CeilToPowerOfTwo(rbc)
+		options.ReadBufferCap = toolkit.CeilToPowerOfTwo(rbc)
 	}
 	el.buffer = make([]byte, options.ReadBufferCap)
 	el.connections = make(map[int]*conn)
