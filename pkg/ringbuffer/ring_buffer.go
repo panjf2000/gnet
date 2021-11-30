@@ -332,6 +332,36 @@ func (rb *RingBuffer) ByteBuffer() *bytebuffer.ByteBuffer {
 	return bb
 }
 
+// WithByteBuffer combines the available read bytes and the given bytes. It does not move the read pointer and
+// only copy the available data.
+func (rb *RingBuffer) WithByteBuffer(b []byte) *bytebuffer.ByteBuffer {
+	if rb.isEmpty {
+		return &bytebuffer.ByteBuffer{B: b}
+	} else if rb.w == rb.r {
+		bb := bytebuffer.Get()
+		_, _ = bb.Write(rb.buf[rb.r:])
+		_, _ = bb.Write(rb.buf[:rb.w])
+		_, _ = bb.Write(b)
+		return bb
+	}
+
+	bb := bytebuffer.Get()
+	if rb.w > rb.r {
+		_, _ = bb.Write(rb.buf[rb.r:rb.w])
+		_, _ = bb.Write(b)
+		return bb
+	}
+
+	_, _ = bb.Write(rb.buf[rb.r:])
+
+	if rb.w != 0 {
+		_, _ = bb.Write(rb.buf[:rb.w])
+	}
+	_, _ = bb.Write(b)
+
+	return bb
+}
+
 // IsFull tells if this ring-buffer is full.
 func (rb *RingBuffer) IsFull() bool {
 	return rb.r == rb.w && !rb.isEmpty
