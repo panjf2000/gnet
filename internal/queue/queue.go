@@ -42,5 +42,5 @@ func PutTask(task *Task) {
 type AsyncTaskQueue interface {
 	Enqueue(*Task)
 	Dequeue() *Task
-	Empty() bool
+	IsEmpty() bool
 }

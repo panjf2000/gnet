@@ -152,8 +152,8 @@ retry:
 	goto retry
 }
 
-// Empty indicates whether this queue is empty or not.
-func (q *lockFreeQueue) Empty() bool {
+// IsEmpty indicates whether this queue is empty or not.
+func (q *lockFreeQueue) IsEmpty() bool {
 	return atomic.LoadInt32(&q.length) == 0
 }
 
