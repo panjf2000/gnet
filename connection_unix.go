@@ -176,7 +176,7 @@ func (c *conn) ReadN(n int) (int, []byte) {
 		return inBufferLen, buf
 	}
 	buf, _ := c.inboundBuffer.Peek(n)
-	return n, buf
+	return len(buf), buf
 }
 
 func (c *conn) ShiftN(n int) int {

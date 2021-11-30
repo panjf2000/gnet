@@ -35,20 +35,27 @@ func (rb *RingBuffer) CopyFromSocket(fd int) (n int, err error) {
 }
 
 // Rewind moves the data from its tail to head and rewind its pointers of read and write.
-func (rb *RingBuffer) Rewind() int {
+func (rb *RingBuffer) Rewind() (n int) {
 	if rb.IsEmpty() {
 		rb.Reset()
-		return 0
+		return
 	}
-	if rb.w != 0 {
-		return 0
+	if rb.w == 0 {
+		if rb.r < rb.size-rb.r {
+			rb.grow(rb.size + rb.size - rb.r)
+			return rb.size - rb.r
+		}
+		n = copy(rb.buf, rb.buf[rb.r:])
+		rb.r = 0
+		rb.w = n
+	} else if rb.size-rb.w < DefaultBufferSize {
+		if rb.r < rb.w-rb.r {
+			rb.grow(rb.size + rb.w - rb.r)
+			return rb.w - rb.r
+		}
+		n = copy(rb.buf, rb.buf[rb.r:rb.w])
+		rb.r = 0
+		rb.w = n
 	}
-	if rb.r < rb.size-rb.r {
-		rb.grow(rb.size + rb.size/2)
-		return rb.size - rb.r
-	}
-	n := copy(rb.buf, rb.buf[rb.r:])
-	rb.r = 0
-	rb.w = n
-	return n
+	return
 }

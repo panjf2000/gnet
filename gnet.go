@@ -283,10 +283,13 @@ func Serve(eventHandler EventHandler, protoAddr string, opts ...Option) (err err
 			"while you are trying to set up %d\n", options.NumEventLoop)
 		return errors.ErrTooManyEventLoopThreads
 	}
-
-	if rbc := options.ReadBufferCap; rbc <= 0 {
+	rbc := options.ReadBufferCap
+	switch {
+	case rbc <= 0:
 		options.ReadBufferCap = ringbuffer.TCPReadBufferSize
-	} else {
+	case rbc <= ringbuffer.DefaultBufferSize:
+		options.ReadBufferCap = ringbuffer.DefaultBufferSize
+	default:
 		options.ReadBufferCap = toolkit.CeilToPowerOfTwo(rbc)
 		ringbuffer.TCPReadBufferSize = options.ReadBufferCap
 	}

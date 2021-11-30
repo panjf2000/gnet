@@ -27,7 +27,8 @@ import (
 )
 
 const (
-	defaultBufferSize   = 1024     // 1KB for the first-time allocation on ring-buffer.
+	// DefaultBufferSize is the first-time allocation on a ring-buffer.
+	DefaultBufferSize   = 1024     // 1KB
 	bufferGrowThreshold = 4 * 1024 // 4KB
 )
 
@@ -380,8 +381,8 @@ func (rb *RingBuffer) Reset() {
 
 func (rb *RingBuffer) grow(newCap int) {
 	if n := rb.size; n == 0 {
-		if newCap <= defaultBufferSize {
-			newCap = defaultBufferSize
+		if newCap <= DefaultBufferSize {
+			newCap = DefaultBufferSize
 		} else {
 			newCap = toolkit.CeilToPowerOfTwo(newCap)
 		}
