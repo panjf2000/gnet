@@ -22,8 +22,6 @@ package ringbuffer
 import (
 	"errors"
 
-	"golang.org/x/sys/unix"
-
 	"github.com/panjf2000/gnet/internal/toolkit"
 	"github.com/panjf2000/gnet/pkg/pool/bytebuffer"
 )
@@ -244,42 +242,6 @@ func (rb *RingBuffer) Write(p []byte) (n int, err error) {
 
 	return
 }
-
-// ========================= gnet specific APIs =========================
-
-// CopyFromSocket copies data from a socket fd into ring-buffer.
-func (rb *RingBuffer) CopyFromSocket(fd int) (n int, err error) {
-	n, err = unix.Read(fd, rb.buf[rb.w:])
-	if n > 0 {
-		rb.isEmpty = false
-		rb.w += n
-		if rb.w == rb.size {
-			rb.w = 0
-		}
-	}
-	return
-}
-
-// Rewind moves the data from its tail to head and rewind its pointers of read and write.
-func (rb *RingBuffer) Rewind() int {
-	if rb.IsEmpty() {
-		rb.Reset()
-		return 0
-	}
-	if rb.w != 0 {
-		return 0
-	}
-	if rb.r < rb.size-rb.r {
-		rb.grow(rb.size + rb.size/2)
-		return rb.size - rb.r
-	}
-	n := copy(rb.buf, rb.buf[rb.r:])
-	rb.r = 0
-	rb.w = n
-	return n
-}
-
-// ========================= gnet specific APIs =========================
 
 // WriteByte writes one byte into buffer.
 func (rb *RingBuffer) WriteByte(c byte) error {
