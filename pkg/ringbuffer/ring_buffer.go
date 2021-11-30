@@ -22,6 +22,8 @@ package ringbuffer
 import (
 	"errors"
 
+	"golang.org/x/sys/unix"
+
 	"github.com/panjf2000/gnet/internal/toolkit"
 	"github.com/panjf2000/gnet/pkg/pool/bytebuffer"
 )
@@ -246,8 +248,8 @@ func (rb *RingBuffer) Write(p []byte) (n int, err error) {
 // ========================= gnet specific APIs =========================
 
 // CopyFromSocket copies data from a socket fd into ring-buffer.
-func (rb *RingBuffer) CopyFromSocket(fd int, read func(int, []byte) (int, error)) (n int, err error) {
-	n, err = read(fd, rb.buf[rb.w:])
+func (rb *RingBuffer) CopyFromSocket(fd int) (n int, err error) {
+	n, err = unix.Read(fd, rb.buf[rb.w:])
 	if n > 0 {
 		rb.isEmpty = false
 		rb.w += n
@@ -258,8 +260,8 @@ func (rb *RingBuffer) CopyFromSocket(fd int, read func(int, []byte) (int, error)
 	return
 }
 
-// MoveLeftoverToHead moves the data from its tail to head.
-func (rb *RingBuffer) MoveLeftoverToHead() int {
+// Rewind moves the data from its tail to head and rewind its pointers of read and write.
+func (rb *RingBuffer) Rewind() int {
 	if rb.IsEmpty() {
 		rb.Reset()
 		return 0
@@ -267,9 +269,9 @@ func (rb *RingBuffer) MoveLeftoverToHead() int {
 	if rb.w != 0 {
 		return 0
 	}
-	if rb.r < rb.Length() {
-		rb.grow(rb.Length() + TCPReadBufferSize)
-		return rb.Length()
+	if rb.r < rb.size-rb.r {
+		rb.grow(rb.size + rb.size/2)
+		return rb.size - rb.r
 	}
 	n := copy(rb.buf, rb.buf[rb.r:])
 	rb.r = 0
@@ -364,36 +366,6 @@ func (rb *RingBuffer) ByteBuffer() *bytebuffer.ByteBuffer {
 	if rb.w != 0 {
 		_, _ = bb.Write(rb.buf[:rb.w])
 	}
-
-	return bb
-}
-
-// WithByteBuffer combines the available read bytes and the given bytes. It does not move the read pointer and
-// only copy the available data.
-func (rb *RingBuffer) WithByteBuffer(b []byte) *bytebuffer.ByteBuffer {
-	if rb.isEmpty {
-		return &bytebuffer.ByteBuffer{B: b}
-	} else if rb.w == rb.r {
-		bb := bytebuffer.Get()
-		_, _ = bb.Write(rb.buf[rb.r:])
-		_, _ = bb.Write(rb.buf[:rb.w])
-		_, _ = bb.Write(b)
-		return bb
-	}
-
-	bb := bytebuffer.Get()
-	if rb.w > rb.r {
-		_, _ = bb.Write(rb.buf[rb.r:rb.w])
-		_, _ = bb.Write(b)
-		return bb
-	}
-
-	_, _ = bb.Write(rb.buf[rb.r:])
-
-	if rb.w != 0 {
-		_, _ = bb.Write(rb.buf[:rb.w])
-	}
-	_, _ = bb.Write(b)
 
 	return bb
 }

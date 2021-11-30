@@ -96,7 +96,7 @@ func (el *eventloop) loopOpen(c *conn) error {
 }
 
 func (el *eventloop) loopRead(c *conn) error {
-	n, err := c.inboundBuffer.CopyFromSocket(c.fd, unix.Read)
+	n, err := c.inboundBuffer.CopyFromSocket(c.fd)
 	if n == 0 || err != nil {
 		if err == unix.EAGAIN {
 			return nil
@@ -127,7 +127,7 @@ func (el *eventloop) loopRead(c *conn) error {
 			return nil
 		}
 	}
-	_ = c.inboundBuffer.MoveLeftoverToHead()
+	_ = c.inboundBuffer.Rewind()
 	return nil
 }
 
