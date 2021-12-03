@@ -127,7 +127,6 @@ func (el *eventloop) loopRead(c *conn) error {
 			return nil
 		}
 	}
-	_ = c.inboundBuffer.Rewind()
 	return nil
 }
 

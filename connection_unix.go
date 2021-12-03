@@ -27,6 +27,7 @@ import (
 	"github.com/panjf2000/gnet/internal/netpoll"
 	"github.com/panjf2000/gnet/internal/socket"
 	"github.com/panjf2000/gnet/pkg/mixedbuffer"
+	"github.com/panjf2000/gnet/pkg/pool/bytebuffer"
 	rbPool "github.com/panjf2000/gnet/pkg/pool/ringbuffer"
 	"github.com/panjf2000/gnet/pkg/ringbuffer"
 )
@@ -40,8 +41,9 @@ type conn struct {
 	opened         bool                    // connection opened event fired
 	localAddr      net.Addr                // local addr
 	remoteAddr     net.Addr                // remote addr
-	inboundBuffer  *ringbuffer.RingBuffer  // buffer for data from the peer
-	outboundBuffer *mixedbuffer.Buffer     // buffer for data that is ready to write to the peer
+	inboundBuffer  *ringbuffer.RingBuffer  // buffer for leftover data from the peer
+	transitBuffer  *bytebuffer.ByteBuffer  // buffer for a complete packet
+	outboundBuffer *mixedbuffer.Buffer     // buffer for data that is eligible to be sent to the peer
 	pollAttachment *netpoll.PollAttachment // connection attachment for poller
 }
 
@@ -161,26 +163,51 @@ func (c *conn) sendTo(buf []byte) error {
 // ================================== Non-concurrency-safe API's ==================================
 
 func (c *conn) Read() []byte {
-	buf, _ := c.inboundBuffer.PeekAll()
-	return buf
+	head, tail := c.inboundBuffer.PeekAll()
+	if tail == nil {
+		return head
+	}
+	if c.transitBuffer == nil {
+		c.transitBuffer = c.inboundBuffer.ByteBuffer()
+		return c.transitBuffer.B
+	}
+	c.transitBuffer.Reset()
+	_, _ = c.transitBuffer.Write(head)
+	_, _ = c.transitBuffer.Write(tail)
+	return c.transitBuffer.B
 }
 
 func (c *conn) ResetBuffer() {
 	c.inboundBuffer.Reset()
+	if c.transitBuffer != nil {
+		c.transitBuffer.Reset()
+	}
 }
 
 func (c *conn) ReadN(n int) (int, []byte) {
 	inBufferLen := c.inboundBuffer.Length()
 	if inBufferLen <= n || n <= 0 {
-		buf, _ := c.inboundBuffer.PeekAll()
-		return inBufferLen, buf
+		return inBufferLen, c.Read()
 	}
-	buf, _ := c.inboundBuffer.Peek(n)
-	return len(buf), buf
+	head, tail := c.inboundBuffer.Peek(n)
+	if tail == nil {
+		return n, head
+	}
+	if c.transitBuffer == nil {
+		c.transitBuffer = bytebuffer.Get()
+	} else {
+		c.transitBuffer.Reset()
+	}
+	_, _ = c.transitBuffer.Write(head)
+	_, _ = c.transitBuffer.Write(tail)
+	return n, c.transitBuffer.B
 }
 
 func (c *conn) ShiftN(n int) int {
 	c.inboundBuffer.Discard(n)
+	if c.transitBuffer != nil {
+		c.transitBuffer.Reset()
+	}
 	return n
 }
 
