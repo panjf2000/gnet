@@ -29,29 +29,25 @@ import (
 func (rb *RingBuffer) CopyFromSocket(fd int) (n int, err error) {
 	if rb.r == rb.w {
 		if !rb.isEmpty {
-			rb.grow(2 * rb.size)
+			rb.grow(rb.size + rb.size/2)
 			n, err = unix.Read(fd, rb.buf[rb.w:])
+			if n > 0 {
+				rb.w = (rb.w + n) % rb.size
+			}
 			return
 		}
 		rb.Reset()
 		n, err = unix.Read(fd, rb.buf)
 		if n > 0 {
-			rb.w += n
+			rb.w = (rb.w + n) % rb.size
 			rb.isEmpty = false
-			if rb.w == rb.size {
-				rb.w = 0
-			}
 		}
 		return
 	}
 	if rb.w < rb.r {
 		n, err = unix.Read(fd, rb.buf[rb.w:rb.r])
 		if n > 0 {
-			rb.w += n
-			rb.isEmpty = false
-			if rb.w == rb.size {
-				rb.w = 0
-			}
+			rb.w = (rb.w + n) % rb.size
 		}
 		return
 	}
@@ -60,7 +56,6 @@ func (rb *RingBuffer) CopyFromSocket(fd int) (n int, err error) {
 	n, err = io.Readv(fd, rb.bs)
 	if n > 0 {
 		rb.w = (rb.w + n) % rb.size
-		rb.isEmpty = false
 	}
 	return
 }
