@@ -40,6 +40,7 @@ var ErrIsEmpty = errors.New("ring-buffer is empty")
 
 // RingBuffer is a circular buffer that implement io.ReaderWriter interface.
 type RingBuffer struct {
+	bs      [][]byte
 	buf     []byte
 	size    int
 	r       int // next position to read
@@ -53,10 +54,11 @@ var EmptyRingBuffer = New(0)
 // New returns a new RingBuffer whose buffer has the given size.
 func New(size int) *RingBuffer {
 	if size == 0 {
-		return &RingBuffer{isEmpty: true}
+		return &RingBuffer{bs: make([][]byte, 2), isEmpty: true}
 	}
 	size = toolkit.CeilToPowerOfTwo(size)
 	return &RingBuffer{
+		bs:      make([][]byte, 2),
 		buf:     make([]byte, size),
 		size:    size,
 		isEmpty: true,

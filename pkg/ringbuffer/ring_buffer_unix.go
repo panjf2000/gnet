@@ -53,7 +53,9 @@ func (rb *RingBuffer) CopyFromSocket(fd int) (n int, err error) {
 		}
 		return
 	}
-	n, err = io.Readv(fd, [][]byte{rb.buf[rb.w:], rb.buf[:rb.r]})
+	rb.bs[0] = rb.buf[rb.w:]
+	rb.bs[1] = rb.buf[:rb.r]
+	n, err = io.Readv(fd, rb.bs)
 	if n > 0 {
 		rb.w = (rb.w + n) % rb.size
 		rb.isEmpty = false
