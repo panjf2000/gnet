@@ -36,7 +36,7 @@ func (rb *RingBuffer) CopyFromSocket(fd int) (n int, err error) {
 			}
 			return
 		}
-		rb.Reset()
+		rb.r, rb.w = 0, 0
 		n, err = unix.Read(fd, rb.buf)
 		if n > 0 {
 			rb.w = (rb.w + n) % rb.size
