@@ -29,6 +29,8 @@ import (
 func (rb *RingBuffer) CopyFromSocket(fd int) (n int, err error) {
 	if rb.r == rb.w {
 		if !rb.isEmpty {
+			rb.grow(2 * rb.size)
+			n, err = unix.Read(fd, rb.buf[rb.w:])
 			return
 		}
 		rb.Reset()
