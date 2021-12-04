@@ -94,16 +94,17 @@ func (svr *server) startSubReactors() {
 }
 
 func (svr *server) activateEventLoops(numEventLoop int) (err error) {
+	network, address := svr.ln.network, svr.ln.address
+	ln := svr.ln
+	svr.ln = nil
 	var striker *eventloop
 	// Create loops locally and bind the listeners.
 	for i := 0; i < numEventLoop; i++ {
-		ln := svr.ln
-		if i > 0 && (svr.opts.ReusePort || ln.network == "udp") {
-			if ln, err = initListener(svr.ln.network, svr.ln.addr, svr.opts); err != nil {
+		if i > 0 {
+			if ln, err = initListener(network, address, svr.opts); err != nil {
 				return
 			}
 		}
-
 		var p *netpoll.Poller
 		if p, err = netpoll.OpenPoller(); err == nil {
 			el := new(eventloop)
@@ -269,15 +270,15 @@ func serve(eventHandler EventHandler, listener *listener, options *Options, prot
 		svr.opts.Codec = new(BuiltInFrameCodec)
 	}
 
-	server := Server{
+	s := Server{
 		svr:          svr,
 		Multicore:    options.Multicore,
-		Addr:         listener.lnaddr,
+		Addr:         listener.addr,
 		NumEventLoop: numEventLoop,
 		ReusePort:    options.ReusePort,
 		TCPKeepAlive: options.TCPKeepAlive,
 	}
-	switch svr.eventHandler.OnInitComplete(server) {
+	switch svr.eventHandler.OnInitComplete(s) {
 	case None:
 	case Shutdown:
 		return nil
@@ -288,7 +289,7 @@ func serve(eventHandler EventHandler, listener *listener, options *Options, prot
 		svr.opts.Logger.Errorf("gnet server is stopping with error: %v", err)
 		return err
 	}
-	defer svr.stop(server)
+	defer svr.stop(s)
 
 	allServers.Store(protoAddr, svr)
 

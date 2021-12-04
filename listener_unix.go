@@ -32,12 +32,12 @@ import (
 )
 
 type listener struct {
-	once           sync.Once
-	fd             int
-	lnaddr         net.Addr
-	addr, network  string
-	sockopts       []socket.Option
-	pollAttachment *netpoll.PollAttachment // listener attachment for poller
+	once             sync.Once
+	fd               int
+	addr             net.Addr
+	address, network string
+	sockOpts         []socket.Option
+	pollAttachment   *netpoll.PollAttachment // listener attachment for poller
 }
 
 func (ln *listener) packPollAttachment(handler netpoll.PollEventHandler) *netpoll.PollAttachment {
@@ -52,14 +52,14 @@ func (ln *listener) dup() (int, string, error) {
 func (ln *listener) normalize() (err error) {
 	switch ln.network {
 	case "tcp", "tcp4", "tcp6":
-		ln.fd, ln.lnaddr, err = socket.TCPSocket(ln.network, ln.addr, ln.sockopts...)
+		ln.fd, ln.addr, err = socket.TCPSocket(ln.network, ln.address, ln.sockOpts...)
 		ln.network = "tcp"
 	case "udp", "udp4", "udp6":
-		ln.fd, ln.lnaddr, err = socket.UDPSocket(ln.network, ln.addr, ln.sockopts...)
+		ln.fd, ln.addr, err = socket.UDPSocket(ln.network, ln.address, ln.sockOpts...)
 		ln.network = "udp"
 	case "unix":
-		_ = os.RemoveAll(ln.addr)
-		ln.fd, ln.lnaddr, err = socket.UnixSocket(ln.network, ln.addr, ln.sockopts...)
+		_ = os.RemoveAll(ln.address)
+		ln.fd, ln.addr, err = socket.UnixSocket(ln.network, ln.address, ln.sockOpts...)
 	default:
 		err = errors.ErrUnsupportedProtocol
 	}
@@ -73,34 +73,34 @@ func (ln *listener) close() {
 				logging.Error(os.NewSyscallError("close", unix.Close(ln.fd)))
 			}
 			if ln.network == "unix" {
-				logging.Error(os.RemoveAll(ln.addr))
+				logging.Error(os.RemoveAll(ln.address))
 			}
 		})
 }
 
 func initListener(network, addr string, options *Options) (l *listener, err error) {
-	var sockopts []socket.Option
+	var sockOpts []socket.Option
 	if options.ReusePort || strings.HasPrefix(network, "udp") {
-		sockopt := socket.Option{SetSockopt: socket.SetReuseport, Opt: 1}
-		sockopts = append(sockopts, sockopt)
+		sockOpt := socket.Option{SetSockopt: socket.SetReuseport, Opt: 1}
+		sockOpts = append(sockOpts, sockOpt)
 	}
 	if options.ReuseAddr {
-		sockopt := socket.Option{SetSockopt: socket.SetReuseAddr, Opt: 1}
-		sockopts = append(sockopts, sockopt)
+		sockOpt := socket.Option{SetSockopt: socket.SetReuseAddr, Opt: 1}
+		sockOpts = append(sockOpts, sockOpt)
 	}
 	if options.TCPNoDelay == TCPNoDelay && strings.HasPrefix(network, "tcp") {
-		sockopt := socket.Option{SetSockopt: socket.SetNoDelay, Opt: 1}
-		sockopts = append(sockopts, sockopt)
+		sockOpt := socket.Option{SetSockopt: socket.SetNoDelay, Opt: 1}
+		sockOpts = append(sockOpts, sockOpt)
 	}
 	if options.SocketRecvBuffer > 0 {
-		sockopt := socket.Option{SetSockopt: socket.SetRecvBuffer, Opt: options.SocketRecvBuffer}
-		sockopts = append(sockopts, sockopt)
+		sockOpt := socket.Option{SetSockopt: socket.SetRecvBuffer, Opt: options.SocketRecvBuffer}
+		sockOpts = append(sockOpts, sockOpt)
 	}
 	if options.SocketSendBuffer > 0 {
-		sockopt := socket.Option{SetSockopt: socket.SetSendBuffer, Opt: options.SocketSendBuffer}
-		sockopts = append(sockopts, sockopt)
+		sockOpt := socket.Option{SetSockopt: socket.SetSendBuffer, Opt: options.SocketSendBuffer}
+		sockOpts = append(sockOpts, sockOpt)
 	}
-	l = &listener{network: network, addr: addr, sockopts: sockopts}
+	l = &listener{network: network, address: addr, sockOpts: sockOpts}
 	err = l.normalize()
 	return
 }

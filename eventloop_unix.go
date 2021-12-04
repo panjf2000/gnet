@@ -288,7 +288,7 @@ func (el *eventloop) loopReadUDP(fd int) error {
 	if fd == el.ln.fd {
 		c = el.serverUDPSockets[sa]
 		if c == nil {
-			c = newUDPConn(fd, el, el.ln.lnaddr, sa, false)
+			c = newUDPConn(fd, el, el.ln.addr, sa, false)
 			el.serverUDPSockets[sa] = c
 		}
 	} else {

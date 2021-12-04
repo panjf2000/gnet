@@ -25,11 +25,11 @@ import (
 )
 
 type listener struct {
-	once          sync.Once
-	ln            net.Listener
-	pconn         net.PacketConn
-	lnaddr        net.Addr
-	addr, network string
+	once             sync.Once
+	ln               net.Listener
+	packetConn       net.PacketConn
+	addr             net.Addr
+	address, network string
 }
 
 func (ln *listener) dup() (int, string, error) {
@@ -39,18 +39,18 @@ func (ln *listener) dup() (int, string, error) {
 func (ln *listener) normalize() (err error) {
 	switch ln.network {
 	case "unix":
-		logging.Error(os.RemoveAll(ln.addr))
+		logging.Error(os.RemoveAll(ln.address))
 		fallthrough
 	case "tcp", "tcp4", "tcp6":
-		if ln.ln, err = net.Listen(ln.network, ln.addr); err != nil {
+		if ln.ln, err = net.Listen(ln.network, ln.address); err != nil {
 			return
 		}
-		ln.lnaddr = ln.ln.Addr()
+		ln.addr = ln.ln.Addr()
 	case "udp", "udp4", "udp6":
-		if ln.pconn, err = net.ListenPacket(ln.network, ln.addr); err != nil {
+		if ln.packetConn, err = net.ListenPacket(ln.network, ln.address); err != nil {
 			return
 		}
-		ln.lnaddr = ln.pconn.LocalAddr()
+		ln.addr = ln.packetConn.LocalAddr()
 	default:
 		err = errors.ErrUnsupportedProtocol
 	}
@@ -62,17 +62,17 @@ func (ln *listener) close() {
 		if ln.ln != nil {
 			logging.Error(ln.ln.Close())
 		}
-		if ln.pconn != nil {
-			logging.Error(ln.pconn.Close())
+		if ln.packetConn != nil {
+			logging.Error(ln.packetConn.Close())
 		}
 		if ln.network == "unix" {
-			logging.Error(os.RemoveAll(ln.addr))
+			logging.Error(os.RemoveAll(ln.address))
 		}
 	})
 }
 
 func initListener(network, addr string, _ *Options) (l *listener, err error) {
-	l = &listener{network: network, addr: addr}
+	l = &listener{network: network, address: addr}
 	err = l.normalize()
 	return
 }

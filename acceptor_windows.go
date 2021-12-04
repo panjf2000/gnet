@@ -30,9 +30,9 @@ func (svr *server) listenerRun(lockOSThread bool) {
 	defer func() { svr.signalShutdownWithErr(err) }()
 	var buffer [0x10000]byte
 	for {
-		if svr.ln.pconn != nil {
+		if svr.ln.packetConn != nil {
 			// Read data from UDP socket.
-			n, addr, e := svr.ln.pconn.ReadFrom(buffer[:])
+			n, addr, e := svr.ln.packetConn.ReadFrom(buffer[:])
 			if e != nil {
 				err = e
 				svr.opts.Logger.Errorf("failed to receive data from UDP fd due to error:%v", err)
@@ -40,7 +40,7 @@ func (svr *server) listenerRun(lockOSThread bool) {
 			}
 
 			el := svr.lb.next(addr)
-			c := newUDPConn(el, svr.ln.lnaddr, addr)
+			c := newUDPConn(el, svr.ln.addr, addr)
 			el.ch <- packUDPConn(c, buffer[:n])
 		} else {
 			// Accept TCP socket.

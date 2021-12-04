@@ -49,7 +49,7 @@ func (svr *server) acceptNewConnection(fd int, _ netpoll.IOEvent) error {
 	}
 
 	el := svr.lb.next(remoteAddr)
-	c := newTCPConn(nfd, el, sa, svr.opts.Codec, el.ln.lnaddr, remoteAddr)
+	c := newTCPConn(nfd, el, sa, svr.opts.Codec, el.ln.addr, remoteAddr)
 
 	err = el.poller.UrgentTrigger(el.loopRegister, c)
 	if err != nil {
@@ -77,12 +77,12 @@ func (el *eventloop) loopAccept(fd int, _ netpoll.IOEvent) error {
 	}
 
 	netAddr := socket.SockaddrToTCPOrUnixAddr(sa)
-	if el.svr.opts.TCPKeepAlive > 0 && el.svr.ln.network == "tcp" {
+	if el.svr.opts.TCPKeepAlive > 0 && el.ln.network == "tcp" {
 		err = socket.SetKeepAlive(nfd, int(el.svr.opts.TCPKeepAlive/time.Second))
 		logging.Error(err)
 	}
 
-	c := newTCPConn(nfd, el, sa, el.svr.opts.Codec, el.ln.lnaddr, netAddr)
+	c := newTCPConn(nfd, el, sa, el.svr.opts.Codec, el.ln.addr, netAddr)
 	if err = el.poller.AddRead(c.pollAttachment); err != nil {
 		return err
 	}

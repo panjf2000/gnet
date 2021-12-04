@@ -178,7 +178,7 @@ func serve(eventHandler EventHandler, listener *listener, options *Options, prot
 	server := Server{
 		svr:          svr,
 		Multicore:    options.Multicore,
-		Addr:         listener.lnaddr,
+		Addr:         listener.addr,
 		NumEventLoop: numEventLoop,
 		ReusePort:    options.ReusePort,
 		TCPKeepAlive: options.TCPKeepAlive,

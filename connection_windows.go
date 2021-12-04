@@ -85,7 +85,7 @@ func newTCPConn(conn net.Conn, el *eventloop) (c *stdConn) {
 		codec:         el.svr.codec,
 		inboundBuffer: rbPool.Get(),
 	}
-	c.localAddr = el.svr.ln.lnaddr
+	c.localAddr = el.svr.ln.addr
 	c.remoteAddr = c.conn.RemoteAddr()
 
 	var (
@@ -248,7 +248,7 @@ func (c *stdConn) AsyncWrite(buf []byte) (err error) {
 
 func (c *stdConn) SendTo(buf []byte) (err error) {
 	c.loop.eventHandler.PreWrite(c)
-	_, err = c.loop.svr.ln.pconn.WriteTo(buf, c.remoteAddr)
+	_, err = c.loop.svr.ln.packetConn.WriteTo(buf, c.remoteAddr)
 	c.loop.eventHandler.AfterWrite(c, buf)
 	return
 }
