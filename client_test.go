@@ -34,6 +34,44 @@ import (
 	"github.com/panjf2000/gnet/pkg/pool/goroutine"
 )
 
+type clientEvents struct {
+	*EventServer
+	packetLen int
+	rspChMap  sync.Map
+}
+
+func (cli *clientEvents) OnOpened(c Conn) ([]byte, Action) {
+	c.SetContext([]byte{})
+	rspCh := make(chan []byte, 1)
+	cli.rspChMap.Store(c.LocalAddr().String(), rspCh)
+	return nil, None
+}
+
+func (cli *clientEvents) React(packet []byte, c Conn) (out []byte, action Action) {
+	ctx := c.Context()
+	var p []byte
+	if ctx != nil {
+		p = ctx.([]byte)
+	} else { // UDP
+		cli.packetLen = 1024
+	}
+	p = append(p, packet...)
+	if len(p) < cli.packetLen {
+		c.SetContext(p)
+		return
+	}
+	v, _ := cli.rspChMap.Load(c.LocalAddr().String())
+	rspCh := v.(chan []byte)
+	rspCh <- p
+	c.SetContext([]byte{})
+	return
+}
+
+func (cli *clientEvents) Tick() (delay time.Duration, action Action) {
+	delay = 200 * time.Millisecond
+	return
+}
+
 func TestCodecServeWithGnetClient(t *testing.T) {
 	// start a server
 	// connect 10 clients
@@ -155,6 +193,7 @@ type testCodecClientServer struct {
 	*EventServer
 	client       *Client
 	clientEV     *clientEvents
+	nclients     int
 	tester       *testing.T
 	network      string
 	addr         string
@@ -179,7 +218,7 @@ func (s *testCodecClientServer) OnClosed(c Conn, err error) (action Action) {
 	require.Equal(s.tester, c.Context(), c, "invalid context")
 	atomic.AddInt32(&s.disconnected, 1)
 	if atomic.LoadInt32(&s.connected) == atomic.LoadInt32(&s.disconnected) &&
-		atomic.LoadInt32(&s.disconnected) == 1 {
+		atomic.LoadInt32(&s.disconnected) == int32(s.nclients) {
 		action = Shutdown
 	}
 
@@ -202,47 +241,11 @@ func (s *testCodecClientServer) React(packet []byte, c Conn) (out []byte, action
 
 func (s *testCodecClientServer) Tick() (delay time.Duration, action Action) {
 	if atomic.CompareAndSwapInt32(&s.started, 0, 1) {
-		go startCodecGnetClient(s.tester, s.client, s.clientEV, s.network, s.addr, s.multicore, s.async, s.codec)
+		for i := 0; i < s.nclients; i++ {
+			go startCodecGnetClient(s.tester, s.client, s.clientEV, s.network, s.addr, s.multicore, s.async, s.codec)
+		}
 	}
 	delay = time.Second / 5
-	return
-}
-
-type clientEvents struct {
-	*EventServer
-	packetLen int
-	rspChMap  sync.Map
-}
-
-func (cli *clientEvents) OnOpened(c Conn) ([]byte, Action) {
-	c.SetContext([]byte{})
-	rspCh := make(chan []byte, 1)
-	cli.rspChMap.Store(c.LocalAddr().String(), rspCh)
-	return nil, None
-}
-
-func (cli *clientEvents) React(packet []byte, c Conn) (out []byte, action Action) {
-	ctx := c.Context()
-	var p []byte
-	if ctx != nil {
-		p = ctx.([]byte)
-	} else { // UDP
-		cli.packetLen = 1024
-	}
-	p = append(p, packet...)
-	if len(p) < cli.packetLen {
-		c.SetContext(p)
-		return
-	}
-	v, _ := cli.rspChMap.Load(c.LocalAddr().String())
-	rspCh := v.(chan []byte)
-	rspCh <- p
-	c.SetContext([]byte{})
-	return
-}
-
-func (cli *clientEvents) Tick() (delay time.Duration, action Action) {
-	delay = 200 * time.Millisecond
 	return
 }
 
@@ -273,7 +276,7 @@ func testCodecServeWithGnetClient(
 	}
 	ts := &testCodecClientServer{
 		tester: t, network: network, addr: addr, multicore: multicore, async: async,
-		codec: codec, workerPool: goroutine.Default(),
+		codec: codec, workerPool: goroutine.Default(), nclients: nclients,
 	}
 	ts.clientEV = &clientEvents{packetLen: packetLen}
 	ts.client, err = NewClient(
