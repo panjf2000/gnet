@@ -36,38 +36,48 @@ import (
 
 type clientEvents struct {
 	*EventServer
+	svr       *testClientServer
 	packetLen int
 	rspChMap  sync.Map
 }
 
-func (cli *clientEvents) OnOpened(c Conn) ([]byte, Action) {
+func (ev *clientEvents) OnOpened(c Conn) ([]byte, Action) {
 	c.SetContext([]byte{})
 	rspCh := make(chan []byte, 1)
-	cli.rspChMap.Store(c.LocalAddr().String(), rspCh)
+	ev.rspChMap.Store(c.LocalAddr().String(), rspCh)
 	return nil, None
 }
 
-func (cli *clientEvents) React(packet []byte, c Conn) (out []byte, action Action) {
+func (ev *clientEvents) OnClosed(c Conn, err error) Action {
+	if ev.svr != nil {
+		if atomic.AddInt32(&ev.svr.clientActive, -1) == 0 {
+			return Shutdown
+		}
+	}
+	return None
+}
+
+func (ev *clientEvents) React(packet []byte, c Conn) (out []byte, action Action) {
 	ctx := c.Context()
 	var p []byte
 	if ctx != nil {
 		p = ctx.([]byte)
 	} else { // UDP
-		cli.packetLen = 1024
+		ev.packetLen = 1024
 	}
 	p = append(p, packet...)
-	if len(p) < cli.packetLen {
+	if len(p) < ev.packetLen {
 		c.SetContext(p)
 		return
 	}
-	v, _ := cli.rspChMap.Load(c.LocalAddr().String())
+	v, _ := ev.rspChMap.Load(c.LocalAddr().String())
 	rspCh := v.(chan []byte)
 	rspCh <- p
 	c.SetContext([]byte{})
 	return
 }
 
-func (cli *clientEvents) Tick() (delay time.Duration, action Action) {
+func (ev *clientEvents) Tick() (delay time.Duration, action Action) {
 	delay = 200 * time.Millisecond
 	return
 }
@@ -549,7 +559,9 @@ func (s *testClientServer) OnClosed(c Conn, err error) (action Action) {
 	if err != nil {
 		logging.Debugf("error occurred on closed, %v\n", err)
 	}
-	require.Equal(s.tester, c.Context(), c, "invalid context")
+	if s.network != "udp" {
+		require.Equal(s.tester, c.Context(), c, "invalid context")
+	}
 
 	atomic.AddInt32(&s.disconnected, 1)
 	if atomic.LoadInt32(&s.connected) == atomic.LoadInt32(&s.disconnected) &&
@@ -593,10 +605,7 @@ func (s *testClientServer) Tick() (delay time.Duration, action Action) {
 	if atomic.CompareAndSwapInt32(&s.started, 0, 1) {
 		for i := 0; i < s.nclients; i++ {
 			atomic.AddInt32(&s.clientActive, 1)
-			go func() {
-				startGnetClient(s.tester, s.client, s.clientEV, s.network, s.addr, s.multicore, s.async)
-				atomic.AddInt32(&s.clientActive, -1)
-			}()
+			go startGnetClient(s.tester, s.client, s.clientEV, s.network, s.addr, s.multicore, s.async)
 		}
 	}
 	if s.network == "udp" && atomic.LoadInt32(&s.clientActive) == 0 {
@@ -618,7 +627,7 @@ func testServeWithGnetClient(t *testing.T, network, addr string, reuseport, reus
 		workerPool: goroutine.Default(),
 	}
 	var err error
-	ts.clientEV = &clientEvents{packetLen: streamLen}
+	ts.clientEV = &clientEvents{packetLen: streamLen, svr: ts}
 	ts.client, err = NewClient(
 		ts.clientEV,
 		WithLogLevel(logging.DebugLevel),

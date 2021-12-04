@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -65,10 +66,10 @@ func (el *eventloop) closeAllSockets() {
 		_ = el.loopCloseConn(c, nil)
 	}
 	for _, c := range el.clientUDPSockets {
-		c.releaseUDP()
+		_ = el.loopCloseConn(c, nil)
 	}
 	for _, c := range el.serverUDPSockets {
-		c.releaseUDP()
+		_ = el.loopCloseConn(c, nil)
 	}
 }
 
@@ -174,6 +175,21 @@ func (el *eventloop) loopWrite(c *conn) error {
 }
 
 func (el *eventloop) loopCloseConn(c *conn, err error) (rerr error) {
+	if addr := c.localAddr; addr != nil && strings.HasPrefix(c.localAddr.Network(), "udp") {
+		rerr = el.poller.Delete(c.fd)
+		if c.fd == el.ln.fd {
+			el.serverUDPSockets = nil
+		} else {
+			rerr = unix.Close(c.fd)
+			delete(el.clientUDPSockets, c.fd)
+		}
+		if el.eventHandler.OnClosed(c, err) == Shutdown {
+			return gerrors.ErrServerShutdown
+		}
+		c.releaseUDP()
+		return
+	}
+
 	if !c.opened {
 		return
 	}
