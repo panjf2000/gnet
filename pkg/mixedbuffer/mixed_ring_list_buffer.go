@@ -63,6 +63,23 @@ func (mb *Buffer) Write(p []byte) (int, error) {
 	return mb.ringBuffer.Write(p)
 }
 
+// Writev appends multiple byte slices to this buffer.
+func (mb *Buffer) Writev(bs [][]byte) (int, error) {
+	var n int
+	if !mb.listBuffer.IsEmpty() || mb.ringBuffer.Length() >= MaxStackingBytes {
+		for _, b := range bs {
+			mb.listBuffer.PushBytesBack(b)
+			n += len(b)
+		}
+		return n, nil
+	}
+	for _, b := range bs {
+		_, _ = mb.ringBuffer.Write(b)
+		n += len(b)
+	}
+	return n, nil
+}
+
 // IsEmpty indicates whether this buffer is empty.
 func (mb *Buffer) IsEmpty() bool {
 	return mb.ringBuffer.IsEmpty() && mb.listBuffer.IsEmpty()

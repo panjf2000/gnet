@@ -24,6 +24,7 @@ import (
 
 	"golang.org/x/sys/unix"
 
+	"github.com/panjf2000/gnet/internal/io"
 	"github.com/panjf2000/gnet/internal/netpoll"
 	"github.com/panjf2000/gnet/internal/socket"
 	"github.com/panjf2000/gnet/pkg/mixedbuffer"
@@ -39,6 +40,7 @@ type conn struct {
 	loop           *eventloop              // connected event-loop
 	codec          ICodec                  // codec for TCP
 	opened         bool                    // connection opened event fired
+	packets        [][]byte                // reuse it for multiple byte slices
 	localAddr      net.Addr                // local addr
 	remoteAddr     net.Addr                // remote addr
 	inboundBuffer  *ringbuffer.RingBuffer  // buffer for leftover data from the peer
@@ -74,6 +76,7 @@ func (c *conn) releaseTCP() {
 	c.outboundBuffer.Release()
 	netpoll.PutPollAttachment(c.pollAttachment)
 	c.pollAttachment = nil
+	c.packets = c.packets[:0]
 }
 
 func newUDPConn(fd int, el *eventloop, localAddr net.Addr, sa unix.Sockaddr, connected bool) (c *conn) {
@@ -156,11 +159,72 @@ func (c *conn) write(buf []byte) (err error) {
 	return
 }
 
+func (c *conn) writev(bs [][]byte) (err error) {
+	defer func() {
+		for _, b := range bs {
+			c.loop.eventHandler.AfterWrite(c, b)
+		}
+		c.packets = c.packets[:0]
+	}()
+
+	var sum int
+	for _, b := range bs {
+		var packet []byte
+		if packet, err = c.codec.Encode(c, b); err != nil {
+			return
+		}
+		c.packets = append(c.packets, packet)
+		sum += len(packet)
+		c.loop.eventHandler.PreWrite(c)
+	}
+
+	// If there is pending data in outbound buffer, the current data ought to be appended to the outbound buffer
+	// for maintaining the sequence of network packets.
+	if !c.outboundBuffer.IsEmpty() {
+		_, _ = c.outboundBuffer.Writev(c.packets)
+		return
+	}
+
+	var n int
+	if n, err = io.Writev(c.fd, c.packets); err != nil {
+		// A temporary error occurs, append the data to outbound buffer, writing it back to the peer in the next round.
+		if err == unix.EAGAIN {
+			_, _ = c.outboundBuffer.Writev(c.packets)
+			err = c.loop.poller.ModReadWrite(c.pollAttachment)
+			return
+		}
+		return c.loop.loopCloseConn(c, os.NewSyscallError("write", err))
+	}
+	// Failed to send all data back to the peer, buffer the leftover data for the next round.
+	if n < sum {
+		var pos int
+		for i := range c.packets {
+			np := len(c.packets[i])
+			if n < np {
+				pos = i
+				c.packets[i] = c.packets[i][n:]
+				break
+			}
+			n -= np
+		}
+		_, _ = c.outboundBuffer.Writev(c.packets[pos:])
+		err = c.loop.poller.ModReadWrite(c.pollAttachment)
+	}
+	return
+}
+
 func (c *conn) asyncWrite(itf interface{}) error {
 	if !c.opened {
 		return nil
 	}
 	return c.write(itf.([]byte))
+}
+
+func (c *conn) asyncWritev(itf interface{}) error {
+	if !c.opened {
+		return nil
+	}
+	return c.writev(itf.([][]byte))
 }
 
 func (c *conn) sendTo(buf []byte) error {
@@ -236,6 +300,10 @@ func (c *conn) RemoteAddr() net.Addr       { return c.remoteAddr }
 
 func (c *conn) AsyncWrite(buf []byte) error {
 	return c.loop.poller.Trigger(c.asyncWrite, buf)
+}
+
+func (c *conn) AsyncWritev(bs [][]byte) error {
+	return c.loop.poller.Trigger(c.asyncWritev, bs)
 }
 
 func (c *conn) SendTo(buf []byte) error {

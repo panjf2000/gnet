@@ -129,9 +129,13 @@ type Conn interface {
 	// SendTo writes data for UDP sockets, it allows you to send data back to UDP socket in individual goroutines.
 	SendTo(buf []byte) error
 
-	// AsyncWrite writes data to peer asynchronously, usually you would call it in individual goroutines
+	// AsyncWrite writes one byte slice to peer asynchronously, usually you would call it in individual goroutines
 	// instead of the event-loop goroutines.
 	AsyncWrite(buf []byte) error
+
+	// AsyncWritev writes multiple byte slices to peer asynchronously, usually you would call it in individual goroutines
+	// instead of the event-loop goroutines.
+	AsyncWritev(bs [][]byte) error
 
 	// Wake triggers a React event for the connection.
 	Wake() error

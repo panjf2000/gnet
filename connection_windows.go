@@ -246,6 +246,16 @@ func (c *stdConn) AsyncWrite(buf []byte) (err error) {
 	return
 }
 
+func (c *stdConn) AsyncWritev(bs [][]byte) (err error) {
+	for _, b := range bs {
+		err = c.AsyncWrite(b)
+		if err != nil {
+			return
+		}
+	}
+	return
+}
+
 func (c *stdConn) SendTo(buf []byte) (err error) {
 	c.loop.eventHandler.PreWrite(c)
 	_, err = c.loop.svr.ln.packetConn.WriteTo(buf, c.remoteAddr)
