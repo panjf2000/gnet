@@ -29,8 +29,8 @@ import (
 	"github.com/panjf2000/gnet/pkg/logging"
 )
 
-func (svr *server) acceptNewConnection(_ netpoll.IOEvent) error {
-	nfd, sa, err := unix.Accept(svr.ln.fd)
+func (svr *server) acceptNewConnection(fd int, _ netpoll.IOEvent) error {
+	nfd, sa, err := unix.Accept(fd)
 	if err != nil {
 		if err == unix.EAGAIN {
 			return nil
@@ -42,14 +42,14 @@ func (svr *server) acceptNewConnection(_ netpoll.IOEvent) error {
 		return err
 	}
 
-	netAddr := socket.SockaddrToTCPOrUnixAddr(sa)
+	remoteAddr := socket.SockaddrToTCPOrUnixAddr(sa)
 	if svr.opts.TCPKeepAlive > 0 && svr.ln.network == "tcp" {
 		err = socket.SetKeepAlive(nfd, int(svr.opts.TCPKeepAlive/time.Second))
 		logging.Error(err)
 	}
 
-	el := svr.lb.next(netAddr)
-	c := newTCPConn(nfd, el, sa, svr.opts.Codec, el.ln.lnaddr, netAddr)
+	el := svr.lb.next(remoteAddr)
+	c := newTCPConn(nfd, el, sa, svr.opts.Codec, el.ln.lnaddr, remoteAddr)
 
 	err = el.poller.UrgentTrigger(el.loopRegister, c)
 	if err != nil {
@@ -59,9 +59,9 @@ func (svr *server) acceptNewConnection(_ netpoll.IOEvent) error {
 	return nil
 }
 
-func (el *eventloop) loopAccept(_ netpoll.IOEvent) error {
+func (el *eventloop) loopAccept(fd int, _ netpoll.IOEvent) error {
 	if el.ln.network == "udp" {
-		return el.loopReadUDP(el.ln.fd)
+		return el.loopReadUDP(fd)
 	}
 
 	nfd, sa, err := unix.Accept(el.ln.fd)

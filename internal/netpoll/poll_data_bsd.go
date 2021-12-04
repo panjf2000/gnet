@@ -18,4 +18,4 @@
 package netpoll
 
 // PollEventHandler is the callback for I/O events notified by the poller.
-type PollEventHandler func(int16) error
+type PollEventHandler func(int, int16) error

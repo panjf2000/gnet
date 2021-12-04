@@ -21,6 +21,8 @@ import (
 	"context"
 	"errors"
 	"net"
+	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -45,6 +47,7 @@ type Client struct {
 func NewClient(eventHandler EventHandler, opts ...Option) (cli *Client, err error) {
 	options := loadOptions(opts...)
 	cli = new(Client)
+	cli.opts = options
 	var logger logging.Logger
 	if options.LogPath != "" {
 		if logger, cli.logFlush, err = logging.CreateLoggerAsLocalFile(options.LogPath, options.LogLevel); err != nil {
@@ -59,7 +62,6 @@ func NewClient(eventHandler EventHandler, opts ...Option) (cli *Client, err erro
 	if options.Codec == nil {
 		cli.opts.Codec = new(BuiltInFrameCodec)
 	}
-	cli.opts = options
 	var p *netpoll.Poller
 	if p, err = netpoll.OpenPoller(); err != nil {
 		return
@@ -68,7 +70,7 @@ func NewClient(eventHandler EventHandler, opts ...Option) (cli *Client, err erro
 	svr.opts = options
 	svr.eventHandler = eventHandler
 	svr.ln = new(listener)
-
+	svr.ln.network = "udp"
 	svr.cond = sync.NewCond(&sync.Mutex{})
 	if options.Ticker {
 		svr.tickerCtx, svr.cancelTicker = context.WithCancel(context.Background())
@@ -83,6 +85,7 @@ func NewClient(eventHandler EventHandler, opts ...Option) (cli *Client, err erro
 		options.ReadBufferCap = toolkit.CeilToPowerOfTwo(rbc)
 	}
 	el.buffer = make([]byte, options.ReadBufferCap)
+	el.udpSockets = make(map[int]*conn)
 	el.connections = make(map[int]*conn)
 	el.eventHandler = eventHandler
 	cli.el = el
@@ -94,7 +97,7 @@ func (cli *Client) Start() error {
 	cli.el.eventHandler.OnInitComplete(Server{})
 	cli.el.svr.wg.Add(1)
 	go func() {
-		cli.el.activateSubReactor(cli.opts.LockOSThread)
+		cli.el.loopRun(cli.opts.LockOSThread)
 		cli.el.svr.wg.Done()
 	}()
 	// Start the ticker.
@@ -149,16 +152,19 @@ func (cli *Client) Dial(network, address string) (Conn, error) {
 		return nil, e
 	}
 
-	if cli.opts.TCPNoDelay == TCPNoDelay {
-		if err = socket.SetNoDelay(DupFD, 1); err != nil {
-			return nil, err
+	if strings.HasPrefix(network, "tcp") {
+		if cli.opts.TCPNoDelay == TCPNoDelay {
+			if err = socket.SetNoDelay(DupFD, 1); err != nil {
+				return nil, err
+			}
+		}
+		if cli.opts.TCPKeepAlive > 0 {
+			if err = socket.SetKeepAlive(DupFD, int(cli.opts.TCPKeepAlive/time.Second)); err != nil {
+				return nil, err
+			}
 		}
 	}
-	if cli.opts.TCPKeepAlive > 0 {
-		if err = socket.SetKeepAlive(DupFD, int(cli.opts.TCPKeepAlive/time.Second)); err != nil {
-			return nil, err
-		}
-	}
+
 	if cli.opts.SocketSendBuffer > 0 {
 		if err = socket.SetSendBuffer(DupFD, cli.opts.SocketSendBuffer); err != nil {
 			return nil, err
@@ -176,26 +182,29 @@ func (cli *Client) Dial(network, address string) (Conn, error) {
 	)
 	switch c.(type) {
 	case *net.UnixConn:
-		if sockAddr, _, _, err = socket.GetUnixSockAddr(c.LocalAddr().Network(), c.LocalAddr().String()); err != nil {
+		if sockAddr, _, _, err = socket.GetUnixSockAddr(c.RemoteAddr().Network(), c.RemoteAddr().String()); err != nil {
 			return nil, err
 		}
+		ua := c.LocalAddr().(*net.UnixAddr)
+		ua.Name = c.RemoteAddr().String() + "." + strconv.Itoa(DupFD)
 		gc = newTCPConn(DupFD, cli.el, sockAddr, cli.opts.Codec, c.LocalAddr(), c.RemoteAddr())
 	case *net.TCPConn:
-		if sockAddr, _, _, _, err = socket.GetTCPSockAddr(c.LocalAddr().Network(), c.LocalAddr().String()); err != nil {
+		if sockAddr, _, _, _, err = socket.GetTCPSockAddr(c.RemoteAddr().Network(), c.RemoteAddr().String()); err != nil {
 			return nil, err
 		}
 		gc = newTCPConn(DupFD, cli.el, sockAddr, cli.opts.Codec, c.LocalAddr(), c.RemoteAddr())
 	case *net.UDPConn:
-		if sockAddr, _, _, _, err = socket.GetUDPSockAddr(c.LocalAddr().Network(), c.LocalAddr().String()); err != nil {
+		if sockAddr, _, _, _, err = socket.GetUDPSockAddr(c.RemoteAddr().Network(), c.RemoteAddr().String()); err != nil {
 			return nil, err
 		}
-		gc = newUDPConn(DupFD, cli.el, c.LocalAddr(), sockAddr)
+		gc = newUDPConn(DupFD, cli.el, c.LocalAddr(), sockAddr, true)
 	default:
 		return nil, gerrors.ErrUnsupportedProtocol
 	}
 	err = cli.el.poller.UrgentTrigger(cli.el.loopRegister, gc)
 	if err != nil {
 		gc.Close()
+		return nil, err
 	}
 	return gc, nil
 }

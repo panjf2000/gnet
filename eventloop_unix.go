@@ -41,7 +41,8 @@ type eventloop struct {
 	poller       *netpoll.Poller // epoll or kqueue
 	buffer       []byte          // read packet buffer whose capacity is set by user, default value is 64KB
 	connCount    int32           // number of active connections in event-loop
-	connections  map[int]*conn   // loop connections fd -> conn
+	udpSockets   map[int]*conn   // UDP socket map: fd -> conn
+	connections  map[int]*conn   // TCP connection map: fd -> conn
 	eventHandler EventHandler    // user eventHandler
 }
 
@@ -66,6 +67,18 @@ func (el *eventloop) closeAllConns() {
 
 func (el *eventloop) loopRegister(itf interface{}) error {
 	c := itf.(*conn)
+	if c.pollAttachment == nil { // UDP socket
+		c.pollAttachment = netpoll.GetPollAttachment()
+		c.pollAttachment.FD = c.fd
+		c.pollAttachment.Callback = el.loopAccept
+		if err := el.poller.AddRead(c.pollAttachment); err != nil {
+			_ = unix.Close(c.fd)
+			c.releaseUDP()
+			return err
+		}
+		el.udpSockets[c.fd] = c
+		return nil
+	}
 	if err := el.poller.AddRead(c.pollAttachment); err != nil {
 		_ = unix.Close(c.fd)
 		c.releaseTCP()
@@ -264,8 +277,12 @@ func (el *eventloop) loopReadUDP(fd int) error {
 		return fmt.Errorf("failed to read UDP packet from fd=%d in event-loop(%d), %v",
 			fd, el.idx, os.NewSyscallError("recvfrom", err))
 	}
-
-	c := newUDPConn(fd, el, el.ln.lnaddr, sa)
+	c := el.udpSockets[fd]
+	var oneOff bool
+	if c == nil {
+		c = newUDPConn(fd, el, el.ln.lnaddr, sa, false)
+		oneOff = true
+	}
 	out, action := el.eventHandler.React(el.buffer[:n], c)
 	if out != nil {
 		_ = c.sendTo(out)
@@ -273,7 +290,9 @@ func (el *eventloop) loopReadUDP(fd int) error {
 	if action == Shutdown {
 		return gerrors.ErrServerShutdown
 	}
-	c.releaseUDP()
+	if oneOff {
+		c.releaseUDP()
+	}
 
 	return nil
 }

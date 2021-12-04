@@ -60,4 +60,4 @@ jobs:
             ${{ runner.os }}-${{ matrix.go }}-go-ci
 
       - name: Run integration testing with poll_opt build tag
-        run: go test -v -tags=poll_opt -timeout 60s
+        run: go test -v -tags=poll_opt -timeout 120s

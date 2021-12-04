@@ -73,22 +73,31 @@ func (c *conn) releaseTCP() {
 	c.inboundBuffer = ringbuffer.EmptyRingBuffer
 	c.outboundBuffer.Release()
 	netpoll.PutPollAttachment(c.pollAttachment)
+	c.pollAttachment = nil
 }
 
-func newUDPConn(fd int, el *eventloop, localAddr net.Addr, sa unix.Sockaddr) *conn {
-	return &conn{
+func newUDPConn(fd int, el *eventloop, localAddr net.Addr, sa unix.Sockaddr, connected bool) (c *conn) {
+	c = &conn{
 		fd:         fd,
 		sa:         sa,
 		loop:       el,
 		localAddr:  localAddr,
 		remoteAddr: socket.SockaddrToUDPAddr(sa),
 	}
+	if connected {
+		c.sa = nil
+	}
+	return
 }
 
 func (c *conn) releaseUDP() {
 	c.ctx = nil
 	c.localAddr = nil
 	c.remoteAddr = nil
+	if c.pollAttachment != nil {
+		netpoll.PutPollAttachment(c.pollAttachment)
+		c.pollAttachment = nil
+	}
 }
 
 func (c *conn) open(buf []byte) error {
@@ -157,6 +166,9 @@ func (c *conn) asyncWrite(itf interface{}) error {
 func (c *conn) sendTo(buf []byte) error {
 	c.loop.eventHandler.PreWrite(c)
 	defer c.loop.eventHandler.AfterWrite(c, buf)
+	if c.sa == nil {
+		return unix.Send(c.fd, buf, 0)
+	}
 	return unix.Sendto(c.fd, buf, 0, c.sa)
 }
 

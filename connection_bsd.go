@@ -19,7 +19,7 @@ package gnet
 
 import "github.com/panjf2000/gnet/internal/netpoll"
 
-func (c *conn) handleEvents(filter int16) (err error) {
+func (c *conn) handleEvents(_ int, filter int16) (err error) {
 	switch filter {
 	case netpoll.EVFilterSock:
 		err = c.loop.loopCloseConn(c, nil)

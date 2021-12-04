@@ -134,7 +134,7 @@ func (p *Poller) Polling() error {
 					evFilter = EVFilterSock
 				}
 				pollAttachment := (*PollAttachment)(unsafe.Pointer(ev.Udata))
-				switch err = pollAttachment.Callback(evFilter); err {
+				switch err = pollAttachment.Callback(int(ev.Ident), evFilter); err {
 				case nil:
 				case errors.ErrAcceptSocket, errors.ErrServerShutdown:
 					return err

@@ -135,7 +135,7 @@ func (p *Poller) Polling() error {
 			ev := &el.events[i]
 			pollAttachment := *(**PollAttachment)(unsafe.Pointer(&ev.data))
 			if pollAttachment.FD != p.wpa.FD {
-				switch err = pollAttachment.Callback(ev.events); err {
+				switch err = pollAttachment.Callback(pollAttachment.FD, ev.events); err {
 				case nil:
 				case errors.ErrAcceptSocket, errors.ErrServerShutdown:
 					return err

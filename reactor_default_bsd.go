@@ -33,7 +33,7 @@ func (el *eventloop) activateMainReactor(lockOSThread bool) {
 
 	defer el.svr.signalShutdown()
 
-	err := el.poller.Polling(func(fd int, filter int16) error { return el.svr.acceptNewConnection(filter) })
+	err := el.poller.Polling(func(fd int, filter int16) error { return el.svr.acceptNewConnection(fd, filter) })
 	if err == errors.ErrServerShutdown {
 		el.svr.opts.Logger.Debugf("main reactor is exiting in terms of the demand from user, %v", err)
 	} else if err != nil {
@@ -100,7 +100,7 @@ func (el *eventloop) loopRun(lockOSThread bool) {
 			}
 			return
 		}
-		return el.loopAccept(filter)
+		return el.loopAccept(fd, filter)
 	})
 	el.getLogger().Debugf("event-loop(%d) is exiting due to error: %v", el.idx, err)
 }

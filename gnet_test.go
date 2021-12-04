@@ -38,7 +38,10 @@ import (
 	"github.com/panjf2000/gnet/pkg/pool/goroutine"
 )
 
-var packetLen = 1024
+var (
+	packetLen = 1024
+	streamLen = 1024 * 1024
+)
 
 func TestCodecServe(t *testing.T) {
 	// start a server
@@ -600,12 +603,9 @@ func startClient(t *testing.T, network, addr string, multicore, async bool) {
 	duration := time.Duration((rand.Float64()*2+1)*float64(time.Second)) / 8
 	start := time.Now()
 	for time.Since(start) < duration {
-		// sz := rand.Intn(10) * (1024 * 1024)
-		sz := 1024 * 1024
-		reqData := make([]byte, sz)
-		if network == "udp" || network == "unix" {
-			n := 1024
-			reqData = reqData[:n]
+		reqData := make([]byte, streamLen)
+		if network == "udp" {
+			reqData = reqData[:1024]
 		}
 		_, err = rand.Read(reqData)
 		require.NoError(t, err)

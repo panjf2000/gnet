@@ -19,7 +19,7 @@ package gnet
 
 import "github.com/panjf2000/gnet/internal/netpoll"
 
-func (c *conn) handleEvents(ev uint32) error {
+func (c *conn) handleEvents(_ int, ev uint32) error {
 	// Don't change the ordering of processing EPOLLOUT | EPOLLRDHUP / EPOLLIN unless you're 100%
 	// sure what you're doing!
 	// Re-ordering can easily introduce bugs and bad side-effects, as I found out painfully in the past.
