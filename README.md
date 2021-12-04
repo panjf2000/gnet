@@ -42,7 +42,7 @@ English | [🇨🇳中文](README_ZH.md)
 - [x] SO_REUSEPORT socket option
 - [x] Built-in multiple codecs to encode/decode network frames into/from TCP stream: LineBasedFrameCodec, DelimiterBasedFrameCodec, FixedLengthFrameCodec and LengthFieldBasedFrameCodec, referencing [netty codec](https://netty.io/4.1/api/io/netty/handler/codec/package-summary.html), also supporting customized codecs
 - [x] Supporting Windows platform with ~~event-driven mechanism of IOCP~~ Go stdlib: net
-- [ ] Implementation of `gnet` Client
+- [x] Implementation of `gnet` Client
 
 # 📊 Performance
 

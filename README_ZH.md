@@ -42,7 +42,7 @@
 - [x] SO_REUSEPORT 端口重用
 - [x] 内置多种编解码器，支持对 TCP 数据流分包：LineBasedFrameCodec, DelimiterBasedFrameCodec, FixedLengthFrameCodec 和 LengthFieldBasedFrameCodec，参考自 [netty codec](https://netty.io/4.1/api/io/netty/handler/codec/package-summary.html)，而且支持自定制编解码器
 - [x] 支持 Windows 平台，基于 ~~IOCP 事件驱动机制~~ Go 标准网络库
-- [ ] 实现 `gnet` 客户端
+- [x] 实现 `gnet` 客户端
 
 # 📊 性能测试
 
