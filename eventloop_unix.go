@@ -35,15 +35,16 @@ import (
 )
 
 type eventloop struct {
-	ln           *listener       // listener
-	idx          int             // loop index in the server loops list
-	svr          *server         // server in loop
-	poller       *netpoll.Poller // epoll or kqueue
-	buffer       []byte          // read packet buffer whose capacity is set by user, default value is 64KB
-	connCount    int32           // number of active connections in event-loop
-	udpSockets   map[int]*conn   // UDP socket map: fd -> conn
-	connections  map[int]*conn   // TCP connection map: fd -> conn
-	eventHandler EventHandler    // user eventHandler
+	ln               *listener               // listener
+	idx              int                     // loop index in the server loops list
+	svr              *server                 // server in loop
+	poller           *netpoll.Poller         // epoll or kqueue
+	buffer           []byte                  // read packet buffer whose capacity is set by user, default value is 64KB
+	connCount        int32                   // number of active connections in event-loop
+	connections      map[int]*conn           // TCP connection map: fd -> conn
+	eventHandler     EventHandler            // user eventHandler
+	clientUDPSockets map[int]*conn           // client-side UDP socket map: fd -> conn
+	serverUDPSockets map[unix.Sockaddr]*conn // server-side UDP socket map: Sockaddr -> conn
 }
 
 func (el *eventloop) getLogger() logging.Logger {
@@ -58,10 +59,16 @@ func (el *eventloop) loadConn() int32 {
 	return atomic.LoadInt32(&el.connCount)
 }
 
-func (el *eventloop) closeAllConns() {
+func (el *eventloop) closeAllSockets() {
 	// Close loops and all outstanding connections
 	for _, c := range el.connections {
 		_ = el.loopCloseConn(c, nil)
+	}
+	for _, c := range el.clientUDPSockets {
+		c.releaseUDP()
+	}
+	for _, c := range el.serverUDPSockets {
+		c.releaseUDP()
 	}
 }
 
@@ -76,7 +83,7 @@ func (el *eventloop) loopRegister(itf interface{}) error {
 			c.releaseUDP()
 			return err
 		}
-		el.udpSockets[c.fd] = c
+		el.clientUDPSockets[c.fd] = c
 		return nil
 	}
 	if err := el.poller.AddRead(c.pollAttachment); err != nil {
@@ -277,11 +284,15 @@ func (el *eventloop) loopReadUDP(fd int) error {
 		return fmt.Errorf("failed to read UDP packet from fd=%d in event-loop(%d), %v",
 			fd, el.idx, os.NewSyscallError("recvfrom", err))
 	}
-	c := el.udpSockets[fd]
-	var oneOff bool
-	if c == nil {
-		c = newUDPConn(fd, el, el.ln.lnaddr, sa, false)
-		oneOff = true
+	var c *conn
+	if fd == el.ln.fd {
+		c = el.serverUDPSockets[sa]
+		if c == nil {
+			c = newUDPConn(fd, el, el.ln.lnaddr, sa, false)
+			el.serverUDPSockets[sa] = c
+		}
+	} else {
+		c = el.clientUDPSockets[fd]
 	}
 	out, action := el.eventHandler.React(el.buffer[:n], c)
 	if out != nil {
@@ -290,9 +301,5 @@ func (el *eventloop) loopReadUDP(fd int) error {
 	if action == Shutdown {
 		return gerrors.ErrServerShutdown
 	}
-	if oneOff {
-		c.releaseUDP()
-	}
-
 	return nil
 }

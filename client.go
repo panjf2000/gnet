@@ -85,7 +85,7 @@ func NewClient(eventHandler EventHandler, opts ...Option) (cli *Client, err erro
 		options.ReadBufferCap = toolkit.CeilToPowerOfTwo(rbc)
 	}
 	el.buffer = make([]byte, options.ReadBufferCap)
-	el.udpSockets = make(map[int]*conn)
+	el.clientUDPSockets = make(map[int]*conn)
 	el.connections = make(map[int]*conn)
 	el.eventHandler = eventHandler
 	cli.el = el

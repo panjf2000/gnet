@@ -48,7 +48,7 @@ func (el *eventloop) activateSubReactor(lockOSThread bool) {
 	}
 
 	defer func() {
-		el.closeAllConns()
+		el.closeAllSockets()
 		el.svr.signalShutdown()
 	}()
 
@@ -81,7 +81,7 @@ func (el *eventloop) loopRun(lockOSThread bool) {
 	}
 
 	defer func() {
-		el.closeAllConns()
+		el.closeAllSockets()
 		el.ln.close()
 		el.svr.signalShutdown()
 	}()

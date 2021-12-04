@@ -34,8 +34,8 @@ import (
 
 type conn struct {
 	fd             int                     // file descriptor
-	sa             unix.Sockaddr           // remote socket address
 	ctx            interface{}             // user-defined context
+	peer           unix.Sockaddr           // remote socket address
 	loop           *eventloop              // connected event-loop
 	codec          ICodec                  // codec for TCP
 	opened         bool                    // connection opened event fired
@@ -50,7 +50,7 @@ type conn struct {
 func newTCPConn(fd int, el *eventloop, sa unix.Sockaddr, codec ICodec, localAddr, remoteAddr net.Addr) (c *conn) {
 	c = &conn{
 		fd:             fd,
-		sa:             sa,
+		peer:           sa,
 		loop:           el,
 		codec:          codec,
 		localAddr:      localAddr,
@@ -65,7 +65,7 @@ func newTCPConn(fd int, el *eventloop, sa unix.Sockaddr, codec ICodec, localAddr
 
 func (c *conn) releaseTCP() {
 	c.opened = false
-	c.sa = nil
+	c.peer = nil
 	c.ctx = nil
 	c.localAddr = nil
 	c.remoteAddr = nil
@@ -79,13 +79,13 @@ func (c *conn) releaseTCP() {
 func newUDPConn(fd int, el *eventloop, localAddr net.Addr, sa unix.Sockaddr, connected bool) (c *conn) {
 	c = &conn{
 		fd:         fd,
-		sa:         sa,
+		peer:       sa,
 		loop:       el,
 		localAddr:  localAddr,
 		remoteAddr: socket.SockaddrToUDPAddr(sa),
 	}
 	if connected {
-		c.sa = nil
+		c.peer = nil
 	}
 	return
 }
@@ -166,10 +166,10 @@ func (c *conn) asyncWrite(itf interface{}) error {
 func (c *conn) sendTo(buf []byte) error {
 	c.loop.eventHandler.PreWrite(c)
 	defer c.loop.eventHandler.AfterWrite(c, buf)
-	if c.sa == nil {
+	if c.peer == nil {
 		return unix.Send(c.fd, buf, 0)
 	}
-	return unix.Sendto(c.fd, buf, 0, c.sa)
+	return unix.Sendto(c.fd, buf, 0, c.peer)
 }
 
 // ================================== Non-concurrency-safe API's ==================================
