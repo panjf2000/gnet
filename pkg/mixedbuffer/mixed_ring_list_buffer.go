@@ -28,13 +28,14 @@ const MaxStackingBytes = 32 * 1024 // 32KB
 // list-buffer if the data size of ring-buffer reaches the maximum(MaxStackingBytes), list-buffer is more
 // flexible and scalable, which helps the application reduce memory footprint.
 type Buffer struct {
-	ringBuffer *ringbuffer.RingBuffer
-	listBuffer listbuffer.ListBuffer
+	maxStackingBytes int
+	ringBuffer       *ringbuffer.RingBuffer
+	listBuffer       listbuffer.ListBuffer
 }
 
 // New instantiates a mixedbuffer.Buffer and returns it.
-func New() *Buffer {
-	return &Buffer{ringBuffer: rbPool.Get()}
+func New(maxTopBufCap int) *Buffer {
+	return &Buffer{maxStackingBytes: maxTopBufCap, ringBuffer: rbPool.Get()}
 }
 
 // Peek returns all bytes as [][]byte, these bytes won't be discarded until Buffer.Discard() is called.
@@ -55,18 +56,22 @@ func (mb *Buffer) Discard(n int) {
 }
 
 // Write appends data to this buffer.
-func (mb *Buffer) Write(p []byte) (int, error) {
-	if !mb.listBuffer.IsEmpty() || mb.ringBuffer.Length() >= MaxStackingBytes {
+func (mb *Buffer) Write(p []byte) (n int, err error) {
+	if !mb.listBuffer.IsEmpty() || mb.ringBuffer.Length() >= mb.maxStackingBytes {
 		mb.listBuffer.PushBytesBack(p)
 		return len(p), nil
 	}
-	return mb.ringBuffer.Write(p)
+	n, err = mb.ringBuffer.Write(p)
+	if n > mb.maxStackingBytes {
+		mb.maxStackingBytes = n
+	}
+	return
 }
 
 // Writev appends multiple byte slices to this buffer.
 func (mb *Buffer) Writev(bs [][]byte) (int, error) {
 	var n int
-	if !mb.listBuffer.IsEmpty() || mb.ringBuffer.Length() >= MaxStackingBytes {
+	if !mb.listBuffer.IsEmpty() || mb.ringBuffer.Length() >= mb.maxStackingBytes {
 		for _, b := range bs {
 			mb.listBuffer.PushBytesBack(b)
 			n += len(b)
@@ -76,6 +81,9 @@ func (mb *Buffer) Writev(bs [][]byte) (int, error) {
 	for _, b := range bs {
 		_, _ = mb.ringBuffer.Write(b)
 		n += len(b)
+	}
+	if n > mb.maxStackingBytes {
+		mb.maxStackingBytes = n
 	}
 	return n, nil
 }

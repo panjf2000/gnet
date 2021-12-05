@@ -58,7 +58,7 @@ func newTCPConn(fd int, el *eventloop, sa unix.Sockaddr, codec ICodec, localAddr
 		localAddr:      localAddr,
 		remoteAddr:     remoteAddr,
 		inboundBuffer:  rbPool.GetWithSize(ringbuffer.TCPReadBufferSize),
-		outboundBuffer: mixedbuffer.New(),
+		outboundBuffer: mixedbuffer.New(mixedbuffer.MaxStackingBytes),
 	}
 	c.pollAttachment = netpoll.GetPollAttachment()
 	c.pollAttachment.FD, c.pollAttachment.Callback = fd, c.handleEvents

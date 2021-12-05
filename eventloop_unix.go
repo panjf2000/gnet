@@ -155,7 +155,15 @@ func (el *eventloop) loopWrite(c *conn) error {
 	el.eventHandler.PreWrite(c)
 
 	iov := c.outboundBuffer.Peek()
-	n, err := io.Writev(c.fd, iov)
+	var (
+		n   int
+		err error
+	)
+	if len(iov) > 1 {
+		n, err = io.Writev(c.fd, iov)
+	} else {
+		n, err = unix.Write(c.fd, iov[0])
+	}
 	c.outboundBuffer.Discard(n)
 	switch err {
 	case nil:
