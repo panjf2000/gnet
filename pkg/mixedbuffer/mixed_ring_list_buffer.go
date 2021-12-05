@@ -20,9 +20,6 @@ import (
 	"github.com/panjf2000/gnet/pkg/ringbuffer"
 )
 
-// MaxStackingBytes is the maximum amount which is allowed to be piled up in the ring-buffer.
-const MaxStackingBytes = 32 * 1024 // 32KB
-
 // Buffer combines ring-buffer and list-buffer.
 // Ring-buffer is the top-priority buffer to store response data, gnet will only switch to
 // list-buffer if the data size of ring-buffer reaches the maximum(MaxStackingBytes), list-buffer is more
@@ -35,7 +32,7 @@ type Buffer struct {
 
 // New instantiates a mixedbuffer.Buffer and returns it.
 func New(maxTopBufCap int) *Buffer {
-	return &Buffer{maxStackingBytes: maxTopBufCap, ringBuffer: rbPool.Get()}
+	return &Buffer{maxStackingBytes: maxTopBufCap, ringBuffer: rbPool.GetWithSize(maxTopBufCap)}
 }
 
 // Peek returns all bytes as [][]byte, these bytes won't be discarded until Buffer.Discard() is called.
@@ -61,31 +58,43 @@ func (mb *Buffer) Write(p []byte) (n int, err error) {
 		mb.listBuffer.PushBytesBack(p)
 		return len(p), nil
 	}
-	n, err = mb.ringBuffer.Write(p)
-	if n > mb.maxStackingBytes {
-		mb.maxStackingBytes = n
+	freeSize := mb.ringBuffer.Free()
+	if len(p) > freeSize {
+		n, err = mb.ringBuffer.Write(p[:freeSize])
+		mb.listBuffer.PushBytesBack(p[n:])
+		return
 	}
-	return
+	return mb.ringBuffer.Write(p)
 }
 
 // Writev appends multiple byte slices to this buffer.
 func (mb *Buffer) Writev(bs [][]byte) (int, error) {
-	var n int
 	if !mb.listBuffer.IsEmpty() || mb.ringBuffer.Length() >= mb.maxStackingBytes {
+		var n int
 		for _, b := range bs {
 			mb.listBuffer.PushBytesBack(b)
 			n += len(b)
 		}
 		return n, nil
 	}
-	for _, b := range bs {
-		_, _ = mb.ringBuffer.Write(b)
-		n += len(b)
+	var pos, sum int
+	freeSize := mb.ringBuffer.Free()
+	for i, b := range bs {
+		pos = i
+		sum += len(b)
+		if len(b) > freeSize {
+			n, _ := mb.ringBuffer.Write(b[:freeSize])
+			mb.listBuffer.PushBytesBack(b[n:])
+			break
+		}
+		n, _ := mb.ringBuffer.Write(b)
+		freeSize -= n
 	}
-	if n > mb.maxStackingBytes {
-		mb.maxStackingBytes = n
+	for pos++; pos < len(bs); pos++ {
+		sum += len(bs[pos])
+		mb.listBuffer.PushBytesBack(bs[pos])
 	}
-	return n, nil
+	return sum, nil
 }
 
 // IsEmpty indicates whether this buffer is empty.

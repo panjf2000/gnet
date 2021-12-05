@@ -57,8 +57,8 @@ func newTCPConn(fd int, el *eventloop, sa unix.Sockaddr, codec ICodec, localAddr
 		codec:          codec,
 		localAddr:      localAddr,
 		remoteAddr:     remoteAddr,
-		inboundBuffer:  rbPool.GetWithSize(ringbuffer.TCPReadBufferSize),
-		outboundBuffer: mixedbuffer.New(mixedbuffer.MaxStackingBytes),
+		inboundBuffer:  rbPool.GetWithSize(ringbuffer.MaxStreamBufferCap),
+		outboundBuffer: mixedbuffer.New(ringbuffer.MaxStreamBufferCap),
 	}
 	c.pollAttachment = netpoll.GetPollAttachment()
 	c.pollAttachment.FD, c.pollAttachment.Callback = fd, c.handleEvents
@@ -201,8 +201,8 @@ func (c *conn) writev(bs [][]byte) (err error) {
 		for i := range c.packets {
 			np := len(c.packets[i])
 			if n < np {
-				pos = i
 				c.packets[i] = c.packets[i][n:]
+				pos = i
 				break
 			}
 			n -= np

@@ -290,12 +290,12 @@ func Serve(eventHandler EventHandler, protoAddr string, opts ...Option) (err err
 	rbc := options.ReadBufferCap
 	switch {
 	case rbc <= 0:
-		options.ReadBufferCap = ringbuffer.TCPReadBufferSize
+		options.ReadBufferCap = ringbuffer.MaxStreamBufferCap
 	case rbc <= ringbuffer.DefaultBufferSize:
 		options.ReadBufferCap = ringbuffer.DefaultBufferSize
 	default:
 		options.ReadBufferCap = toolkit.CeilToPowerOfTwo(rbc)
-		ringbuffer.TCPReadBufferSize = options.ReadBufferCap
+		ringbuffer.MaxStreamBufferCap = options.ReadBufferCap
 	}
 
 	network, addr := parseProtoAddr(protoAddr)

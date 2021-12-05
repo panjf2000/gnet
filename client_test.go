@@ -471,57 +471,6 @@ func TestServeWithGnetClient(t *testing.T) {
 			})
 		})
 	})
-
-	t.Run("poll-reuseaddr", func(t *testing.T) {
-		t.Run("tcp", func(t *testing.T) {
-			t.Run("1-loop", func(t *testing.T) {
-				testServeWithGnetClient(t, "tcp", ":9991", false, true, false, false, 10, RoundRobin)
-			})
-			t.Run("N-loop", func(t *testing.T) {
-				testServeWithGnetClient(t, "tcp", ":9992", false, true, true, false, 10, LeastConnections)
-			})
-		})
-		t.Run("tcp-async", func(t *testing.T) {
-			t.Run("1-loop", func(t *testing.T) {
-				testServeWithGnetClient(t, "tcp", ":9991", false, true, false, true, 10, RoundRobin)
-			})
-			t.Run("N-loop", func(t *testing.T) {
-				testServeWithGnetClient(t, "tcp", ":9992", false, true, true, false, 10, LeastConnections)
-			})
-		})
-		t.Run("udp", func(t *testing.T) {
-			t.Run("1-loop", func(t *testing.T) {
-				testServeWithGnetClient(t, "udp", ":9991", false, true, false, false, 10, RoundRobin)
-			})
-			t.Run("N-loop", func(t *testing.T) {
-				testServeWithGnetClient(t, "udp", ":9992", false, true, true, false, 10, LeastConnections)
-			})
-		})
-		t.Run("udp-async", func(t *testing.T) {
-			t.Run("1-loop", func(t *testing.T) {
-				testServeWithGnetClient(t, "udp", ":9991", false, true, false, false, 10, RoundRobin)
-			})
-			t.Run("N-loop", func(t *testing.T) {
-				testServeWithGnetClient(t, "udp", ":9992", false, true, true, true, 10, LeastConnections)
-			})
-		})
-		t.Run("unix", func(t *testing.T) {
-			t.Run("1-loop", func(t *testing.T) {
-				testServeWithGnetClient(t, "unix", "gnet1.sock", false, true, false, false, 10, RoundRobin)
-			})
-			t.Run("N-loop", func(t *testing.T) {
-				testServeWithGnetClient(t, "unix", "gnet2.sock", false, true, true, false, 10, LeastConnections)
-			})
-		})
-		t.Run("unix-async", func(t *testing.T) {
-			t.Run("1-loop", func(t *testing.T) {
-				testServeWithGnetClient(t, "unix", "gnet1.sock", false, true, false, true, 10, RoundRobin)
-			})
-			t.Run("N-loop", func(t *testing.T) {
-				testServeWithGnetClient(t, "unix", "gnet2.sock", false, true, true, true, 10, LeastConnections)
-			})
-		})
-	})
 }
 
 type testClientServer struct {

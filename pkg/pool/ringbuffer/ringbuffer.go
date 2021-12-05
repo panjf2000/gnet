@@ -83,7 +83,7 @@ func (p *Pool) GetWithSize(size int) *RingBuffer {
 	v := p.pool.Get()
 	if v != nil {
 		rb := v.(*RingBuffer)
-		if rb.Cap() >= size {
+		if rb.Len() >= size {
 			return rb
 		}
 		p.pool.Put(v)

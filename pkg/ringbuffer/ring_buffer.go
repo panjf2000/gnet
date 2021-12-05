@@ -32,8 +32,8 @@ const (
 	bufferGrowThreshold = 4 * 1024 // 4KB
 )
 
-// TCPReadBufferSize is the default read buffer size for each TCP socket.
-var TCPReadBufferSize = 64 * 1024 // 64KB
+// MaxStreamBufferCap is the default buffer size for each stream-oriented connection(TCP/Unix).
+var MaxStreamBufferCap = 64 * 1024 // 64KB
 
 // ErrIsEmpty will be returned when trying to read an empty ring-buffer.
 var ErrIsEmpty = errors.New("ring-buffer is empty")
