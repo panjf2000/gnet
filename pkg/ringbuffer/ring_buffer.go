@@ -412,4 +412,7 @@ func (rb *RingBuffer) grow(newCap int) {
 	rb.r = 0
 	rb.w = oldLen
 	rb.size = newCap
+	if rb.w > 0 {
+		rb.isEmpty = false
+	}
 }
