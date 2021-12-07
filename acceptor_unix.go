@@ -59,9 +59,9 @@ func (svr *server) acceptNewConnection(fd int, _ netpoll.IOEvent) error {
 	return nil
 }
 
-func (el *eventloop) loopAccept(fd int, _ netpoll.IOEvent) error {
+func (el *eventloop) loopAccept(fd int, ev netpoll.IOEvent) error {
 	if el.ln.network == "udp" {
-		return el.loopReadUDP(fd)
+		return el.loopReadUDP(fd, ev)
 	}
 
 	nfd, sa, err := unix.Accept(el.ln.fd)

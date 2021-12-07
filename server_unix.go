@@ -24,8 +24,6 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"golang.org/x/sys/unix"
-
 	"github.com/panjf2000/gnet/internal/netpoll"
 	"github.com/panjf2000/gnet/pkg/errors"
 )
@@ -48,7 +46,7 @@ func (svr *server) isInShutdown() bool {
 	return atomic.LoadInt32(&svr.inShutdown) == 1
 }
 
-// waitForShutdown waits for a signal to shutdown.
+// waitForShutdown waits for a signal to shut down.
 func (svr *server) waitForShutdown() {
 	svr.cond.L.Lock()
 	svr.cond.Wait()
@@ -112,7 +110,6 @@ func (svr *server) activateEventLoops(numEventLoop int) (err error) {
 			el.svr = svr
 			el.poller = p
 			el.buffer = make([]byte, svr.opts.ReadBufferCap)
-			el.serverUDPSockets = make(map[unix.Sockaddr]*conn)
 			el.connections = make(map[int]*conn)
 			el.eventHandler = svr.eventHandler
 			if err = el.poller.AddRead(el.ln.packPollAttachment(el.loopAccept)); err != nil {
@@ -145,7 +142,6 @@ func (svr *server) activateReactors(numEventLoop int) error {
 			el.svr = svr
 			el.poller = p
 			el.buffer = make([]byte, svr.opts.ReadBufferCap)
-			el.serverUDPSockets = make(map[unix.Sockaddr]*conn)
 			el.connections = make(map[int]*conn)
 			el.eventHandler = svr.eventHandler
 			svr.lb.register(el)

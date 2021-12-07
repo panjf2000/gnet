@@ -97,10 +97,8 @@ func (c *conn) releaseUDP() {
 	c.ctx = nil
 	c.localAddr = nil
 	c.remoteAddr = nil
-	if c.pollAttachment != nil {
-		netpoll.PutPollAttachment(c.pollAttachment)
-		c.pollAttachment = nil
-	}
+	netpoll.PutPollAttachment(c.pollAttachment)
+	c.pollAttachment = nil
 }
 
 func (c *conn) open(buf []byte) error {

@@ -28,6 +28,9 @@ func GetPollAttachment() *PollAttachment {
 
 // PutPollAttachment put an unused PollAttachment back to pool.
 func PutPollAttachment(pa *PollAttachment) {
+	if pa == nil {
+		return
+	}
 	pa.FD, pa.Callback = 0, nil
 	pollAttachmentPool.Put(pa)
 }

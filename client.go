@@ -69,8 +69,7 @@ func NewClient(eventHandler EventHandler, opts ...Option) (cli *Client, err erro
 	svr := new(server)
 	svr.opts = options
 	svr.eventHandler = eventHandler
-	svr.ln = new(listener)
-	svr.ln.network = "udp"
+	svr.ln = &listener{network: "udp"}
 	svr.cond = sync.NewCond(&sync.Mutex{})
 	if options.Ticker {
 		svr.tickerCtx, svr.cancelTicker = context.WithCancel(context.Background())
@@ -85,7 +84,7 @@ func NewClient(eventHandler EventHandler, opts ...Option) (cli *Client, err erro
 		options.ReadBufferCap = toolkit.CeilToPowerOfTwo(rbc)
 	}
 	el.buffer = make([]byte, options.ReadBufferCap)
-	el.clientUDPSockets = make(map[int]*conn)
+	el.udpSockets = make(map[int]*conn)
 	el.connections = make(map[int]*conn)
 	el.eventHandler = eventHandler
 	cli.el = el
