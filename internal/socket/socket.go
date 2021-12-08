@@ -26,21 +26,21 @@ import (
 
 // Option is used for setting an option on socket.
 type Option struct {
-	SetSockopt func(int, int) error
+	SetSockOpt func(int, int) error
 	Opt        int
 }
 
 // TCPSocket calls the internal tcpSocket.
-func TCPSocket(proto, addr string, sockopts ...Option) (int, net.Addr, error) {
-	return tcpSocket(proto, addr, sockopts...)
+func TCPSocket(proto, addr string, passive bool, sockOpts ...Option) (int, net.Addr, error) {
+	return tcpSocket(proto, addr, passive, sockOpts...)
 }
 
 // UDPSocket calls the internal udpSocket.
-func UDPSocket(proto, addr string, sockopts ...Option) (int, net.Addr, error) {
-	return udpSocket(proto, addr, sockopts...)
+func UDPSocket(proto, addr string, connect bool, sockOpts ...Option) (int, net.Addr, error) {
+	return udpSocket(proto, addr, connect, sockOpts...)
 }
 
 // UnixSocket calls the internal udsSocket.
-func UnixSocket(proto, addr string, sockopts ...Option) (int, net.Addr, error) {
-	return udsSocket(proto, addr, sockopts...)
+func UnixSocket(proto, addr string, passive bool, sockOpts ...Option) (int, net.Addr, error) {
+	return udsSocket(proto, addr, passive, sockOpts...)
 }

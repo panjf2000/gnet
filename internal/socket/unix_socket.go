@@ -45,13 +45,13 @@ func GetUnixSockAddr(proto, addr string) (sa unix.Sockaddr, family int, unixAddr
 
 // udsSocket creates an endpoint for communication and returns a file descriptor that refers to that endpoint.
 // Argument `reusePort` indicates whether the SO_REUSEPORT flag will be assigned.
-func udsSocket(proto, addr string, sockopts ...Option) (fd int, netAddr net.Addr, err error) {
+func udsSocket(proto, addr string, passive bool, sockOpts ...Option) (fd int, netAddr net.Addr, err error) {
 	var (
-		family   int
-		sockaddr unix.Sockaddr
+		family int
+		sa     unix.Sockaddr
 	)
 
-	if sockaddr, family, netAddr, err = GetUnixSockAddr(proto, addr); err != nil {
+	if sa, family, netAddr, err = GetUnixSockAddr(proto, addr); err != nil {
 		return
 	}
 
@@ -65,18 +65,22 @@ func udsSocket(proto, addr string, sockopts ...Option) (fd int, netAddr net.Addr
 		}
 	}()
 
-	for _, sockopt := range sockopts {
-		if err = sockopt.SetSockopt(fd, sockopt.Opt); err != nil {
+	for _, sockOpt := range sockOpts {
+		if err = sockOpt.SetSockOpt(fd, sockOpt.Opt); err != nil {
 			return
 		}
 	}
 
-	if err = os.NewSyscallError("bind", unix.Bind(fd, sockaddr)); err != nil {
+	if err = os.NewSyscallError("bind", unix.Bind(fd, sa)); err != nil {
 		return
 	}
 
-	// Set backlog size to the maximum.
-	err = os.NewSyscallError("listen", unix.Listen(fd, listenerBacklogMaxSize))
+	if passive {
+		// Set backlog size to the maximum.
+		err = os.NewSyscallError("listen", unix.Listen(fd, listenerBacklogMaxSize))
+	} else {
+		err = os.NewSyscallError("connect", unix.Connect(fd, sa))
+	}
 
 	return
 }

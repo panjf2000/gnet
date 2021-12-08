@@ -52,14 +52,14 @@ func (ln *listener) dup() (int, string, error) {
 func (ln *listener) normalize() (err error) {
 	switch ln.network {
 	case "tcp", "tcp4", "tcp6":
-		ln.fd, ln.addr, err = socket.TCPSocket(ln.network, ln.address, ln.sockOpts...)
+		ln.fd, ln.addr, err = socket.TCPSocket(ln.network, ln.address, true, ln.sockOpts...)
 		ln.network = "tcp"
 	case "udp", "udp4", "udp6":
-		ln.fd, ln.addr, err = socket.UDPSocket(ln.network, ln.address, ln.sockOpts...)
+		ln.fd, ln.addr, err = socket.UDPSocket(ln.network, ln.address, false, ln.sockOpts...)
 		ln.network = "udp"
 	case "unix":
 		_ = os.RemoveAll(ln.address)
-		ln.fd, ln.addr, err = socket.UnixSocket(ln.network, ln.address, ln.sockOpts...)
+		ln.fd, ln.addr, err = socket.UnixSocket(ln.network, ln.address, true, ln.sockOpts...)
 	default:
 		err = errors.ErrUnsupportedProtocol
 	}
@@ -81,23 +81,23 @@ func (ln *listener) close() {
 func initListener(network, addr string, options *Options) (l *listener, err error) {
 	var sockOpts []socket.Option
 	if options.ReusePort || strings.HasPrefix(network, "udp") {
-		sockOpt := socket.Option{SetSockopt: socket.SetReuseport, Opt: 1}
+		sockOpt := socket.Option{SetSockOpt: socket.SetReuseport, Opt: 1}
 		sockOpts = append(sockOpts, sockOpt)
 	}
 	if options.ReuseAddr {
-		sockOpt := socket.Option{SetSockopt: socket.SetReuseAddr, Opt: 1}
+		sockOpt := socket.Option{SetSockOpt: socket.SetReuseAddr, Opt: 1}
 		sockOpts = append(sockOpts, sockOpt)
 	}
 	if options.TCPNoDelay == TCPNoDelay && strings.HasPrefix(network, "tcp") {
-		sockOpt := socket.Option{SetSockopt: socket.SetNoDelay, Opt: 1}
+		sockOpt := socket.Option{SetSockOpt: socket.SetNoDelay, Opt: 1}
 		sockOpts = append(sockOpts, sockOpt)
 	}
 	if options.SocketRecvBuffer > 0 {
-		sockOpt := socket.Option{SetSockopt: socket.SetRecvBuffer, Opt: options.SocketRecvBuffer}
+		sockOpt := socket.Option{SetSockOpt: socket.SetRecvBuffer, Opt: options.SocketRecvBuffer}
 		sockOpts = append(sockOpts, sockOpt)
 	}
 	if options.SocketSendBuffer > 0 {
-		sockOpt := socket.Option{SetSockopt: socket.SetSendBuffer, Opt: options.SocketSendBuffer}
+		sockOpt := socket.Option{SetSockOpt: socket.SetSendBuffer, Opt: options.SocketSendBuffer}
 		sockOpts = append(sockOpts, sockOpt)
 	}
 	l = &listener{network: network, address: addr, sockOpts: sockOpts}
