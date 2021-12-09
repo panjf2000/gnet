@@ -146,7 +146,7 @@ func (el *eventloop) read(c *conn) error {
 			return nil
 		}
 	}
-	if err != nil && err != gerrors.ErrIncompletePacket {
+	if err != gerrors.ErrIncompletePacket {
 		return el.closeConn(c, err)
 	}
 
