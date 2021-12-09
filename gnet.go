@@ -53,7 +53,7 @@ type Server struct {
 	// assigned to the value of logical CPUs usable by the current process.
 	Multicore bool
 
-	// The Addr parameter is the listening address that align
+	// Addr is the listening address that align
 	// with the addr string passed to the Serve function.
 	Addr net.Addr
 
@@ -103,19 +103,29 @@ type Conn interface {
 	// RemoteAddr is the connection's remote peer address.
 	RemoteAddr() (addr net.Addr)
 
-	// Read reads all data from inbound ring-buffer and event-loop-buffer without moving "read" pointer, which means
-	// it does not evict the data from buffers actually and those data will present in buffers until the
-	// ResetBuffer method is called.
+	// Read reads all data from inbound ring-buffer without moving "read" pointer,
+	// which means it does not evict the data from buffers actually and those data will
+	// present in buffers until the ResetBuffer method is called.
+	//
+	// Note that the (buf []byte) returned by Read() is not allowed to be passed to a new goroutine,
+	// as this []byte will be reused within event-loop.
+	// If you have to use buf in a new goroutine, then you need to make a copy of buf and pass this copy
+	// to that new goroutine.
 	Read() (buf []byte)
 
 	// ResetBuffer resets the buffers, which means all data in inbound ring-buffer and event-loop-buffer will be evicted.
 	ResetBuffer()
 
-	// ReadN reads bytes with the given length from inbound ring-buffer and event-loop-buffer without moving
-	// "read" pointer, which means it will not evict the data from buffers until the ShiftN method is called,
-	// it reads data from the inbound ring-buffer and event-loop-buffer and returns both bytes and the size of it.
-	// If the length of the available data is less than the given "n", ReadN will return all available data, so you
-	// should make use of the variable "size" returned by it to be aware of the exact length of the returned data.
+	// ReadN reads bytes with the given length from inbound ring-buffer without moving "read" pointer,
+	// which means it will not evict the data from buffers until the ShiftN method is called,
+	// it reads data from the inbound ring-buffer and returns both bytes and the size of it.
+	// If the length of the available data is less than the given "n", ReadN will return all available data,
+	// so you should make use of the variable "size" returned by ReadN() to be aware of the exact length of the returned data.
+	//
+	// Note that the []byte buf returned by ReadN() is not allowed to be passed to a new goroutine,
+	// as this []byte will be reused within event-loop.
+	// If you have to use buf in a new goroutine, then you need to make a copy of buf and pass this copy
+	// to that new goroutine.
 	ReadN(n int) (size int, buf []byte)
 
 	// ShiftN shifts "read" pointer in the internal buffers with the given length.
@@ -150,7 +160,7 @@ type (
 	// of the connection and server.
 	EventHandler interface {
 		// OnInitComplete fires when the server is ready for accepting connections.
-		// The parameter:server has information and various utilities.
+		// The parameter server has information and various utilities.
 		OnInitComplete(server Server) (action Action)
 
 		// OnShutdown fires when the server is being shut down, it is called right after
@@ -158,15 +168,15 @@ type (
 		OnShutdown(server Server)
 
 		// OnOpened fires when a new connection has been opened.
-		// The parameter:c has information about the connection such as it's local and remote address.
-		// Parameter:out is the return value which is going to be sent back to the peer.
-		// It is generally not recommended to send large amounts of data back to the peer in OnOpened.
+		// The Conn c has information about the connection such as it's local and remote address.
+		// The parameter out is the return value which is going to be sent back to the peer.
+		// It is usually not recommended to send large amounts of data back to the peer in OnOpened.
 		//
 		// Note that the bytes returned by OnOpened will be sent back to the peer without being encoded.
 		OnOpened(c Conn) (out []byte, action Action)
 
 		// OnClosed fires when a connection has been closed.
-		// The parameter:err is the last known connection error.
+		// The parameter err is the last known connection error.
 		OnClosed(c Conn, err error) (action Action)
 
 		// PreWrite fires just before a packet is written to the peer socket, this event function is usually where
@@ -177,9 +187,14 @@ type (
 		// you put the []byte returned from React() back to your memory pool.
 		AfterWrite(c Conn, b []byte)
 
-		// React fires when a connection sends the server data.
-		// Call c.Read() or c.ReadN(n) within the parameter:c to read incoming data from the peer.
-		// Parameter:out is the return value which is going to be sent back to the peer.
+		// React fires when a socket receives data from the peer.
+		// Call c.Read() or c.ReadN(n) of Conn c to read incoming data from the peer.
+		// The parameter out is the return value which is going to be sent back to the peer.
+		//
+		// Note that the parameter packet returned from React() is not allowed to be passed to a new goroutine,
+		// as this []byte will be reused within event-loop after React() returns.
+		// If you have to use packet in a new goroutine, then you need to make a copy of buf and pass this copy
+		// to that new goroutine.
 		React(packet []byte, c Conn) (out []byte, action Action)
 
 		// Tick fires immediately after the server starts and will fire again
@@ -194,7 +209,7 @@ type (
 )
 
 // OnInitComplete fires when the server is ready for accepting connections.
-// The parameter:server has information and various utilities.
+// The parameter server has information and various utilities.
 func (es *EventServer) OnInitComplete(svr Server) (action Action) {
 	return
 }
@@ -205,14 +220,13 @@ func (es *EventServer) OnShutdown(svr Server) {
 }
 
 // OnOpened fires when a new connection has been opened.
-// The parameter:c has information about the connection such as it's local and remote address.
-// Parameter:out is the return value which is going to be sent back to the peer.
+// The parameter out is the return value which is going to be sent back to the peer.
 func (es *EventServer) OnOpened(c Conn) (out []byte, action Action) {
 	return
 }
 
 // OnClosed fires when a connection has been closed.
-// The parameter:err is the last known connection error.
+// The parameter err is the last known connection error.
 func (es *EventServer) OnClosed(c Conn, err error) (action Action) {
 	return
 }
@@ -228,8 +242,8 @@ func (es *EventServer) AfterWrite(c Conn, b []byte) {
 }
 
 // React fires when a connection sends the server data.
-// Call c.Read() or c.ReadN(n) within the parameter:c to read incoming data from the peer.
-// Parameter:out is the return value which is going to be sent back to the peer.
+// Call c.Read() or c.ReadN(n) of Conn c to read incoming data from the peer.
+// The parameter out is the return value which is going to be sent back to the peer.
 func (es *EventServer) React(packet []byte, c Conn) (out []byte, action Action) {
 	return
 }
