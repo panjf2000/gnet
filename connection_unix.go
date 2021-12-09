@@ -29,6 +29,7 @@ import (
 	"github.com/panjf2000/gnet/internal/socket"
 	"github.com/panjf2000/gnet/pkg/mixedbuffer"
 	"github.com/panjf2000/gnet/pkg/pool/bytebuffer"
+	"github.com/panjf2000/gnet/pkg/pool/byteslice"
 	rbPool "github.com/panjf2000/gnet/pkg/pool/ringbuffer"
 	"github.com/panjf2000/gnet/pkg/ringbuffer"
 )
@@ -69,6 +70,12 @@ func (c *conn) releaseTCP() {
 	c.opened = false
 	c.peer = nil
 	c.ctx = nil
+	if addr, ok := c.localAddr.(*net.TCPAddr); ok && c.localAddr != c.loop.ln.addr {
+		byteslice.Put(addr.IP)
+	}
+	if addr, ok := c.remoteAddr.(*net.TCPAddr); ok {
+		byteslice.Put(addr.IP)
+	}
 	c.localAddr = nil
 	c.remoteAddr = nil
 	rbPool.Put(c.inboundBuffer)
@@ -95,6 +102,12 @@ func newUDPConn(fd int, el *eventloop, localAddr net.Addr, sa unix.Sockaddr, con
 
 func (c *conn) releaseUDP() {
 	c.ctx = nil
+	if addr, ok := c.localAddr.(*net.UDPAddr); ok && c.localAddr != c.loop.ln.addr {
+		byteslice.Put(addr.IP)
+	}
+	if addr, ok := c.remoteAddr.(*net.UDPAddr); ok {
+		byteslice.Put(addr.IP)
+	}
 	c.localAddr = nil
 	c.remoteAddr = nil
 	netpoll.PutPollAttachment(c.pollAttachment)

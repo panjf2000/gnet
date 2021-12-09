@@ -76,13 +76,13 @@ func (el *eventloop) loopAccept(fd int, ev netpoll.IOEvent) error {
 		return err
 	}
 
-	netAddr := socket.SockaddrToTCPOrUnixAddr(sa)
+	remoteAddr := socket.SockaddrToTCPOrUnixAddr(sa)
 	if el.svr.opts.TCPKeepAlive > 0 && el.ln.network == "tcp" {
 		err = socket.SetKeepAlive(nfd, int(el.svr.opts.TCPKeepAlive/time.Second))
 		logging.Error(err)
 	}
 
-	c := newTCPConn(nfd, el, sa, el.svr.opts.Codec, el.ln.addr, netAddr)
+	c := newTCPConn(nfd, el, sa, el.svr.opts.Codec, el.ln.addr, remoteAddr)
 	if err = el.poller.AddRead(c.pollAttachment); err != nil {
 		return err
 	}

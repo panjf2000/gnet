@@ -24,6 +24,7 @@ import (
 
 	"github.com/panjf2000/gnet/internal/toolkit"
 	"github.com/panjf2000/gnet/pkg/pool/bytebuffer"
+	"github.com/panjf2000/gnet/pkg/pool/byteslice"
 )
 
 const (
@@ -405,9 +406,10 @@ func (rb *RingBuffer) grow(newCap int) {
 			}
 		}
 	}
-	newBuf := make([]byte, newCap)
+	newBuf := byteslice.Get(newCap)
 	oldLen := rb.Length()
 	_, _ = rb.Read(newBuf)
+	byteslice.Put(rb.buf)
 	rb.buf = newBuf
 	rb.r = 0
 	rb.w = oldLen

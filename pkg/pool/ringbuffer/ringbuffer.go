@@ -39,7 +39,7 @@ const (
 // RingBuffer is the alias of ringbuffer.RingBuffer.
 type RingBuffer = ringbuffer.RingBuffer
 
-// Pool represents byte buffer pool.
+// Pool represents ring-buffer pool.
 //
 // Distinct pools may be used for distinct types of byte buffers.
 // Properly determined byte buffer types with their own pools may help reducing
@@ -54,14 +54,14 @@ type Pool struct {
 	pool sync.Pool
 }
 
-var defaultPool Pool
+var builtinPool Pool
 
 // Get returns an empty byte buffer from the pool.
 //
 // Got byte buffer may be returned to the pool via Put call.
 // This reduces the number of memory allocations required for byte buffer
 // management.
-func Get() *RingBuffer { return defaultPool.Get() }
+func Get() *RingBuffer { return builtinPool.Get() }
 
 // Get returns new byte buffer with zero length.
 //
@@ -76,7 +76,7 @@ func (p *Pool) Get() *RingBuffer {
 }
 
 // GetWithSize is like Get(), but with initial size.
-func GetWithSize(size int) *RingBuffer { return defaultPool.GetWithSize(size) }
+func GetWithSize(size int) *RingBuffer { return builtinPool.GetWithSize(size) }
 
 // GetWithSize is like Pool.Get(), but with initial size.
 func (p *Pool) GetWithSize(size int) *RingBuffer {
@@ -95,7 +95,7 @@ func (p *Pool) GetWithSize(size int) *RingBuffer {
 //
 // ByteBuffer.B mustn't be touched after returning it to the pool.
 // Otherwise data races will occur.
-func Put(b *RingBuffer) { defaultPool.Put(b) }
+func Put(b *RingBuffer) { builtinPool.Put(b) }
 
 // Put releases byte buffer obtained via Get to the pool.
 //

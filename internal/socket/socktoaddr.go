@@ -21,6 +21,8 @@ import (
 	"net"
 
 	"golang.org/x/sys/unix"
+
+	"github.com/panjf2000/gnet/pkg/pool/byteslice"
 )
 
 // SockaddrToTCPOrUnixAddr converts a Sockaddr to a net.TCPAddr or net.UnixAddr.
@@ -56,7 +58,7 @@ func SockaddrToUDPAddr(sa unix.Sockaddr) net.Addr {
 // sockaddrInet4ToIPAndZone converts a SockaddrInet4 to a net.IP.
 // It returns nil if conversion fails.
 func sockaddrInet4ToIP(sa *unix.SockaddrInet4) net.IP {
-	ip := make([]byte, 16)
+	ip := byteslice.Get(16)
 	// V4InV6Prefix
 	ip[10] = 0xff
 	ip[11] = 0xff
@@ -67,7 +69,7 @@ func sockaddrInet4ToIP(sa *unix.SockaddrInet4) net.IP {
 // sockaddrInet6ToIPAndZone converts a SockaddrInet6 to a net.IP with IPv6 Zone.
 // It returns nil if conversion fails.
 func sockaddrInet6ToIPAndZone(sa *unix.SockaddrInet6) (net.IP, string) {
-	ip := make([]byte, 16)
+	ip := byteslice.Get(16)
 	copy(ip, sa.Addr[:])
 	return ip, ip6ZoneToString(int(sa.ZoneId))
 }
@@ -91,7 +93,7 @@ func int2decimal(i uint) string {
 	}
 
 	// Assemble decimal in reverse order.
-	var b [32]byte
+	b := byteslice.Get(32)
 	bp := len(b)
 	for ; i > 0; i /= 10 {
 		bp--
