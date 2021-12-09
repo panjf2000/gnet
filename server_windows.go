@@ -97,12 +97,12 @@ func (svr *server) startEventLoops(numEventLoop int) {
 
 	svr.loopWG.Add(svr.lb.len())
 	svr.lb.iterate(func(i int, el *eventloop) bool {
-		go el.loopRun(svr.opts.LockOSThread)
+		go el.run(svr.opts.LockOSThread)
 		return true
 	})
 
 	// Start the ticker.
-	go striker.loopTicker(svr.tickerCtx)
+	go striker.ticker(svr.tickerCtx)
 }
 
 func (svr *server) stop(s Server) {

@@ -28,11 +28,11 @@ func (c *conn) handleEvents(_ int, ev uint32) error {
 	// the peer when any error occurs on a connection.
 	//
 	// Either an EPOLLOUT or EPOLLERR event may be fired when a connection is refused.
-	// In either case loopWrite() should take care of it properly:
+	// In either case write() should take care of it properly:
 	// 1) writing data back,
 	// 2) closing the connection.
 	if ev&netpoll.OutEvents != 0 && !c.outboundBuffer.IsEmpty() {
-		if err := c.loop.loopWrite(c); err != nil {
+		if err := c.loop.write(c); err != nil {
 			return err
 		}
 	}
@@ -44,7 +44,7 @@ func (c *conn) handleEvents(_ int, ev uint32) error {
 	// in which case if the server socket send buffer is full, we need to let it go and continue reading
 	// the data to prevent blocking forever.
 	if ev&netpoll.InEvents != 0 && (ev&netpoll.OutEvents == 0 || c.outboundBuffer.IsEmpty()) {
-		return c.loop.loopRead(c)
+		return c.loop.read(c)
 	}
 	return nil
 }

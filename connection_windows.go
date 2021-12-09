@@ -265,7 +265,7 @@ func (c *stdConn) SendTo(buf []byte) (err error) {
 
 func (c *stdConn) Wake() error {
 	task := signalTaskPool.Get().(*signalTask)
-	task.run = c.loop.loopWake
+	task.run = c.loop.wake
 	task.c = c
 	c.loop.ch <- task
 	return nil
@@ -273,7 +273,7 @@ func (c *stdConn) Wake() error {
 
 func (c *stdConn) Close() error {
 	task := signalTaskPool.Get().(*signalTask)
-	task.run = c.loop.loopCloseConn
+	task.run = c.loop.closeConn
 	task.c = c
 	c.loop.ch <- task
 	return nil

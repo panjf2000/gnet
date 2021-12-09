@@ -58,7 +58,7 @@ func (el *eventloop) activateSubReactor(lockOSThread bool) {
 	}
 }
 
-func (el *eventloop) loopRun(lockOSThread bool) {
+func (el *eventloop) run(lockOSThread bool) {
 	if lockOSThread {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()

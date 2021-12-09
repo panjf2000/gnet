@@ -22,13 +22,13 @@ import "github.com/panjf2000/gnet/internal/netpoll"
 func (c *conn) handleEvents(_ int, filter int16) (err error) {
 	switch filter {
 	case netpoll.EVFilterSock:
-		err = c.loop.loopCloseConn(c, nil)
+		err = c.loop.closeConn(c, nil)
 	case netpoll.EVFilterWrite:
 		if !c.outboundBuffer.IsEmpty() {
-			err = c.loop.loopWrite(c)
+			err = c.loop.write(c)
 		}
 	case netpoll.EVFilterRead:
-		err = c.loop.loopRead(c)
+		err = c.loop.read(c)
 	}
 	return
 }

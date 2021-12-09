@@ -33,7 +33,7 @@ func (el *eventloop) activateMainReactor(lockOSThread bool) {
 
 	defer el.svr.signalShutdown()
 
-	err := el.poller.Polling(func(fd int, filter int16) error { return el.svr.acceptNewConnection(fd, filter) })
+	err := el.poller.Polling(func(fd int, filter int16) error { return el.svr.accept(fd, filter) })
 	if err == errors.ErrServerShutdown {
 		el.svr.opts.Logger.Debugf("main reactor is exiting in terms of the demand from user, %v", err)
 	} else if err != nil {
@@ -56,13 +56,13 @@ func (el *eventloop) activateSubReactor(lockOSThread bool) {
 		if c, ack := el.connections[fd]; ack {
 			switch filter {
 			case netpoll.EVFilterSock:
-				err = el.loopCloseConn(c, nil)
+				err = el.closeConn(c, nil)
 			case netpoll.EVFilterWrite:
 				if !c.outboundBuffer.IsEmpty() {
-					err = el.loopWrite(c)
+					err = el.write(c)
 				}
 			case netpoll.EVFilterRead:
-				err = el.loopRead(c)
+				err = el.read(c)
 			}
 		}
 		return
@@ -74,7 +74,7 @@ func (el *eventloop) activateSubReactor(lockOSThread bool) {
 	}
 }
 
-func (el *eventloop) loopRun(lockOSThread bool) {
+func (el *eventloop) run(lockOSThread bool) {
 	if lockOSThread {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -90,17 +90,17 @@ func (el *eventloop) loopRun(lockOSThread bool) {
 		if c, ack := el.connections[fd]; ack {
 			switch filter {
 			case netpoll.EVFilterSock:
-				err = el.loopCloseConn(c, nil)
+				err = el.closeConn(c, nil)
 			case netpoll.EVFilterWrite:
 				if !c.outboundBuffer.IsEmpty() {
-					err = el.loopWrite(c)
+					err = el.write(c)
 				}
 			case netpoll.EVFilterRead:
-				err = el.loopRead(c)
+				err = el.read(c)
 			}
 			return
 		}
-		return el.loopAccept(fd, filter)
+		return el.accept(fd, filter)
 	})
 	el.getLogger().Debugf("event-loop(%d) is exiting due to error: %v", el.idx, err)
 }

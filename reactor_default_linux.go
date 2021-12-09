@@ -32,7 +32,7 @@ func (el *eventloop) activateMainReactor(lockOSThread bool) {
 
 	defer el.svr.signalShutdown()
 
-	err := el.poller.Polling(func(fd int, ev uint32) error { return el.svr.acceptNewConnection(fd, ev) })
+	err := el.poller.Polling(func(fd int, ev uint32) error { return el.svr.accept(fd, ev) })
 	if err == errors.ErrServerShutdown {
 		el.svr.opts.Logger.Debugf("main reactor is exiting in terms of the demand from user, %v", err)
 	} else if err != nil {
@@ -61,11 +61,11 @@ func (el *eventloop) activateSubReactor(lockOSThread bool) {
 			// the peer when any error occurs on a connection.
 			//
 			// Either an EPOLLOUT or EPOLLERR event may be fired when a connection is refused.
-			// In either case loopWrite() should take care of it properly:
+			// In either case write() should take care of it properly:
 			// 1) writing data back,
 			// 2) closing the connection.
 			if ev&netpoll.OutEvents != 0 && !c.outboundBuffer.IsEmpty() {
-				if err := el.loopWrite(c); err != nil {
+				if err := el.write(c); err != nil {
 					return err
 				}
 			}
@@ -77,7 +77,7 @@ func (el *eventloop) activateSubReactor(lockOSThread bool) {
 			// in which case if the server socket send buffer is full, we need to let it go and continue reading
 			// the data to prevent blocking forever.
 			if ev&netpoll.InEvents != 0 && (ev&netpoll.OutEvents == 0 || c.outboundBuffer.IsEmpty()) {
-				return el.loopRead(c)
+				return el.read(c)
 			}
 		}
 		return nil
@@ -89,7 +89,7 @@ func (el *eventloop) activateSubReactor(lockOSThread bool) {
 	}
 }
 
-func (el *eventloop) loopRun(lockOSThread bool) {
+func (el *eventloop) run(lockOSThread bool) {
 	if lockOSThread {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -111,11 +111,11 @@ func (el *eventloop) loopRun(lockOSThread bool) {
 			// the peer when any error occurs on a connection.
 			//
 			// Either an EPOLLOUT or EPOLLERR event may be fired when a connection is refused.
-			// In either case loopWrite() should take care of it properly:
+			// In either case write() should take care of it properly:
 			// 1) writing data back,
 			// 2) closing the connection.
 			if ev&netpoll.OutEvents != 0 && !c.outboundBuffer.IsEmpty() {
-				if err := el.loopWrite(c); err != nil {
+				if err := el.write(c); err != nil {
 					return err
 				}
 			}
@@ -127,11 +127,11 @@ func (el *eventloop) loopRun(lockOSThread bool) {
 			// in which case if the socket send buffer is full, we need to let it go and continue reading the data
 			// to prevent blocking forever.
 			if ev&netpoll.InEvents != 0 && (ev&netpoll.OutEvents == 0 || c.outboundBuffer.IsEmpty()) {
-				return el.loopRead(c)
+				return el.read(c)
 			}
 			return nil
 		}
-		return el.loopAccept(fd, ev)
+		return el.accept(fd, ev)
 	})
 	el.getLogger().Debugf("event-loop(%d) is exiting due to error: %v", el.idx, err)
 }

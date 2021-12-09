@@ -96,12 +96,12 @@ func (cli *Client) Start() error {
 	cli.el.eventHandler.OnInitComplete(Server{})
 	cli.el.svr.wg.Add(1)
 	go func() {
-		cli.el.loopRun(cli.opts.LockOSThread)
+		cli.el.run(cli.opts.LockOSThread)
 		cli.el.svr.wg.Done()
 	}()
 	// Start the ticker.
 	if cli.opts.Ticker {
-		go cli.el.loopTicker(cli.el.svr.tickerCtx)
+		go cli.el.ticker(cli.el.svr.tickerCtx)
 	}
 	return nil
 }
@@ -200,7 +200,7 @@ func (cli *Client) Dial(network, address string) (Conn, error) {
 	default:
 		return nil, gerrors.ErrUnsupportedProtocol
 	}
-	err = cli.el.poller.UrgentTrigger(cli.el.loopRegister, gc)
+	err = cli.el.poller.UrgentTrigger(cli.el.register, gc)
 	if err != nil {
 		gc.Close()
 		return nil, err

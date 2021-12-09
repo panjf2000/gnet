@@ -160,7 +160,7 @@ func (c *conn) write(buf []byte) (err error) {
 			err = c.loop.poller.ModReadWrite(c.pollAttachment)
 			return
 		}
-		return c.loop.loopCloseConn(c, os.NewSyscallError("write", err))
+		return c.loop.closeConn(c, os.NewSyscallError("write", err))
 	}
 	// Failed to send all data back to the peer, buffer the leftover data for the next round.
 	if n < len(packet) {
@@ -204,7 +204,7 @@ func (c *conn) writev(bs [][]byte) (err error) {
 			err = c.loop.poller.ModReadWrite(c.pollAttachment)
 			return
 		}
-		return c.loop.loopCloseConn(c, os.NewSyscallError("write", err))
+		return c.loop.closeConn(c, os.NewSyscallError("write", err))
 	}
 	// Failed to send all data back to the peer, buffer the leftover data for the next round.
 	if n < sum {
@@ -322,9 +322,9 @@ func (c *conn) SendTo(buf []byte) error {
 }
 
 func (c *conn) Wake() error {
-	return c.loop.poller.UrgentTrigger(func(_ interface{}) error { return c.loop.loopWake(c) }, nil)
+	return c.loop.poller.UrgentTrigger(func(_ interface{}) error { return c.loop.wake(c) }, nil)
 }
 
 func (c *conn) Close() error {
-	return c.loop.poller.Trigger(func(_ interface{}) error { return c.loop.loopCloseConn(c, nil) }, nil)
+	return c.loop.poller.Trigger(func(_ interface{}) error { return c.loop.closeConn(c, nil) }, nil)
 }

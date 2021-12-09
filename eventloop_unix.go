@@ -62,19 +62,19 @@ func (el *eventloop) loadConn() int32 {
 func (el *eventloop) closeAllSockets() {
 	// Close loops and all outstanding connections
 	for _, c := range el.connections {
-		_ = el.loopCloseConn(c, nil)
+		_ = el.closeConn(c, nil)
 	}
 	for _, c := range el.udpSockets {
-		_ = el.loopCloseConn(c, nil)
+		_ = el.closeConn(c, nil)
 	}
 }
 
-func (el *eventloop) loopRegister(itf interface{}) error {
+func (el *eventloop) register(itf interface{}) error {
 	c := itf.(*conn)
 	if c.pollAttachment == nil { // UDP socket
 		c.pollAttachment = netpoll.GetPollAttachment()
 		c.pollAttachment.FD = c.fd
-		c.pollAttachment.Callback = el.loopReadUDP
+		c.pollAttachment.Callback = el.readUDP
 		if err := el.poller.AddRead(c.pollAttachment); err != nil {
 			_ = unix.Close(c.fd)
 			c.releaseUDP()
@@ -89,10 +89,10 @@ func (el *eventloop) loopRegister(itf interface{}) error {
 		return err
 	}
 	el.connections[c.fd] = c
-	return el.loopOpen(c)
+	return el.open(c)
 }
 
-func (el *eventloop) loopOpen(c *conn) error {
+func (el *eventloop) open(c *conn) error {
 	c.opened = true
 	el.addConn(1)
 
@@ -112,15 +112,17 @@ func (el *eventloop) loopOpen(c *conn) error {
 	return el.handleAction(c, action)
 }
 
-func (el *eventloop) loopRead(c *conn) error {
+func (el *eventloop) read(c *conn) error {
 	n, err := c.inboundBuffer.CopyFromSocket(c.fd)
 	if n == 0 || err != nil {
 		if err == unix.EAGAIN {
 			return nil
 		}
-		return el.loopCloseConn(c, os.NewSyscallError("read", err))
+		return el.closeConn(c, os.NewSyscallError("read", err))
 	}
-	for packet, _ := c.read(); packet != nil; packet, _ = c.read() {
+
+	var packet []byte
+	for packet, err = c.read(); err == nil; packet, err = c.read() {
 		out, action := el.eventHandler.React(packet, c)
 		if out != nil {
 			// Encode data and try to write it back to the peer, this attempt is based on a fact:
@@ -133,7 +135,7 @@ func (el *eventloop) loopRead(c *conn) error {
 		switch action {
 		case None:
 		case Close:
-			return el.loopCloseConn(c, nil)
+			return el.closeConn(c, nil)
 		case Shutdown:
 			return gerrors.ErrServerShutdown
 		}
@@ -144,10 +146,14 @@ func (el *eventloop) loopRead(c *conn) error {
 			return nil
 		}
 	}
+	if err != nil && err != gerrors.ErrIncompletePacket {
+		return el.closeConn(c, err)
+	}
+
 	return nil
 }
 
-func (el *eventloop) loopWrite(c *conn) error {
+func (el *eventloop) write(c *conn) error {
 	el.eventHandler.PreWrite(c)
 
 	iov := c.outboundBuffer.Peek()
@@ -166,7 +172,7 @@ func (el *eventloop) loopWrite(c *conn) error {
 	case unix.EAGAIN:
 		return nil
 	default:
-		return el.loopCloseConn(c, os.NewSyscallError("write", err))
+		return el.closeConn(c, os.NewSyscallError("write", err))
 	}
 
 	// All data have been drained, it's no need to monitor the writable events,
@@ -178,7 +184,7 @@ func (el *eventloop) loopWrite(c *conn) error {
 	return nil
 }
 
-func (el *eventloop) loopCloseConn(c *conn, err error) (rerr error) {
+func (el *eventloop) closeConn(c *conn, err error) (rerr error) {
 	if addr := c.localAddr; addr != nil && strings.HasPrefix(c.localAddr.Network(), "udp") {
 		rerr = el.poller.Delete(c.fd)
 		if c.fd != el.ln.fd {
@@ -229,7 +235,7 @@ func (el *eventloop) loopCloseConn(c *conn, err error) (rerr error) {
 	return
 }
 
-func (el *eventloop) loopWake(c *conn) error {
+func (el *eventloop) wake(c *conn) error {
 	if co, ok := el.connections[c.fd]; !ok || co != c {
 		return nil // ignore stale wakes.
 	}
@@ -244,7 +250,7 @@ func (el *eventloop) loopWake(c *conn) error {
 	return el.handleAction(c, action)
 }
 
-func (el *eventloop) loopTicker(ctx context.Context) {
+func (el *eventloop) ticker(ctx context.Context) {
 	if el == nil {
 		return
 	}
@@ -285,7 +291,7 @@ func (el *eventloop) handleAction(c *conn, action Action) error {
 	case None:
 		return nil
 	case Close:
-		return el.loopCloseConn(c, nil)
+		return el.closeConn(c, nil)
 	case Shutdown:
 		return gerrors.ErrServerShutdown
 	default:
@@ -293,7 +299,7 @@ func (el *eventloop) handleAction(c *conn, action Action) error {
 	}
 }
 
-func (el *eventloop) loopReadUDP(fd int, _ netpoll.IOEvent) error {
+func (el *eventloop) readUDP(fd int, _ netpoll.IOEvent) error {
 	n, sa, err := unix.Recvfrom(fd, el.buffer, 0)
 	if err != nil {
 		if err == unix.EAGAIN || err == unix.EWOULDBLOCK {

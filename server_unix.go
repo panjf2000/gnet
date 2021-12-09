@@ -66,7 +66,7 @@ func (svr *server) startEventLoops() {
 	svr.lb.iterate(func(i int, el *eventloop) bool {
 		svr.wg.Add(1)
 		go func() {
-			el.loopRun(svr.opts.LockOSThread)
+			el.run(svr.opts.LockOSThread)
 			svr.wg.Done()
 		}()
 		return true
@@ -112,7 +112,7 @@ func (svr *server) activateEventLoops(numEventLoop int) (err error) {
 			el.buffer = make([]byte, svr.opts.ReadBufferCap)
 			el.connections = make(map[int]*conn)
 			el.eventHandler = svr.eventHandler
-			if err = el.poller.AddRead(el.ln.packPollAttachment(el.loopAccept)); err != nil {
+			if err = el.poller.AddRead(el.ln.packPollAttachment(el.accept)); err != nil {
 				return
 			}
 			svr.lb.register(el)
@@ -129,7 +129,7 @@ func (svr *server) activateEventLoops(numEventLoop int) (err error) {
 	// Start event-loops in background.
 	svr.startEventLoops()
 
-	go striker.loopTicker(svr.tickerCtx)
+	go striker.ticker(svr.tickerCtx)
 
 	return
 }
@@ -160,7 +160,7 @@ func (svr *server) activateReactors(numEventLoop int) error {
 		el.svr = svr
 		el.poller = p
 		el.eventHandler = svr.eventHandler
-		if err = el.poller.AddRead(svr.ln.packPollAttachment(svr.acceptNewConnection)); err != nil {
+		if err = el.poller.AddRead(svr.ln.packPollAttachment(svr.accept)); err != nil {
 			return err
 		}
 		svr.mainLoop = el
@@ -177,7 +177,7 @@ func (svr *server) activateReactors(numEventLoop int) error {
 
 	// Start the ticker.
 	if svr.opts.Ticker {
-		go svr.mainLoop.loopTicker(svr.tickerCtx)
+		go svr.mainLoop.ticker(svr.tickerCtx)
 	}
 
 	return nil

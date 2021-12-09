@@ -29,7 +29,7 @@ import (
 	"github.com/panjf2000/gnet/pkg/logging"
 )
 
-func (svr *server) acceptNewConnection(fd int, _ netpoll.IOEvent) error {
+func (svr *server) accept(fd int, _ netpoll.IOEvent) error {
 	nfd, sa, err := unix.Accept(fd)
 	if err != nil {
 		if err == unix.EAGAIN {
@@ -51,7 +51,7 @@ func (svr *server) acceptNewConnection(fd int, _ netpoll.IOEvent) error {
 	el := svr.lb.next(remoteAddr)
 	c := newTCPConn(nfd, el, sa, svr.opts.Codec, el.ln.addr, remoteAddr)
 
-	err = el.poller.UrgentTrigger(el.loopRegister, c)
+	err = el.poller.UrgentTrigger(el.register, c)
 	if err != nil {
 		_ = unix.Close(nfd)
 		c.releaseTCP()
@@ -59,9 +59,9 @@ func (svr *server) acceptNewConnection(fd int, _ netpoll.IOEvent) error {
 	return nil
 }
 
-func (el *eventloop) loopAccept(fd int, ev netpoll.IOEvent) error {
+func (el *eventloop) accept(fd int, ev netpoll.IOEvent) error {
 	if el.ln.network == "udp" {
-		return el.loopReadUDP(fd, ev)
+		return el.readUDP(fd, ev)
 	}
 
 	nfd, sa, err := unix.Accept(el.ln.fd)
@@ -87,5 +87,5 @@ func (el *eventloop) loopAccept(fd int, ev netpoll.IOEvent) error {
 		return err
 	}
 	el.connections[c.fd] = c
-	return el.loopOpen(c)
+	return el.open(c)
 }
