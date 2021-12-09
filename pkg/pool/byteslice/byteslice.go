@@ -47,7 +47,8 @@ func (p *Pool) Get(size int) []byte {
 	}
 	idx := index(uint32(size))
 	if v := p.pools[idx].Get(); v != nil {
-		return v.([]byte)[:size]
+		bp := v.(*[]byte)
+		return (*bp)[:size]
 	}
 	return make([]byte, 1<<idx)[:size]
 }
@@ -62,7 +63,7 @@ func (p *Pool) Put(buf []byte) {
 	if size != 1<<idx { // this byte slice is not from Pool.Get(), put it into the previous interval of idx
 		idx--
 	}
-	p.pools[idx].Put(buf)
+	p.pools[idx].Put(&buf)
 }
 
 func index(n uint32) uint32 {
