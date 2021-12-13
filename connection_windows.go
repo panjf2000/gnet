@@ -235,25 +235,19 @@ func (c *stdConn) RemoteAddr() net.Addr       { return c.remoteAddr }
 
 // ==================================== Concurrency-safe API's ====================================
 
-func (c *stdConn) AsyncWrite(buf []byte) (err error) {
-	var encodedBuf []byte
-	if encodedBuf, err = c.codec.Encode(c, buf); err == nil {
-		task := dataTaskPool.Get().(*dataTask)
-		task.run = c.write
-		task.buf = encodedBuf
-		c.loop.ch <- task
-	}
-	return
+func (c *stdConn) AsyncWrite(buf []byte) error {
+	task := dataTaskPool.Get().(*dataTask)
+	task.run = c.write
+	task.buf = buf
+	c.loop.ch <- task
+	return nil
 }
 
-func (c *stdConn) AsyncWritev(bs [][]byte) (err error) {
+func (c *stdConn) AsyncWritev(bs [][]byte) error {
 	for _, b := range bs {
-		err = c.AsyncWrite(b)
-		if err != nil {
-			return
-		}
+		_ = c.AsyncWrite(b)
 	}
-	return
+	return nil
 }
 
 func (c *stdConn) SendTo(buf []byte) (err error) {
