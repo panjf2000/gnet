@@ -14,7 +14,11 @@
 
 package listbuffer
 
-import bPool "github.com/panjf2000/gnet/pkg/pool/bytebuffer"
+import (
+	"math"
+
+	bPool "github.com/panjf2000/gnet/pkg/pool/bytebuffer"
+)
 
 // ByteBuffer is the node of the linked list of bytes.
 type ByteBuffer struct {
@@ -115,26 +119,43 @@ func (l *ListBuffer) PushBytesBack(p []byte) {
 	l.PushBack(&ByteBuffer{Buf: bb})
 }
 
-// PeekBytesList assembles the [][]byte based on the list of ByteBuffer,
+// PeekBytesList assembles the up to maxBytes of [][]byte based on the list of ByteBuffer,
 // it won't remove these nodes from l until DiscardBytes() is called.
-func (l *ListBuffer) PeekBytesList() [][]byte {
+func (l *ListBuffer) PeekBytesList(maxBytes int) [][]byte {
+	if maxBytes <= 0 {
+		maxBytes = math.MaxInt
+	}
 	l.bs = l.bs[:0]
+	var cum int
 	for iter := l.head; iter != nil; iter = iter.next {
 		l.bs = append(l.bs, iter.Buf.B)
+		if cum += iter.Buf.Len(); cum >= maxBytes {
+			break
+		}
 	}
 	return l.bs
 }
 
 // PeekBytesListWithBytes is like PeekBytesList but accepts [][]byte and puts them onto head.
-func (l *ListBuffer) PeekBytesListWithBytes(bs ...[]byte) [][]byte {
+func (l *ListBuffer) PeekBytesListWithBytes(maxBytes int, bs ...[]byte) [][]byte {
+	if maxBytes <= 0 {
+		maxBytes = math.MaxInt
+	}
 	l.bs = l.bs[:0]
+	var cum int
 	for _, b := range bs {
-		if len(b) > 0 {
+		if n := len(b); n > 0 {
 			l.bs = append(l.bs, b)
+			if cum += n; cum >= maxBytes {
+				return l.bs
+			}
 		}
 	}
 	for iter := l.head; iter != nil; iter = iter.next {
 		l.bs = append(l.bs, iter.Buf.B)
+		if cum += iter.Buf.Len(); cum >= maxBytes {
+			break
+		}
 	}
 	return l.bs
 }

@@ -153,15 +153,25 @@ func (el *eventloop) read(c *conn) error {
 	return nil
 }
 
+const (
+	// MaxBytesToWritePerLoop is the maximum amount of bytes to be sent in one system call.
+	MaxBytesToWritePerLoop = 64 * 1024
+	// MaxIovSize is IOV_MAX.
+	MaxIovSize = 1024
+)
+
 func (el *eventloop) write(c *conn) error {
 	el.eventHandler.PreWrite(c)
 
-	iov := c.outboundBuffer.Peek()
+	iov := c.outboundBuffer.Peek(MaxBytesToWritePerLoop)
 	var (
 		n   int
 		err error
 	)
 	if len(iov) > 1 {
+		if len(iov) > MaxIovSize {
+			iov = iov[:MaxIovSize]
+		}
 		n, err = io.Writev(c.fd, iov)
 	} else {
 		n, err = unix.Write(c.fd, iov[0])
@@ -205,8 +215,18 @@ func (el *eventloop) closeConn(c *conn, err error) (rerr error) {
 	// Send residual data in buffer back to the peer before actually closing the connection.
 	if !c.outboundBuffer.IsEmpty() {
 		el.eventHandler.PreWrite(c)
-		iov := c.outboundBuffer.Peek()
-		_, _ = io.Writev(c.fd, iov)
+		for !c.outboundBuffer.IsEmpty() {
+			iov := c.outboundBuffer.Peek(0)
+			if len(iov) > MaxIovSize {
+				iov = iov[:MaxIovSize]
+			}
+			n, err := io.Writev(c.fd, iov)
+			if err != nil && err != unix.EAGAIN {
+				el.getLogger().Errorf("closeConn: error occurs when sending data back to peer, %v", err)
+				break
+			}
+			c.outboundBuffer.Discard(n)
+		}
 		c.outboundBuffer.Release()
 	}
 

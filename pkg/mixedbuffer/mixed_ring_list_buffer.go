@@ -35,10 +35,10 @@ func New(maxTopBufCap int) *Buffer {
 	return &Buffer{maxStackingBytes: maxTopBufCap, ringBuffer: rbPool.GetWithSize(maxTopBufCap)}
 }
 
-// Peek returns all bytes as [][]byte, these bytes won't be discarded until Buffer.Discard() is called.
-func (mb *Buffer) Peek() [][]byte {
+// Peek returns n bytes as [][]byte, these bytes won't be discarded until Buffer.Discard() is called.
+func (mb *Buffer) Peek(n int) [][]byte {
 	head, tail := mb.ringBuffer.PeekAll()
-	return mb.listBuffer.PeekBytesListWithBytes(head, tail)
+	return mb.listBuffer.PeekBytesListWithBytes(n, head, tail)
 }
 
 // Discard discards n bytes in this buffer.
