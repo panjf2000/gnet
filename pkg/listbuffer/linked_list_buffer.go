@@ -123,7 +123,7 @@ func (l *ListBuffer) PushBytesBack(p []byte) {
 // it won't remove these nodes from l until DiscardBytes() is called.
 func (l *ListBuffer) PeekBytesList(maxBytes int) [][]byte {
 	if maxBytes <= 0 {
-		maxBytes = math.MaxInt
+		maxBytes = math.MaxInt32
 	}
 	l.bs = l.bs[:0]
 	var cum int
@@ -139,7 +139,7 @@ func (l *ListBuffer) PeekBytesList(maxBytes int) [][]byte {
 // PeekBytesListWithBytes is like PeekBytesList but accepts [][]byte and puts them onto head.
 func (l *ListBuffer) PeekBytesListWithBytes(maxBytes int, bs ...[]byte) [][]byte {
 	if maxBytes <= 0 {
-		maxBytes = math.MaxInt
+		maxBytes = math.MaxInt32
 	}
 	l.bs = l.bs[:0]
 	var cum int
