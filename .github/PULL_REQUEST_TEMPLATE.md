@@ -14,7 +14,7 @@ Was this change discussed in an issue first? That can help save time in case the
 It is not uncommon for pull requests to go through several, iterative reviews. Please be patient with us! Every reviewer is a volunteer, and each has their own style.
 -->
 
-## 1. Are you opening this pull request for bug-fixs, optimizations or new feature?
+## 1. Are you opening this pull request for bug-fixes, optimizations or new feature?
 
 
 

@@ -1,29 +1,23 @@
 // Copyright (c) 2019 Andy Pan
 //
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
+//     http://www.apache.org/licenses/LICENSE-2.0
 //
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-// SOFTWARE.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 package gnet
 
 import (
 	"time"
 
-	"github.com/panjf2000/gnet/internal/logging"
+	"github.com/panjf2000/gnet/pkg/logging"
 )
 
 // Option is a function that will set up option.
@@ -46,36 +40,43 @@ const (
 	TCPDelay
 )
 
-// Options are set when the client opens.
+// Options are configurations for the gnet application.
 type Options struct {
+	// ================================== Options for only server-side ==================================
+
 	// Multicore indicates whether the server will be effectively created with multi-cores, if so,
 	// then you must take care with synchronizing memory between all event callbacks, otherwise,
 	// it will run the server with single thread. The number of threads in the server will be automatically
 	// assigned to the value of logical CPUs usable by the current process.
 	Multicore bool
 
+	// NumEventLoop is set up to start the given number of event-loop goroutine.
+	// Note: Setting up NumEventLoop will override Multicore.
+	NumEventLoop int
+
+	// LB represents the load-balancing algorithm used when assigning new connections.
+	LB LoadBalancing
+
+	// ReuseAddr indicates whether to set up the SO_REUSEADDR socket option.
+	ReuseAddr bool
+
+	// ReusePort indicates whether to set up the SO_REUSEPORT socket option.
+	ReusePort bool
+
+	// ============================= Options for both server-side and client-side =============================
+
+	// ReadBufferCap is the maximum number of bytes that can be read from the peer when the readable event comes.
+	// The default value is 64KB, it can be reduced to avoid starving the subsequent connections.
+	//
+	// Note that ReadBufferCap will always be converted to the least power of two integer value greater than
+	// or equal to its real amount.
+	ReadBufferCap int
+
 	// LockOSThread is used to determine whether each I/O event-loop is associated to an OS thread, it is useful when you
 	// need some kind of mechanisms like thread local storage, or invoke certain C libraries (such as graphics lib: GLib)
 	// that require thread-level manipulation via cgo, or want all I/O event-loops to actually run in parallel for a
 	// potential higher performance.
 	LockOSThread bool
-
-	// ReadBufferCap is the maximum number of bytes that can be read from the client when the readable event comes.
-	// The default value is 16KB, it can be reduced to avoid starving subsequent client connections.
-	//
-	// Note that ReadBufferCap will be always converted to the least power of two integer value greater than
-	// or equal to its real amount.
-	ReadBufferCap int
-
-	// LB represents the load-balancing algorithm used when assigning new connections.
-	LB LoadBalancing
-
-	// NumEventLoop is set up to start the given number of event-loop goroutine.
-	// Note: Setting up NumEventLoop will override Multicore.
-	NumEventLoop int
-
-	// ReusePort indicates whether to set up the SO_REUSEPORT socket option.
-	ReusePort bool
 
 	// Ticker indicates whether the ticker has been set up.
 	Ticker bool
@@ -87,7 +88,7 @@ type Options struct {
 	// packet transmission in hopes of sending fewer packets (Nagle's algorithm).
 	//
 	// The default is true (no delay), meaning that data is sent
-	// as soon as possible after a Write.
+	// as soon as possible after a write operation.
 	TCPNoDelay TCPSocketOpt
 
 	// SocketRecvBuffer sets the maximum socket receive buffer in bytes.
@@ -98,6 +99,16 @@ type Options struct {
 
 	// ICodec encodes and decodes TCP stream.
 	Codec ICodec
+
+	// LogPath the local path where logs will be written, this is the easiest way to set up logging,
+	// gnet instantiates a default uber-go/zap logger with this given log path, you are also allowed to employ
+	// you own logger during the lifetime by implementing the following log.Logger interface.
+	//
+	// Note that this option can be overridden by the option Logger.
+	LogPath string
+
+	// LogLevel indicates the logging level, it should be used along with LogPath.
+	LogLevel logging.Level
 
 	// Logger is the customized logger for logging info, if it is not set,
 	// then gnet will use the default logger powered by go.uber.org/zap.
@@ -153,6 +164,13 @@ func WithReusePort(reusePort bool) Option {
 	}
 }
 
+// WithReuseAddr sets up SO_REUSEADDR socket option.
+func WithReuseAddr(reuseAddr bool) Option {
+	return func(opts *Options) {
+		opts.ReuseAddr = reuseAddr
+	}
+}
+
 // WithTCPKeepAlive sets up the SO_KEEPALIVE socket option with duration.
 func WithTCPKeepAlive(tcpKeepAlive time.Duration) Option {
 	return func(opts *Options) {
@@ -192,6 +210,20 @@ func WithTicker(ticker bool) Option {
 func WithCodec(codec ICodec) Option {
 	return func(opts *Options) {
 		opts.Codec = codec
+	}
+}
+
+// WithLogPath is an option to set up the local path of log file.
+func WithLogPath(fileName string) Option {
+	return func(opts *Options) {
+		opts.LogPath = fileName
+	}
+}
+
+// WithLogLevel is an option to set up the logging level.
+func WithLogLevel(lvl logging.Level) Option {
+	return func(opts *Options) {
+		opts.LogLevel = lvl
 	}
 }
 

@@ -1,37 +1,31 @@
 // Copyright (c) 2019 Andy Pan
 // Copyright (c) 2018 Joshua J Baker
 //
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
+//     http://www.apache.org/licenses/LICENSE-2.0
 //
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-// SOFTWARE.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
+//go:build linux || freebsd || dragonfly || darwin
 // +build linux freebsd dragonfly darwin
 
 package gnet
 
 import (
+	"context"
 	"runtime"
 	"sync"
 	"sync/atomic"
-	"time"
 
-	"github.com/panjf2000/gnet/errors"
-	"github.com/panjf2000/gnet/internal/logging"
 	"github.com/panjf2000/gnet/internal/netpoll"
+	"github.com/panjf2000/gnet/pkg/errors"
 )
 
 type server struct {
@@ -41,21 +35,18 @@ type server struct {
 	opts         *Options           // options with server
 	once         sync.Once          // make sure only signalShutdown once
 	cond         *sync.Cond         // shutdown signaler
-	codec        ICodec             // codec for TCP stream
-	logger       logging.Logger     // customized logger for logging info
-	ticktock     chan time.Duration // ticker channel
 	mainLoop     *eventloop         // main event-loop for accepting connections
 	inShutdown   int32              // whether the server is in shutdown
+	tickerCtx    context.Context    // context for ticker
+	cancelTicker context.CancelFunc // function to stop the ticker
 	eventHandler EventHandler       // user eventHandler
 }
-
-var serverFarm sync.Map
 
 func (svr *server) isInShutdown() bool {
 	return atomic.LoadInt32(&svr.inShutdown) == 1
 }
 
-// waitForShutdown waits for a signal to shutdown.
+// waitForShutdown waits for a signal to shut down.
 func (svr *server) waitForShutdown() {
 	svr.cond.L.Lock()
 	svr.cond.Wait()
@@ -75,7 +66,7 @@ func (svr *server) startEventLoops() {
 	svr.lb.iterate(func(i int, el *eventloop) bool {
 		svr.wg.Add(1)
 		go func() {
-			el.loopRun(svr.opts.LockOSThread)
+			el.run(svr.opts.LockOSThread)
 			svr.wg.Done()
 		}()
 		return true
@@ -93,7 +84,7 @@ func (svr *server) startSubReactors() {
 	svr.lb.iterate(func(i int, el *eventloop) bool {
 		svr.wg.Add(1)
 		go func() {
-			svr.activateSubReactor(el, svr.opts.LockOSThread)
+			el.activateSubReactor(svr.opts.LockOSThread)
 			svr.wg.Done()
 		}()
 		return true
@@ -101,31 +92,34 @@ func (svr *server) startSubReactors() {
 }
 
 func (svr *server) activateEventLoops(numEventLoop int) (err error) {
+	network, address := svr.ln.network, svr.ln.address
+	ln := svr.ln
+	svr.ln = nil
+	var striker *eventloop
 	// Create loops locally and bind the listeners.
 	for i := 0; i < numEventLoop; i++ {
-		l := svr.ln
-		if i > 0 && svr.opts.ReusePort {
-			if l, err = initListener(svr.ln.network, svr.ln.addr, svr.opts); err != nil {
+		if i > 0 {
+			if ln, err = initListener(network, address, svr.opts); err != nil {
 				return
 			}
 		}
-
 		var p *netpoll.Poller
 		if p, err = netpoll.OpenPoller(); err == nil {
 			el := new(eventloop)
-			el.ln = l
+			el.ln = ln
 			el.svr = svr
 			el.poller = p
-			el.packet = make([]byte, svr.opts.ReadBufferCap)
+			el.buffer = make([]byte, svr.opts.ReadBufferCap)
 			el.connections = make(map[int]*conn)
 			el.eventHandler = svr.eventHandler
-			el.calibrateCallback = svr.lb.calibrate
-			_ = el.poller.AddRead(el.ln.fd)
+			if err = el.poller.AddRead(el.ln.packPollAttachment(el.accept)); err != nil {
+				return
+			}
 			svr.lb.register(el)
 
 			// Start the ticker.
 			if el.idx == 0 && svr.opts.Ticker {
-				go el.loopTicker()
+				striker = el
 			}
 		} else {
 			return
@@ -134,6 +128,8 @@ func (svr *server) activateEventLoops(numEventLoop int) (err error) {
 
 	// Start event-loops in background.
 	svr.startEventLoops()
+
+	go striker.ticker(svr.tickerCtx)
 
 	return
 }
@@ -145,16 +141,10 @@ func (svr *server) activateReactors(numEventLoop int) error {
 			el.ln = svr.ln
 			el.svr = svr
 			el.poller = p
-			el.packet = make([]byte, svr.opts.ReadBufferCap)
+			el.buffer = make([]byte, svr.opts.ReadBufferCap)
 			el.connections = make(map[int]*conn)
 			el.eventHandler = svr.eventHandler
-			el.calibrateCallback = svr.lb.calibrate
 			svr.lb.register(el)
-
-			// Start the ticker.
-			if el.idx == 0 && svr.opts.Ticker {
-				go el.loopTicker()
-			}
 		} else {
 			return err
 		}
@@ -169,17 +159,25 @@ func (svr *server) activateReactors(numEventLoop int) error {
 		el.idx = -1
 		el.svr = svr
 		el.poller = p
-		_ = el.poller.AddRead(el.ln.fd)
+		el.eventHandler = svr.eventHandler
+		if err = el.poller.AddRead(svr.ln.packPollAttachment(svr.accept)); err != nil {
+			return err
+		}
 		svr.mainLoop = el
 
 		// Start main reactor in background.
 		svr.wg.Add(1)
 		go func() {
-			svr.activateMainReactor(svr.opts.LockOSThread)
+			el.activateMainReactor(svr.opts.LockOSThread)
 			svr.wg.Done()
 		}()
 	} else {
 		return err
+	}
+
+	// Start the ticker.
+	if svr.opts.Ticker {
+		go svr.mainLoop.ticker(svr.tickerCtx)
 	}
 
 	return nil
@@ -201,17 +199,19 @@ func (svr *server) stop(s Server) {
 
 	// Notify all loops to close by closing all listeners
 	svr.lb.iterate(func(i int, el *eventloop) bool {
-		sniffErrorAndLog(el.poller.Trigger(func() error {
-			return errors.ErrServerShutdown
-		}))
+		err := el.poller.UrgentTrigger(func(_ interface{}) error { return errors.ErrServerShutdown }, nil)
+		if err != nil {
+			svr.opts.Logger.Errorf("failed to call UrgentTrigger on sub event-loop when stopping server: %v", err)
+		}
 		return true
 	})
 
 	if svr.mainLoop != nil {
 		svr.ln.close()
-		sniffErrorAndLog(svr.mainLoop.poller.Trigger(func() error {
-			return errors.ErrServerShutdown
-		}))
+		err := svr.mainLoop.poller.UrgentTrigger(func(_ interface{}) error { return errors.ErrServerShutdown }, nil)
+		if err != nil {
+			svr.opts.Logger.Errorf("failed to call UrgentTrigger on main event-loop when stopping server: %v", err)
+		}
 	}
 
 	// Wait on all loops to complete reading events
@@ -220,12 +220,15 @@ func (svr *server) stop(s Server) {
 	svr.closeEventLoops()
 
 	if svr.mainLoop != nil {
-		sniffErrorAndLog(svr.mainLoop.poller.Close())
+		err := svr.mainLoop.poller.Close()
+		if err != nil {
+			svr.opts.Logger.Errorf("failed to close poller when stopping server: %v", err)
+		}
 	}
 
 	// Stop the ticker.
 	if svr.opts.Ticker {
-		close(svr.ticktock)
+		svr.cancelTicker()
 	}
 
 	atomic.StoreInt32(&svr.inShutdown, 1)
@@ -256,24 +259,22 @@ func serve(eventHandler EventHandler, listener *listener, options *Options, prot
 	}
 
 	svr.cond = sync.NewCond(&sync.Mutex{})
-	svr.ticktock = make(chan time.Duration, channelBuffer)
-	svr.logger = logging.DefaultLogger
-	svr.codec = func() ICodec {
-		if options.Codec == nil {
-			return new(BuiltInFrameCodec)
-		}
-		return options.Codec
-	}()
+	if svr.opts.Ticker {
+		svr.tickerCtx, svr.cancelTicker = context.WithCancel(context.Background())
+	}
+	if options.Codec == nil {
+		svr.opts.Codec = new(BuiltInFrameCodec)
+	}
 
-	server := Server{
+	s := Server{
 		svr:          svr,
 		Multicore:    options.Multicore,
-		Addr:         listener.lnaddr,
+		Addr:         listener.addr,
 		NumEventLoop: numEventLoop,
 		ReusePort:    options.ReusePort,
 		TCPKeepAlive: options.TCPKeepAlive,
 	}
-	switch svr.eventHandler.OnInitComplete(server) {
+	switch svr.eventHandler.OnInitComplete(s) {
 	case None:
 	case Shutdown:
 		return nil
@@ -281,12 +282,12 @@ func serve(eventHandler EventHandler, listener *listener, options *Options, prot
 
 	if err := svr.start(numEventLoop); err != nil {
 		svr.closeEventLoops()
-		svr.logger.Errorf("gnet server is stopping with error: %v", err)
+		svr.opts.Logger.Errorf("gnet server is stopping with error: %v", err)
 		return err
 	}
-	defer svr.stop(server)
+	defer svr.stop(s)
 
-	serverFarm.Store(protoAddr, svr)
+	allServers.Store(protoAddr, svr)
 
 	return nil
 }

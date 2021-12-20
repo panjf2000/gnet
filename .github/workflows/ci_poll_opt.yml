@@ -1,0 +1,63 @@
+name: Tests-poll_opt
+
+on:
+  push:
+    branches:
+      - master
+      - dev
+    paths-ignore:
+      - '**.md'
+  pull_request:
+    branches:
+      - master
+      - dev
+    paths-ignore:
+      - '**.md'
+
+env:
+  GO111MODULE: on
+  GOPROXY: "https://proxy.golang.org"
+
+jobs:
+  test:
+    name: Go-Test
+    strategy:
+      fail-fast: false
+      matrix:
+        go: [1.15.x, 1.16.x]
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os}}
+    steps:
+      - name: Installing Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go }}
+
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Print Go environment
+        id: vars
+        run: |
+          printf "Using go at: $(which go)\n"
+          printf "Go version: $(go version)\n"
+          printf "\n\nGo environment:\n\n"
+          go env
+          printf "\n\nSystem environment:\n\n"
+          env
+          # Calculate the short SHA1 hash of the git commit
+          echo "::set-output name=short_sha::$(git rev-parse --short HEAD)"
+          echo "::set-output name=go_cache::$(go env GOCACHE)"
+
+      - name: Cache go modules
+        uses: actions/cache@v2
+        with:
+          path: |
+            ${{ steps.vars.outputs.go_cache }}
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-${{ matrix.go }}-go-ci-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.go }}-go-ci
+
+      - name: Run integration testing with poll_opt build tag
+        run: go test -v -tags=poll_opt -timeout 120s

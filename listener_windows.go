@@ -1,22 +1,16 @@
 // Copyright (c) 2019 Andy Pan
 //
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
+//     http://www.apache.org/licenses/LICENSE-2.0
 //
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-// SOFTWARE.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 package gnet
 
@@ -25,37 +19,38 @@ import (
 	"os"
 	"sync"
 
-	"github.com/panjf2000/gnet/errors"
 	"github.com/panjf2000/gnet/internal/netpoll"
+	"github.com/panjf2000/gnet/pkg/errors"
+	"github.com/panjf2000/gnet/pkg/logging"
 )
 
 type listener struct {
-	once          sync.Once
-	ln            net.Listener
-	pconn         net.PacketConn
-	lnaddr        net.Addr
-	addr, network string
+	once             sync.Once
+	ln               net.Listener
+	packetConn       net.PacketConn
+	addr             net.Addr
+	address, network string
 }
 
-func (ln *listener) Dup() (int, string, error) {
+func (ln *listener) dup() (int, string, error) {
 	return netpoll.Dup(0)
 }
 
 func (ln *listener) normalize() (err error) {
 	switch ln.network {
 	case "unix":
-		sniffErrorAndLog(os.RemoveAll(ln.addr))
+		logging.Error(os.RemoveAll(ln.address))
 		fallthrough
 	case "tcp", "tcp4", "tcp6":
-		if ln.ln, err = net.Listen(ln.network, ln.addr); err != nil {
+		if ln.ln, err = net.Listen(ln.network, ln.address); err != nil {
 			return
 		}
-		ln.lnaddr = ln.ln.Addr()
+		ln.addr = ln.ln.Addr()
 	case "udp", "udp4", "udp6":
-		if ln.pconn, err = net.ListenPacket(ln.network, ln.addr); err != nil {
+		if ln.packetConn, err = net.ListenPacket(ln.network, ln.address); err != nil {
 			return
 		}
-		ln.lnaddr = ln.pconn.LocalAddr()
+		ln.addr = ln.packetConn.LocalAddr()
 	default:
 		err = errors.ErrUnsupportedProtocol
 	}
@@ -65,19 +60,19 @@ func (ln *listener) normalize() (err error) {
 func (ln *listener) close() {
 	ln.once.Do(func() {
 		if ln.ln != nil {
-			sniffErrorAndLog(ln.ln.Close())
+			logging.Error(ln.ln.Close())
 		}
-		if ln.pconn != nil {
-			sniffErrorAndLog(ln.pconn.Close())
+		if ln.packetConn != nil {
+			logging.Error(ln.packetConn.Close())
 		}
 		if ln.network == "unix" {
-			sniffErrorAndLog(os.RemoveAll(ln.addr))
+			logging.Error(os.RemoveAll(ln.address))
 		}
 	})
 }
 
 func initListener(network, addr string, _ *Options) (l *listener, err error) {
-	l = &listener{network: network, addr: addr}
+	l = &listener{network: network, address: addr}
 	err = l.normalize()
 	return
 }

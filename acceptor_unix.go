@@ -1,64 +1,91 @@
-// Copyright (c) 2019 Andy Pan
+// Copyright (c) 2021 Andy Pan
 //
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
+//     http://www.apache.org/licenses/LICENSE-2.0
 //
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-// SOFTWARE.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
+//go:build linux || freebsd || dragonfly || darwin
 // +build linux freebsd dragonfly darwin
 
 package gnet
 
 import (
 	"os"
+	"time"
 
-	"github.com/panjf2000/gnet/errors"
-	"github.com/panjf2000/gnet/internal/socket"
 	"golang.org/x/sys/unix"
+
+	"github.com/panjf2000/gnet/internal/netpoll"
+	"github.com/panjf2000/gnet/internal/socket"
+	"github.com/panjf2000/gnet/pkg/errors"
+	"github.com/panjf2000/gnet/pkg/logging"
 )
 
-func (svr *server) acceptNewConnection(fd int) error {
+func (svr *server) accept(fd int, _ netpoll.IOEvent) error {
 	nfd, sa, err := unix.Accept(fd)
 	if err != nil {
 		if err == unix.EAGAIN {
 			return nil
 		}
+		svr.opts.Logger.Errorf("Accept() fails due to error: %v", err)
 		return errors.ErrAcceptSocket
 	}
 	if err = os.NewSyscallError("fcntl nonblock", unix.SetNonblock(nfd, true)); err != nil {
 		return err
 	}
 
-	netAddr := socket.SockaddrToTCPOrUnixAddr(sa)
-	el := svr.lb.next(netAddr)
-	c := newTCPConn(nfd, el, sa, netAddr)
+	remoteAddr := socket.SockaddrToTCPOrUnixAddr(sa)
+	if svr.opts.TCPKeepAlive > 0 && svr.ln.network == "tcp" {
+		err = socket.SetKeepAlive(nfd, int(svr.opts.TCPKeepAlive/time.Second))
+		logging.Error(err)
+	}
 
-	err = el.poller.Trigger(func() (err error) {
-		if err = el.poller.AddRead(nfd); err != nil {
-			_ = unix.Close(nfd)
-			c.releaseTCP()
-			return
-		}
-		el.connections[nfd] = c
-		err = el.loopOpen(c)
-		return
-	})
+	el := svr.lb.next(remoteAddr)
+	c := newTCPConn(nfd, el, sa, svr.opts.Codec, el.ln.addr, remoteAddr)
+
+	err = el.poller.UrgentTrigger(el.register, c)
 	if err != nil {
 		_ = unix.Close(nfd)
 		c.releaseTCP()
 	}
 	return nil
+}
+
+func (el *eventloop) accept(fd int, ev netpoll.IOEvent) error {
+	if el.ln.network == "udp" {
+		return el.readUDP(fd, ev)
+	}
+
+	nfd, sa, err := unix.Accept(el.ln.fd)
+	if err != nil {
+		if err == unix.EAGAIN {
+			return nil
+		}
+		el.getLogger().Errorf("Accept() fails due to error: %v", err)
+		return os.NewSyscallError("accept", err)
+	}
+	if err = os.NewSyscallError("fcntl nonblock", unix.SetNonblock(nfd, true)); err != nil {
+		return err
+	}
+
+	remoteAddr := socket.SockaddrToTCPOrUnixAddr(sa)
+	if el.svr.opts.TCPKeepAlive > 0 && el.ln.network == "tcp" {
+		err = socket.SetKeepAlive(nfd, int(el.svr.opts.TCPKeepAlive/time.Second))
+		logging.Error(err)
+	}
+
+	c := newTCPConn(nfd, el, sa, el.svr.opts.Codec, el.ln.addr, remoteAddr)
+	if err = el.poller.AddRead(c.pollAttachment); err != nil {
+		return err
+	}
+	el.connections[c.fd] = c
+	return el.open(c)
 }
