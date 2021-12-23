@@ -214,7 +214,6 @@ func (el *eventloop) closeConn(c *conn, err error) (rerr error) {
 
 	// Send residual data in buffer back to the peer before actually closing the connection.
 	if !c.outboundBuffer.IsEmpty() {
-		el.eventHandler.PreWrite(c)
 		for !c.outboundBuffer.IsEmpty() {
 			iov := c.outboundBuffer.Peek(0)
 			if len(iov) > MaxIovSize {
@@ -227,30 +226,27 @@ func (el *eventloop) closeConn(c *conn, err error) (rerr error) {
 			}
 			c.outboundBuffer.Discard(n)
 		}
-		c.outboundBuffer.Release()
 	}
 
-	if err0, err1 := el.poller.Delete(c.fd), unix.Close(c.fd); err0 == nil && err1 == nil {
-		delete(el.connections, c.fd)
-		el.addConn(-1)
-
-		if el.eventHandler.OnClosed(c, err) == Shutdown {
-			return gerrors.ErrServerShutdown
-		}
-		c.releaseTCP()
-	} else {
-		if err0 != nil {
-			rerr = fmt.Errorf("failed to delete fd=%d from poller in event-loop(%d): %v", c.fd, el.idx, err0)
-		}
-		if err1 != nil {
-			err1 = fmt.Errorf("failed to close fd=%d in event-loop(%d): %v", c.fd, el.idx, os.NewSyscallError("close", err1))
-			if rerr != nil {
-				rerr = errors.New(rerr.Error() + " & " + err1.Error())
-			} else {
-				rerr = err1
-			}
+	err0, err1 := el.poller.Delete(c.fd), unix.Close(c.fd)
+	if err0 != nil {
+		rerr = fmt.Errorf("failed to delete fd=%d from poller in event-loop(%d): %v", c.fd, el.idx, err0)
+	}
+	if err1 != nil {
+		err1 = fmt.Errorf("failed to close fd=%d in event-loop(%d): %v", c.fd, el.idx, os.NewSyscallError("close", err1))
+		if rerr != nil {
+			rerr = errors.New(rerr.Error() + " & " + err1.Error())
+		} else {
+			rerr = err1
 		}
 	}
+
+	delete(el.connections, c.fd)
+	el.addConn(-1)
+	if el.eventHandler.OnClosed(c, err) == Shutdown {
+		rerr = gerrors.ErrServerShutdown
+	}
+	c.releaseTCP()
 
 	return
 }

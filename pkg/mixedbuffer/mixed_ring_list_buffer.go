@@ -99,11 +99,18 @@ func (mb *Buffer) Writev(bs [][]byte) (int, error) {
 
 // IsEmpty indicates whether this buffer is empty.
 func (mb *Buffer) IsEmpty() bool {
+	if mb.ringBuffer == nil {
+		return true
+	}
 	return mb.ringBuffer.IsEmpty() && mb.listBuffer.IsEmpty()
 }
 
 // Release frees all resource of this buffer.
 func (mb *Buffer) Release() {
+	if mb.ringBuffer == nil {
+		return
+	}
 	rbPool.Put(mb.ringBuffer)
+	mb.ringBuffer = nil
 	mb.listBuffer.Reset()
 }
