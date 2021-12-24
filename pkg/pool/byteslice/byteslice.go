@@ -17,7 +17,10 @@ package byteslice
 import (
 	"math"
 	"math/bits"
+	"reflect"
+	"runtime"
 	"sync"
+	"unsafe"
 )
 
 var builtinPool Pool
@@ -38,7 +41,7 @@ func Put(buf []byte) {
 }
 
 // Get retrieves a byte slice of the length requested by the caller from pool or allocates a new one.
-func (p *Pool) Get(size int) []byte {
+func (p *Pool) Get(size int) (buf []byte) {
 	if size <= 0 {
 		return nil
 	}
@@ -46,11 +49,16 @@ func (p *Pool) Get(size int) []byte {
 		return make([]byte, size)
 	}
 	idx := index(uint32(size))
-	if v := p.pools[idx].Get(); v != nil {
-		bp := v.(*[]byte)
-		return (*bp)[:size]
+	ptr, _ := p.pools[idx].Get().(unsafe.Pointer)
+	if ptr == nil {
+		return make([]byte, 1<<idx)[:size]
 	}
-	return make([]byte, 1<<idx)[:size]
+	sh := (*reflect.SliceHeader)(unsafe.Pointer(&buf))
+	sh.Data = uintptr(ptr)
+	sh.Len = size
+	sh.Cap = 1 << idx
+	runtime.KeepAlive(ptr)
+	return
 }
 
 // Put returns the byte slice to the pool.
@@ -63,7 +71,8 @@ func (p *Pool) Put(buf []byte) {
 	if size != 1<<idx { // this byte slice is not from Pool.Get(), put it into the previous interval of idx
 		idx--
 	}
-	p.pools[idx].Put(&buf)
+	// array pointer
+	p.pools[idx].Put(unsafe.Pointer(&buf[:1][0]))
 }
 
 func index(n uint32) uint32 {
