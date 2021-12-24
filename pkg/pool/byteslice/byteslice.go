@@ -53,10 +53,10 @@ func (p *Pool) Get(size int) (buf []byte) {
 	if ptr == nil {
 		return make([]byte, 1<<idx)[:size]
 	}
-	slice := (*reflect.SliceHeader)(unsafe.Pointer(&buf))
-	slice.Data = uintptr(ptr)
-	slice.Len = size
-	slice.Cap = 1 << idx
+	sh := (*reflect.SliceHeader)(unsafe.Pointer(&buf))
+	sh.Data = uintptr(ptr)
+	sh.Len = size
+	sh.Cap = 1 << idx
 	runtime.KeepAlive(ptr)
 	return
 }
