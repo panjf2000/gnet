@@ -19,7 +19,7 @@ import (
 	"net"
 	"sync"
 
-	"github.com/panjf2000/gnet/pkg/pool/bytebuffer"
+	bbPool "github.com/panjf2000/gnet/pkg/pool/bytebuffer"
 	rbPool "github.com/panjf2000/gnet/pkg/pool/ringbuffer"
 	"github.com/panjf2000/gnet/pkg/ringbuffer"
 )
@@ -41,7 +41,7 @@ type dataTask struct {
 
 type tcpConn struct {
 	c  *stdConn
-	bb *bytebuffer.ByteBuffer
+	bb *bbPool.ByteBuffer
 }
 
 type udpConn struct {
@@ -57,17 +57,17 @@ type stdConn struct {
 	ctx           interface{}            // user-defined context
 	conn          net.Conn               // original connection
 	loop          *eventloop             // owner event-loop
-	buffer        *bytebuffer.ByteBuffer // reuse memory of inbound data as a temporary buffer
+	buffer        *bbPool.ByteBuffer     // reuse memory of inbound data as a temporary buffer
 	codec         ICodec                 // codec for TCP
 	localAddr     net.Addr               // local server addr
 	remoteAddr    net.Addr               // remote peer addr
-	byteBuffer    *bytebuffer.ByteBuffer // bytes buffer for buffering current packet and data in ring-buffer
+	byteBuffer    *bbPool.ByteBuffer     // bytes buffer for buffering current packet and data in ring-buffer
 	inboundBuffer *ringbuffer.RingBuffer // buffer for data from the peer
 }
 
 func packTCPConn(c *stdConn, buf []byte) *tcpConn {
 	packet := &tcpConn{c: c}
-	packet.bb = bytebuffer.Get()
+	packet.bb = bbPool.Get()
 	_, _ = packet.bb.Write(buf)
 	return packet
 }
@@ -116,14 +116,14 @@ func (c *stdConn) releaseTCP() {
 	c.conn = nil
 	rbPool.Put(c.inboundBuffer)
 	c.inboundBuffer = ringbuffer.EmptyRingBuffer
-	bytebuffer.Put(c.buffer)
+	bbPool.Put(c.buffer)
 	c.buffer = nil
 }
 
 func newUDPConn(el *eventloop, localAddr, remoteAddr net.Addr) *stdConn {
 	return &stdConn{
 		loop:       el,
-		buffer:     bytebuffer.Get(),
+		buffer:     bbPool.Get(),
 		localAddr:  localAddr,
 		remoteAddr: remoteAddr,
 	}
@@ -132,7 +132,7 @@ func newUDPConn(el *eventloop, localAddr, remoteAddr net.Addr) *stdConn {
 func (c *stdConn) releaseUDP() {
 	c.ctx = nil
 	c.localAddr = nil
-	bytebuffer.Put(c.buffer)
+	bbPool.Put(c.buffer)
 	c.buffer = nil
 }
 
@@ -166,7 +166,7 @@ func (c *stdConn) Read() []byte {
 func (c *stdConn) ResetBuffer() {
 	c.buffer.Reset()
 	c.inboundBuffer.Reset()
-	bytebuffer.Put(c.byteBuffer)
+	bbPool.Put(c.byteBuffer)
 	c.byteBuffer = nil
 }
 
@@ -182,7 +182,7 @@ func (c *stdConn) ReadN(n int) (size int, buf []byte) {
 		return
 	}
 	head, tail := c.inboundBuffer.Peek(n)
-	c.byteBuffer = bytebuffer.Get()
+	c.byteBuffer = bbPool.Get()
 	_, _ = c.byteBuffer.Write(head)
 	_, _ = c.byteBuffer.Write(tail)
 	if inBufferLen >= n {
@@ -210,7 +210,7 @@ func (c *stdConn) ShiftN(n int) (size int) {
 		return
 	}
 
-	bytebuffer.Put(c.byteBuffer)
+	bbPool.Put(c.byteBuffer)
 	c.byteBuffer = nil
 
 	if inBufferLen >= n {

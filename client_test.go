@@ -30,8 +30,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/panjf2000/gnet/pkg/logging"
-	"github.com/panjf2000/gnet/pkg/pool/bytebuffer"
-	"github.com/panjf2000/gnet/pkg/pool/goroutine"
+	bbPool "github.com/panjf2000/gnet/pkg/pool/bytebuffer"
+	goPool "github.com/panjf2000/gnet/pkg/pool/goroutine"
 )
 
 type clientEvents struct {
@@ -213,7 +213,7 @@ type testCodecClientServer struct {
 	connected    int32
 	disconnected int32
 	codec        ICodec
-	workerPool   *goroutine.Pool
+	workerPool   *goPool.Pool
 }
 
 func (s *testCodecClientServer) OnOpened(c Conn) (out []byte, action Action) {
@@ -286,7 +286,7 @@ func testCodecServeWithGnetClient(
 	}
 	ts := &testCodecClientServer{
 		tester: t, network: network, addr: addr, multicore: multicore, async: async,
-		codec: codec, workerPool: goroutine.Default(), nclients: nclients,
+		codec: codec, workerPool: goPool.Default(), nclients: nclients,
 	}
 	ts.clientEV = &clientEvents{packetLen: packetLen}
 	ts.client, err = NewClient(
@@ -488,7 +488,7 @@ type testClientServer struct {
 	connected    int32
 	clientActive int32
 	disconnected int32
-	workerPool   *goroutine.Pool
+	workerPool   *goPool.Pool
 }
 
 func (s *testClientServer) OnInitComplete(svr Server) (action Action) {
@@ -524,7 +524,7 @@ func (s *testClientServer) OnClosed(c Conn, err error) (action Action) {
 
 func (s *testClientServer) React(packet []byte, c Conn) (out []byte, action Action) {
 	if s.async {
-		buf := bytebuffer.Get()
+		buf := bbPool.Get()
 		_, _ = buf.Write(packet)
 
 		if s.network == "tcp" || s.network == "unix" {
@@ -573,7 +573,7 @@ func testServeWithGnetClient(t *testing.T, network, addr string, reuseport, reus
 		multicore:  multicore,
 		async:      async,
 		nclients:   nclients,
-		workerPool: goroutine.Default(),
+		workerPool: goPool.Default(),
 	}
 	var err error
 	ts.clientEV = &clientEvents{packetLen: streamLen, svr: ts}

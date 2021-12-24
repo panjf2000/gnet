@@ -23,7 +23,7 @@ import (
 
 	"github.com/panjf2000/gnet/pkg/errors"
 	"github.com/panjf2000/gnet/pkg/logging"
-	"github.com/panjf2000/gnet/pkg/pool/bytebuffer"
+	bbPool "github.com/panjf2000/gnet/pkg/pool/bytebuffer"
 )
 
 type eventloop struct {
@@ -125,8 +125,8 @@ func (el *eventloop) read(c *stdConn) error {
 			return errors.ErrServerShutdown
 		}
 	}
-	_, _ = c.inboundBuffer.Write(c.buffer.Bytes())
-	bytebuffer.Put(c.buffer)
+	_, _ = c.inboundBuffer.Write(c.buffer.B)
+	bbPool.Put(c.buffer)
 	c.buffer = nil
 
 	return nil

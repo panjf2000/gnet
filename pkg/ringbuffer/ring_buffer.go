@@ -23,8 +23,8 @@ import (
 	"errors"
 
 	"github.com/panjf2000/gnet/internal/toolkit"
-	"github.com/panjf2000/gnet/pkg/pool/bytebuffer"
-	"github.com/panjf2000/gnet/pkg/pool/byteslice"
+	bbPool "github.com/panjf2000/gnet/pkg/pool/bytebuffer"
+	bsPool "github.com/panjf2000/gnet/pkg/pool/byteslice"
 )
 
 const (
@@ -311,17 +311,17 @@ func (rb *RingBuffer) WriteString(s string) (int, error) {
 }
 
 // ByteBuffer returns all available read bytes. It does not move the read pointer and only copy the available data.
-func (rb *RingBuffer) ByteBuffer() *bytebuffer.ByteBuffer {
+func (rb *RingBuffer) ByteBuffer() *bbPool.ByteBuffer {
 	if rb.isEmpty {
 		return nil
 	} else if rb.w == rb.r {
-		bb := bytebuffer.Get()
+		bb := bbPool.Get()
 		_, _ = bb.Write(rb.buf[rb.r:])
 		_, _ = bb.Write(rb.buf[:rb.w])
 		return bb
 	}
 
-	bb := bytebuffer.Get()
+	bb := bbPool.Get()
 	if rb.w > rb.r {
 		_, _ = bb.Write(rb.buf[rb.r:rb.w])
 		return bb
@@ -338,18 +338,18 @@ func (rb *RingBuffer) ByteBuffer() *bytebuffer.ByteBuffer {
 
 // WithByteBuffer combines the available read bytes and the given bytes. It does not move the read pointer and
 // only copy the available data.
-func (rb *RingBuffer) WithByteBuffer(b []byte) *bytebuffer.ByteBuffer {
+func (rb *RingBuffer) WithByteBuffer(b []byte) *bbPool.ByteBuffer {
 	if rb.isEmpty {
-		return &bytebuffer.ByteBuffer{B: b}
+		return &bbPool.ByteBuffer{B: b}
 	} else if rb.w == rb.r {
-		bb := bytebuffer.Get()
+		bb := bbPool.Get()
 		_, _ = bb.Write(rb.buf[rb.r:])
 		_, _ = bb.Write(rb.buf[:rb.w])
 		_, _ = bb.Write(b)
 		return bb
 	}
 
-	bb := bytebuffer.Get()
+	bb := bbPool.Get()
 	if rb.w > rb.r {
 		_, _ = bb.Write(rb.buf[rb.r:rb.w])
 		_, _ = bb.Write(b)
@@ -406,10 +406,10 @@ func (rb *RingBuffer) grow(newCap int) {
 			}
 		}
 	}
-	newBuf := byteslice.Get(newCap)
+	newBuf := bsPool.Get(newCap)
 	oldLen := rb.Length()
 	_, _ = rb.Read(newBuf)
-	byteslice.Put(rb.buf)
+	bsPool.Put(rb.buf)
 	rb.buf = newBuf
 	rb.r = 0
 	rb.w = oldLen

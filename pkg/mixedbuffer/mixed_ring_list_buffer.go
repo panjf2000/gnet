@@ -25,14 +25,14 @@ import (
 // list-buffer if the data size of ring-buffer reaches the maximum(MaxStackingBytes), list-buffer is more
 // flexible and scalable, which helps the application reduce memory footprint.
 type Buffer struct {
-	maxStackingBytes int
-	ringBuffer       *ringbuffer.RingBuffer
-	listBuffer       listbuffer.ListBuffer
+	maxStaticBytes int
+	ringBuffer     *ringbuffer.RingBuffer
+	listBuffer     listbuffer.ListBuffer
 }
 
 // New instantiates a mixedbuffer.Buffer and returns it.
-func New(maxTopBufCap int) *Buffer {
-	return &Buffer{maxStackingBytes: maxTopBufCap, ringBuffer: rbPool.GetWithSize(maxTopBufCap)}
+func New(maxStaticBytes int) *Buffer {
+	return &Buffer{maxStaticBytes: maxStaticBytes, ringBuffer: rbPool.Get()}
 }
 
 // Peek returns n bytes as [][]byte, these bytes won't be discarded until Buffer.Discard() is called.
@@ -54,22 +54,24 @@ func (mb *Buffer) Discard(n int) {
 
 // Write appends data to this buffer.
 func (mb *Buffer) Write(p []byte) (n int, err error) {
-	if !mb.listBuffer.IsEmpty() || mb.ringBuffer.Length() >= mb.maxStackingBytes {
+	if !mb.listBuffer.IsEmpty() || mb.ringBuffer.Length() >= mb.maxStaticBytes {
 		mb.listBuffer.PushBytesBack(p)
 		return len(p), nil
 	}
-	freeSize := mb.ringBuffer.Free()
-	if len(p) > freeSize {
-		n, err = mb.ringBuffer.Write(p[:freeSize])
-		mb.listBuffer.PushBytesBack(p[n:])
-		return
+	if mb.ringBuffer.Len() >= mb.maxStaticBytes {
+		freeSize := mb.ringBuffer.Free()
+		if n = len(p); n > freeSize {
+			_, _ = mb.ringBuffer.Write(p[:freeSize])
+			mb.listBuffer.PushBytesBack(p[freeSize:])
+			return
+		}
 	}
 	return mb.ringBuffer.Write(p)
 }
 
 // Writev appends multiple byte slices to this buffer.
 func (mb *Buffer) Writev(bs [][]byte) (int, error) {
-	if !mb.listBuffer.IsEmpty() || mb.ringBuffer.Length() >= mb.maxStackingBytes {
+	if !mb.listBuffer.IsEmpty() || mb.ringBuffer.Length() >= mb.maxStaticBytes {
 		var n int
 		for _, b := range bs {
 			mb.listBuffer.PushBytesBack(b)
@@ -77,24 +79,27 @@ func (mb *Buffer) Writev(bs [][]byte) (int, error) {
 		}
 		return n, nil
 	}
-	var pos, sum int
+	var pos, cum int
 	freeSize := mb.ringBuffer.Free()
+	if mb.ringBuffer.Len() < mb.maxStaticBytes {
+		freeSize = mb.maxStaticBytes - mb.ringBuffer.Length()
+	}
 	for i, b := range bs {
 		pos = i
-		sum += len(b)
+		cum += len(b)
 		if len(b) > freeSize {
-			n, _ := mb.ringBuffer.Write(b[:freeSize])
-			mb.listBuffer.PushBytesBack(b[n:])
+			_, _ = mb.ringBuffer.Write(b[:freeSize])
+			mb.listBuffer.PushBytesBack(b[freeSize:])
 			break
 		}
 		n, _ := mb.ringBuffer.Write(b)
 		freeSize -= n
 	}
 	for pos++; pos < len(bs); pos++ {
-		sum += len(bs[pos])
+		cum += len(bs[pos])
 		mb.listBuffer.PushBytesBack(bs[pos])
 	}
-	return sum, nil
+	return cum, nil
 }
 
 // IsEmpty indicates whether this buffer is empty.

@@ -28,8 +28,8 @@ import (
 	"github.com/panjf2000/gnet/internal/netpoll"
 	"github.com/panjf2000/gnet/internal/socket"
 	"github.com/panjf2000/gnet/pkg/mixedbuffer"
-	"github.com/panjf2000/gnet/pkg/pool/bytebuffer"
-	"github.com/panjf2000/gnet/pkg/pool/byteslice"
+	bbPool "github.com/panjf2000/gnet/pkg/pool/bytebuffer"
+	bsPool "github.com/panjf2000/gnet/pkg/pool/byteslice"
 	rbPool "github.com/panjf2000/gnet/pkg/pool/ringbuffer"
 	"github.com/panjf2000/gnet/pkg/ringbuffer"
 )
@@ -40,12 +40,13 @@ type conn struct {
 	peer           unix.Sockaddr           // remote socket address
 	loop           *eventloop              // connected event-loop
 	codec          ICodec                  // codec for TCP
+	cache          *bbPool.ByteBuffer      // temporary buffer in each event-loop
+	buffer         []byte                  // buffer for the latest bytes
 	opened         bool                    // connection opened event fired
 	packets        [][]byte                // reuse it for multiple byte slices
 	localAddr      net.Addr                // local addr
 	remoteAddr     net.Addr                // remote addr
 	inboundBuffer  *ringbuffer.RingBuffer  // buffer for leftover data from the peer
-	transitBuffer  *bytebuffer.ByteBuffer  // buffer for a complete packet
 	outboundBuffer *mixedbuffer.Buffer     // buffer for data that is eligible to be sent to the peer
 	pollAttachment *netpoll.PollAttachment // connection attachment for poller
 }
@@ -58,7 +59,7 @@ func newTCPConn(fd int, el *eventloop, sa unix.Sockaddr, codec ICodec, localAddr
 		codec:          codec,
 		localAddr:      localAddr,
 		remoteAddr:     remoteAddr,
-		inboundBuffer:  rbPool.GetWithSize(ringbuffer.MaxStreamBufferCap),
+		inboundBuffer:  rbPool.Get(),
 		outboundBuffer: mixedbuffer.New(ringbuffer.MaxStreamBufferCap),
 	}
 	c.pollAttachment = netpoll.GetPollAttachment()
@@ -70,20 +71,23 @@ func (c *conn) releaseTCP() {
 	c.opened = false
 	c.peer = nil
 	c.ctx = nil
+	c.packets = nil
+	c.buffer = nil
 	if addr, ok := c.localAddr.(*net.TCPAddr); ok && c.localAddr != c.loop.ln.addr {
-		byteslice.Put(addr.IP)
+		bsPool.Put(addr.IP)
 	}
 	if addr, ok := c.remoteAddr.(*net.TCPAddr); ok {
-		byteslice.Put(addr.IP)
+		bsPool.Put(addr.IP)
 	}
 	c.localAddr = nil
 	c.remoteAddr = nil
 	rbPool.Put(c.inboundBuffer)
 	c.inboundBuffer = ringbuffer.EmptyRingBuffer
 	c.outboundBuffer.Release()
+	bbPool.Put(c.cache)
+	c.cache = nil
 	netpoll.PutPollAttachment(c.pollAttachment)
 	c.pollAttachment = nil
-	c.packets = c.packets[:0]
 }
 
 func newUDPConn(fd int, el *eventloop, localAddr net.Addr, sa unix.Sockaddr, connected bool) (c *conn) {
@@ -103,10 +107,10 @@ func newUDPConn(fd int, el *eventloop, localAddr net.Addr, sa unix.Sockaddr, con
 func (c *conn) releaseUDP() {
 	c.ctx = nil
 	if addr, ok := c.localAddr.(*net.UDPAddr); ok && c.localAddr != c.loop.ln.addr {
-		byteslice.Put(addr.IP)
+		bsPool.Put(addr.IP)
 	}
 	if addr, ok := c.remoteAddr.(*net.UDPAddr); ok {
-		byteslice.Put(addr.IP)
+		bsPool.Put(addr.IP)
 	}
 	c.localAddr = nil
 	c.remoteAddr = nil
@@ -250,56 +254,72 @@ func (c *conn) sendTo(buf []byte) error {
 // ================================== Non-concurrency-safe API's ==================================
 
 func (c *conn) Read() []byte {
-	head, tail := c.inboundBuffer.PeekAll()
-	if tail == nil {
-		return head
+	if c.inboundBuffer.IsEmpty() {
+		return c.buffer
 	}
-	if c.transitBuffer == nil {
-		c.transitBuffer = c.inboundBuffer.ByteBuffer()
-		return c.transitBuffer.B
-	}
-	c.transitBuffer.Reset()
-	_, _ = c.transitBuffer.Write(head)
-	_, _ = c.transitBuffer.Write(tail)
-	return c.transitBuffer.B
+	c.cache = c.inboundBuffer.WithByteBuffer(c.buffer)
+	return c.cache.B
 }
 
 func (c *conn) ResetBuffer() {
+	c.buffer = c.buffer[:0]
 	c.inboundBuffer.Reset()
-	if c.transitBuffer != nil {
-		c.transitBuffer.Reset()
-	}
+	bbPool.Put(c.cache)
+	c.cache = nil
 }
 
 func (c *conn) ReadN(n int) (int, []byte) {
 	inBufferLen := c.inboundBuffer.Length()
-	if inBufferLen <= n || n <= 0 {
-		return inBufferLen, c.Read()
+	if totalLen := inBufferLen + len(c.buffer); totalLen < n || n <= 0 {
+		n = totalLen
+	}
+	if c.inboundBuffer.IsEmpty() {
+		return n, c.buffer[:n]
 	}
 	head, tail := c.inboundBuffer.Peek(n)
-	if tail == nil {
-		return n, head
+	if len(head) >= n {
+		return n, head[:n]
 	}
-	if c.transitBuffer == nil {
-		c.transitBuffer = bytebuffer.Get()
-	} else {
-		c.transitBuffer.Reset()
+	c.cache = bbPool.Get()
+	_, _ = c.cache.Write(head)
+	_, _ = c.cache.Write(tail)
+	if inBufferLen >= n {
+		return n, c.cache.B
 	}
-	_, _ = c.transitBuffer.Write(head)
-	_, _ = c.transitBuffer.Write(tail)
-	return n, c.transitBuffer.B
+
+	remaining := n - inBufferLen
+	_, _ = c.cache.Write(c.buffer[:remaining])
+	return n, c.cache.B
 }
 
-func (c *conn) ShiftN(n int) int {
-	c.inboundBuffer.Discard(n)
-	if c.transitBuffer != nil {
-		c.transitBuffer.Reset()
+func (c *conn) ShiftN(n int) (size int) {
+	inBufferLen := c.inboundBuffer.Length()
+	tempBufferLen := len(c.buffer)
+	if inBufferLen+tempBufferLen < n || n <= 0 {
+		c.ResetBuffer()
+		return inBufferLen + tempBufferLen
 	}
+	if c.inboundBuffer.IsEmpty() {
+		c.buffer = c.buffer[n:]
+		return n
+	}
+
+	bbPool.Put(c.cache)
+	c.cache = nil
+
+	if inBufferLen >= n {
+		c.inboundBuffer.Discard(n)
+		return n
+	}
+	c.inboundBuffer.Reset()
+
+	remaining := n - inBufferLen
+	c.buffer = c.buffer[remaining:]
 	return n
 }
 
 func (c *conn) BufferLength() int {
-	return c.inboundBuffer.Length()
+	return c.inboundBuffer.Length() + len(c.buffer)
 }
 
 func (c *conn) Context() interface{}       { return c.ctx }

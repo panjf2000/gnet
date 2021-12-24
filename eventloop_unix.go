@@ -113,7 +113,7 @@ func (el *eventloop) open(c *conn) error {
 }
 
 func (el *eventloop) read(c *conn) error {
-	n, err := c.inboundBuffer.CopyFromSocket(c.fd)
+	n, err := unix.Read(c.fd, el.buffer)
 	if n == 0 || err != nil {
 		if err == unix.EAGAIN {
 			return nil
@@ -121,8 +121,8 @@ func (el *eventloop) read(c *conn) error {
 		return el.closeConn(c, os.NewSyscallError("read", err))
 	}
 
-	var packet []byte
-	for packet, err = c.read(); err == nil; packet, err = c.read() {
+	c.buffer = el.buffer[:n]
+	for packet, _ := c.read(); packet != nil; packet, _ = c.read() {
 		out, action := el.eventHandler.React(packet, c)
 		if out != nil {
 			// Encode data and try to write it back to the peer, this attempt is based on a fact:
@@ -146,9 +146,8 @@ func (el *eventloop) read(c *conn) error {
 			return nil
 		}
 	}
-	if err != gerrors.ErrIncompletePacket {
-		return el.closeConn(c, err)
-	}
+
+	_, _ = c.inboundBuffer.Write(c.buffer)
 
 	return nil
 }

@@ -17,12 +17,12 @@ package listbuffer
 import (
 	"math"
 
-	bPool "github.com/panjf2000/gnet/pkg/pool/bytebuffer"
+	bbPool "github.com/panjf2000/gnet/pkg/pool/bytebuffer"
 )
 
 // ByteBuffer is the node of the linked list of bytes.
 type ByteBuffer struct {
-	Buf  *bPool.ByteBuffer
+	Buf  *bbPool.ByteBuffer
 	next *ByteBuffer
 }
 
@@ -104,7 +104,7 @@ func (l *ListBuffer) PushBytesFront(p []byte) {
 	if len(p) == 0 {
 		return
 	}
-	bb := bPool.Get()
+	bb := bbPool.Get()
 	_, _ = bb.Write(p)
 	l.PushFront(&ByteBuffer{Buf: bb})
 }
@@ -114,7 +114,7 @@ func (l *ListBuffer) PushBytesBack(p []byte) {
 	if len(p) == 0 {
 		return
 	}
-	bb := bPool.Get()
+	bb := bbPool.Get()
 	_, _ = bb.Write(p)
 	l.PushBack(&ByteBuffer{Buf: bb})
 }
@@ -176,7 +176,7 @@ func (l *ListBuffer) DiscardBytes(n int) {
 			break
 		}
 		n -= b.Len()
-		bPool.Put(b.Buf)
+		bbPool.Put(b.Buf)
 	}
 }
 
@@ -198,7 +198,7 @@ func (l *ListBuffer) IsEmpty() bool {
 // Reset removes all elements from this list.
 func (l *ListBuffer) Reset() {
 	for b := l.Pop(); b != nil; b = l.Pop() {
-		bPool.Put(b.Buf)
+		bbPool.Put(b.Buf)
 	}
 	l.head = nil
 	l.tail = nil
