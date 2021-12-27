@@ -220,7 +220,7 @@ func (el *eventloop) closeConn(c *conn, err error) (rerr error) {
 			}
 			n, err := io.Writev(c.fd, iov)
 			if err != nil && err != unix.EAGAIN {
-				el.getLogger().Errorf("closeConn: error occurs when sending data back to peer, %v", err)
+				el.getLogger().Warnf("closeConn: error occurs when sending data back to peer, %v", err)
 				break
 			}
 			c.outboundBuffer.Discard(n)
