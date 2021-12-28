@@ -36,8 +36,8 @@ type TCPSocketOpt int
 
 // Available TCP socket options.
 const (
-	TCPNoDelay TCPSocketOpt = iota
-	TCPDelay
+	TCPDelay TCPSocketOpt = iota
+	TCPNoDelay
 )
 
 // Options are configurations for the gnet application.

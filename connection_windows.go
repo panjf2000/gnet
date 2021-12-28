@@ -78,6 +78,13 @@ func packUDPConn(c *stdConn, buf []byte) *udpConn {
 	return packet
 }
 
+func boolint(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
+}
+
 func newTCPConn(conn net.Conn, el *eventloop) (c *stdConn) {
 	c = &stdConn{
 		conn:          conn,
@@ -95,13 +102,7 @@ func newTCPConn(conn net.Conn, el *eventloop) (c *stdConn) {
 	if tc, ok = conn.(*net.TCPConn); !ok {
 		return
 	}
-	var noDelay bool
-	switch el.svr.opts.TCPNoDelay {
-	case TCPNoDelay:
-		noDelay = true
-	case TCPDelay:
-	}
-	_ = tc.SetNoDelay(noDelay)
+	_ = tc.SetNoDelay(boolint(el.svr.opts.TCPNoDelay))
 	if el.svr.opts.TCPKeepAlive > 0 {
 		_ = tc.SetKeepAlive(true)
 		_ = tc.SetKeepAlivePeriod(el.svr.opts.TCPKeepAlive)

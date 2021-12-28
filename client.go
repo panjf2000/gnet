@@ -152,8 +152,8 @@ func (cli *Client) Dial(network, address string) (Conn, error) {
 	}
 
 	if strings.HasPrefix(network, "tcp") {
-		if cli.opts.TCPNoDelay == TCPNoDelay {
-			if err = socket.SetNoDelay(DupFD, 1); err != nil {
+		if cli.opts.TCPNoDelay == TCPDelay {
+			if err = socket.SetNoDelay(DupFD, 0); err != nil {
 				return nil, err
 			}
 		}
