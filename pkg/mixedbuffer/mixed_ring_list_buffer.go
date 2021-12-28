@@ -37,23 +37,42 @@ func New(maxStaticBytes int) *Buffer {
 
 // Peek returns n bytes as [][]byte, these bytes won't be discarded until Buffer.Discard() is called.
 func (mb *Buffer) Peek(n int) [][]byte {
+	if mb.ringBuffer == nil {
+		return mb.listBuffer.PeekBytesList(n)
+	}
+
 	head, tail := mb.ringBuffer.PeekAll()
 	return mb.listBuffer.PeekBytesListWithBytes(n, head, tail)
 }
 
 // Discard discards n bytes in this buffer.
 func (mb *Buffer) Discard(n int) {
+	if mb.ringBuffer == nil {
+		mb.listBuffer.DiscardBytes(n)
+		return
+	}
+
 	rbLen := mb.ringBuffer.Length()
 	mb.ringBuffer.Discard(n)
 	if n <= rbLen {
+		if n == rbLen {
+			rbPool.Put(mb.ringBuffer)
+			mb.ringBuffer = nil
+		}
 		return
 	}
+	rbPool.Put(mb.ringBuffer)
+	mb.ringBuffer = nil
 	n -= rbLen
 	mb.listBuffer.DiscardBytes(n)
 }
 
 // Write appends data to this buffer.
 func (mb *Buffer) Write(p []byte) (n int, err error) {
+	if mb.ringBuffer == nil && mb.listBuffer.IsEmpty() {
+		mb.ringBuffer = rbPool.Get()
+	}
+
 	if !mb.listBuffer.IsEmpty() || mb.ringBuffer.Length() >= mb.maxStaticBytes {
 		mb.listBuffer.PushBytesBack(p)
 		return len(p), nil
@@ -71,6 +90,10 @@ func (mb *Buffer) Write(p []byte) (n int, err error) {
 
 // Writev appends multiple byte slices to this buffer.
 func (mb *Buffer) Writev(bs [][]byte) (int, error) {
+	if mb.ringBuffer == nil && mb.listBuffer.IsEmpty() {
+		mb.ringBuffer = rbPool.Get()
+	}
+
 	if !mb.listBuffer.IsEmpty() || mb.ringBuffer.Length() >= mb.maxStaticBytes {
 		var n int
 		for _, b := range bs {
@@ -79,21 +102,22 @@ func (mb *Buffer) Writev(bs [][]byte) (int, error) {
 		}
 		return n, nil
 	}
+
 	var pos, cum int
-	freeSize := mb.ringBuffer.Free()
+	writableSize := mb.ringBuffer.Free()
 	if mb.ringBuffer.Len() < mb.maxStaticBytes {
-		freeSize = mb.maxStaticBytes - mb.ringBuffer.Length()
+		writableSize = mb.maxStaticBytes - mb.ringBuffer.Length()
 	}
 	for i, b := range bs {
 		pos = i
 		cum += len(b)
-		if len(b) > freeSize {
-			_, _ = mb.ringBuffer.Write(b[:freeSize])
-			mb.listBuffer.PushBytesBack(b[freeSize:])
+		if len(b) > writableSize {
+			_, _ = mb.ringBuffer.Write(b[:writableSize])
+			mb.listBuffer.PushBytesBack(b[writableSize:])
 			break
 		}
 		n, _ := mb.ringBuffer.Write(b)
-		freeSize -= n
+		writableSize -= n
 	}
 	for pos++; pos < len(bs); pos++ {
 		cum += len(bs[pos])
@@ -105,17 +129,18 @@ func (mb *Buffer) Writev(bs [][]byte) (int, error) {
 // IsEmpty indicates whether this buffer is empty.
 func (mb *Buffer) IsEmpty() bool {
 	if mb.ringBuffer == nil {
-		return true
+		return mb.listBuffer.IsEmpty()
 	}
+
 	return mb.ringBuffer.IsEmpty() && mb.listBuffer.IsEmpty()
 }
 
 // Release frees all resource of this buffer.
 func (mb *Buffer) Release() {
-	if mb.ringBuffer == nil {
-		return
+	if mb.ringBuffer != nil {
+		rbPool.Put(mb.ringBuffer)
+		mb.ringBuffer = nil
 	}
-	rbPool.Put(mb.ringBuffer)
-	mb.ringBuffer = nil
+
 	mb.listBuffer.Reset()
 }
