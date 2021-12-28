@@ -21,7 +21,7 @@ import (
 	"github.com/panjf2000/gnet/internal/toolkit"
 )
 
-// LoadBalancing represents the the type of load-balancing algorithm.
+// LoadBalancing represents the type of load-balancing algorithm.
 type LoadBalancing int
 
 const (
@@ -32,12 +32,12 @@ const (
 	// serving the least number of active connections at the current time.
 	LeastConnections
 
-	// SourceAddrHash assignes the next accepted connection to the event-loop by hashing the remote address.
+	// SourceAddrHash assigns the next accepted connection to the event-loop by hashing the remote address.
 	SourceAddrHash
 )
 
 type (
-	// loadBalancer is a interface which manipulates the event-loop set.
+	// loadBalancer is an interface which manipulates the event-loop set.
 	loadBalancer interface {
 		register(*eventloop)
 		next(net.Addr) *eventloop
@@ -139,7 +139,7 @@ func (lb *sourceAddrHashLoadBalancer) register(el *eventloop) {
 	lb.size++
 }
 
-// hash hashes a string to a unique hash code.
+// hash converts a string to a unique hash code.
 func (lb *sourceAddrHashLoadBalancer) hash(s string) int {
 	v := int(crc32.ChecksumIEEE(toolkit.StringToBytes(s)))
 	if v >= 0 {
