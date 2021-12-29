@@ -39,7 +39,6 @@ type conn struct {
 	ctx            interface{}             // user-defined context
 	peer           unix.Sockaddr           // remote socket address
 	loop           *eventloop              // connected event-loop
-	codec          ICodec                  // codec for TCP
 	cache          *bbPool.ByteBuffer      // temporary buffer in each event-loop
 	buffer         []byte                  // buffer for the latest bytes
 	opened         bool                    // connection opened event fired
@@ -51,12 +50,11 @@ type conn struct {
 	pollAttachment *netpoll.PollAttachment // connection attachment for poller
 }
 
-func newTCPConn(fd int, el *eventloop, sa unix.Sockaddr, codec ICodec, localAddr, remoteAddr net.Addr) (c *conn) {
+func newTCPConn(fd int, el *eventloop, sa unix.Sockaddr, localAddr, remoteAddr net.Addr) (c *conn) {
 	c = &conn{
 		fd:             fd,
 		peer:           sa,
 		loop:           el,
-		codec:          codec,
 		localAddr:      localAddr,
 		remoteAddr:     remoteAddr,
 		inboundBuffer:  rbPool.Get(),
@@ -135,40 +133,31 @@ func (c *conn) open(buf []byte) error {
 	return err
 }
 
-func (c *conn) read() ([]byte, error) {
-	return c.codec.Decode(c)
-}
-
-func (c *conn) write(buf []byte) (err error) {
-	defer c.loop.eventHandler.AfterWrite(c, buf)
-
-	var packet []byte
-	if packet, err = c.codec.Encode(c, buf); err != nil {
-		return
-	}
+func (c *conn) write(data []byte) (err error) {
+	defer c.loop.eventHandler.AfterWrite(c, data)
 
 	c.loop.eventHandler.PreWrite(c)
 
 	// If there is pending data in outbound buffer, the current data ought to be appended to the outbound buffer
 	// for maintaining the sequence of network packets.
 	if !c.outboundBuffer.IsEmpty() {
-		_, _ = c.outboundBuffer.Write(packet)
+		_, _ = c.outboundBuffer.Write(data)
 		return
 	}
 
 	var n int
-	if n, err = unix.Write(c.fd, packet); err != nil {
+	if n, err = unix.Write(c.fd, data); err != nil {
 		// A temporary error occurs, append the data to outbound buffer, writing it back to the peer in the next round.
 		if err == unix.EAGAIN {
-			_, _ = c.outboundBuffer.Write(packet)
+			_, _ = c.outboundBuffer.Write(data)
 			err = c.loop.poller.ModReadWrite(c.pollAttachment)
 			return
 		}
 		return c.loop.closeConn(c, os.NewSyscallError("write", err))
 	}
 	// Failed to send all data back to the peer, buffer the leftover data for the next round.
-	if n < len(packet) {
-		_, _ = c.outboundBuffer.Write(packet[n:])
+	if n < len(data) {
+		_, _ = c.outboundBuffer.Write(data[n:])
 		err = c.loop.poller.ModReadWrite(c.pollAttachment)
 	}
 	return
@@ -184,12 +173,8 @@ func (c *conn) writev(bs [][]byte) (err error) {
 
 	var sum int
 	for _, b := range bs {
-		var packet []byte
-		if packet, err = c.codec.Encode(c, b); err != nil {
-			return
-		}
-		c.packets = append(c.packets, packet)
-		sum += len(packet)
+		c.packets = append(c.packets, b)
+		sum += len(b)
 		c.loop.eventHandler.PreWrite(c)
 	}
 

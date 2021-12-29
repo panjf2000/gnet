@@ -37,17 +37,4 @@ var (
 	ErrUnsupportedPlatform = errors.New("unsupported platform in gnet")
 	// ErrConnectionClosed occurs when the event-loop receives a closed connection.
 	ErrConnectionClosed = errors.New("connection is closed")
-
-	// ================================================= codec errors =================================================.
-
-	// ErrIncompletePacket occurs when there is an incomplete packet under TCP protocol.
-	ErrIncompletePacket = errors.New("incomplete packet")
-	// ErrInvalidFixedLength occurs when the output data have invalid fixed length.
-	ErrInvalidFixedLength = errors.New("invalid fixed length of bytes")
-	// ErrUnexpectedEOF occurs when no enough data to read by codec.
-	ErrUnexpectedEOF = errors.New("there is no enough data")
-	// ErrUnsupportedLength occurs when unsupported lengthFieldLength is from input data.
-	ErrUnsupportedLength = errors.New("unsupported lengthFieldLength. (expected: 1, 2, 3, 4, or 8)")
-	// ErrTooLessLength occurs when adjusted frame length is less than zero.
-	ErrTooLessLength = errors.New("adjusted frame length is less than zero")
 )

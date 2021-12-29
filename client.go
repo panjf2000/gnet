@@ -59,9 +59,6 @@ func NewClient(eventHandler EventHandler, opts ...Option) (cli *Client, err erro
 	if options.Logger == nil {
 		options.Logger = logger
 	}
-	if options.Codec == nil {
-		cli.opts.Codec = new(BuiltInFrameCodec)
-	}
 	var p *netpoll.Poller
 	if p, err = netpoll.OpenPoller(); err != nil {
 		return
@@ -186,12 +183,12 @@ func (cli *Client) Dial(network, address string) (Conn, error) {
 		}
 		ua := c.LocalAddr().(*net.UnixAddr)
 		ua.Name = c.RemoteAddr().String() + "." + strconv.Itoa(DupFD)
-		gc = newTCPConn(DupFD, cli.el, sockAddr, cli.opts.Codec, c.LocalAddr(), c.RemoteAddr())
+		gc = newTCPConn(DupFD, cli.el, sockAddr, c.LocalAddr(), c.RemoteAddr())
 	case *net.TCPConn:
 		if sockAddr, _, _, _, err = socket.GetTCPSockAddr(c.RemoteAddr().Network(), c.RemoteAddr().String()); err != nil {
 			return nil, err
 		}
-		gc = newTCPConn(DupFD, cli.el, sockAddr, cli.opts.Codec, c.LocalAddr(), c.RemoteAddr())
+		gc = newTCPConn(DupFD, cli.el, sockAddr, c.LocalAddr(), c.RemoteAddr())
 	case *net.UDPConn:
 		if sockAddr, _, _, _, err = socket.GetUDPSockAddr(c.RemoteAddr().Network(), c.RemoteAddr().String()); err != nil {
 			return nil, err

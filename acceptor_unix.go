@@ -49,7 +49,7 @@ func (svr *server) accept(fd int, _ netpoll.IOEvent) error {
 	}
 
 	el := svr.lb.next(remoteAddr)
-	c := newTCPConn(nfd, el, sa, svr.opts.Codec, el.ln.addr, remoteAddr)
+	c := newTCPConn(nfd, el, sa, el.ln.addr, remoteAddr)
 
 	err = el.poller.UrgentTrigger(el.register, c)
 	if err != nil {
@@ -82,7 +82,7 @@ func (el *eventloop) accept(fd int, ev netpoll.IOEvent) error {
 		logging.Error(err)
 	}
 
-	c := newTCPConn(nfd, el, sa, el.svr.opts.Codec, el.ln.addr, remoteAddr)
+	c := newTCPConn(nfd, el, sa, el.ln.addr, remoteAddr)
 	if err = el.poller.AddRead(c.pollAttachment); err != nil {
 		return err
 	}

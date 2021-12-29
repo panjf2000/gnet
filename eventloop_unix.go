@@ -122,29 +122,19 @@ func (el *eventloop) read(c *conn) error {
 	}
 
 	c.buffer = el.buffer[:n]
-	for packet, _ := c.read(); packet != nil; packet, _ = c.read() {
-		out, action := el.eventHandler.React(packet, c)
-		if out != nil {
-			// Encode data and try to write it back to the peer, this attempt is based on a fact:
-			// the peer socket waits for the response data after sending request data to the server,
-			// which makes the peer socket writable.
-			if err = c.write(out); err != nil {
-				return err
-			}
-		}
-		switch action {
-		case None:
-		case Close:
-			return el.closeConn(c, nil)
-		case Shutdown:
-			return gerrors.ErrServerShutdown
-		}
+	action := el.eventHandler.React(c)
+	switch action {
+	case None:
+	case Close:
+		return el.closeConn(c, nil)
+	case Shutdown:
+		return gerrors.ErrServerShutdown
+	}
 
-		// Check the status of connection every loop since it might be closed
-		// during writing data back to the peer due to some kind of system error.
-		if !c.opened {
-			return nil
-		}
+	// Check the status of connection every loop since it might be closed
+	// during writing data back to the peer due to some kind of system error.
+	if !c.opened {
+		return nil
 	}
 
 	_, _ = c.inboundBuffer.Write(c.buffer)
@@ -255,12 +245,7 @@ func (el *eventloop) wake(c *conn) error {
 		return nil // ignore stale wakes.
 	}
 
-	out, action := el.eventHandler.React(nil, c)
-	if out != nil {
-		if err := c.write(out); err != nil {
-			return err
-		}
-	}
+	action := el.eventHandler.React(c)
 
 	return el.handleAction(c, action)
 }
@@ -329,10 +314,8 @@ func (el *eventloop) readUDP(fd int, _ netpoll.IOEvent) error {
 	} else {
 		c = el.udpSockets[fd]
 	}
-	out, action := el.eventHandler.React(el.buffer[:n], c)
-	if out != nil {
-		_ = c.sendTo(out)
-	}
+	c.buffer = el.buffer[:n]
+	action := el.eventHandler.React(c)
 	if c.peer != nil {
 		c.releaseUDP()
 	}

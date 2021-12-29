@@ -262,9 +262,6 @@ func serve(eventHandler EventHandler, listener *listener, options *Options, prot
 	if svr.opts.Ticker {
 		svr.tickerCtx, svr.cancelTicker = context.WithCancel(context.Background())
 	}
-	if options.Codec == nil {
-		svr.opts.Codec = new(BuiltInFrameCodec)
-	}
 
 	s := Server{
 		svr:          svr,

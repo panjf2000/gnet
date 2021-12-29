@@ -195,7 +195,7 @@ type (
 		// as this []byte will be reused within event-loop after React() returns.
 		// If you have to use packet in a new goroutine, then you need to make a copy of buf and pass this copy
 		// to that new goroutine.
-		React(packet []byte, c Conn) (out []byte, action Action)
+		React(c Conn) (action Action)
 
 		// Tick fires immediately after the server starts and will fire again
 		// following the duration specified by the delay return value.
@@ -244,7 +244,7 @@ func (es *EventServer) AfterWrite(c Conn, b []byte) {
 // React fires when a connection sends the server data.
 // Call c.Read() or c.ReadN(n) of Conn c to read incoming data from the peer.
 // The parameter out is the return value which is going to be sent back to the peer.
-func (es *EventServer) React(packet []byte, c Conn) (out []byte, action Action) {
+func (es *EventServer) React(c Conn) (action Action) {
 	return
 }
 

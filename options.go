@@ -97,9 +97,6 @@ type Options struct {
 	// SocketSendBuffer sets the maximum socket send buffer in bytes.
 	SocketSendBuffer int
 
-	// ICodec encodes and decodes TCP stream.
-	Codec ICodec
-
 	// LogPath the local path where logs will be written, this is the easiest way to set up logging,
 	// gnet instantiates a default uber-go/zap logger with this given log path, you are also allowed to employ
 	// you own logger during the lifetime by implementing the following log.Logger interface.
@@ -203,13 +200,6 @@ func WithSocketSendBuffer(sendBuf int) Option {
 func WithTicker(ticker bool) Option {
 	return func(opts *Options) {
 		opts.Ticker = ticker
-	}
-}
-
-// WithCodec sets up a codec to handle TCP stream.
-func WithCodec(codec ICodec) Option {
-	return func(opts *Options) {
-		opts.Codec = codec
 	}
 }
 
