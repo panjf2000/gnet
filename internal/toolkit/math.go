@@ -11,7 +11,7 @@ const (
 
 // IsPowerOfTwo reports whether given integer is a power of two.
 func IsPowerOfTwo(n int) bool {
-	return n&(n-1) == 0
+	return n > 0 && n&(n-1) == 0
 }
 
 // CeilToPowerOfTwo returns the least power of two integer value greater than
