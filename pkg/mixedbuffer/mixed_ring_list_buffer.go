@@ -27,7 +27,7 @@ import (
 type Buffer struct {
 	maxStaticBytes int
 	ringBuffer     *ringbuffer.RingBuffer
-	listBuffer     listbuffer.ListBuffer
+	listBuffer     listbuffer.LinkedListBuffer
 }
 
 // New instantiates a mixedbuffer.Buffer and returns it.

@@ -42,8 +42,8 @@ func (b *ByteBuffer) IsEmpty() bool {
 	return b.Buf.Len() == 0
 }
 
-// ListBuffer is a linked list of ByteBuffer.
-type ListBuffer struct {
+// LinkedListBuffer is a linked list of ByteBuffer.
+type LinkedListBuffer struct {
 	bs    [][]byte
 	head  *ByteBuffer
 	tail  *ByteBuffer
@@ -52,7 +52,7 @@ type ListBuffer struct {
 }
 
 // Pop returns and removes the head of l. If l is empty, it returns nil.
-func (l *ListBuffer) Pop() *ByteBuffer {
+func (l *LinkedListBuffer) Pop() *ByteBuffer {
 	if l.head == nil {
 		return nil
 	}
@@ -68,7 +68,7 @@ func (l *ListBuffer) Pop() *ByteBuffer {
 }
 
 // PushFront adds the new node to the head of l.
-func (l *ListBuffer) PushFront(b *ByteBuffer) {
+func (l *LinkedListBuffer) PushFront(b *ByteBuffer) {
 	if b == nil {
 		return
 	}
@@ -84,7 +84,7 @@ func (l *ListBuffer) PushFront(b *ByteBuffer) {
 }
 
 // PushBack adds a new node to the tail of l.
-func (l *ListBuffer) PushBack(b *ByteBuffer) {
+func (l *LinkedListBuffer) PushBack(b *ByteBuffer) {
 	if b == nil {
 		return
 	}
@@ -100,7 +100,7 @@ func (l *ListBuffer) PushBack(b *ByteBuffer) {
 }
 
 // PushBytesFront is a wrapper of PushFront, which accepts []byte as its argument.
-func (l *ListBuffer) PushBytesFront(p []byte) {
+func (l *LinkedListBuffer) PushBytesFront(p []byte) {
 	if len(p) == 0 {
 		return
 	}
@@ -110,7 +110,7 @@ func (l *ListBuffer) PushBytesFront(p []byte) {
 }
 
 // PushBytesBack is a wrapper of PushBack, which accepts []byte as its argument.
-func (l *ListBuffer) PushBytesBack(p []byte) {
+func (l *LinkedListBuffer) PushBytesBack(p []byte) {
 	if len(p) == 0 {
 		return
 	}
@@ -121,7 +121,7 @@ func (l *ListBuffer) PushBytesBack(p []byte) {
 
 // PeekBytesList assembles the up to maxBytes of [][]byte based on the list of ByteBuffer,
 // it won't remove these nodes from l until DiscardBytes() is called.
-func (l *ListBuffer) PeekBytesList(maxBytes int) [][]byte {
+func (l *LinkedListBuffer) PeekBytesList(maxBytes int) [][]byte {
 	if maxBytes <= 0 {
 		maxBytes = math.MaxInt32
 	}
@@ -137,7 +137,7 @@ func (l *ListBuffer) PeekBytesList(maxBytes int) [][]byte {
 }
 
 // PeekBytesListWithBytes is like PeekBytesList but accepts [][]byte and puts them onto head.
-func (l *ListBuffer) PeekBytesListWithBytes(maxBytes int, bs ...[]byte) [][]byte {
+func (l *LinkedListBuffer) PeekBytesListWithBytes(maxBytes int, bs ...[]byte) [][]byte {
 	if maxBytes <= 0 {
 		maxBytes = math.MaxInt32
 	}
@@ -161,7 +161,7 @@ func (l *ListBuffer) PeekBytesListWithBytes(maxBytes int, bs ...[]byte) [][]byte
 }
 
 // DiscardBytes removes some nodes based on n.
-func (l *ListBuffer) DiscardBytes(n int) {
+func (l *LinkedListBuffer) DiscardBytes(n int) {
 	if n <= 0 {
 		return
 	}
@@ -181,22 +181,22 @@ func (l *ListBuffer) DiscardBytes(n int) {
 }
 
 // Len returns the length of the list.
-func (l *ListBuffer) Len() int {
+func (l *LinkedListBuffer) Len() int {
 	return l.size
 }
 
 // Bytes returns the amount of bytes in this list.
-func (l *ListBuffer) Bytes() int64 {
+func (l *LinkedListBuffer) Bytes() int64 {
 	return l.bytes
 }
 
 // IsEmpty reports whether l is empty.
-func (l *ListBuffer) IsEmpty() bool {
+func (l *LinkedListBuffer) IsEmpty() bool {
 	return l.head == nil
 }
 
 // Reset removes all elements from this list.
-func (l *ListBuffer) Reset() {
+func (l *LinkedListBuffer) Reset() {
 	for b := l.Pop(); b != nil; b = l.Pop() {
 		bbPool.Put(b.Buf)
 	}
