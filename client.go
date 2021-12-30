@@ -152,16 +152,10 @@ func (cli *Client) Dial(network, address string) (Conn, error) {
 	}
 
 	if strings.HasPrefix(network, "tcp") {
-		switch cli.opts.TCPNoDelay {
-		case TCPDelay:
+		if cli.opts.TCPNoDelay == TCPDelay {
 			if err = socket.SetNoDelay(DupFD, 0); err != nil {
 				return nil, err
 			}
-		case TCPNoDelay:
-			if err = socket.SetNoDelay(DupFD, 1); err != nil {
-				return nil, err
-			}
-		default:
 		}
 		if cli.opts.TCPKeepAlive > 0 {
 			if err = socket.SetKeepAlive(DupFD, int(cli.opts.TCPKeepAlive/time.Second)); err != nil {
