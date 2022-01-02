@@ -30,13 +30,13 @@ func (el *eventloop) activateMainReactor(lockOSThread bool) {
 		defer runtime.UnlockOSThread()
 	}
 
-	defer el.svr.signalShutdown()
+	defer el.engine.signalShutdown()
 
 	err := el.poller.Polling()
-	if err == errors.ErrServerShutdown {
-		el.svr.opts.Logger.Debugf("main reactor is exiting in terms of the demand from user, %v", err)
+	if err == errors.ErrEngineShutdown {
+		el.engine.opts.Logger.Debugf("main reactor is exiting in terms of the demand from user, %v", err)
 	} else if err != nil {
-		el.svr.opts.Logger.Errorf("main reactor is exiting due to error: %v", err)
+		el.engine.opts.Logger.Errorf("main reactor is exiting due to error: %v", err)
 	}
 }
 
@@ -48,14 +48,14 @@ func (el *eventloop) activateSubReactor(lockOSThread bool) {
 
 	defer func() {
 		el.closeAllSockets()
-		el.svr.signalShutdown()
+		el.engine.signalShutdown()
 	}()
 
 	err := el.poller.Polling()
-	if err == errors.ErrServerShutdown {
-		el.svr.opts.Logger.Debugf("event-loop(%d) is exiting in terms of the demand from user, %v", el.idx, err)
+	if err == errors.ErrEngineShutdown {
+		el.engine.opts.Logger.Debugf("event-loop(%d) is exiting in terms of the demand from user, %v", el.idx, err)
 	} else if err != nil {
-		el.svr.opts.Logger.Errorf("event-loop(%d) is exiting due to error: %v", el.idx, err)
+		el.engine.opts.Logger.Errorf("event-loop(%d) is exiting due to error: %v", el.idx, err)
 	}
 }
 
@@ -68,7 +68,7 @@ func (el *eventloop) run(lockOSThread bool) {
 	defer func() {
 		el.closeAllSockets()
 		el.ln.close()
-		el.svr.signalShutdown()
+		el.engine.signalShutdown()
 	}()
 
 	err := el.poller.Polling()

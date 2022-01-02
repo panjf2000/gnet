@@ -37,8 +37,8 @@ import (
 
 type eventloop struct {
 	ln           *listener       // listener
-	idx          int             // loop index in the server loops list
-	svr          *server         // server in loop
+	idx          int             // loop index in the engine loops list
+	engine       *engine         // engine in loop
 	poller       *netpoll.Poller // epoll or kqueue
 	buffer       []byte          // read packet buffer whose capacity is set by user, default value is 64KB
 	connCount    int32           // number of active connections in event-loop
@@ -48,7 +48,7 @@ type eventloop struct {
 }
 
 func (el *eventloop) getLogger() logging.Logger {
-	return el.svr.opts.Logger
+	return el.engine.opts.Logger
 }
 
 func (el *eventloop) addConn(delta int32) {
@@ -128,7 +128,7 @@ func (el *eventloop) read(c *conn) error {
 	case Close:
 		return el.closeConn(c, nil)
 	case Shutdown:
-		return gerrors.ErrServerShutdown
+		return gerrors.ErrEngineShutdown
 	}
 
 	// Check the status of connection every loop since it might be closed
@@ -189,7 +189,7 @@ func (el *eventloop) closeConn(c *conn, err error) (rerr error) {
 			delete(el.udpSockets, c.fd)
 		}
 		if el.eventHandler.OnClose(c, err) == Shutdown {
-			return gerrors.ErrServerShutdown
+			return gerrors.ErrEngineShutdown
 		}
 		c.releaseUDP()
 		return
@@ -231,7 +231,7 @@ func (el *eventloop) closeConn(c *conn, err error) (rerr error) {
 	delete(el.connections, c.fd)
 	el.addConn(-1)
 	if el.eventHandler.OnClose(c, err) == Shutdown {
-		rerr = gerrors.ErrServerShutdown
+		rerr = gerrors.ErrEngineShutdown
 	}
 	c.releaseTCP()
 
@@ -267,7 +267,7 @@ func (el *eventloop) ticker(ctx context.Context) {
 		switch action {
 		case None:
 		case Shutdown:
-			err := el.poller.UrgentTrigger(func(_ interface{}) error { return gerrors.ErrServerShutdown }, nil)
+			err := el.poller.UrgentTrigger(func(_ interface{}) error { return gerrors.ErrEngineShutdown }, nil)
 			el.getLogger().Debugf("stopping ticker in event-loop(%d) from OnTick(), UrgentTrigger:%v", el.idx, err)
 		}
 		if timer == nil {
@@ -277,7 +277,7 @@ func (el *eventloop) ticker(ctx context.Context) {
 		}
 		select {
 		case <-ctx.Done():
-			el.getLogger().Debugf("stopping ticker in event-loop(%d) from Server, error:%v", el.idx, ctx.Err())
+			el.getLogger().Debugf("stopping ticker in event-loop(%d) from Engine, error:%v", el.idx, ctx.Err())
 			return
 		case <-timer.C:
 		}
@@ -291,7 +291,7 @@ func (el *eventloop) handleAction(c *conn, action Action) error {
 	case Close:
 		return el.closeConn(c, nil)
 	case Shutdown:
-		return gerrors.ErrServerShutdown
+		return gerrors.ErrEngineShutdown
 	default:
 		return nil
 	}
@@ -318,7 +318,7 @@ func (el *eventloop) readUDP(fd int, _ netpoll.IOEvent) error {
 		c.releaseUDP()
 	}
 	if action == Shutdown {
-		return gerrors.ErrServerShutdown
+		return gerrors.ErrEngineShutdown
 	}
 	return nil
 }

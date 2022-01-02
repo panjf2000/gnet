@@ -66,14 +66,15 @@ func New(size int) *RingBuffer {
 	}
 }
 
-// Peek returns the next n bytes without advancing the read pointer.
+// Peek returns the next n bytes without advancing the read pointer,
+// it returns all bytes when n <= 0.
 func (rb *RingBuffer) Peek(n int) (head []byte, tail []byte) {
 	if rb.isEmpty {
 		return
 	}
 
 	if n <= 0 {
-		return
+		return rb.peekAll()
 	}
 
 	if rb.w > rb.r {
@@ -102,8 +103,8 @@ func (rb *RingBuffer) Peek(n int) (head []byte, tail []byte) {
 	return
 }
 
-// PeekAll returns all bytes without advancing the read pointer.
-func (rb *RingBuffer) PeekAll() (head []byte, tail []byte) {
+// peekAll returns all bytes without advancing the read pointer.
+func (rb *RingBuffer) peekAll() (head []byte, tail []byte) {
 	if rb.isEmpty {
 		return
 	}
@@ -188,133 +189,6 @@ func (rb *RingBuffer) Read(p []byte) (n int, err error) {
 	return
 }
 
-func (rb *RingBuffer) ReadFrom(r io.Reader) (n int64, err error) {
-	var m int
-	for {
-		if rb.Free() < MinRead {
-			rb.grow(rb.Buffered() + MinRead)
-		}
-
-		if rb.w >= rb.r {
-			m, err = r.Read(rb.buf[rb.w:])
-			if m < 0 {
-				panic("RingBuffer.ReadFrom: reader returned negative count from Read")
-			}
-			rb.isEmpty = false
-			rb.w = (rb.w + m) % rb.size
-			n += int64(m)
-			if err == io.EOF {
-				return n, nil
-			}
-			if err != nil {
-				return
-			}
-			m, err = r.Read(rb.buf[:rb.r])
-			if m < 0 {
-				panic("RingBuffer.ReadFrom: reader returned negative count from Read")
-			}
-			rb.w = (rb.w + m) % rb.size
-			n += int64(m)
-			if err == io.EOF {
-				return n, nil
-			}
-			if err != nil {
-				return
-			}
-		} else {
-			m, err = r.Read(rb.buf[rb.w:rb.r])
-			if m < 0 {
-				panic("RingBuffer.ReadFrom: reader returned negative count from Read")
-			}
-			rb.isEmpty = false
-			rb.w = (rb.w + m) % rb.size
-			n += int64(m)
-			if err == io.EOF {
-				return n, nil
-			}
-			if err != nil {
-				return
-			}
-		}
-	}
-}
-
-func (rb *RingBuffer) WriteTo(w io.Writer) (int64, error) {
-	if rb.isEmpty {
-		return 0, ErrIsEmpty
-	}
-
-	if rb.w > rb.r {
-		n := rb.w - rb.r
-		m, err := w.Write(rb.buf[rb.r : rb.r+n])
-		if m > n {
-			panic("RingBuffer.WriteTo: invalid Write count")
-		}
-		rb.r += m
-		if rb.r == rb.w {
-			rb.Reset()
-		}
-		if err != nil {
-			return int64(m), err
-		}
-		if !rb.isEmpty {
-			return int64(m), io.ErrShortWrite
-		}
-		return int64(m), nil
-	}
-
-	n := rb.size - rb.r + rb.w
-	if rb.r+n <= rb.size {
-		m, err := w.Write(rb.buf[rb.r : rb.r+n])
-		if m > n {
-			panic("RingBuffer.WriteTo: invalid Write count")
-		}
-		rb.r = (rb.r + m) % rb.size
-		if rb.r == rb.w {
-			rb.Reset()
-		}
-		if err != nil {
-			return int64(m), err
-		}
-		if !rb.isEmpty {
-			return int64(m), io.ErrShortWrite
-		}
-		return int64(m), nil
-	} else {
-		var cum int64
-		c1 := rb.size - rb.r
-		m, err := w.Write(rb.buf[rb.r:])
-		if m > c1 {
-			panic("RingBuffer.WriteTo: invalid Write count")
-		}
-		rb.r = (rb.r + m) % rb.size
-		if err != nil {
-			return int64(m), err
-		}
-		if m < c1 {
-			return int64(m), io.ErrShortWrite
-		}
-		cum += int64(m)
-		c2 := n - c1
-		m, err = w.Write(rb.buf[:c2])
-		if m > c2 {
-			panic("RingBuffer.WriteTo: invalid Write count")
-		}
-		rb.r = m
-		cum += int64(m)
-		if rb.r == rb.w {
-			rb.Reset()
-		}
-		if err != nil {
-			return cum, err
-		}
-		if !rb.isEmpty {
-			return cum, io.ErrShortWrite
-		}
-		return cum, nil
-	}
-}
-
 // ReadByte reads and returns the next byte from the input or ErrIsEmpty.
 func (rb *RingBuffer) ReadByte() (b byte, err error) {
 	if rb.isEmpty {
@@ -344,7 +218,7 @@ func (rb *RingBuffer) Write(p []byte) (n int, err error) {
 		return
 	}
 
-	free := rb.Free()
+	free := rb.Available()
 	if n > free {
 		rb.grow(rb.size + n - free)
 	}
@@ -376,7 +250,7 @@ func (rb *RingBuffer) Write(p []byte) (n int, err error) {
 
 // WriteByte writes one byte into buffer.
 func (rb *RingBuffer) WriteByte(c byte) error {
-	if rb.Free() < 1 {
+	if rb.Available() < 1 {
 		rb.grow(1)
 	}
 	rb.buf[rb.w] = c
@@ -416,8 +290,8 @@ func (rb *RingBuffer) Cap() int {
 	return rb.size
 }
 
-// Free returns the length of available bytes to write.
-func (rb *RingBuffer) Free() int {
+// Available returns the length of available bytes to write.
+func (rb *RingBuffer) Available() int {
 	if rb.r == rb.w {
 		if rb.isEmpty {
 			return rb.size
@@ -491,6 +365,135 @@ func (rb *RingBuffer) WithByteBuffer(b []byte) *bbPool.ByteBuffer {
 	_, _ = bb.Write(b)
 
 	return bb
+}
+
+// ReadFrom implements io.ReaderFrom.
+func (rb *RingBuffer) ReadFrom(r io.Reader) (n int64, err error) {
+	var m int
+	for {
+		if rb.Available() < MinRead {
+			rb.grow(rb.Buffered() + MinRead)
+		}
+
+		if rb.w >= rb.r {
+			m, err = r.Read(rb.buf[rb.w:])
+			if m < 0 {
+				panic("RingBuffer.ReadFrom: reader returned negative count from Read")
+			}
+			rb.isEmpty = false
+			rb.w = (rb.w + m) % rb.size
+			n += int64(m)
+			if err == io.EOF {
+				return n, nil
+			}
+			if err != nil {
+				return
+			}
+			m, err = r.Read(rb.buf[:rb.r])
+			if m < 0 {
+				panic("RingBuffer.ReadFrom: reader returned negative count from Read")
+			}
+			rb.w = (rb.w + m) % rb.size
+			n += int64(m)
+			if err == io.EOF {
+				return n, nil
+			}
+			if err != nil {
+				return
+			}
+		} else {
+			m, err = r.Read(rb.buf[rb.w:rb.r])
+			if m < 0 {
+				panic("RingBuffer.ReadFrom: reader returned negative count from Read")
+			}
+			rb.isEmpty = false
+			rb.w = (rb.w + m) % rb.size
+			n += int64(m)
+			if err == io.EOF {
+				return n, nil
+			}
+			if err != nil {
+				return
+			}
+		}
+	}
+}
+
+// WriteTo implements io.WriterTo.
+func (rb *RingBuffer) WriteTo(w io.Writer) (int64, error) {
+	if rb.isEmpty {
+		return 0, ErrIsEmpty
+	}
+
+	if rb.w > rb.r {
+		n := rb.w - rb.r
+		m, err := w.Write(rb.buf[rb.r : rb.r+n])
+		if m > n {
+			panic("RingBuffer.WriteTo: invalid Write count")
+		}
+		rb.r += m
+		if rb.r == rb.w {
+			rb.Reset()
+		}
+		if err != nil {
+			return int64(m), err
+		}
+		if !rb.isEmpty {
+			return int64(m), io.ErrShortWrite
+		}
+		return int64(m), nil
+	}
+
+	n := rb.size - rb.r + rb.w
+	if rb.r+n <= rb.size {
+		m, err := w.Write(rb.buf[rb.r : rb.r+n])
+		if m > n {
+			panic("RingBuffer.WriteTo: invalid Write count")
+		}
+		rb.r = (rb.r + m) % rb.size
+		if rb.r == rb.w {
+			rb.Reset()
+		}
+		if err != nil {
+			return int64(m), err
+		}
+		if !rb.isEmpty {
+			return int64(m), io.ErrShortWrite
+		}
+		return int64(m), nil
+	}
+
+	var cum int64
+	c1 := rb.size - rb.r
+	m, err := w.Write(rb.buf[rb.r:])
+	if m > c1 {
+		panic("RingBuffer.WriteTo: invalid Write count")
+	}
+	rb.r = (rb.r + m) % rb.size
+	if err != nil {
+		return int64(m), err
+	}
+	if m < c1 {
+		return int64(m), io.ErrShortWrite
+	}
+	cum += int64(m)
+	c2 := n - c1
+	m, err = w.Write(rb.buf[:c2])
+	if m > c2 {
+		panic("RingBuffer.WriteTo: invalid Write count")
+	}
+	rb.r = m
+	cum += int64(m)
+	if rb.r == rb.w {
+		rb.Reset()
+	}
+	if err != nil {
+		return cum, err
+	}
+	if !rb.isEmpty {
+		return cum, io.ErrShortWrite
+	}
+	return cum, nil
 }
 
 // IsFull tells if this ring-buffer is full.

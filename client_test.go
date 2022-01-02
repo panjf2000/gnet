@@ -33,7 +33,7 @@ import (
 )
 
 type clientEvents struct {
-	*EventServer
+	*BuiltinEventEngine
 	svr       *testClientServer
 	packetLen int
 	rspChMap  sync.Map
@@ -65,7 +65,7 @@ func (ev *clientEvents) OnTraffic(c Conn) (action Action) {
 	}
 	buf, _ := c.Peek(-1)
 	p = append(p, buf...)
-	c.Discard(-1)
+	_, _ = c.Discard(-1)
 	if len(p) < ev.packetLen {
 		c.SetContext(p)
 		return
@@ -83,11 +83,11 @@ func (ev *clientEvents) OnTick() (delay time.Duration, action Action) {
 }
 
 func TestServeWithGnetClient(t *testing.T) {
-	// start a server
+	// start a engine
 	// connect 10 clients
 	// each client will pipe random data for 1-3 seconds.
-	// the writes to the server will be random sizes. 0KB - 1MB.
-	// the server will echo back the data.
+	// the writes to the engine will be random sizes. 0KB - 1MB.
+	// the engine will echo back the data.
 	// waits for graceful connection closing.
 	t.Run("poll", func(t *testing.T) {
 		t.Run("tcp", func(t *testing.T) {
@@ -193,11 +193,11 @@ func TestServeWithGnetClient(t *testing.T) {
 }
 
 type testClientServer struct {
-	*EventServer
+	*BuiltinEventEngine
 	client       *Client
 	clientEV     *clientEvents
 	tester       *testing.T
-	svr          Server
+	eng          Engine
 	network      string
 	addr         string
 	multicore    bool
@@ -210,8 +210,8 @@ type testClientServer struct {
 	workerPool   *goPool.Pool
 }
 
-func (s *testClientServer) OnBoot(svr Server) (action Action) {
-	s.svr = svr
+func (s *testClientServer) OnBoot(eng Engine) (action Action) {
+	s.eng = eng
 	return
 }
 
@@ -244,13 +244,13 @@ func (s *testClientServer) OnClose(c Conn, err error) (action Action) {
 func (s *testClientServer) OnTraffic(c Conn) (action Action) {
 	if s.async {
 		buf := bbPool.Get()
-		c.WriteTo(buf)
+		_, _ = c.WriteTo(buf)
 
 		if s.network == "tcp" || s.network == "unix" {
 			// just for test
 			_ = c.InboundBuffered()
 			_ = c.OutboundBuffered()
-			c.Discard(1)
+			_, _ = c.Discard(1)
 
 		}
 		_ = s.workerPool.Submit(
@@ -260,8 +260,8 @@ func (s *testClientServer) OnTraffic(c Conn) (action Action) {
 		return
 	}
 	buf, _ := c.Peek(-1)
-	c.Write(buf)
-	c.Discard(-1)
+	_, _ = c.Write(buf)
+	_, _ = c.Discard(-1)
 	return
 }
 

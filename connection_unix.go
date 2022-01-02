@@ -247,9 +247,38 @@ func (c *conn) Read(p []byte) (n int, err error) {
 		c.buffer = c.buffer[n:]
 		return n, nil
 	}
-	n, err = c.inboundBuffer.Read(p)
+	n, _ = c.inboundBuffer.Read(p)
 	n += copy(p[n:], c.buffer)
 	return c.Discard(n)
+}
+
+func (c *conn) Next(n int) (buf []byte, err error) {
+	inBufferLen := c.inboundBuffer.Buffered()
+	if totalLen := inBufferLen + len(c.buffer); totalLen < n || n <= 0 {
+		err = gerrors.ErrBufferFull
+		n = totalLen
+	}
+	if c.inboundBuffer.IsEmpty() {
+		buf = c.buffer[:n]
+		c.buffer = c.buffer[n:]
+		return
+	}
+	head, tail := c.inboundBuffer.Peek(n)
+	defer c.inboundBuffer.Discard(n)
+	if len(head) >= n {
+		return head[:n], err
+	}
+	c.cache = bbPool.Get()
+	_, _ = c.cache.Write(head)
+	_, _ = c.cache.Write(tail)
+	if inBufferLen >= n {
+		return c.cache.B, err
+	}
+
+	remaining := n - inBufferLen
+	_, _ = c.cache.Write(c.buffer[:remaining])
+	c.buffer = c.buffer[remaining:]
+	return c.cache.B, err
 }
 
 func (c *conn) Peek(n int) (buf []byte, err error) {
@@ -395,6 +424,7 @@ func (c *conn) AsyncWritev(bs [][]byte) error {
 				return err
 			}
 		}
+		return nil
 	}
 	return c.loop.poller.Trigger(c.asyncWritev, bs)
 }

@@ -52,6 +52,7 @@ type LinkedListBuffer struct {
 	bytes int
 }
 
+// Read reads data from the LinkedListBuffer.
 func (llb *LinkedListBuffer) Read(p []byte) (n int, err error) {
 	if len(p) == 0 {
 		return 0, nil
@@ -202,7 +203,8 @@ func (llb *LinkedListBuffer) Discard(n int) {
 	}
 }
 
-func (llb LinkedListBuffer) ReadFrom(r io.Reader) (n int64, err error) {
+// ReadFrom implements io.ReaderFrom.
+func (llb *LinkedListBuffer) ReadFrom(r io.Reader) (n int64, err error) {
 	var m int
 	for {
 		bb := bbPool.Get()
@@ -223,6 +225,7 @@ func (llb LinkedListBuffer) ReadFrom(r io.Reader) (n int64, err error) {
 	}
 }
 
+// WriteTo implements io.WriterTo.
 func (llb *LinkedListBuffer) WriteTo(w io.Writer) (n int64, err error) {
 	var m int
 	for b := llb.Pop(); b != nil; b = llb.Pop() {
@@ -248,7 +251,7 @@ func (llb *LinkedListBuffer) Len() int {
 	return llb.size
 }
 
-// Buffered returns the amount of bytes in this list.
+// Buffered returns the number of bytes that can be read from the current buffer.
 func (llb *LinkedListBuffer) Buffered() int {
 	return llb.bytes
 }

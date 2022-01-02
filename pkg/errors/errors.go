@@ -17,10 +17,10 @@ package errors
 import "errors"
 
 var (
-	// ErrServerShutdown occurs when server is closing.
-	ErrServerShutdown = errors.New("server is going to be shutdown")
-	// ErrServerInShutdown occurs when attempting to shut the server down more than once.
-	ErrServerInShutdown = errors.New("server is already in shutdown")
+	// ErrEngineShutdown occurs when server is closing.
+	ErrEngineShutdown = errors.New("server is going to be shutdown")
+	// ErrEngineInShutdown occurs when attempting to shut the server down more than once.
+	ErrEngineInShutdown = errors.New("server is already in shutdown")
 	// ErrAcceptSocket occurs when acceptor does not accept the new connection properly.
 	ErrAcceptSocket = errors.New("accept a new connection error")
 	// ErrTooManyEventLoopThreads occurs when attempting to set up more than 10,000 event-loop goroutines under LockOSThread mode.
@@ -37,8 +37,8 @@ var (
 	ErrUnsupportedPlatform = errors.New("unsupported platform in gnet")
 	// ErrConnectionClosed occurs when the event-loop receives a closed connection.
 	ErrConnectionClosed = errors.New("connection is closed")
-
+	// ErrBufferFull occurs when trying to read bytes that is larger than the buffer size.
 	ErrBufferFull = errors.New("buffer full")
-
+	// ErrUnsupportedOp occurs when calling some methods that has not been implemented yet.
 	ErrUnsupportedOp = errors.New("unsupported operation")
 )

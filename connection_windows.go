@@ -59,7 +59,7 @@ type stdConn struct {
 	loop          *eventloop             // owner event-loop
 	buffer        *bbPool.ByteBuffer     // reuse memory of inbound data as a temporary buffer
 	codec         ICodec                 // codec for TCP
-	localAddr     net.Addr               // local server addr
+	localAddr     net.Addr               // local engine addr
 	remoteAddr    net.Addr               // remote peer addr
 	byteBuffer    *bbPool.ByteBuffer     // bytes buffer for buffering current packet and data in ring-buffer
 	inboundBuffer *ringbuffer.RingBuffer // buffer for data from the peer
@@ -82,10 +82,10 @@ func newTCPConn(conn net.Conn, el *eventloop) (c *stdConn) {
 	c = &stdConn{
 		conn:          conn,
 		loop:          el,
-		codec:         el.svr.codec,
+		codec:         el.engine.codec,
 		inboundBuffer: rbPool.Get(),
 	}
-	c.localAddr = el.svr.ln.addr
+	c.localAddr = el.engine.ln.addr
 	c.remoteAddr = c.conn.RemoteAddr()
 
 	var (
@@ -96,15 +96,15 @@ func newTCPConn(conn net.Conn, el *eventloop) (c *stdConn) {
 		return
 	}
 	var noDelay bool
-	switch el.svr.opts.TCPNoDelay {
+	switch el.engine.opts.TCPNoDelay {
 	case TCPNoDelay:
 		noDelay = true
 	case TCPDelay:
 	}
 	_ = tc.SetNoDelay(noDelay)
-	if el.svr.opts.TCPKeepAlive > 0 {
+	if el.engine.opts.TCPKeepAlive > 0 {
 		_ = tc.SetKeepAlive(true)
-		_ = tc.SetKeepAlivePeriod(el.svr.opts.TCPKeepAlive)
+		_ = tc.SetKeepAlivePeriod(el.engine.opts.TCPKeepAlive)
 	}
 	return
 }

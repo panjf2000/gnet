@@ -39,38 +39,19 @@ const (
 	// Close closes the connection.
 	Close
 
-	// Shutdown shutdowns the server.
+	// Shutdown shutdowns the engine.
 	Shutdown
 )
 
-// Server represents a server context which provides information about the
-// running server and has control functions for managing state.
-type Server struct {
-	// svr is the internal server struct.
-	svr *server
-	// Multicore indicates whether the server will be effectively created with multi-cores, if so,
-	// then you must take care of synchronizing the shared data between all event callbacks, otherwise,
-	// it will run the server with single thread. The number of threads in the server will be automatically
-	// assigned to the value of logical CPUs usable by the current process.
-	Multicore bool
-
-	// Addr is the listening address that align
-	// with the addr string passed to the Serve function.
-	Addr net.Addr
-
-	// NumEventLoop is the number of event-loops that the server is using.
-	NumEventLoop int
-
-	// ReusePort indicates whether SO_REUSEPORT is enable.
-	ReusePort bool
-
-	// TCPKeepAlive (SO_KEEPALIVE) socket option.
-	TCPKeepAlive time.Duration
+// Engine represents an engine context which provides some functions.
+type Engine struct {
+	// eng is the internal engine struct.
+	eng *engine
 }
 
 // CountConnections counts the number of currently active connections and returns it.
-func (s Server) CountConnections() (count int) {
-	s.svr.lb.iterate(func(i int, el *eventloop) bool {
+func (s Engine) CountConnections() (count int) {
+	s.eng.lb.iterate(func(i int, el *eventloop) bool {
 		count += int(el.loadConn())
 		return true
 	})
@@ -80,17 +61,31 @@ func (s Server) CountConnections() (count int) {
 // DupFd returns a copy of the underlying file descriptor of listener.
 // It is the caller's responsibility to close dupFD when finished.
 // Closing listener does not affect dupFD, and closing dupFD does not affect listener.
-func (s Server) DupFd() (dupFD int, err error) {
-	dupFD, sc, err := s.svr.ln.dup()
+func (s Engine) DupFd() (dupFD int, err error) {
+	dupFD, sc, err := s.eng.ln.dup()
 	if err != nil {
 		logging.Warnf("%s failed when duplicating new fd\n", sc)
 	}
 	return
 }
 
+// Reader is an interface that consists of a number of methods for reading that Conn must implement.
 type Reader interface {
+	// ================================== Non-concurrency-safe API's ==================================
+
 	io.Reader
 	io.WriterTo // must be non-blocking, otherwise it may block the event-loop.
+
+	// Next returns a slice containing the next n bytes from the buffer,
+	// advancing the buffer as if the bytes had been returned by Read.
+	// If there are fewer than n bytes in the buffer, Next returns the entire buffer.
+	// The error is ErrBufferFull if n is larger than b's buffer size.
+	//
+	// Note that the []byte buf returned by Next() is not allowed to be passed to a new goroutine,
+	// as this []byte will be reused within event-loop.
+	// If you have to use buf in a new goroutine, then you need to make a copy of buf and pass this copy
+	// to that new goroutine.
+	Next(n int) (buf []byte, err error)
 
 	// Peek returns the next n bytes without advancing the reader. The bytes stop
 	// being valid at the next read call. If Peek returns fewer than n bytes, it
@@ -102,17 +97,35 @@ type Reader interface {
 	// If you have to use buf in a new goroutine, then you need to make a copy of buf and pass this copy
 	// to that new goroutine.
 	Peek(n int) (buf []byte, err error)
+
+	// Discard skips the next n bytes, returning the number of bytes discarded.
+	//
+	// If Discard skips fewer than n bytes, it also returns an error.
+	// If 0 <= n <= b.Buffered(), Discard is guaranteed to succeed without
+	// reading from the underlying io.Reader.
 	Discard(n int) (discarded int, err error)
+
+	// InboundBuffered returns the number of bytes that can be read from the current buffer.
 	InboundBuffered() (n int)
 }
 
+// Writer is an interface that consists of a number of methods for writing that Conn must implement.
 type Writer interface {
+	// ================================== Non-concurrency-safe API's ==================================
+
 	io.Writer
 	io.ReaderFrom // must be non-blocking, otherwise it may block the event-loop.
 
+	// Writev writes multiple byte slices to peer synchronously, you must call it in the current goroutine.
 	Writev(bs [][]byte) (n int, err error)
+
+	// Flush writes any buffered data to the underlying connection, you must call it in the current goroutine.
 	Flush() (err error)
+
+	// OutboundBuffered returns the number of bytes that can be read from the current buffer.
 	OutboundBuffered() (n int)
+
+	// ==================================== Concurrency-safe API's ====================================
 
 	// AsyncWrite writes one byte slice to peer asynchronously, usually you would call it in individual goroutines
 	// instead of the event-loop goroutines.
@@ -123,7 +136,7 @@ type Writer interface {
 	AsyncWritev(bs [][]byte) (err error)
 }
 
-// Conn is an interface of gnet connection.
+// Conn is an interface of underlying connection.
 type Conn interface {
 	Reader
 	Writer
@@ -161,17 +174,17 @@ type Conn interface {
 }
 
 type (
-	// EventHandler represents the server events' callbacks for the Serve call.
+	// EventHandler represents the engine events' callbacks for the Serve call.
 	// Each event has an Action return value that is used manage the state
-	// of the connection and server.
+	// of the connection and engine.
 	EventHandler interface {
-		// OnBoot fires when the server is ready for accepting connections.
-		// The parameter server has information and various utilities.
-		OnBoot(server Server) (action Action)
+		// OnBoot fires when the engine is ready for accepting connections.
+		// The parameter engine has information and various utilities.
+		OnBoot(eng Engine) (action Action)
 
-		// OnShutdown fires when the server is being shut down, it is called right after
+		// OnShutdown fires when the engine is being shut down, it is called right after
 		// all event-loops and connections are closed.
-		OnShutdown(server Server)
+		OnShutdown(eng Engine)
 
 		// OnOpen fires when a new connection has been opened.
 		// The Conn c has information about the connection such as it's local and remote address.
@@ -185,7 +198,7 @@ type (
 		// The parameter err is the last known connection error.
 		OnClose(c Conn, err error) (action Action)
 
-		// OnTraffic fires when a server-side socket receives data from the peer.
+		// OnTraffic fires when a socket receives data from the peer.
 		//
 		// Note that the parameter packet returned from React() is not allowed to be passed to a new goroutine,
 		// as this []byte will be reused within event-loop after React() returns.
@@ -193,48 +206,48 @@ type (
 		// to that new goroutine.
 		OnTraffic(c Conn) (action Action)
 
-		// OnTick fires immediately after the server starts and will fire again
+		// OnTick fires immediately after the engine starts and will fire again
 		// following the duration specified by the delay return value.
 		OnTick() (delay time.Duration, action Action)
 	}
 
-	// EventServer is a built-in implementation of EventHandler which sets up each method with a default implementation,
+	// BuiltinEventEngine is a built-in implementation of EventHandler which sets up each method with a default implementation,
 	// you can compose it with your own implementation of EventHandler when you don't want to implement all methods
 	// in EventHandler.
-	EventServer struct{}
+	BuiltinEventEngine struct{}
 )
 
-// OnBoot fires when the server is ready for accepting connections.
-// The parameter server has information and various utilities.
-func (es *EventServer) OnBoot(svr Server) (action Action) {
+// OnBoot fires when the engine is ready for accepting connections.
+// The parameter engine has information and various utilities.
+func (es *BuiltinEventEngine) OnBoot(_ Engine) (action Action) {
 	return
 }
 
-// OnShutdown fires when the server is being shut down, it is called right after
+// OnShutdown fires when the engine is being shut down, it is called right after
 // all event-loops and connections are closed.
-func (es *EventServer) OnShutdown(svr Server) {
+func (es *BuiltinEventEngine) OnShutdown(_ Engine) {
 }
 
 // OnOpen fires when a new connection has been opened.
 // The parameter out is the return value which is going to be sent back to the peer.
-func (es *EventServer) OnOpen(c Conn) (out []byte, action Action) {
+func (es *BuiltinEventEngine) OnOpen(_ Conn) (out []byte, action Action) {
 	return
 }
 
 // OnClose fires when a connection has been closed.
 // The parameter err is the last known connection error.
-func (es *EventServer) OnClose(c Conn, err error) (action Action) {
+func (es *BuiltinEventEngine) OnClose(_ Conn, _ error) (action Action) {
 	return
 }
 
-// OnTraffic fires when a server-side socket receives data from the peer.
-func (es *EventServer) OnTraffic(c Conn) (action Action) {
+// OnTraffic fires when a local socket receives data from the peer.
+func (es *BuiltinEventEngine) OnTraffic(_ Conn) (action Action) {
 	return
 }
 
-// OnTick fires immediately after the server starts and will fire again
+// OnTick fires immediately after the engine starts and will fire again
 // following the duration specified by the delay return value.
-func (es *EventServer) OnTick() (delay time.Duration, action Action) {
+func (es *BuiltinEventEngine) OnTick() (delay time.Duration, action Action) {
 	return
 }
 
@@ -310,32 +323,32 @@ func Serve(eventHandler EventHandler, protoAddr string, opts ...Option) (err err
 }
 
 var (
-	allServers sync.Map
+	allEngines sync.Map
 
-	// shutdownPollInterval is how often we poll to check whether server has been shut down during gnet.Stop().
+	// shutdownPollInterval is how often we poll to check whether engine has been shut down during gnet.Stop().
 	shutdownPollInterval = 500 * time.Millisecond
 )
 
-// Stop gracefully shuts down the server without interrupting any active event-loops,
+// Stop gracefully shuts down the engine without interrupting any active event-loops,
 // it waits indefinitely for connections and event-loops to be closed and then shuts down.
 func Stop(ctx context.Context, protoAddr string) error {
-	var svr *server
-	if s, ok := allServers.Load(protoAddr); ok {
-		svr = s.(*server)
-		svr.signalShutdown()
-		defer allServers.Delete(protoAddr)
+	var eng *engine
+	if s, ok := allEngines.Load(protoAddr); ok {
+		eng = s.(*engine)
+		eng.signalShutdown()
+		defer allEngines.Delete(protoAddr)
 	} else {
-		return errors.ErrServerInShutdown
+		return errors.ErrEngineInShutdown
 	}
 
-	if svr.isInShutdown() {
-		return errors.ErrServerInShutdown
+	if eng.isInShutdown() {
+		return errors.ErrEngineInShutdown
 	}
 
 	ticker := time.NewTicker(shutdownPollInterval)
 	defer ticker.Stop()
 	for {
-		if svr.isInShutdown() {
+		if eng.isInShutdown() {
 			return nil
 		}
 		select {

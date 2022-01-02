@@ -39,11 +39,11 @@ import (
 var streamLen = 1024 * 1024
 
 func TestServe(t *testing.T) {
-	// start a server
+	// start a engine
 	// connect 10 clients
 	// each client will pipe random data for 1-3 seconds.
-	// the writes to the server will be random sizes. 0KB - 1MB.
-	// the server will echo back the data.
+	// the writes to the engine will be random sizes. 0KB - 1MB.
+	// the engine will echo back the data.
 	// waits for graceful connection closing.
 	t.Run("poll", func(t *testing.T) {
 		t.Run("tcp", func(t *testing.T) {
@@ -232,9 +232,9 @@ func TestServe(t *testing.T) {
 }
 
 type testServer struct {
-	*EventServer
+	*BuiltinEventEngine
 	tester       *testing.T
-	svr          Server
+	eng          Engine
 	network      string
 	addr         string
 	multicore    bool
@@ -248,8 +248,8 @@ type testServer struct {
 	workerPool   *goPool.Pool
 }
 
-func (s *testServer) OnBoot(svr Server) (action Action) {
-	s.svr = svr
+func (s *testServer) OnBoot(eng Engine) (action Action) {
+	s.eng = eng
 	return
 }
 
@@ -283,13 +283,13 @@ func (s *testServer) OnClose(c Conn, err error) (action Action) {
 func (s *testServer) OnTraffic(c Conn) (action Action) {
 	if s.async {
 		buf := bbPool.Get()
-		c.WriteTo(buf)
+		_, _ = c.WriteTo(buf)
 
 		if s.network == "tcp" || s.network == "unix" {
 			// just for test
 			_ = c.InboundBuffered()
 			_ = c.OutboundBuffered()
-			c.Discard(1)
+			_, _ = c.Discard(1)
 
 			_ = s.workerPool.Submit(
 				func() {
@@ -314,8 +314,8 @@ func (s *testServer) OnTraffic(c Conn) (action Action) {
 		return
 	}
 	buf, _ := c.Peek(-1)
-	c.Write(buf)
-	c.Discard(-1)
+	_, _ = c.Write(buf)
+	_, _ = c.Discard(-1)
 	return
 }
 
@@ -403,8 +403,8 @@ func startClient(t *testing.T, network, addr string, multicore, async bool) {
 }
 
 func TestDefaultGnetServer(t *testing.T) {
-	svr := EventServer{}
-	svr.OnBoot(Server{})
+	svr := BuiltinEventEngine{}
+	svr.OnBoot(Engine{})
 	svr.OnOpen(nil)
 	svr.OnClose(nil, nil)
 	svr.OnTraffic(nil)
@@ -412,10 +412,10 @@ func TestDefaultGnetServer(t *testing.T) {
 }
 
 type testBadAddrServer struct {
-	*EventServer
+	*BuiltinEventEngine
 }
 
-func (t *testBadAddrServer) OnBoot(srv Server) (action Action) {
+func (t *testBadAddrServer) OnBoot(_ Engine) (action Action) {
 	return Shutdown
 }
 
@@ -434,7 +434,7 @@ func TestTick(t *testing.T) {
 }
 
 type testTickServer struct {
-	*EventServer
+	*BuiltinEventEngine
 	count int
 }
 
@@ -465,7 +465,7 @@ func TestWakeConn(t *testing.T) {
 }
 
 type testWakeConnServer struct {
-	*EventServer
+	*BuiltinEventEngine
 	tester  *testing.T
 	network string
 	addr    string
@@ -485,7 +485,7 @@ func (t *testWakeConnServer) OnClose(c Conn, err error) (action Action) {
 }
 
 func (t *testWakeConnServer) OnTraffic(c Conn) (action Action) {
-	c.Write([]byte("Waking up."))
+	_, _ = c.Write([]byte("Waking up."))
 	action = -1
 	return
 }
@@ -524,7 +524,7 @@ func TestShutdown(t *testing.T) {
 }
 
 type testShutdownServer struct {
-	*EventServer
+	*BuiltinEventEngine
 	tester  *testing.T
 	network string
 	addr    string
@@ -575,7 +575,7 @@ func TestCloseActionError(t *testing.T) {
 }
 
 type testCloseActionErrorServer struct {
-	*EventServer
+	*BuiltinEventEngine
 	tester        *testing.T
 	network, addr string
 	action        bool
@@ -589,8 +589,8 @@ func (t *testCloseActionErrorServer) OnClose(c Conn, err error) (action Action) 
 func (t *testCloseActionErrorServer) OnTraffic(c Conn) (action Action) {
 	n := c.InboundBuffered()
 	buf, _ := c.Peek(n)
-	c.Write(buf)
-	c.Discard(n)
+	_, _ = c.Write(buf)
+	_, _ = c.Discard(n)
 	action = Close
 	return
 }
@@ -625,7 +625,7 @@ func TestShutdownActionError(t *testing.T) {
 }
 
 type testShutdownActionErrorServer struct {
-	*EventServer
+	*BuiltinEventEngine
 	tester        *testing.T
 	network, addr string
 	action        bool
@@ -633,8 +633,8 @@ type testShutdownActionErrorServer struct {
 
 func (t *testShutdownActionErrorServer) OnTraffic(c Conn) (action Action) {
 	buf, _ := c.Peek(-1)
-	c.Write(buf)
-	c.Discard(-1)
+	_, _ = c.Write(buf)
+	_, _ = c.Discard(-1)
 	action = Shutdown
 	return
 }
@@ -669,7 +669,7 @@ func TestCloseActionOnOpen(t *testing.T) {
 }
 
 type testCloseActionOnOpenServer struct {
-	*EventServer
+	*BuiltinEventEngine
 	tester        *testing.T
 	network, addr string
 	action        bool
@@ -711,7 +711,7 @@ func TestShutdownActionOnOpen(t *testing.T) {
 }
 
 type testShutdownActionOnOpenServer struct {
-	*EventServer
+	*BuiltinEventEngine
 	tester        *testing.T
 	network, addr string
 	action        bool
@@ -722,7 +722,7 @@ func (t *testShutdownActionOnOpenServer) OnOpen(c Conn) (out []byte, action Acti
 	return
 }
 
-func (t *testShutdownActionOnOpenServer) OnShutdown(s Server) {
+func (t *testShutdownActionOnOpenServer) OnShutdown(s Engine) {
 	dupFD, err := s.DupFd()
 	logging.Debugf("dup fd: %d with error: %v\n", dupFD, err)
 }
@@ -753,7 +753,7 @@ func TestUDPShutdown(t *testing.T) {
 }
 
 type testUDPShutdownServer struct {
-	*EventServer
+	*BuiltinEventEngine
 	tester  *testing.T
 	network string
 	addr    string
@@ -762,8 +762,8 @@ type testUDPShutdownServer struct {
 
 func (t *testUDPShutdownServer) OnTraffic(c Conn) (action Action) {
 	buf, _ := c.Peek(-1)
-	c.Write(buf)
-	c.Discard(-1)
+	_, _ = c.Write(buf)
+	_, _ = c.Discard(-1)
 	action = Shutdown
 	return
 }
@@ -799,7 +799,7 @@ func TestCloseConnection(t *testing.T) {
 }
 
 type testCloseConnectionServer struct {
-	*EventServer
+	*BuiltinEventEngine
 	tester        *testing.T
 	network, addr string
 	action        bool
@@ -812,8 +812,8 @@ func (t *testCloseConnectionServer) OnClose(c Conn, err error) (action Action) {
 
 func (t *testCloseConnectionServer) OnTraffic(c Conn) (action Action) {
 	buf, _ := c.Peek(-1)
-	c.Write(buf)
-	c.Discard(-1)
+	_, _ = c.Write(buf)
+	_, _ = c.Discard(-1)
 	go func() {
 		time.Sleep(time.Second)
 		_ = c.Close()
@@ -833,7 +833,7 @@ func (t *testCloseConnectionServer) OnTick() (delay time.Duration, action Action
 			_, _ = conn.Write(data)
 			_, err = conn.Read(data)
 			require.NoError(t.tester, err)
-			// waiting the server shutdown.
+			// waiting the engine shutdown.
 			_, err = conn.Read(data)
 			require.Error(t.tester, err)
 		}()
@@ -849,7 +849,7 @@ func testCloseConnection(t *testing.T, network, addr string) {
 }
 
 func TestServerOptionsCheck(t *testing.T) {
-	err := Serve(&EventServer{}, "tcp://:3500", WithNumEventLoop(10001), WithLockOSThread(true))
+	err := Serve(&BuiltinEventEngine{}, "tcp://:3500", WithNumEventLoop(10001), WithLockOSThread(true))
 	assert.EqualError(t, err, errors.ErrTooManyEventLoopThreads.Error(), "error returned with LockOSThread option")
 }
 
@@ -858,7 +858,7 @@ func TestStop(t *testing.T) {
 }
 
 type testStopServer struct {
-	*EventServer
+	*BuiltinEventEngine
 	tester                   *testing.T
 	network, addr, protoAddr string
 	action                   bool
@@ -871,8 +871,8 @@ func (t *testStopServer) OnClose(c Conn, err error) (action Action) {
 
 func (t *testStopServer) OnTraffic(c Conn) (action Action) {
 	buf, _ := c.Peek(-1)
-	c.Write(buf)
-	c.Discard(-1)
+	_, _ = c.Write(buf)
+	_, _ = c.Discard(-1)
 	return
 }
 
@@ -892,10 +892,10 @@ func (t *testStopServer) OnTick() (delay time.Duration, action Action) {
 			go func() {
 				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 				defer cancel()
-				logging.Debugf("stop server...", Stop(ctx, t.protoAddr))
+				logging.Debugf("stop engine...", Stop(ctx, t.protoAddr))
 			}()
 
-			// waiting the server shutdown.
+			// waiting the engine shutdown.
 			_, err = conn.Read(data)
 			require.Error(t.tester, err)
 		}()
@@ -913,8 +913,8 @@ func testStop(t *testing.T, network, addr string) {
 // Test should not panic when we wake-up server_closed conn.
 func TestClosedWakeUp(t *testing.T) {
 	events := &testClosedWakeUpServer{
-		tester:      t,
-		EventServer: &EventServer{}, network: "tcp", addr: ":8888", protoAddr: "tcp://:8888",
+		tester:             t,
+		BuiltinEventEngine: &BuiltinEventEngine{}, network: "tcp", addr: ":8888", protoAddr: "tcp://:8888",
 		clientClosed: make(chan struct{}),
 		serverClosed: make(chan struct{}),
 		wakeup:       make(chan struct{}),
@@ -925,7 +925,7 @@ func TestClosedWakeUp(t *testing.T) {
 }
 
 type testClosedWakeUpServer struct {
-	*EventServer
+	*BuiltinEventEngine
 	tester                   *testing.T
 	network, addr, protoAddr string
 
@@ -934,7 +934,7 @@ type testClosedWakeUpServer struct {
 	clientClosed chan struct{}
 }
 
-func (s *testClosedWakeUpServer) OnBoot(_ Server) (action Action) {
+func (s *testClosedWakeUpServer) OnBoot(_ Engine) (action Action) {
 	go func() {
 		c, err := net.Dial(s.network, s.addr)
 		require.NoError(s.tester, err)
@@ -949,14 +949,14 @@ func (s *testClosedWakeUpServer) OnBoot(_ Server) (action Action) {
 		close(s.clientClosed)
 		<-s.serverClosed
 
-		logging.Debugf("stop server...", Stop(context.TODO(), s.protoAddr))
+		logging.Debugf("stop engine...", Stop(context.TODO(), s.protoAddr))
 	}()
 
 	return None
 }
 
-func (s *testClosedWakeUpServer) OnTraffic(conn Conn) Action {
-	require.NotNil(s.tester, conn.RemoteAddr())
+func (s *testClosedWakeUpServer) OnTraffic(c Conn) Action {
+	require.NotNil(s.tester, c.RemoteAddr())
 
 	select {
 	case <-s.wakeup:
@@ -967,12 +967,12 @@ func (s *testClosedWakeUpServer) OnTraffic(conn Conn) Action {
 	// Actually goroutines here needed only on windows since its async actions
 	// rely on an unbuffered channel and since we already into it - this will
 	// block forever.
-	go func() { require.NoError(s.tester, conn.Wake()) }()
-	go func() { require.NoError(s.tester, conn.Close()) }()
+	go func() { require.NoError(s.tester, c.Wake()) }()
+	go func() { require.NoError(s.tester, c.Close()) }()
 
 	<-s.clientClosed
 
-	conn.Write([]byte("answer"))
+	_, _ = c.Write([]byte("answer"))
 	return None
 }
 

@@ -63,17 +63,17 @@ func NewClient(eventHandler EventHandler, opts ...Option) (cli *Client, err erro
 	if p, err = netpoll.OpenPoller(); err != nil {
 		return
 	}
-	svr := new(server)
-	svr.opts = options
-	svr.eventHandler = eventHandler
-	svr.ln = &listener{network: "udp"}
-	svr.cond = sync.NewCond(&sync.Mutex{})
+	eng := new(engine)
+	eng.opts = options
+	eng.eventHandler = eventHandler
+	eng.ln = &listener{network: "udp"}
+	eng.cond = sync.NewCond(&sync.Mutex{})
 	if options.Ticker {
-		svr.tickerCtx, svr.cancelTicker = context.WithCancel(context.Background())
+		eng.tickerCtx, eng.cancelTicker = context.WithCancel(context.Background())
 	}
 	el := new(eventloop)
-	el.ln = svr.ln
-	el.svr = svr
+	el.ln = eng.ln
+	el.engine = eng
 	el.poller = p
 	if rbc := options.ReadBufferCap; rbc <= 0 {
 		options.ReadBufferCap = 0x10000
@@ -90,28 +90,28 @@ func NewClient(eventHandler EventHandler, opts ...Option) (cli *Client, err erro
 
 // Start starts the client event-loop, handing IO events.
 func (cli *Client) Start() error {
-	cli.el.eventHandler.OnBoot(Server{})
-	cli.el.svr.wg.Add(1)
+	cli.el.eventHandler.OnBoot(Engine{})
+	cli.el.engine.wg.Add(1)
 	go func() {
 		cli.el.run(cli.opts.LockOSThread)
-		cli.el.svr.wg.Done()
+		cli.el.engine.wg.Done()
 	}()
 	// Start the ticker.
 	if cli.opts.Ticker {
-		go cli.el.ticker(cli.el.svr.tickerCtx)
+		go cli.el.ticker(cli.el.engine.tickerCtx)
 	}
 	return nil
 }
 
 // Stop stops the client event-loop.
 func (cli *Client) Stop() (err error) {
-	err = cli.el.poller.UrgentTrigger(func(_ interface{}) error { return gerrors.ErrServerShutdown }, nil)
-	cli.el.svr.wg.Wait()
+	err = cli.el.poller.UrgentTrigger(func(_ interface{}) error { return gerrors.ErrEngineShutdown }, nil)
+	cli.el.engine.wg.Wait()
 	cli.el.poller.Close()
-	cli.el.eventHandler.OnShutdown(Server{})
+	cli.el.eventHandler.OnShutdown(Engine{})
 	// Stop the ticker.
 	if cli.opts.Ticker {
-		cli.el.svr.cancelTicker()
+		cli.el.engine.cancelTicker()
 	}
 	if cli.logFlush != nil {
 		err = cli.logFlush()

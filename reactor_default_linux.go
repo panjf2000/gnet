@@ -30,13 +30,13 @@ func (el *eventloop) activateMainReactor(lockOSThread bool) {
 		defer runtime.UnlockOSThread()
 	}
 
-	defer el.svr.signalShutdown()
+	defer el.engine.signalShutdown()
 
-	err := el.poller.Polling(func(fd int, ev uint32) error { return el.svr.accept(fd, ev) })
-	if err == errors.ErrServerShutdown {
-		el.svr.opts.Logger.Debugf("main reactor is exiting in terms of the demand from user, %v", err)
+	err := el.poller.Polling(func(fd int, ev uint32) error { return el.engine.accept(fd, ev) })
+	if err == errors.ErrEngineShutdown {
+		el.engine.opts.Logger.Debugf("main reactor is exiting in terms of the demand from user, %v", err)
 	} else if err != nil {
-		el.svr.opts.Logger.Errorf("main reactor is exiting due to error: %v", err)
+		el.engine.opts.Logger.Errorf("main reactor is exiting due to error: %v", err)
 	}
 }
 
@@ -48,7 +48,7 @@ func (el *eventloop) activateSubReactor(lockOSThread bool) {
 
 	defer func() {
 		el.closeAllSockets()
-		el.svr.signalShutdown()
+		el.engine.signalShutdown()
 	}()
 
 	err := el.poller.Polling(func(fd int, ev uint32) error {
@@ -72,9 +72,9 @@ func (el *eventloop) activateSubReactor(lockOSThread bool) {
 			// If there is pending data in outbound buffer, then we should omit this readable event
 			// and prioritize the writable events to achieve a higher performance.
 			//
-			// Note that the peer may send massive amounts of data to server by write() under blocking mode,
-			// resulting in that it won't receive any responses before the server reads all data from the peer,
-			// in which case if the server socket send buffer is full, we need to let it go and continue reading
+			// Note that the peer may send massive amounts of data to engine by write() under blocking mode,
+			// resulting in that it won't receive any responses before the engine reads all data from the peer,
+			// in which case if the engine socket send buffer is full, we need to let it go and continue reading
 			// the data to prevent blocking forever.
 			if ev&netpoll.InEvents != 0 && (ev&netpoll.OutEvents == 0 || c.outboundBuffer.IsEmpty()) {
 				return el.read(c)
@@ -82,10 +82,10 @@ func (el *eventloop) activateSubReactor(lockOSThread bool) {
 		}
 		return nil
 	})
-	if err == errors.ErrServerShutdown {
-		el.svr.opts.Logger.Debugf("event-loop(%d) is exiting in terms of the demand from user, %v", el.idx, err)
+	if err == errors.ErrEngineShutdown {
+		el.engine.opts.Logger.Debugf("event-loop(%d) is exiting in terms of the demand from user, %v", el.idx, err)
 	} else if err != nil {
-		el.svr.opts.Logger.Errorf("event-loop(%d) is exiting due to error: %v", el.idx, err)
+		el.engine.opts.Logger.Errorf("event-loop(%d) is exiting due to error: %v", el.idx, err)
 	}
 }
 
@@ -98,7 +98,7 @@ func (el *eventloop) run(lockOSThread bool) {
 	defer func() {
 		el.closeAllSockets()
 		el.ln.close()
-		el.svr.signalShutdown()
+		el.engine.signalShutdown()
 	}()
 
 	err := el.poller.Polling(func(fd int, ev uint32) error {
@@ -122,8 +122,8 @@ func (el *eventloop) run(lockOSThread bool) {
 			// If there is pending data in outbound buffer, then we should omit this readable event
 			// and prioritize the writable events to achieve a higher performance.
 			//
-			// Note that the peer may send massive amounts of data to server by write() under blocking mode,
-			// resulting in that it won't receive any responses before the server reads all data from the peer,
+			// Note that the peer may send massive amounts of data to engine by write() under blocking mode,
+			// resulting in that it won't receive any responses before the engine reads all data from the peer,
 			// in which case if the socket send buffer is full, we need to let it go and continue reading the data
 			// to prevent blocking forever.
 			if ev&netpoll.InEvents != 0 && (ev&netpoll.OutEvents == 0 || c.outboundBuffer.IsEmpty()) {

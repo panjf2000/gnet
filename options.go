@@ -44,9 +44,9 @@ const (
 type Options struct {
 	// ================================== Options for only server-side ==================================
 
-	// Multicore indicates whether the server will be effectively created with multi-cores, if so,
+	// Multicore indicates whether the engine will be effectively created with multi-cores, if so,
 	// then you must take care with synchronizing memory between all event callbacks, otherwise,
-	// it will run the server with single thread. The number of threads in the server will be automatically
+	// it will run the engine with single thread. The number of threads in the engine will be automatically
 	// assigned to the value of logical CPUs usable by the current process.
 	Multicore bool
 
@@ -119,7 +119,7 @@ func WithOptions(options Options) Option {
 	}
 }
 
-// WithMulticore sets up multi-cores in gnet server.
+// WithMulticore sets up multi-cores in gnet engine.
 func WithMulticore(multicore bool) Option {
 	return func(opts *Options) {
 		opts.Multicore = multicore
@@ -140,14 +140,14 @@ func WithReadBufferCap(readBufferCap int) Option {
 	}
 }
 
-// WithLoadBalancing sets up the load-balancing algorithm in gnet server.
+// WithLoadBalancing sets up the load-balancing algorithm in gnet engine.
 func WithLoadBalancing(lb LoadBalancing) Option {
 	return func(opts *Options) {
 		opts.LB = lb
 	}
 }
 
-// WithNumEventLoop sets up NumEventLoop in gnet server.
+// WithNumEventLoop sets up NumEventLoop in gnet engine.
 func WithNumEventLoop(numEventLoop int) Option {
 	return func(opts *Options) {
 		opts.NumEventLoop = numEventLoop

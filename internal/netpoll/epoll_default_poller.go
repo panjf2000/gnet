@@ -135,7 +135,7 @@ func (p *Poller) Polling(callback func(fd int, ev uint32) error) error {
 			if fd := int(ev.Fd); fd != p.wfd {
 				switch err = callback(fd, ev.Events); err {
 				case nil:
-				case errors.ErrAcceptSocket, errors.ErrServerShutdown:
+				case errors.ErrAcceptSocket, errors.ErrEngineShutdown:
 					return err
 				default:
 					logging.Warnf("error occurs in event-loop: %v", err)
@@ -152,7 +152,7 @@ func (p *Poller) Polling(callback func(fd int, ev uint32) error) error {
 			for ; task != nil; task = p.priorAsyncTaskQueue.Dequeue() {
 				switch err = task.Run(task.Arg); err {
 				case nil:
-				case errors.ErrServerShutdown:
+				case errors.ErrEngineShutdown:
 					return err
 				default:
 					logging.Warnf("error occurs in user-defined function, %v", err)
@@ -165,7 +165,7 @@ func (p *Poller) Polling(callback func(fd int, ev uint32) error) error {
 				}
 				switch err = task.Run(task.Arg); err {
 				case nil:
-				case errors.ErrServerShutdown:
+				case errors.ErrEngineShutdown:
 					return err
 				default:
 					logging.Warnf("error occurs in user-defined function, %v", err)

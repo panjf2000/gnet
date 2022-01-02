@@ -20,37 +20,37 @@ import (
 	"time"
 )
 
-func (svr *server) listenerRun(lockOSThread bool) {
+func (eng *engine) listenerRun(lockOSThread bool) {
 	if lockOSThread {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
 	}
 
 	var err error
-	defer func() { svr.signalShutdownWithErr(err) }()
+	defer func() { eng.signalShutdownWithErr(err) }()
 	var buffer [0x10000]byte
 	for {
-		if svr.ln.packetConn != nil {
+		if eng.ln.packetConn != nil {
 			// Read data from UDP socket.
-			n, addr, e := svr.ln.packetConn.ReadFrom(buffer[:])
+			n, addr, e := eng.ln.packetConn.ReadFrom(buffer[:])
 			if e != nil {
 				err = e
-				svr.opts.Logger.Errorf("failed to receive data from UDP fd due to error:%v", err)
+				eng.opts.Logger.Errorf("failed to receive data from UDP fd due to error:%v", err)
 				return
 			}
 
-			el := svr.lb.next(addr)
-			c := newUDPConn(el, svr.ln.addr, addr)
+			el := eng.lb.next(addr)
+			c := newUDPConn(el, eng.ln.addr, addr)
 			el.ch <- packUDPConn(c, buffer[:n])
 		} else {
 			// Accept TCP socket.
-			conn, e := svr.ln.ln.Accept()
+			conn, e := eng.ln.ln.Accept()
 			if e != nil {
 				err = e
-				svr.opts.Logger.Errorf("Accept() fails due to error: %v", err)
+				eng.opts.Logger.Errorf("Accept() fails due to error: %v", err)
 				return
 			}
-			el := svr.lb.next(conn.RemoteAddr())
+			el := eng.lb.next(conn.RemoteAddr())
 			c := newTCPConn(conn, el)
 			el.ch <- c
 			go func() {

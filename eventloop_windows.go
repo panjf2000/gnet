@@ -29,7 +29,7 @@ import (
 type eventloop struct {
 	ch           chan interface{}      // command channel
 	idx          int                   // loop index
-	svr          *server               // server in loop
+	svr          *engine               // engine in loop
 	connCount    int32                 // number of active connections in event-loop
 	connections  map[*stdConn]struct{} // track all the sockets bound to this loop
 	eventHandler EventHandler          // user eventHandler
@@ -86,7 +86,7 @@ func (el *eventloop) run(lockOSThread bool) {
 			dataTaskPool.Put(i)
 		}
 
-		if err == errors.ErrServerShutdown {
+		if err == errors.ErrEngineShutdown {
 			el.getLogger().Debugf("event-loop(%d) is exiting in terms of the demand from user, %v", el.idx, err)
 			break
 		} else if err != nil {
@@ -122,7 +122,7 @@ func (el *eventloop) read(c *stdConn) error {
 		case Close:
 			return el.closeConn(c)
 		case Shutdown:
-			return errors.ErrServerShutdown
+			return errors.ErrEngineShutdown
 		}
 	}
 	_, _ = c.inboundBuffer.Write(c.buffer.B)
@@ -176,7 +176,7 @@ func (el *eventloop) ticker(ctx context.Context) {
 	for {
 		delay, action = el.eventHandler.Tick()
 		if action == Shutdown {
-			el.ch <- errors.ErrServerShutdown
+			el.ch <- errors.ErrEngineShutdown
 			el.getLogger().Debugf("stopping ticker in event-loop(%d) from Tick()", el.idx)
 		}
 		if timer == nil {
@@ -186,7 +186,7 @@ func (el *eventloop) ticker(ctx context.Context) {
 		}
 		select {
 		case <-ctx.Done():
-			el.getLogger().Debugf("stopping ticker in event-loop(%d) from Server, error:%v", el.idx, ctx.Err())
+			el.getLogger().Debugf("stopping ticker in event-loop(%d) from Engine, error:%v", el.idx, ctx.Err())
 			return
 		case <-timer.C:
 		}
@@ -212,7 +212,7 @@ func (el *eventloop) error(c *stdConn, err error) (e error) {
 	}()
 
 	if el.eventHandler.OnClosed(c, err) == Shutdown {
-		return errors.ErrServerShutdown
+		return errors.ErrEngineShutdown
 	}
 
 	return
@@ -240,7 +240,7 @@ func (el *eventloop) handleAction(c *stdConn, action Action) error {
 	case Close:
 		return el.closeConn(c)
 	case Shutdown:
-		return errors.ErrServerShutdown
+		return errors.ErrEngineShutdown
 	default:
 		return nil
 	}
@@ -252,7 +252,7 @@ func (el *eventloop) readUDP(c *stdConn) error {
 		_ = c.SendTo(out)
 	}
 	if action == Shutdown {
-		return errors.ErrServerShutdown
+		return errors.ErrEngineShutdown
 	}
 	c.releaseUDP()
 

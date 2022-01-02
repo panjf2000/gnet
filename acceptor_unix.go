@@ -29,13 +29,13 @@ import (
 	"github.com/panjf2000/gnet/pkg/logging"
 )
 
-func (svr *server) accept(fd int, _ netpoll.IOEvent) error {
+func (eng *engine) accept(fd int, _ netpoll.IOEvent) error {
 	nfd, sa, err := unix.Accept(fd)
 	if err != nil {
 		if err == unix.EAGAIN {
 			return nil
 		}
-		svr.opts.Logger.Errorf("Accept() fails due to error: %v", err)
+		eng.opts.Logger.Errorf("Accept() fails due to error: %v", err)
 		return errors.ErrAcceptSocket
 	}
 	if err = os.NewSyscallError("fcntl nonblock", unix.SetNonblock(nfd, true)); err != nil {
@@ -43,12 +43,12 @@ func (svr *server) accept(fd int, _ netpoll.IOEvent) error {
 	}
 
 	remoteAddr := socket.SockaddrToTCPOrUnixAddr(sa)
-	if svr.opts.TCPKeepAlive > 0 && svr.ln.network == "tcp" {
-		err = socket.SetKeepAlive(nfd, int(svr.opts.TCPKeepAlive/time.Second))
+	if eng.opts.TCPKeepAlive > 0 && eng.ln.network == "tcp" {
+		err = socket.SetKeepAlive(nfd, int(eng.opts.TCPKeepAlive/time.Second))
 		logging.Error(err)
 	}
 
-	el := svr.lb.next(remoteAddr)
+	el := eng.lb.next(remoteAddr)
 	c := newTCPConn(nfd, el, sa, el.ln.addr, remoteAddr)
 
 	err = el.poller.UrgentTrigger(el.register, c)
@@ -77,8 +77,8 @@ func (el *eventloop) accept(fd int, ev netpoll.IOEvent) error {
 	}
 
 	remoteAddr := socket.SockaddrToTCPOrUnixAddr(sa)
-	if el.svr.opts.TCPKeepAlive > 0 && el.ln.network == "tcp" {
-		err = socket.SetKeepAlive(nfd, int(el.svr.opts.TCPKeepAlive/time.Second))
+	if el.engine.opts.TCPKeepAlive > 0 && el.ln.network == "tcp" {
+		err = socket.SetKeepAlive(nfd, int(el.engine.opts.TCPKeepAlive/time.Second))
 		logging.Error(err)
 	}
 

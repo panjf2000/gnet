@@ -33,13 +33,13 @@ type server struct {
 	ln           *listener          // the listeners for accepting new connections
 	lb           loadBalancer       // event-loops for handling events
 	cond         *sync.Cond         // shutdown signaler
-	opts         *Options           // options with server
+	opts         *Options           // options with engine
 	serr         error              // signal error
 	once         sync.Once          // make sure only signalShutdown once
 	codec        ICodec             // codec for TCP stream
 	loopWG       sync.WaitGroup     // loop close WaitGroup
 	listenerWG   sync.WaitGroup     // listener close WaitGroup
-	inShutdown   int32              // whether the server is in shutdown
+	inShutdown   int32              // whether the engine is in shutdown
 	tickerCtx    context.Context    // context for ticker
 	cancelTicker context.CancelFunc // function to stop the ticker
 	eventHandler EventHandler       // user eventHandler
@@ -58,12 +58,12 @@ func (svr *server) waitForShutdown() error {
 	return err
 }
 
-// signalShutdown signals the server to shut down.
+// signalShutdown signals the engine to shut down.
 func (svr *server) signalShutdown() {
 	svr.signalShutdownWithErr(nil)
 }
 
-// signalShutdownWithErr signals the server to shut down with an error.
+// signalShutdownWithErr signals the engine to shut down with an error.
 func (svr *server) signalShutdownWithErr(err error) {
 	svr.once.Do(func() {
 		svr.cond.L.Lock()
@@ -86,7 +86,7 @@ func (svr *server) startEventLoops(numEventLoop int) {
 	for i := 0; i < numEventLoop; i++ {
 		el := new(eventloop)
 		el.ch = make(chan interface{}, channelBuffer(TaskBufferCap))
-		el.svr = svr
+		el.engine = svr
 		el.connections = make(map[*stdConn]struct{})
 		el.eventHandler = svr.eventHandler
 		svr.lb.register(el)
@@ -105,9 +105,9 @@ func (svr *server) startEventLoops(numEventLoop int) {
 	go striker.ticker(svr.tickerCtx)
 }
 
-func (svr *server) stop(s Server) {
+func (svr *server) stop(s Engine) {
 	// Wait on a signal for shutdown.
-	svr.opts.Logger.Infof("Server is being shutdown on the signal error: %v", svr.waitForShutdown())
+	svr.opts.Logger.Infof("Engine is being shutdown on the signal error: %v", svr.waitForShutdown())
 
 	svr.eventHandler.OnShutdown(s)
 
@@ -117,7 +117,7 @@ func (svr *server) stop(s Server) {
 
 	// Notify all loops to close.
 	svr.lb.iterate(func(i int, el *eventloop) bool {
-		el.ch <- gerrors.ErrServerShutdown
+		el.ch <- gerrors.ErrEngineShutdown
 		return true
 	})
 
@@ -175,8 +175,8 @@ func serve(eventHandler EventHandler, listener *listener, options *Options, prot
 		return options.Codec
 	}()
 
-	server := Server{
-		svr:          svr,
+	server := Engine{
+		eng:          svr,
 		Multicore:    options.Multicore,
 		Addr:         listener.addr,
 		NumEventLoop: numEventLoop,
@@ -197,7 +197,7 @@ func serve(eventHandler EventHandler, listener *listener, options *Options, prot
 
 	defer svr.stop(server)
 
-	allServers.Store(protoAddr, svr)
+	allEngines.Store(protoAddr, svr)
 
 	return
 }

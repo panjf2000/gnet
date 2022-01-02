@@ -37,7 +37,8 @@ func New(maxStaticBytes int) *Buffer {
 	return &Buffer{maxStaticBytes: maxStaticBytes, ringBuffer: rbPool.Get()}
 }
 
-func (mb Buffer) Read(p []byte) (n int, err error) {
+// Read reads data from the LinkedListBuffer.
+func (mb *Buffer) Read(p []byte) (n int, err error) {
 	if mb.ringBuffer == nil {
 		return mb.listBuffer.Read(p)
 	}
@@ -57,15 +58,8 @@ func (mb *Buffer) Peek(n int) [][]byte {
 		return mb.listBuffer.PeekBytesList(n)
 	}
 
-	head, tail := mb.ringBuffer.PeekAll()
+	head, tail := mb.ringBuffer.Peek(-1)
 	return mb.listBuffer.PeekBytesListWithBytes(n, head, tail)
-}
-
-func (mb Buffer) WriteTo(w io.Writer) (int64, error) {
-	if mb.ringBuffer == nil {
-		return mb.listBuffer.WriteTo(w)
-	}
-	return mb.ringBuffer.WriteTo(w)
 }
 
 // Discard discards n bytes in this buffer.
@@ -101,7 +95,7 @@ func (mb *Buffer) Write(p []byte) (n int, err error) {
 		return len(p), nil
 	}
 	if mb.ringBuffer.Len() >= mb.maxStaticBytes {
-		freeSize := mb.ringBuffer.Free()
+		freeSize := mb.ringBuffer.Available()
 		if n = len(p); n > freeSize {
 			_, _ = mb.ringBuffer.Write(p[:freeSize])
 			mb.listBuffer.PushBytesBack(p[freeSize:])
@@ -109,16 +103,6 @@ func (mb *Buffer) Write(p []byte) (n int, err error) {
 		}
 	}
 	return mb.ringBuffer.Write(p)
-}
-
-func (mb *Buffer) ReadFrom(r io.Reader) (int64, error) {
-	if mb.ringBuffer == nil && mb.listBuffer.IsEmpty() {
-		mb.ringBuffer = rbPool.Get()
-	}
-	if !mb.listBuffer.IsEmpty() || mb.ringBuffer.Buffered() >= mb.maxStaticBytes {
-		return mb.listBuffer.ReadFrom(r)
-	}
-	return mb.ringBuffer.ReadFrom(r)
 }
 
 // Writev appends multiple byte slices to this buffer.
@@ -137,7 +121,7 @@ func (mb *Buffer) Writev(bs [][]byte) (int, error) {
 	}
 
 	var pos, cum int
-	writableSize := mb.ringBuffer.Free()
+	writableSize := mb.ringBuffer.Available()
 	if mb.ringBuffer.Len() < mb.maxStaticBytes {
 		writableSize = mb.maxStaticBytes - mb.ringBuffer.Buffered()
 	}
@@ -159,6 +143,26 @@ func (mb *Buffer) Writev(bs [][]byte) (int, error) {
 	return cum, nil
 }
 
+// ReadFrom implements io.ReaderFrom.
+func (mb *Buffer) ReadFrom(r io.Reader) (int64, error) {
+	if mb.ringBuffer == nil && mb.listBuffer.IsEmpty() {
+		mb.ringBuffer = rbPool.Get()
+	}
+	if !mb.listBuffer.IsEmpty() || mb.ringBuffer.Buffered() >= mb.maxStaticBytes {
+		return mb.listBuffer.ReadFrom(r)
+	}
+	return mb.ringBuffer.ReadFrom(r)
+}
+
+// WriteTo implements io.WriterTo.
+func (mb *Buffer) WriteTo(w io.Writer) (int64, error) {
+	if mb.ringBuffer == nil {
+		return mb.listBuffer.WriteTo(w)
+	}
+	return mb.ringBuffer.WriteTo(w)
+}
+
+// Buffered returns the number of bytes that can be read from the current buffer.
 func (mb *Buffer) Buffered() int {
 	if mb.ringBuffer == nil {
 		return mb.listBuffer.Buffered()
