@@ -339,7 +339,7 @@ func startGnetClient(t *testing.T, cli *Client, ev *clientEvents, network, addr 
 		require.True(t, ok)
 		rspCh = v.(chan []byte)
 	}
-	duration := time.Duration((rand.Float64()*2+1)*float64(time.Second)) / 8
+	duration := time.Duration((rand.Float64()*2+1)*float64(time.Second)) / 2
 	start := time.Now()
 	for time.Since(start) < duration {
 		reqData := make([]byte, streamLen)

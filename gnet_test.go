@@ -17,7 +17,10 @@ package gnet
 
 import (
 	"bufio"
+	"bytes"
 	"context"
+	"encoding/binary"
+	"errors"
 	"io"
 	"math/rand"
 	"net"
@@ -30,7 +33,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
-	"github.com/panjf2000/gnet/v2/pkg/errors"
+	gerr "github.com/panjf2000/gnet/v2/pkg/errors"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
 	bbPool "github.com/panjf2000/gnet/v2/pkg/pool/bytebuffer"
 	goPool "github.com/panjf2000/gnet/v2/pkg/pool/goroutine"
@@ -39,7 +42,7 @@ import (
 var streamLen = 1024 * 1024
 
 func TestServe(t *testing.T) {
-	// start a engine
+	// start an engine
 	// connect 10 clients
 	// each client will pipe random data for 1-3 seconds.
 	// the writes to the engine will be random sizes. 0KB - 1MB.
@@ -372,7 +375,8 @@ func startClient(t *testing.T, network, addr string, multicore, async bool) {
 		require.NoError(t, err)
 		require.Equal(t, string(msg), "sweetness\r\n", "bad header")
 	}
-	duration := time.Duration((rand.Float64()*2+1)*float64(time.Second)) / 8
+	duration := time.Duration((rand.Float64()*2+1)*float64(time.Second)) / 2
+	t.Logf("test duration: %dms", duration/time.Millisecond)
 	start := time.Now()
 	for time.Since(start) < duration {
 		reqData := make([]byte, streamLen)
@@ -850,7 +854,7 @@ func testCloseConnection(t *testing.T, network, addr string) {
 
 func TestServerOptionsCheck(t *testing.T) {
 	err := Serve(&BuiltinEventEngine{}, "tcp://:3500", WithNumEventLoop(10001), WithLockOSThread(true))
-	assert.EqualError(t, err, errors.ErrTooManyEventLoopThreads.Error(), "error returned with LockOSThread option")
+	assert.EqualError(t, err, gerr.ErrTooManyEventLoopThreads.Error(), "error returned with LockOSThread option")
 }
 
 func TestStop(t *testing.T) {
@@ -983,4 +987,274 @@ func (s *testClosedWakeUpServer) OnClose(c Conn, err error) (action Action) {
 		close(s.serverClosed)
 	}
 	return
+}
+
+var errIncompletePacket = errors.New("incomplete packet")
+
+type simServer struct {
+	BuiltinEventEngine
+	tester       *testing.T
+	eng          Engine
+	network      string
+	addr         string
+	multicore    bool
+	nclients     int
+	packetSize   int
+	packetBatch  int
+	started      int32
+	connected    int32
+	disconnected int32
+}
+
+func (s *simServer) OnBoot(eng Engine) (action Action) {
+	s.eng = eng
+	return
+}
+
+func (s *simServer) OnOpen(c Conn) (out []byte, action Action) {
+	c.SetContext(&testCodec{})
+	atomic.AddInt32(&s.connected, 1)
+	out = []byte("sweetness\r\n")
+	require.NotNil(s.tester, c.LocalAddr(), "nil local addr")
+	require.NotNil(s.tester, c.RemoteAddr(), "nil remote addr")
+	return
+}
+
+func (s *simServer) OnClose(c Conn, err error) (action Action) {
+	if err != nil {
+		logging.Debugf("error occurred on closed, %v\n", err)
+	}
+
+	atomic.AddInt32(&s.disconnected, 1)
+	if atomic.LoadInt32(&s.connected) == atomic.LoadInt32(&s.disconnected) &&
+		atomic.LoadInt32(&s.disconnected) == int32(s.nclients) {
+		action = Shutdown
+	}
+
+	return
+}
+
+func (s *simServer) OnTraffic(c Conn) (action Action) {
+	codec := c.Context().(*testCodec)
+	var packets [][]byte
+	for {
+		data, err := codec.Decode(c)
+		if err == errIncompletePacket {
+			break
+		}
+		if err != nil {
+			logging.Errorf("invalid packet: %v", err)
+			return Close
+		}
+		packet, _ := codec.Encode(data)
+		codec.Discard(c)
+		packets = append(packets, packet)
+	}
+	if n := len(packets); n > 1 {
+		_, _ = c.Writev(packets)
+	} else if n == 1 {
+		_, _ = c.Write(packets[0])
+	}
+	return
+}
+
+func (s *simServer) OnTick() (delay time.Duration, action Action) {
+	if atomic.CompareAndSwapInt32(&s.started, 0, 1) {
+		for i := 0; i < s.nclients; i++ {
+			go func() {
+				runClient(s.tester, s.network, s.addr, s.packetSize, s.packetBatch)
+			}()
+		}
+	}
+	delay = 100 * time.Millisecond
+	return
+}
+
+// All current protocols.
+const (
+	magicNumber     = 1314
+	magicNumberSize = 2
+	bodySize        = 4
+)
+
+var magicNumberBytes []byte
+
+func init() {
+	magicNumberBytes = make([]byte, magicNumberSize)
+	binary.BigEndian.PutUint16(magicNumberBytes, uint16(magicNumber))
+}
+
+// Protocol format:
+//
+// * 0           2                       6
+// * +-----------+-----------------------+
+// * |   magic   |       body len        |
+// * +-----------+-----------+-----------+
+// * |                                   |
+// * +                                   +
+// * |           body bytes              |
+// * +                                   +
+// * |            ... ...                |
+// * +-----------------------------------+
+type testCodec struct {
+	discardBytes int
+}
+
+func (codec testCodec) Encode(buf []byte) ([]byte, error) {
+	bodyOffset := magicNumberSize + bodySize
+	msgLen := bodyOffset + len(buf)
+
+	data := make([]byte, msgLen)
+	copy(data, magicNumberBytes)
+
+	binary.BigEndian.PutUint32(data[magicNumberSize:bodyOffset], uint32(len(buf)))
+	copy(data[bodyOffset:msgLen], buf)
+	return data, nil
+}
+
+func (codec *testCodec) Decode(c Conn) ([]byte, error) {
+	bodyOffset := magicNumberSize + bodySize
+	buf, _ := c.Peek(bodyOffset)
+	if len(buf) < bodyOffset {
+		return nil, errIncompletePacket
+	}
+
+	if bytes.Compare(magicNumberBytes, buf[:magicNumberSize]) != 0 {
+		return nil, errors.New("invalid magic number")
+	}
+
+	bodyLen := binary.BigEndian.Uint32(buf[magicNumberSize:bodyOffset])
+	msgLen := bodyOffset + int(bodyLen)
+	if c.InboundBuffered() < msgLen {
+		return nil, errIncompletePacket
+	}
+	buf, _ = c.Peek(msgLen)
+	codec.discardBytes = msgLen
+
+	return buf[bodyOffset:msgLen], nil
+}
+
+func (codec *testCodec) Discard(c Conn) {
+	if codec.discardBytes <= 0 {
+		return
+	}
+	_, _ = c.Discard(codec.discardBytes)
+	codec.discardBytes = 0
+}
+
+func (codec testCodec) Unpack(buf []byte) ([]byte, error) {
+	bodyOffset := magicNumberSize + bodySize
+	if len(buf) < bodyOffset {
+		return nil, errIncompletePacket
+	}
+
+	if bytes.Compare(magicNumberBytes, buf[:magicNumberSize]) != 0 {
+		return nil, errors.New("invalid magic number")
+	}
+
+	bodyLen := binary.BigEndian.Uint32(buf[magicNumberSize:bodyOffset])
+	msgLen := bodyOffset + int(bodyLen)
+	if len(buf) < msgLen {
+		return nil, errIncompletePacket
+	}
+
+	return buf[bodyOffset:msgLen], nil
+}
+
+func TestSimServer(t *testing.T) {
+	t.Run("packet-size=128,batch=100", func(t *testing.T) {
+		testSimServer(t, ":7200", 10, 128, 100)
+	})
+	t.Run("packet-size=256,batch=50", func(t *testing.T) {
+		testSimServer(t, ":7201", 10, 256, 50)
+	})
+	t.Run("packet-size=512,batch=30", func(t *testing.T) {
+		testSimServer(t, ":7202", 10, 512, 30)
+	})
+	t.Run("packet-size=1024,batch=20", func(t *testing.T) {
+		testSimServer(t, ":7203", 10, 1024, 20)
+	})
+	t.Run("packet-size=64*1024,batch=5", func(t *testing.T) {
+		testSimServer(t, ":7204", 10, 64*1024, 5)
+	})
+	t.Run("packet-size=128*1024,batch=3", func(t *testing.T) {
+		testSimServer(t, ":7205", 10, 128*1024, 3)
+	})
+	t.Run("packet-size=1024*1024,batch=1", func(t *testing.T) {
+		testSimServer(t, ":7206", 10, 1024*1024, 1)
+	})
+}
+
+func testSimServer(t *testing.T, addr string, nclients, packetSize, packetBatch int) {
+	ts := &simServer{
+		tester:      t,
+		network:     "tcp",
+		addr:        addr,
+		multicore:   true,
+		nclients:    nclients,
+		packetSize:  packetSize,
+		packetBatch: packetBatch,
+	}
+	err := Serve(ts,
+		ts.network+"://"+ts.addr,
+		WithMulticore(ts.multicore),
+		WithTicker(true),
+		WithTCPKeepAlive(time.Minute*1))
+	assert.NoError(t, err)
+}
+
+func runClient(t *testing.T, network, addr string, packetSize, batch int) {
+	rand.Seed(time.Now().UnixNano())
+	c, err := net.Dial(network, addr)
+	require.NoError(t, err)
+	defer c.Close()
+	rd := bufio.NewReader(c)
+	msg, err := rd.ReadBytes('\n')
+	require.NoError(t, err)
+	require.Equal(t, string(msg), "sweetness\r\n", "bad header")
+	var duration time.Duration
+	packetBytes := packetSize * batch
+	switch {
+	case packetBytes < 16*1024:
+		duration = 2 * time.Second
+	case packetBytes < 32*1024:
+		duration = 3 * time.Second
+	case packetBytes < 480*1024:
+		duration = 4 * time.Second
+	default:
+		duration = 5 * time.Second
+	}
+	t.Logf("test duration: %ds", duration/time.Second)
+	start := time.Now()
+	for time.Since(start) < duration {
+		batchWriteAndVerify(t, c, rd, packetSize, batch)
+	}
+}
+
+func batchWriteAndVerify(t *testing.T, c net.Conn, rd *bufio.Reader, packetSize, batch int) {
+	codec := testCodec{}
+	var (
+		requests  [][]byte
+		buf       []byte
+		packetLen int
+	)
+	for i := 0; i < batch; i++ {
+		req := make([]byte, packetSize)
+		_, err := rand.Read(req)
+		require.NoError(t, err)
+		requests = append(requests, req)
+		packet, _ := codec.Encode(req)
+		packetLen = len(packet)
+		buf = append(buf, packet...)
+	}
+	_, err := c.Write(buf)
+	require.NoError(t, err)
+	respPacket := make([]byte, batch*packetLen)
+	_, err = io.ReadFull(rd, respPacket)
+	require.NoError(t, err)
+	for i, req := range requests {
+		rsp, err := codec.Unpack(respPacket[i*packetLen:])
+		require.NoError(t, err)
+		require.Equalf(t, req, rsp, "request and response mismatch, packet size: %d, batch: %d", packetSize, batch)
+	}
 }
