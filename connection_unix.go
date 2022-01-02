@@ -84,7 +84,7 @@ func (c *conn) releaseTCP() {
 	c.localAddr = nil
 	c.remoteAddr = nil
 	rbPool.Put(c.inboundBuffer)
-	c.inboundBuffer = ringbuffer.EmptyRingBuffer
+	c.inboundBuffer = ringbuffer.New(0)
 	c.outboundBuffer.Release()
 	bbPool.Put(c.cache)
 	c.cache = nil
@@ -100,7 +100,7 @@ func newUDPConn(fd int, el *eventloop, localAddr net.Addr, sa unix.Sockaddr, con
 		localAddr:     localAddr,
 		remoteAddr:    socket.SockaddrToUDPAddr(sa),
 		isDatagram:    true,
-		inboundBuffer: ringbuffer.EmptyRingBuffer,
+		inboundBuffer: ringbuffer.New(0),
 	}
 	if connected {
 		c.peer = nil

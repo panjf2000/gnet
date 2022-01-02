@@ -52,9 +52,6 @@ type RingBuffer struct {
 	isEmpty bool
 }
 
-// EmptyRingBuffer can be used as a placeholder for those closed connections.
-var EmptyRingBuffer = New(0)
-
 // New returns a new RingBuffer whose buffer has the given size.
 func New(size int) *RingBuffer {
 	if size == 0 {
