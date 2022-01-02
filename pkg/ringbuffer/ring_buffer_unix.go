@@ -20,7 +20,7 @@ package ringbuffer
 import (
 	"golang.org/x/sys/unix"
 
-	"github.com/panjf2000/gnet/internal/io"
+	"github.com/panjf2000/gnet/v2/internal/io"
 )
 
 // ========================= gnet specific APIs =========================

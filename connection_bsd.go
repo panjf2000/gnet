@@ -17,7 +17,7 @@
 
 package gnet
 
-import "github.com/panjf2000/gnet/internal/netpoll"
+import "github.com/panjf2000/gnet/v2/internal/netpoll"
 
 func (c *conn) handleEvents(_ int, filter int16) (err error) {
 	switch filter {

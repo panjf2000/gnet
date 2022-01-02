@@ -24,7 +24,7 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"github.com/panjf2000/gnet/pkg/errors"
+	"github.com/panjf2000/gnet/v2/pkg/errors"
 )
 
 var listenerBacklogMaxSize = maxListenerBacklog()

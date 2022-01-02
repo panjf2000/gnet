@@ -27,9 +27,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/panjf2000/gnet/pkg/logging"
-	bbPool "github.com/panjf2000/gnet/pkg/pool/bytebuffer"
-	goPool "github.com/panjf2000/gnet/pkg/pool/goroutine"
+	"github.com/panjf2000/gnet/v2/pkg/logging"
+	bbPool "github.com/panjf2000/gnet/v2/pkg/pool/bytebuffer"
+	goPool "github.com/panjf2000/gnet/v2/pkg/pool/goroutine"
 )
 
 type clientEvents struct {

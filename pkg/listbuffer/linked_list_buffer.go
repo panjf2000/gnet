@@ -18,7 +18,7 @@ import (
 	"io"
 	"math"
 
-	bbPool "github.com/panjf2000/gnet/pkg/pool/bytebuffer"
+	bbPool "github.com/panjf2000/gnet/v2/pkg/pool/bytebuffer"
 )
 
 // ByteBuffer is the node of the linked list of bytes.

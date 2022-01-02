@@ -22,7 +22,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	gerrors "github.com/panjf2000/gnet/pkg/errors"
+	gerrors "github.com/panjf2000/gnet/v2/pkg/errors"
 )
 
 var errCloseAllConns = errors.New("close all connections in event-loop")

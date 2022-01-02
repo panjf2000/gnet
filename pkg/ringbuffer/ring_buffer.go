@@ -23,9 +23,9 @@ import (
 	"errors"
 	"io"
 
-	"github.com/panjf2000/gnet/internal/toolkit"
-	bbPool "github.com/panjf2000/gnet/pkg/pool/bytebuffer"
-	bsPool "github.com/panjf2000/gnet/pkg/pool/byteslice"
+	"github.com/panjf2000/gnet/v2/internal/toolkit"
+	bbPool "github.com/panjf2000/gnet/v2/pkg/pool/bytebuffer"
+	bsPool "github.com/panjf2000/gnet/v2/pkg/pool/byteslice"
 )
 
 const (

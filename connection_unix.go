@@ -26,15 +26,15 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	gio "github.com/panjf2000/gnet/internal/io"
-	"github.com/panjf2000/gnet/internal/netpoll"
-	"github.com/panjf2000/gnet/internal/socket"
-	gerrors "github.com/panjf2000/gnet/pkg/errors"
-	"github.com/panjf2000/gnet/pkg/mixedbuffer"
-	bbPool "github.com/panjf2000/gnet/pkg/pool/bytebuffer"
-	bsPool "github.com/panjf2000/gnet/pkg/pool/byteslice"
-	rbPool "github.com/panjf2000/gnet/pkg/pool/ringbuffer"
-	"github.com/panjf2000/gnet/pkg/ringbuffer"
+	gio "github.com/panjf2000/gnet/v2/internal/io"
+	"github.com/panjf2000/gnet/v2/internal/netpoll"
+	"github.com/panjf2000/gnet/v2/internal/socket"
+	gerrors "github.com/panjf2000/gnet/v2/pkg/errors"
+	"github.com/panjf2000/gnet/v2/pkg/mixedbuffer"
+	bbPool "github.com/panjf2000/gnet/v2/pkg/pool/bytebuffer"
+	bsPool "github.com/panjf2000/gnet/v2/pkg/pool/byteslice"
+	rbPool "github.com/panjf2000/gnet/v2/pkg/pool/ringbuffer"
+	"github.com/panjf2000/gnet/v2/pkg/ringbuffer"
 )
 
 type conn struct {

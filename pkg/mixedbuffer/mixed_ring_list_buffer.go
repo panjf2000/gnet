@@ -17,9 +17,9 @@ package mixedbuffer
 import (
 	"io"
 
-	"github.com/panjf2000/gnet/pkg/listbuffer"
-	rbPool "github.com/panjf2000/gnet/pkg/pool/ringbuffer"
-	"github.com/panjf2000/gnet/pkg/ringbuffer"
+	"github.com/panjf2000/gnet/v2/pkg/listbuffer"
+	rbPool "github.com/panjf2000/gnet/v2/pkg/pool/ringbuffer"
+	"github.com/panjf2000/gnet/v2/pkg/ringbuffer"
 )
 
 // Buffer combines ring-buffer and list-buffer.

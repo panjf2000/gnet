@@ -5,7 +5,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/panjf2000/gnet/internal/queue"
+	"github.com/panjf2000/gnet/v2/internal/queue"
 )
 
 func TestLockFreeQueue(t *testing.T) {

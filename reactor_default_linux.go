@@ -20,8 +20,8 @@ package gnet
 import (
 	"runtime"
 
-	"github.com/panjf2000/gnet/internal/netpoll"
-	"github.com/panjf2000/gnet/pkg/errors"
+	"github.com/panjf2000/gnet/v2/internal/netpoll"
+	"github.com/panjf2000/gnet/v2/pkg/errors"
 )
 
 func (el *eventloop) activateMainReactor(lockOSThread bool) {
