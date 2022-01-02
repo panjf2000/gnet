@@ -36,10 +36,7 @@ import (
 	goPool "github.com/panjf2000/gnet/pkg/pool/goroutine"
 )
 
-var (
-	packetLen = 1024
-	streamLen = 1024 * 1024
-)
+var streamLen = 1024 * 1024
 
 func TestServe(t *testing.T) {
 	// start a server
@@ -251,12 +248,12 @@ type testServer struct {
 	workerPool   *goPool.Pool
 }
 
-func (s *testServer) OnInitComplete(svr Server) (action Action) {
+func (s *testServer) OnBoot(svr Server) (action Action) {
 	s.svr = svr
 	return
 }
 
-func (s *testServer) OnOpened(c Conn) (out []byte, action Action) {
+func (s *testServer) OnOpen(c Conn) (out []byte, action Action) {
 	c.SetContext(c)
 	atomic.AddInt32(&s.connected, 1)
 	out = []byte("sweetness\r\n")
@@ -265,7 +262,7 @@ func (s *testServer) OnOpened(c Conn) (out []byte, action Action) {
 	return
 }
 
-func (s *testServer) OnClosed(c Conn, err error) (action Action) {
+func (s *testServer) OnClose(c Conn, err error) (action Action) {
 	if err != nil {
 		logging.Debugf("error occurred on closed, %v\n", err)
 	}
@@ -283,15 +280,16 @@ func (s *testServer) OnClosed(c Conn, err error) (action Action) {
 	return
 }
 
-func (s *testServer) React(packet []byte, c Conn) (out []byte, action Action) {
+func (s *testServer) OnTraffic(c Conn) (action Action) {
 	if s.async {
 		buf := bbPool.Get()
-		_, _ = buf.Write(packet)
+		c.WriteTo(buf)
 
 		if s.network == "tcp" || s.network == "unix" {
 			// just for test
-			_ = c.BufferLength()
-			c.ShiftN(1)
+			_ = c.InboundBuffered()
+			_ = c.OutboundBuffered()
+			c.Discard(1)
 
 			_ = s.workerPool.Submit(
 				func() {
@@ -309,17 +307,19 @@ func (s *testServer) React(packet []byte, c Conn) (out []byte, action Action) {
 		} else if s.network == "udp" {
 			_ = s.workerPool.Submit(
 				func() {
-					_ = c.SendTo(buf.Bytes())
+					_ = c.AsyncWrite(buf.Bytes())
 				})
 			return
 		}
 		return
 	}
-	out = packet
+	buf, _ := c.Peek(-1)
+	c.Write(buf)
+	c.Discard(-1)
 	return
 }
 
-func (s *testServer) Tick() (delay time.Duration, action Action) {
+func (s *testServer) OnTick() (delay time.Duration, action Action) {
 	if atomic.CompareAndSwapInt32(&s.started, 0, 1) {
 		for i := 0; i < s.nclients; i++ {
 			atomic.AddInt32(&s.clientActive, 1)
@@ -404,20 +404,18 @@ func startClient(t *testing.T, network, addr string, multicore, async bool) {
 
 func TestDefaultGnetServer(t *testing.T) {
 	svr := EventServer{}
-	svr.OnInitComplete(Server{})
-	svr.OnOpened(nil)
-	svr.OnClosed(nil, nil)
-	svr.PreWrite(nil)
-	svr.AfterWrite(nil, nil)
-	svr.React(nil)
-	svr.Tick()
+	svr.OnBoot(Server{})
+	svr.OnOpen(nil)
+	svr.OnClose(nil, nil)
+	svr.OnTraffic(nil)
+	svr.OnTick()
 }
 
 type testBadAddrServer struct {
 	*EventServer
 }
 
-func (t *testBadAddrServer) OnInitComplete(srv Server) (action Action) {
+func (t *testBadAddrServer) OnBoot(srv Server) (action Action) {
 	return Shutdown
 }
 
@@ -440,7 +438,7 @@ type testTickServer struct {
 	count int
 }
 
-func (t *testTickServer) Tick() (delay time.Duration, action Action) {
+func (t *testTickServer) OnTick() (delay time.Duration, action Action) {
 	if t.count == 25 {
 		action = Shutdown
 		return
@@ -476,23 +474,23 @@ type testWakeConnServer struct {
 	wake    bool
 }
 
-func (t *testWakeConnServer) OnOpened(c Conn) (out []byte, action Action) {
+func (t *testWakeConnServer) OnOpen(c Conn) (out []byte, action Action) {
 	t.conn <- c
 	return
 }
 
-func (t *testWakeConnServer) OnClosed(c Conn, err error) (action Action) {
+func (t *testWakeConnServer) OnClose(c Conn, err error) (action Action) {
 	action = Shutdown
 	return
 }
 
-func (t *testWakeConnServer) React(packet []byte, c Conn) (out []byte, action Action) {
-	out = []byte("Waking up.")
+func (t *testWakeConnServer) OnTraffic(c Conn) (action Action) {
+	c.Write([]byte("Waking up."))
 	action = -1
 	return
 }
 
-func (t *testWakeConnServer) Tick() (delay time.Duration, action Action) {
+func (t *testWakeConnServer) OnTick() (delay time.Duration, action Action) {
 	if !t.wake {
 		t.wake = true
 		delay = time.Millisecond * 100
@@ -535,17 +533,17 @@ type testShutdownServer struct {
 	N       int
 }
 
-func (t *testShutdownServer) OnOpened(c Conn) (out []byte, action Action) {
+func (t *testShutdownServer) OnOpen(c Conn) (out []byte, action Action) {
 	atomic.AddInt64(&t.clients, 1)
 	return
 }
 
-func (t *testShutdownServer) OnClosed(c Conn, err error) (action Action) {
+func (t *testShutdownServer) OnClose(c Conn, err error) (action Action) {
 	atomic.AddInt64(&t.clients, -1)
 	return
 }
 
-func (t *testShutdownServer) Tick() (delay time.Duration, action Action) {
+func (t *testShutdownServer) OnTick() (delay time.Duration, action Action) {
 	if t.count == 0 {
 		// start clients
 		for i := 0; i < t.N; i++ {
@@ -583,18 +581,21 @@ type testCloseActionErrorServer struct {
 	action        bool
 }
 
-func (t *testCloseActionErrorServer) OnClosed(c Conn, err error) (action Action) {
+func (t *testCloseActionErrorServer) OnClose(c Conn, err error) (action Action) {
 	action = Shutdown
 	return
 }
 
-func (t *testCloseActionErrorServer) React(packet []byte, c Conn) (out []byte, action Action) {
-	out = packet
+func (t *testCloseActionErrorServer) OnTraffic(c Conn) (action Action) {
+	n := c.InboundBuffered()
+	buf, _ := c.Peek(n)
+	c.Write(buf)
+	c.Discard(n)
 	action = Close
 	return
 }
 
-func (t *testCloseActionErrorServer) Tick() (delay time.Duration, action Action) {
+func (t *testCloseActionErrorServer) OnTick() (delay time.Duration, action Action) {
 	if !t.action {
 		t.action = true
 		delay = time.Millisecond * 100
@@ -630,14 +631,15 @@ type testShutdownActionErrorServer struct {
 	action        bool
 }
 
-func (t *testShutdownActionErrorServer) React(packet []byte, c Conn) (out []byte, action Action) {
-	c.ReadN(-1) // just for test
-	out = packet
+func (t *testShutdownActionErrorServer) OnTraffic(c Conn) (action Action) {
+	buf, _ := c.Peek(-1)
+	c.Write(buf)
+	c.Discard(-1)
 	action = Shutdown
 	return
 }
 
-func (t *testShutdownActionErrorServer) Tick() (delay time.Duration, action Action) {
+func (t *testShutdownActionErrorServer) OnTick() (delay time.Duration, action Action) {
 	if !t.action {
 		t.action = true
 		delay = time.Millisecond * 100
@@ -673,17 +675,17 @@ type testCloseActionOnOpenServer struct {
 	action        bool
 }
 
-func (t *testCloseActionOnOpenServer) OnOpened(c Conn) (out []byte, action Action) {
+func (t *testCloseActionOnOpenServer) OnOpen(c Conn) (out []byte, action Action) {
 	action = Close
 	return
 }
 
-func (t *testCloseActionOnOpenServer) OnClosed(c Conn, err error) (action Action) {
+func (t *testCloseActionOnOpenServer) OnClose(c Conn, err error) (action Action) {
 	action = Shutdown
 	return
 }
 
-func (t *testCloseActionOnOpenServer) Tick() (delay time.Duration, action Action) {
+func (t *testCloseActionOnOpenServer) OnTick() (delay time.Duration, action Action) {
 	if !t.action {
 		t.action = true
 		delay = time.Millisecond * 100
@@ -715,7 +717,7 @@ type testShutdownActionOnOpenServer struct {
 	action        bool
 }
 
-func (t *testShutdownActionOnOpenServer) OnOpened(c Conn) (out []byte, action Action) {
+func (t *testShutdownActionOnOpenServer) OnOpen(c Conn) (out []byte, action Action) {
 	action = Shutdown
 	return
 }
@@ -725,7 +727,7 @@ func (t *testShutdownActionOnOpenServer) OnShutdown(s Server) {
 	logging.Debugf("dup fd: %d with error: %v\n", dupFD, err)
 }
 
-func (t *testShutdownActionOnOpenServer) Tick() (delay time.Duration, action Action) {
+func (t *testShutdownActionOnOpenServer) OnTick() (delay time.Duration, action Action) {
 	if !t.action {
 		t.action = true
 		delay = time.Millisecond * 100
@@ -758,13 +760,15 @@ type testUDPShutdownServer struct {
 	tick    bool
 }
 
-func (t *testUDPShutdownServer) React(packet []byte, c Conn) (out []byte, action Action) {
-	out = packet
+func (t *testUDPShutdownServer) OnTraffic(c Conn) (action Action) {
+	buf, _ := c.Peek(-1)
+	c.Write(buf)
+	c.Discard(-1)
 	action = Shutdown
 	return
 }
 
-func (t *testUDPShutdownServer) Tick() (delay time.Duration, action Action) {
+func (t *testUDPShutdownServer) OnTick() (delay time.Duration, action Action) {
 	if !t.tick {
 		t.tick = true
 		delay = time.Millisecond * 100
@@ -801,13 +805,15 @@ type testCloseConnectionServer struct {
 	action        bool
 }
 
-func (t *testCloseConnectionServer) OnClosed(c Conn, err error) (action Action) {
+func (t *testCloseConnectionServer) OnClose(c Conn, err error) (action Action) {
 	action = Shutdown
 	return
 }
 
-func (t *testCloseConnectionServer) React(packet []byte, c Conn) (out []byte, action Action) {
-	out = packet
+func (t *testCloseConnectionServer) OnTraffic(c Conn) (action Action) {
+	buf, _ := c.Peek(-1)
+	c.Write(buf)
+	c.Discard(-1)
 	go func() {
 		time.Sleep(time.Second)
 		_ = c.Close()
@@ -815,7 +821,7 @@ func (t *testCloseConnectionServer) React(packet []byte, c Conn) (out []byte, ac
 	return
 }
 
-func (t *testCloseConnectionServer) Tick() (delay time.Duration, action Action) {
+func (t *testCloseConnectionServer) OnTick() (delay time.Duration, action Action) {
 	delay = time.Millisecond * 100
 	if !t.action {
 		t.action = true
@@ -858,17 +864,19 @@ type testStopServer struct {
 	action                   bool
 }
 
-func (t *testStopServer) OnClosed(c Conn, err error) (action Action) {
+func (t *testStopServer) OnClose(c Conn, err error) (action Action) {
 	logging.Debugf("closing connection...")
 	return
 }
 
-func (t *testStopServer) React(packet []byte, c Conn) (out []byte, action Action) {
-	out = packet
+func (t *testStopServer) OnTraffic(c Conn) (action Action) {
+	buf, _ := c.Peek(-1)
+	c.Write(buf)
+	c.Discard(-1)
 	return
 }
 
-func (t *testStopServer) Tick() (delay time.Duration, action Action) {
+func (t *testStopServer) OnTick() (delay time.Duration, action Action) {
 	delay = time.Millisecond * 100
 	if !t.action {
 		t.action = true
@@ -926,52 +934,53 @@ type testClosedWakeUpServer struct {
 	clientClosed chan struct{}
 }
 
-func (tes *testClosedWakeUpServer) OnInitComplete(_ Server) (action Action) {
+func (s *testClosedWakeUpServer) OnBoot(_ Server) (action Action) {
 	go func() {
-		c, err := net.Dial(tes.network, tes.addr)
-		require.NoError(tes.tester, err)
+		c, err := net.Dial(s.network, s.addr)
+		require.NoError(s.tester, err)
 
 		_, err = c.Write([]byte("hello"))
-		require.NoError(tes.tester, err)
+		require.NoError(s.tester, err)
 
-		<-tes.wakeup
+		<-s.wakeup
 		_, err = c.Write([]byte("hello again"))
-		require.NoError(tes.tester, err)
+		require.NoError(s.tester, err)
 
-		close(tes.clientClosed)
-		<-tes.serverClosed
+		close(s.clientClosed)
+		<-s.serverClosed
 
-		logging.Debugf("stop server...", Stop(context.TODO(), tes.protoAddr))
+		logging.Debugf("stop server...", Stop(context.TODO(), s.protoAddr))
 	}()
 
 	return None
 }
 
-func (tes *testClosedWakeUpServer) React(_ []byte, conn Conn) ([]byte, Action) {
-	require.NotNil(tes.tester, conn.RemoteAddr())
+func (s *testClosedWakeUpServer) OnTraffic(conn Conn) Action {
+	require.NotNil(s.tester, conn.RemoteAddr())
 
 	select {
-	case <-tes.wakeup:
+	case <-s.wakeup:
 	default:
-		close(tes.wakeup)
+		close(s.wakeup)
 	}
 
 	// Actually goroutines here needed only on windows since its async actions
 	// rely on an unbuffered channel and since we already into it - this will
 	// block forever.
-	go func() { require.NoError(tes.tester, conn.Wake()) }()
-	go func() { require.NoError(tes.tester, conn.Close()) }()
+	go func() { require.NoError(s.tester, conn.Wake()) }()
+	go func() { require.NoError(s.tester, conn.Close()) }()
 
-	<-tes.clientClosed
+	<-s.clientClosed
 
-	return []byte("answer"), None
+	conn.Write([]byte("answer"))
+	return None
 }
 
-func (tes *testClosedWakeUpServer) OnClosed(c Conn, err error) (action Action) {
+func (s *testClosedWakeUpServer) OnClose(c Conn, err error) (action Action) {
 	select {
-	case <-tes.serverClosed:
+	case <-s.serverClosed:
 	default:
-		close(tes.serverClosed)
+		close(s.serverClosed)
 	}
 	return
 }

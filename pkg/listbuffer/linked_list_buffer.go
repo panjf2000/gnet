@@ -15,6 +15,7 @@
 package listbuffer
 
 import (
+	"io"
 	"math"
 
 	bbPool "github.com/panjf2000/gnet/pkg/pool/bytebuffer"
@@ -48,131 +49,152 @@ type LinkedListBuffer struct {
 	head  *ByteBuffer
 	tail  *ByteBuffer
 	size  int
-	bytes int64
+	bytes int
+}
+
+func (llb *LinkedListBuffer) Read(p []byte) (n int, err error) {
+	if len(p) == 0 {
+		return 0, nil
+	}
+
+	for b := llb.Pop(); b != nil; b = llb.Pop() {
+		m := copy(p[n:], b.Buf.B)
+		n += m
+		if m < b.Len() {
+			b.Buf.B = b.Buf.B[m:]
+			llb.PushFront(b)
+		} else {
+			bbPool.Put(b.Buf)
+		}
+		if n == len(p) {
+			return
+		}
+	}
+	return
 }
 
 // Pop returns and removes the head of l. If l is empty, it returns nil.
-func (l *LinkedListBuffer) Pop() *ByteBuffer {
-	if l.head == nil {
+func (llb *LinkedListBuffer) Pop() *ByteBuffer {
+	if llb.head == nil {
 		return nil
 	}
-	b := l.head
-	l.head = b.next
-	if l.head == nil {
-		l.tail = nil
+	b := llb.head
+	llb.head = b.next
+	if llb.head == nil {
+		llb.tail = nil
 	}
 	b.next = nil
-	l.size--
-	l.bytes -= int64(b.Buf.Len())
+	llb.size--
+	llb.bytes -= b.Buf.Len()
 	return b
 }
 
 // PushFront adds the new node to the head of l.
-func (l *LinkedListBuffer) PushFront(b *ByteBuffer) {
+func (llb *LinkedListBuffer) PushFront(b *ByteBuffer) {
 	if b == nil {
 		return
 	}
-	if l.head == nil {
+	if llb.head == nil {
 		b.next = nil
-		l.tail = b
+		llb.tail = b
 	} else {
-		b.next = l.head
+		b.next = llb.head
 	}
-	l.head = b
-	l.size++
-	l.bytes += int64(b.Buf.Len())
+	llb.head = b
+	llb.size++
+	llb.bytes += b.Buf.Len()
 }
 
 // PushBack adds a new node to the tail of l.
-func (l *LinkedListBuffer) PushBack(b *ByteBuffer) {
+func (llb *LinkedListBuffer) PushBack(b *ByteBuffer) {
 	if b == nil {
 		return
 	}
-	if l.tail == nil {
-		l.head = b
+	if llb.tail == nil {
+		llb.head = b
 	} else {
-		l.tail.next = b
+		llb.tail.next = b
 	}
 	b.next = nil
-	l.tail = b
-	l.size++
-	l.bytes += int64(b.Buf.Len())
+	llb.tail = b
+	llb.size++
+	llb.bytes += b.Buf.Len()
 }
 
 // PushBytesFront is a wrapper of PushFront, which accepts []byte as its argument.
-func (l *LinkedListBuffer) PushBytesFront(p []byte) {
+func (llb *LinkedListBuffer) PushBytesFront(p []byte) {
 	if len(p) == 0 {
 		return
 	}
 	bb := bbPool.Get()
 	_, _ = bb.Write(p)
-	l.PushFront(&ByteBuffer{Buf: bb})
+	llb.PushFront(&ByteBuffer{Buf: bb})
 }
 
 // PushBytesBack is a wrapper of PushBack, which accepts []byte as its argument.
-func (l *LinkedListBuffer) PushBytesBack(p []byte) {
+func (llb *LinkedListBuffer) PushBytesBack(p []byte) {
 	if len(p) == 0 {
 		return
 	}
 	bb := bbPool.Get()
 	_, _ = bb.Write(p)
-	l.PushBack(&ByteBuffer{Buf: bb})
+	llb.PushBack(&ByteBuffer{Buf: bb})
 }
 
 // PeekBytesList assembles the up to maxBytes of [][]byte based on the list of ByteBuffer,
-// it won't remove these nodes from l until DiscardBytes() is called.
-func (l *LinkedListBuffer) PeekBytesList(maxBytes int) [][]byte {
+// it won't remove these nodes from l until Discard() is called.
+func (llb *LinkedListBuffer) PeekBytesList(maxBytes int) [][]byte {
 	if maxBytes <= 0 {
 		maxBytes = math.MaxInt32
 	}
-	l.bs = l.bs[:0]
+	llb.bs = llb.bs[:0]
 	var cum int
-	for iter := l.head; iter != nil; iter = iter.next {
-		l.bs = append(l.bs, iter.Buf.B)
+	for iter := llb.head; iter != nil; iter = iter.next {
+		llb.bs = append(llb.bs, iter.Buf.B)
 		if cum += iter.Buf.Len(); cum >= maxBytes {
 			break
 		}
 	}
-	return l.bs
+	return llb.bs
 }
 
 // PeekBytesListWithBytes is like PeekBytesList but accepts [][]byte and puts them onto head.
-func (l *LinkedListBuffer) PeekBytesListWithBytes(maxBytes int, bs ...[]byte) [][]byte {
+func (llb *LinkedListBuffer) PeekBytesListWithBytes(maxBytes int, bs ...[]byte) [][]byte {
 	if maxBytes <= 0 {
 		maxBytes = math.MaxInt32
 	}
-	l.bs = l.bs[:0]
+	llb.bs = llb.bs[:0]
 	var cum int
 	for _, b := range bs {
 		if n := len(b); n > 0 {
-			l.bs = append(l.bs, b)
+			llb.bs = append(llb.bs, b)
 			if cum += n; cum >= maxBytes {
-				return l.bs
+				return llb.bs
 			}
 		}
 	}
-	for iter := l.head; iter != nil; iter = iter.next {
-		l.bs = append(l.bs, iter.Buf.B)
+	for iter := llb.head; iter != nil; iter = iter.next {
+		llb.bs = append(llb.bs, iter.Buf.B)
 		if cum += iter.Buf.Len(); cum >= maxBytes {
 			break
 		}
 	}
-	return l.bs
+	return llb.bs
 }
 
-// DiscardBytes removes some nodes based on n.
-func (l *LinkedListBuffer) DiscardBytes(n int) {
+// Discard removes some nodes based on n bytes.
+func (llb *LinkedListBuffer) Discard(n int) {
 	if n <= 0 {
 		return
 	}
 	for n != 0 {
-		b := l.Pop()
+		b := llb.Pop()
 		if b == nil {
 			break
 		}
 		if n < b.Len() {
 			b.Buf.B = b.Buf.B[n:]
-			l.PushFront(b)
+			llb.PushFront(b)
 			break
 		}
 		n -= b.Len()
@@ -180,29 +202,70 @@ func (l *LinkedListBuffer) DiscardBytes(n int) {
 	}
 }
 
-// Len returns the length of the list.
-func (l *LinkedListBuffer) Len() int {
-	return l.size
+func (llb LinkedListBuffer) ReadFrom(r io.Reader) (n int64, err error) {
+	var m int
+	for {
+		bb := bbPool.Get()
+		bb.B = bb.B[:cap(bb.B)]
+		m, err = r.Read(bb.B)
+		if m < 0 {
+			panic("LinkedListBuffer.ReadFrom: reader returned negative count from Read")
+		}
+		n += int64(m)
+		bb.B = bb.B[:m]
+		llb.PushBack(&ByteBuffer{Buf: bb})
+		if err == io.EOF {
+			return n, nil
+		}
+		if err != nil {
+			return
+		}
+	}
 }
 
-// Bytes returns the amount of bytes in this list.
-func (l *LinkedListBuffer) Bytes() int64 {
-	return l.bytes
+func (llb *LinkedListBuffer) WriteTo(w io.Writer) (n int64, err error) {
+	var m int
+	for b := llb.Pop(); b != nil; b = llb.Pop() {
+		m, err = w.Write(b.Buf.B)
+		if m > b.Len() {
+			panic("LinkedListBuffer.WriteTo: invalid Write count")
+		}
+		n += int64(m)
+		if err != nil {
+			return
+		}
+		if m < b.Len() {
+			b.Buf.B = b.Buf.B[m:]
+			llb.PushFront(b)
+			return n, io.ErrShortWrite
+		}
+	}
+	return
+}
+
+// Len returns the length of the list.
+func (llb *LinkedListBuffer) Len() int {
+	return llb.size
+}
+
+// Buffered returns the amount of bytes in this list.
+func (llb *LinkedListBuffer) Buffered() int {
+	return llb.bytes
 }
 
 // IsEmpty reports whether l is empty.
-func (l *LinkedListBuffer) IsEmpty() bool {
-	return l.head == nil
+func (llb *LinkedListBuffer) IsEmpty() bool {
+	return llb.head == nil
 }
 
 // Reset removes all elements from this list.
-func (l *LinkedListBuffer) Reset() {
-	for b := l.Pop(); b != nil; b = l.Pop() {
+func (llb *LinkedListBuffer) Reset() {
+	for b := llb.Pop(); b != nil; b = llb.Pop() {
 		bbPool.Put(b.Buf)
 	}
-	l.head = nil
-	l.tail = nil
-	l.size = 0
-	l.bytes = 0
-	l.bs = l.bs[:0]
+	llb.head = nil
+	llb.tail = nil
+	llb.size = 0
+	llb.bytes = 0
+	llb.bs = llb.bs[:0]
 }

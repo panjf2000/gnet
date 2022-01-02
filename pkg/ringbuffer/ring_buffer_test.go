@@ -35,14 +35,14 @@ func TestRingBuffer_Write(t *testing.T) {
 	// check empty or full
 	assert.True(t, rb.IsEmpty(), "expect IsEmpty is true but got false")
 	assert.False(t, rb.IsFull(), "expect IsFull is false but got true")
-	assert.EqualValuesf(t, 0, rb.Length(), "expect len 0 bytes but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
+	assert.EqualValuesf(t, 0, rb.Buffered(), "expect len 0 bytes but got %d. r.w=%d, r.r=%d", rb.Buffered(), rb.w, rb.r)
 	assert.EqualValuesf(t, 64, rb.Free(), "expect free 64 bytes but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
 
 	// write 4 * 4 = 16 bytes
 	data := []byte(strings.Repeat("abcd", 4))
 	n, _ := rb.Write(data)
 	assert.EqualValuesf(t, 16, n, "expect write 16 bytes but got %d", n)
-	assert.EqualValuesf(t, 16, rb.Length(), "expect len 16 bytes but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
+	assert.EqualValuesf(t, 16, rb.Buffered(), "expect len 16 bytes but got %d. r.w=%d, r.r=%d", rb.Buffered(), rb.w, rb.r)
 	assert.EqualValuesf(t, 48, rb.Free(), "expect free 48 bytes but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
 	assert.EqualValuesf(t, data, rb.ByteBuffer().Bytes(), "expect 4 abcd but got %s. r.w=%d, r.r=%d", rb.ByteBuffer().Bytes(), rb.w, rb.r)
 
@@ -54,7 +54,7 @@ func TestRingBuffer_Write(t *testing.T) {
 	data = []byte(strings.Repeat("abcd", 12))
 	n, _ = rb.Write(data)
 	assert.EqualValuesf(t, 48, n, "expect write 48 bytes but got %d", n)
-	assert.EqualValuesf(t, 64, rb.Length(), "expect len 64 bytes but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
+	assert.EqualValuesf(t, 64, rb.Buffered(), "expect len 64 bytes but got %d. r.w=%d, r.r=%d", rb.Buffered(), rb.w, rb.r)
 	assert.EqualValuesf(t, 0, rb.Free(), "expect free 0 bytes but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
 	assert.EqualValuesf(t, 0, rb.w, "expect r.w=0 but got %d. r.r=%d", rb.w, rb.r)
 	assert.EqualValuesf(t, []byte(strings.Repeat("abcd", 16)), rb.ByteBuffer().Bytes(), "expect 16 abcd but got %s. r.w=%d, r.r=%d", rb.ByteBuffer().Bytes(), rb.w, rb.r)
@@ -68,7 +68,7 @@ func TestRingBuffer_Write(t *testing.T) {
 	n, _ = rb.Write([]byte(strings.Repeat("abcd", 1)))
 	assert.EqualValuesf(t, 4, n, "expect write 4 bytes but got %d", n)
 	size := rb.Cap()
-	assert.EqualValuesf(t, 68, rb.Length(), "expect len 68 bytes but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
+	assert.EqualValuesf(t, 68, rb.Buffered(), "expect len 68 bytes but got %d. r.w=%d, r.r=%d", rb.Buffered(), rb.w, rb.r)
 	assert.EqualValuesf(t, size-68, rb.Free(), "expect free 60 bytes but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
 
 	// check empty or full
@@ -79,7 +79,7 @@ func TestRingBuffer_Write(t *testing.T) {
 	rb.Reset()
 	n, _ = rb.Write([]byte(strings.Repeat("abcd", 20)))
 	assert.EqualValuesf(t, 80, n, "expect write 80 bytes but got %d", n)
-	assert.EqualValuesf(t, 80, rb.Length(), "expect len 80 bytes but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
+	assert.EqualValuesf(t, 80, rb.Buffered(), "expect len 80 bytes but got %d. r.w=%d, r.r=%d", rb.Buffered(), rb.w, rb.r)
 	assert.EqualValuesf(t, size-80, rb.Free(), "expect free 48 bytes but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
 	assert.Greaterf(t, rb.w, 0, "expect r.w>=0 but got %d. r.r=%d", rb.w, rb.r)
 
@@ -94,11 +94,11 @@ func TestRingBuffer_Write(t *testing.T) {
 	// write 4 * 2 = 8 bytes
 	n, _ = rb.Write([]byte(strings.Repeat("abcd", 2)))
 	assert.EqualValuesf(t, 8, n, "expect write 16 bytes but got %d", n)
-	assert.EqualValuesf(t, 8, rb.Length(), "expect len 16 bytes but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
+	assert.EqualValuesf(t, 8, rb.Buffered(), "expect len 16 bytes but got %d. r.w=%d, r.r=%d", rb.Buffered(), rb.w, rb.r)
 	assert.EqualValuesf(t, size-8, rb.Free(), "expect free 48 bytes but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
 	buf := make([]byte, 5)
 	_, _ = rb.Read(buf)
-	assert.EqualValuesf(t, 3, rb.Length(), "expect len 3 bytes but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
+	assert.EqualValuesf(t, 3, rb.Buffered(), "expect len 3 bytes but got %d. r.w=%d, r.r=%d", rb.Buffered(), rb.w, rb.r)
 	_, _ = rb.Write([]byte(strings.Repeat("abcd", 15)))
 
 	assert.EqualValuesf(t, []byte("bcd"+strings.Repeat("abcd", 15)), rb.ByteBuffer().Bytes(), "expect 63 ... but got %s. r.w=%d, r.r=%d", rb.ByteBuffer().Bytes(), rb.w, rb.r)
@@ -123,7 +123,7 @@ func TestZeroRingBuffer(t *testing.T) {
 	head, tail = rb.PeekAll()
 	assert.Empty(t, head, "head should be empty")
 	assert.Empty(t, tail, "tail should be empty")
-	assert.EqualValues(t, 0, rb.Length(), "expect length is 0")
+	assert.EqualValues(t, 0, rb.Buffered(), "expect length is 0")
 	assert.EqualValues(t, 0, rb.Free(), "expect free is 0")
 	buf := []byte(strings.Repeat("1234", 12))
 	_, _ = rb.Write(buf)
@@ -149,7 +149,7 @@ func TestRingBufferGrow(t *testing.T) {
 	assert.EqualValues(t, DefaultBufferSize+1, n)
 	assert.EqualValues(t, 2*DefaultBufferSize, rb.Cap())
 	assert.EqualValues(t, 2*DefaultBufferSize, rb.Len())
-	assert.EqualValues(t, DefaultBufferSize+1, rb.Length())
+	assert.EqualValues(t, DefaultBufferSize+1, rb.Buffered())
 	assert.EqualValues(t, DefaultBufferSize-1, rb.Free())
 	assert.EqualValues(t, data, rb.ByteBuffer().Bytes())
 
@@ -163,7 +163,7 @@ func TestRingBufferGrow(t *testing.T) {
 	assert.EqualValues(t, 3*512, n)
 	assert.EqualValues(t, 2*DefaultBufferSize, rb.Cap())
 	assert.EqualValues(t, 2*DefaultBufferSize, rb.Len())
-	assert.EqualValues(t, 3*512, rb.Length())
+	assert.EqualValues(t, 3*512, rb.Buffered())
 	assert.EqualValues(t, 512, rb.Free())
 	assert.EqualValues(t, newData, rb.ByteBuffer().Bytes())
 
@@ -177,7 +177,7 @@ func TestRingBufferGrow(t *testing.T) {
 	assert.EqualValues(t, bufferGrowThreshold, n)
 	assert.EqualValues(t, bufferGrowThreshold, rb.Cap())
 	assert.EqualValues(t, bufferGrowThreshold, rb.Len())
-	assert.EqualValues(t, bufferGrowThreshold, rb.Length())
+	assert.EqualValues(t, bufferGrowThreshold, rb.Buffered())
 	assert.EqualValues(t, 0, rb.Free())
 	assert.EqualValues(t, data, rb.ByteBuffer().Bytes())
 	newData = make([]byte, bufferGrowThreshold/2+1)
@@ -189,8 +189,8 @@ func TestRingBufferGrow(t *testing.T) {
 	assert.EqualValues(t, bufferGrowThreshold/2+1, n)
 	assert.EqualValues(t, 1.25*(1.25*bufferGrowThreshold), rb.Cap())
 	assert.EqualValues(t, 1.25*(1.25*bufferGrowThreshold), rb.Len())
-	assert.EqualValues(t, 1.5*bufferGrowThreshold+1, rb.Length())
-	assert.EqualValues(t, 1.25*(1.25*bufferGrowThreshold)-rb.Length(), rb.Free())
+	assert.EqualValues(t, 1.5*bufferGrowThreshold+1, rb.Buffered())
+	assert.EqualValues(t, 1.25*(1.25*bufferGrowThreshold)-rb.Buffered(), rb.Free())
 	assert.EqualValues(t, append(data, newData...), rb.ByteBuffer().Bytes())
 }
 
@@ -200,7 +200,7 @@ func TestRingBuffer_Read(t *testing.T) {
 	// check empty or full
 	assert.True(t, rb.IsEmpty(), "expect IsEmpty is true but got false")
 	assert.False(t, rb.IsFull(), "expect isfull is false but got true")
-	assert.EqualValuesf(t, 0, rb.Length(), "expect len 0 bytes but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
+	assert.EqualValuesf(t, 0, rb.Buffered(), "expect len 0 bytes but got %d. r.w=%d, r.r=%d", rb.Buffered(), rb.w, rb.r)
 	assert.EqualValuesf(t, 64, rb.Free(), "expect free 64 bytes but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
 
 	// read empty
@@ -208,7 +208,7 @@ func TestRingBuffer_Read(t *testing.T) {
 	n, err := rb.Read(buf)
 	assert.ErrorIs(t, err, ErrIsEmpty, "expect ErrIsEmpty but got nil")
 	assert.EqualValuesf(t, 0, n, "expect read 0 bytes but got %d", n)
-	assert.EqualValuesf(t, 0, rb.Length(), "expect len 0 bytes but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
+	assert.EqualValuesf(t, 0, rb.Buffered(), "expect len 0 bytes but got %d. r.w=%d, r.r=%d", rb.Buffered(), rb.w, rb.r)
 	assert.EqualValuesf(t, 64, rb.Free(), "expect free 64 bytes but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
 	assert.EqualValuesf(t, 0, rb.r, "expect r.r=0 but got %d. r.w=%d", rb.r, rb.w)
 
@@ -218,7 +218,7 @@ func TestRingBuffer_Read(t *testing.T) {
 	n, err = rb.Read(buf)
 	assert.NoErrorf(t, err, "read failed: %v", err)
 	assert.EqualValuesf(t, 16, n, "expect read 16 bytes but got %d", n)
-	assert.EqualValuesf(t, 0, rb.Length(), "expect len 0 bytes but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
+	assert.EqualValuesf(t, 0, rb.Buffered(), "expect len 0 bytes but got %d. r.w=%d, r.r=%d", rb.Buffered(), rb.w, rb.r)
 	assert.EqualValuesf(t, 64, rb.Free(), "expect free 64 bytes but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
 	assert.EqualValuesf(t, 0, rb.r, "expect r.r=0 but got %d. r.w=%d", rb.r, rb.w)
 
@@ -228,7 +228,7 @@ func TestRingBuffer_Read(t *testing.T) {
 	n, err = rb.Read(buf)
 	assert.NoErrorf(t, err, "read failed: %v", err)
 	assert.EqualValuesf(t, 80, n, "expect read 80 bytes but got %d", n)
-	assert.EqualValuesf(t, 0, rb.Length(), "expect len 0 bytes but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
+	assert.EqualValuesf(t, 0, rb.Buffered(), "expect len 0 bytes but got %d. r.w=%d, r.r=%d", rb.Buffered(), rb.w, rb.r)
 	assert.EqualValuesf(t, 128, rb.Free(), "expect free 128 bytes but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
 	assert.EqualValuesf(t, 0, rb.r, "expect r.r=0 but got %d. r.w=%d", rb.r, rb.w)
 
@@ -265,7 +265,7 @@ func TestRingBuffer_ByteInterface(t *testing.T) {
 
 	// write one
 	_ = rb.WriteByte('a')
-	assert.EqualValuesf(t, 1, rb.Length(), "expect len 1 byte but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
+	assert.EqualValuesf(t, 1, rb.Buffered(), "expect len 1 byte but got %d. r.w=%d, r.r=%d", rb.Buffered(), rb.w, rb.r)
 	assert.EqualValuesf(t, 1, rb.Free(), "expect free 1 byte but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
 	assert.EqualValuesf(t, []byte{'a'}, rb.ByteBuffer().Bytes(), "expect a but got %s. r.w=%d, r.r=%d", rb.ByteBuffer().Bytes(), rb.w, rb.r)
 	// check empty or full
@@ -274,7 +274,7 @@ func TestRingBuffer_ByteInterface(t *testing.T) {
 
 	// write two, isFull
 	_ = rb.WriteByte('b')
-	assert.EqualValuesf(t, 2, rb.Length(), "expect len 2 bytes but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
+	assert.EqualValuesf(t, 2, rb.Buffered(), "expect len 2 bytes but got %d. r.w=%d, r.r=%d", rb.Buffered(), rb.w, rb.r)
 	assert.EqualValuesf(t, 0, rb.Free(), "expect free 0 byte but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
 	assert.EqualValuesf(t, []byte{'a', 'b'}, rb.ByteBuffer().Bytes(), "expect a but got %s. r.w=%d, r.r=%d", rb.ByteBuffer().Bytes(), rb.w, rb.r)
 	// check empty or full
@@ -283,7 +283,7 @@ func TestRingBuffer_ByteInterface(t *testing.T) {
 
 	// write, it will scale from 2 to 4 bytes.
 	_ = rb.WriteByte('c')
-	assert.EqualValuesf(t, 3, rb.Length(), "expect len 3 bytes but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
+	assert.EqualValuesf(t, 3, rb.Buffered(), "expect len 3 bytes but got %d. r.w=%d, r.r=%d", rb.Buffered(), rb.w, rb.r)
 	assert.EqualValuesf(t, 1, rb.Free(), "expect free 1 byte but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
 	assert.EqualValuesf(t, []byte{'a', 'b', 'c'}, rb.ByteBuffer().Bytes(), "expect a but got %s. r.w=%d, r.r=%d", rb.ByteBuffer().Bytes(), rb.w, rb.r)
 	// check empty or full
@@ -294,7 +294,7 @@ func TestRingBuffer_ByteInterface(t *testing.T) {
 	b, err := rb.ReadByte()
 	assert.NoErrorf(t, err, "ReadByte failed: %v", err)
 	assert.EqualValuesf(t, 'a', b, "expect a but got %c. r.w=%d, r.r=%d", b, rb.w, rb.r)
-	assert.EqualValuesf(t, 2, rb.Length(), "expect len 2 byte but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
+	assert.EqualValuesf(t, 2, rb.Buffered(), "expect len 2 byte but got %d. r.w=%d, r.r=%d", rb.Buffered(), rb.w, rb.r)
 	assert.EqualValuesf(t, 2, rb.Free(), "expect free 2 byte but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
 	assert.EqualValuesf(t, []byte{'b', 'c'}, rb.ByteBuffer().Bytes(), "expect a but got %s. r.w=%d, r.r=%d", rb.ByteBuffer().Bytes(), rb.w, rb.r)
 	// check empty or full
@@ -304,7 +304,7 @@ func TestRingBuffer_ByteInterface(t *testing.T) {
 	// read two
 	b, _ = rb.ReadByte()
 	assert.EqualValuesf(t, 'b', b, "expect b but got %c. r.w=%d, r.r=%d", b, rb.w, rb.r)
-	assert.EqualValuesf(t, 1, rb.Length(), "expect len 1 byte but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
+	assert.EqualValuesf(t, 1, rb.Buffered(), "expect len 1 byte but got %d. r.w=%d, r.r=%d", rb.Buffered(), rb.w, rb.r)
 	assert.EqualValuesf(t, 3, rb.Free(), "expect free 3 byte but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
 	// check empty or full
 	assert.False(t, rb.IsEmpty(), "expect IsEmpty is false but got true")
@@ -312,7 +312,7 @@ func TestRingBuffer_ByteInterface(t *testing.T) {
 
 	// read three
 	_, _ = rb.ReadByte()
-	assert.EqualValuesf(t, 0, rb.Length(), "expect len 0 byte but got %d. r.w=%d, r.r=%d", rb.Length(), rb.w, rb.r)
+	assert.EqualValuesf(t, 0, rb.Buffered(), "expect len 0 byte but got %d. r.w=%d, r.r=%d", rb.Buffered(), rb.w, rb.r)
 	assert.EqualValuesf(t, 4, rb.Free(), "expect free 4 byte but got %d. r.w=%d, r.r=%d", rb.Free(), rb.w, rb.r)
 	// check empty or full
 	assert.True(t, rb.IsEmpty(), "expect IsEmpty is true but got false")

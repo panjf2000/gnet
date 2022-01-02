@@ -39,14 +39,14 @@ type clientEvents struct {
 	rspChMap  sync.Map
 }
 
-func (ev *clientEvents) OnOpened(c Conn) ([]byte, Action) {
+func (ev *clientEvents) OnOpen(c Conn) ([]byte, Action) {
 	c.SetContext([]byte{})
 	rspCh := make(chan []byte, 1)
 	ev.rspChMap.Store(c.LocalAddr().String(), rspCh)
 	return nil, None
 }
 
-func (ev *clientEvents) OnClosed(c Conn, err error) Action {
+func (ev *clientEvents) OnClose(c Conn, err error) Action {
 	if ev.svr != nil {
 		if atomic.AddInt32(&ev.svr.clientActive, -1) == 0 {
 			return Shutdown
@@ -55,7 +55,7 @@ func (ev *clientEvents) OnClosed(c Conn, err error) Action {
 	return None
 }
 
-func (ev *clientEvents) React(packet []byte, c Conn) (out []byte, action Action) {
+func (ev *clientEvents) OnTraffic(c Conn) (action Action) {
 	ctx := c.Context()
 	var p []byte
 	if ctx != nil {
@@ -63,7 +63,9 @@ func (ev *clientEvents) React(packet []byte, c Conn) (out []byte, action Action)
 	} else { // UDP
 		ev.packetLen = 1024
 	}
-	p = append(p, packet...)
+	buf, _ := c.Peek(-1)
+	p = append(p, buf...)
+	c.Discard(-1)
 	if len(p) < ev.packetLen {
 		c.SetContext(p)
 		return
@@ -75,7 +77,7 @@ func (ev *clientEvents) React(packet []byte, c Conn) (out []byte, action Action)
 	return
 }
 
-func (ev *clientEvents) Tick() (delay time.Duration, action Action) {
+func (ev *clientEvents) OnTick() (delay time.Duration, action Action) {
 	delay = 200 * time.Millisecond
 	return
 }
@@ -208,12 +210,12 @@ type testClientServer struct {
 	workerPool   *goPool.Pool
 }
 
-func (s *testClientServer) OnInitComplete(svr Server) (action Action) {
+func (s *testClientServer) OnBoot(svr Server) (action Action) {
 	s.svr = svr
 	return
 }
 
-func (s *testClientServer) OnOpened(c Conn) (out []byte, action Action) {
+func (s *testClientServer) OnOpen(c Conn) (out []byte, action Action) {
 	c.SetContext(c)
 	atomic.AddInt32(&s.connected, 1)
 	require.NotNil(s.tester, c.LocalAddr(), "nil local addr")
@@ -221,7 +223,7 @@ func (s *testClientServer) OnOpened(c Conn) (out []byte, action Action) {
 	return
 }
 
-func (s *testClientServer) OnClosed(c Conn, err error) (action Action) {
+func (s *testClientServer) OnClose(c Conn, err error) (action Action) {
 	if err != nil {
 		logging.Debugf("error occurred on closed, %v\n", err)
 	}
@@ -239,35 +241,31 @@ func (s *testClientServer) OnClosed(c Conn, err error) (action Action) {
 	return
 }
 
-func (s *testClientServer) React(packet []byte, c Conn) (out []byte, action Action) {
+func (s *testClientServer) OnTraffic(c Conn) (action Action) {
 	if s.async {
 		buf := bbPool.Get()
-		_, _ = buf.Write(packet)
+		c.WriteTo(buf)
 
 		if s.network == "tcp" || s.network == "unix" {
 			// just for test
-			_ = c.BufferLength()
-			c.ShiftN(1)
+			_ = c.InboundBuffered()
+			_ = c.OutboundBuffered()
+			c.Discard(1)
 
-			_ = s.workerPool.Submit(
-				func() {
-					_ = c.AsyncWrite(buf.Bytes())
-				})
-			return
-		} else if s.network == "udp" {
-			_ = s.workerPool.Submit(
-				func() {
-					_ = c.SendTo(buf.Bytes())
-				})
-			return
 		}
+		_ = s.workerPool.Submit(
+			func() {
+				_ = c.AsyncWrite(buf.Bytes())
+			})
 		return
 	}
-	out = packet
+	buf, _ := c.Peek(-1)
+	c.Write(buf)
+	c.Discard(-1)
 	return
 }
 
-func (s *testClientServer) Tick() (delay time.Duration, action Action) {
+func (s *testClientServer) OnTick() (delay time.Duration, action Action) {
 	if atomic.CompareAndSwapInt32(&s.started, 0, 1) {
 		for i := 0; i < s.nclients; i++ {
 			atomic.AddInt32(&s.clientActive, 1)
@@ -350,11 +348,7 @@ func startGnetClient(t *testing.T, cli *Client, ev *clientEvents, network, addr 
 		}
 		_, err = rand.Read(reqData)
 		require.NoError(t, err)
-		if network == "udp" {
-			err = c.SendTo(reqData)
-		} else {
-			err = c.AsyncWrite(reqData)
-		}
+		err = c.AsyncWrite(reqData)
 		require.NoError(t, err)
 		respData := <-rspCh
 		require.NoError(t, err)

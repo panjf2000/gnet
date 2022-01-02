@@ -15,6 +15,8 @@
 package mixedbuffer
 
 import (
+	"io"
+
 	"github.com/panjf2000/gnet/pkg/listbuffer"
 	rbPool "github.com/panjf2000/gnet/pkg/pool/ringbuffer"
 	"github.com/panjf2000/gnet/pkg/ringbuffer"
@@ -35,6 +37,20 @@ func New(maxStaticBytes int) *Buffer {
 	return &Buffer{maxStaticBytes: maxStaticBytes, ringBuffer: rbPool.Get()}
 }
 
+func (mb Buffer) Read(p []byte) (n int, err error) {
+	if mb.ringBuffer == nil {
+		return mb.listBuffer.Read(p)
+	}
+	n, err = mb.ringBuffer.Read(p)
+	if n == len(p) {
+		return n, err
+	}
+	var m int
+	m, err = mb.listBuffer.Read(p[n:])
+	n += m
+	return
+}
+
 // Peek returns n bytes as [][]byte, these bytes won't be discarded until Buffer.Discard() is called.
 func (mb *Buffer) Peek(n int) [][]byte {
 	if mb.ringBuffer == nil {
@@ -45,14 +61,21 @@ func (mb *Buffer) Peek(n int) [][]byte {
 	return mb.listBuffer.PeekBytesListWithBytes(n, head, tail)
 }
 
+func (mb Buffer) WriteTo(w io.Writer) (int64, error) {
+	if mb.ringBuffer == nil {
+		return mb.listBuffer.WriteTo(w)
+	}
+	return mb.ringBuffer.WriteTo(w)
+}
+
 // Discard discards n bytes in this buffer.
 func (mb *Buffer) Discard(n int) {
 	if mb.ringBuffer == nil {
-		mb.listBuffer.DiscardBytes(n)
+		mb.listBuffer.Discard(n)
 		return
 	}
 
-	rbLen := mb.ringBuffer.Length()
+	rbLen := mb.ringBuffer.Buffered()
 	mb.ringBuffer.Discard(n)
 	if n <= rbLen {
 		if n == rbLen {
@@ -64,7 +87,7 @@ func (mb *Buffer) Discard(n int) {
 	rbPool.Put(mb.ringBuffer)
 	mb.ringBuffer = nil
 	n -= rbLen
-	mb.listBuffer.DiscardBytes(n)
+	mb.listBuffer.Discard(n)
 }
 
 // Write appends data to this buffer.
@@ -73,7 +96,7 @@ func (mb *Buffer) Write(p []byte) (n int, err error) {
 		mb.ringBuffer = rbPool.Get()
 	}
 
-	if !mb.listBuffer.IsEmpty() || mb.ringBuffer.Length() >= mb.maxStaticBytes {
+	if !mb.listBuffer.IsEmpty() || mb.ringBuffer.Buffered() >= mb.maxStaticBytes {
 		mb.listBuffer.PushBytesBack(p)
 		return len(p), nil
 	}
@@ -88,13 +111,23 @@ func (mb *Buffer) Write(p []byte) (n int, err error) {
 	return mb.ringBuffer.Write(p)
 }
 
+func (mb *Buffer) ReadFrom(r io.Reader) (int64, error) {
+	if mb.ringBuffer == nil && mb.listBuffer.IsEmpty() {
+		mb.ringBuffer = rbPool.Get()
+	}
+	if !mb.listBuffer.IsEmpty() || mb.ringBuffer.Buffered() >= mb.maxStaticBytes {
+		return mb.listBuffer.ReadFrom(r)
+	}
+	return mb.ringBuffer.ReadFrom(r)
+}
+
 // Writev appends multiple byte slices to this buffer.
 func (mb *Buffer) Writev(bs [][]byte) (int, error) {
 	if mb.ringBuffer == nil && mb.listBuffer.IsEmpty() {
 		mb.ringBuffer = rbPool.Get()
 	}
 
-	if !mb.listBuffer.IsEmpty() || mb.ringBuffer.Length() >= mb.maxStaticBytes {
+	if !mb.listBuffer.IsEmpty() || mb.ringBuffer.Buffered() >= mb.maxStaticBytes {
 		var n int
 		for _, b := range bs {
 			mb.listBuffer.PushBytesBack(b)
@@ -106,7 +139,7 @@ func (mb *Buffer) Writev(bs [][]byte) (int, error) {
 	var pos, cum int
 	writableSize := mb.ringBuffer.Free()
 	if mb.ringBuffer.Len() < mb.maxStaticBytes {
-		writableSize = mb.maxStaticBytes - mb.ringBuffer.Length()
+		writableSize = mb.maxStaticBytes - mb.ringBuffer.Buffered()
 	}
 	for i, b := range bs {
 		pos = i
@@ -124,6 +157,13 @@ func (mb *Buffer) Writev(bs [][]byte) (int, error) {
 		mb.listBuffer.PushBytesBack(bs[pos])
 	}
 	return cum, nil
+}
+
+func (mb *Buffer) Buffered() int {
+	if mb.ringBuffer == nil {
+		return mb.listBuffer.Buffered()
+	}
+	return mb.ringBuffer.Buffered() + mb.listBuffer.Buffered()
 }
 
 // IsEmpty indicates whether this buffer is empty.

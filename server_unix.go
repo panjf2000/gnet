@@ -271,7 +271,7 @@ func serve(eventHandler EventHandler, listener *listener, options *Options, prot
 		ReusePort:    options.ReusePort,
 		TCPKeepAlive: options.TCPKeepAlive,
 	}
-	switch svr.eventHandler.OnInitComplete(s) {
+	switch svr.eventHandler.OnBoot(s) {
 	case None:
 	case Shutdown:
 		return nil

@@ -19,14 +19,17 @@
 package gnet
 
 import (
+	"io"
 	"net"
 	"os"
+	"time"
 
 	"golang.org/x/sys/unix"
 
-	"github.com/panjf2000/gnet/internal/io"
+	gio "github.com/panjf2000/gnet/internal/io"
 	"github.com/panjf2000/gnet/internal/netpoll"
 	"github.com/panjf2000/gnet/internal/socket"
+	gerrors "github.com/panjf2000/gnet/pkg/errors"
 	"github.com/panjf2000/gnet/pkg/mixedbuffer"
 	bbPool "github.com/panjf2000/gnet/pkg/pool/bytebuffer"
 	bsPool "github.com/panjf2000/gnet/pkg/pool/byteslice"
@@ -43,6 +46,7 @@ type conn struct {
 	buffer         []byte                  // buffer for the latest bytes
 	opened         bool                    // connection opened event fired
 	packets        [][]byte                // reuse it for multiple byte slices
+	isDatagram     bool                    // UDP protocol
 	localAddr      net.Addr                // local addr
 	remoteAddr     net.Addr                // remote addr
 	inboundBuffer  *ringbuffer.RingBuffer  // buffer for leftover data from the peer
@@ -58,7 +62,7 @@ func newTCPConn(fd int, el *eventloop, sa unix.Sockaddr, localAddr, remoteAddr n
 		localAddr:      localAddr,
 		remoteAddr:     remoteAddr,
 		inboundBuffer:  rbPool.Get(),
-		outboundBuffer: mixedbuffer.New(ringbuffer.MaxStreamBufferCap),
+		outboundBuffer: mixedbuffer.New(MaxStreamBufferCap),
 	}
 	c.pollAttachment = netpoll.GetPollAttachment()
 	c.pollAttachment.FD, c.pollAttachment.Callback = fd, c.handleEvents
@@ -90,11 +94,13 @@ func (c *conn) releaseTCP() {
 
 func newUDPConn(fd int, el *eventloop, localAddr net.Addr, sa unix.Sockaddr, connected bool) (c *conn) {
 	c = &conn{
-		fd:         fd,
-		peer:       sa,
-		loop:       el,
-		localAddr:  localAddr,
-		remoteAddr: socket.SockaddrToUDPAddr(sa),
+		fd:            fd,
+		peer:          sa,
+		loop:          el,
+		localAddr:     localAddr,
+		remoteAddr:    socket.SockaddrToUDPAddr(sa),
+		isDatagram:    true,
+		inboundBuffer: ringbuffer.EmptyRingBuffer,
 	}
 	if connected {
 		c.peer = nil
@@ -112,14 +118,12 @@ func (c *conn) releaseUDP() {
 	}
 	c.localAddr = nil
 	c.remoteAddr = nil
+	c.buffer = nil
 	netpoll.PutPollAttachment(c.pollAttachment)
 	c.pollAttachment = nil
 }
 
 func (c *conn) open(buf []byte) error {
-	defer c.loop.eventHandler.AfterWrite(c, buf)
-
-	c.loop.eventHandler.PreWrite(c)
 	n, err := unix.Write(c.fd, buf)
 	if err != nil && err == unix.EAGAIN {
 		_, _ = c.outboundBuffer.Write(buf)
@@ -134,10 +138,6 @@ func (c *conn) open(buf []byte) error {
 }
 
 func (c *conn) write(data []byte) (err error) {
-	defer c.loop.eventHandler.AfterWrite(c, data)
-
-	c.loop.eventHandler.PreWrite(c)
-
 	// If there is pending data in outbound buffer, the current data ought to be appended to the outbound buffer
 	// for maintaining the sequence of network packets.
 	if !c.outboundBuffer.IsEmpty() {
@@ -165,9 +165,6 @@ func (c *conn) write(data []byte) (err error) {
 
 func (c *conn) writev(bs [][]byte) (err error) {
 	defer func() {
-		for _, b := range bs {
-			c.loop.eventHandler.AfterWrite(c, b)
-		}
 		c.packets = c.packets[:0]
 	}()
 
@@ -175,7 +172,6 @@ func (c *conn) writev(bs [][]byte) (err error) {
 	for _, b := range bs {
 		c.packets = append(c.packets, b)
 		sum += len(b)
-		c.loop.eventHandler.PreWrite(c)
 	}
 
 	// If there is pending data in outbound buffer, the current data ought to be appended to the outbound buffer
@@ -186,7 +182,7 @@ func (c *conn) writev(bs [][]byte) (err error) {
 	}
 
 	var n int
-	if n, err = io.Writev(c.fd, c.packets); err != nil {
+	if n, err = gio.Writev(c.fd, c.packets); err != nil {
 		// A temporary error occurs, append the data to outbound buffer, writing it back to the peer in the next round.
 		if err == unix.EAGAIN {
 			_, _ = c.outboundBuffer.Writev(c.packets)
@@ -217,6 +213,7 @@ func (c *conn) asyncWrite(itf interface{}) error {
 	if !c.opened {
 		return nil
 	}
+
 	return c.write(itf.([]byte))
 }
 
@@ -224,69 +221,72 @@ func (c *conn) asyncWritev(itf interface{}) error {
 	if !c.opened {
 		return nil
 	}
+
 	return c.writev(itf.([][]byte))
 }
 
 func (c *conn) sendTo(buf []byte) error {
-	c.loop.eventHandler.PreWrite(c)
-	defer c.loop.eventHandler.AfterWrite(c, buf)
 	if c.peer == nil {
 		return unix.Send(c.fd, buf, 0)
 	}
 	return unix.Sendto(c.fd, buf, 0, c.peer)
 }
 
-// ================================== Non-concurrency-safe API's ==================================
-
-func (c *conn) Read() []byte {
-	if c.inboundBuffer.IsEmpty() {
-		return c.buffer
-	}
-	c.cache = c.inboundBuffer.WithByteBuffer(c.buffer)
-	return c.cache.B
-}
-
-func (c *conn) ResetBuffer() {
+func (c *conn) resetBuffer() {
 	c.buffer = c.buffer[:0]
 	c.inboundBuffer.Reset()
 	bbPool.Put(c.cache)
 	c.cache = nil
 }
 
-func (c *conn) ReadN(n int) (int, []byte) {
-	inBufferLen := c.inboundBuffer.Length()
+// ================================== Non-concurrency-safe API's ==================================
+
+func (c *conn) Read(p []byte) (n int, err error) {
+	if c.inboundBuffer.IsEmpty() {
+		n = copy(p, c.buffer)
+		c.buffer = c.buffer[n:]
+		return n, nil
+	}
+	n, err = c.inboundBuffer.Read(p)
+	n += copy(p[n:], c.buffer)
+	return c.Discard(n)
+}
+
+func (c *conn) Peek(n int) (buf []byte, err error) {
+	inBufferLen := c.inboundBuffer.Buffered()
 	if totalLen := inBufferLen + len(c.buffer); totalLen < n || n <= 0 {
+		err = gerrors.ErrBufferFull
 		n = totalLen
 	}
 	if c.inboundBuffer.IsEmpty() {
-		return n, c.buffer[:n]
+		return c.buffer[:n], err
 	}
 	head, tail := c.inboundBuffer.Peek(n)
 	if len(head) >= n {
-		return n, head[:n]
+		return head[:n], err
 	}
 	c.cache = bbPool.Get()
 	_, _ = c.cache.Write(head)
 	_, _ = c.cache.Write(tail)
 	if inBufferLen >= n {
-		return n, c.cache.B
+		return c.cache.B, err
 	}
 
 	remaining := n - inBufferLen
 	_, _ = c.cache.Write(c.buffer[:remaining])
-	return n, c.cache.B
+	return c.cache.B, err
 }
 
-func (c *conn) ShiftN(n int) (size int) {
-	inBufferLen := c.inboundBuffer.Length()
+func (c *conn) Discard(n int) (int, error) {
+	inBufferLen := c.inboundBuffer.Buffered()
 	tempBufferLen := len(c.buffer)
 	if inBufferLen+tempBufferLen < n || n <= 0 {
-		c.ResetBuffer()
-		return inBufferLen + tempBufferLen
+		c.resetBuffer()
+		return inBufferLen + tempBufferLen, nil
 	}
 	if c.inboundBuffer.IsEmpty() {
 		c.buffer = c.buffer[n:]
-		return n
+		return n, nil
 	}
 
 	bbPool.Put(c.cache)
@@ -294,17 +294,84 @@ func (c *conn) ShiftN(n int) (size int) {
 
 	if inBufferLen >= n {
 		c.inboundBuffer.Discard(n)
-		return n
+		return n, nil
 	}
 	c.inboundBuffer.Reset()
 
 	remaining := n - inBufferLen
 	c.buffer = c.buffer[remaining:]
-	return n
+	return n, nil
 }
 
-func (c *conn) BufferLength() int {
-	return c.inboundBuffer.Length() + len(c.buffer)
+func (c *conn) Write(p []byte) (n int, err error) {
+	if c.isDatagram {
+		return len(p), c.sendTo(p)
+	}
+	return len(p), c.write(p)
+}
+
+func (c *conn) Writev(bs [][]byte) (n int, err error) {
+	for _, b := range bs {
+		n += len(b)
+	}
+	if c.isDatagram {
+		buf := bsPool.Get(n)
+		var m int
+		for _, b := range bs {
+			copy(buf[m:], b)
+			m += len(b)
+		}
+		err = c.sendTo(buf)
+		bsPool.Put(buf)
+		return
+	}
+	err = c.writev(bs)
+	return
+}
+
+func (c *conn) ReadFrom(r io.Reader) (n int64, err error) {
+	return c.outboundBuffer.ReadFrom(r)
+}
+
+func (c *conn) WriteTo(w io.Writer) (n int64, err error) {
+	if c.inboundBuffer.IsEmpty() {
+		var m int
+		m, err = w.Write(c.buffer)
+		c.buffer = c.buffer[m:]
+		return int64(m), err
+	}
+	n, err = c.inboundBuffer.WriteTo(w)
+	if err != nil {
+		return
+	}
+	var m int
+	m, err = w.Write(c.buffer)
+	c.buffer = c.buffer[m:]
+	return int64(m), err
+}
+
+func (c *conn) Flush() error {
+	return c.loop.write(c)
+}
+
+func (c *conn) InboundBuffered() int {
+	return c.inboundBuffer.Buffered() + len(c.buffer)
+}
+
+func (c *conn) OutboundBuffered() int {
+	return c.outboundBuffer.Buffered()
+}
+
+func (c *conn) SetDeadline(_ time.Time) error {
+	return gerrors.ErrUnsupportedOp
+}
+
+func (c *conn) SetReadDeadline(_ time.Time) error {
+	return gerrors.ErrUnsupportedOp
+}
+
+func (c *conn) SetWriteDeadline(_ time.Time) error {
+	return gerrors.ErrUnsupportedOp
 }
 
 func (c *conn) Context() interface{}       { return c.ctx }
@@ -315,15 +382,21 @@ func (c *conn) RemoteAddr() net.Addr       { return c.remoteAddr }
 // ==================================== Concurrency-safe API's ====================================
 
 func (c *conn) AsyncWrite(buf []byte) error {
+	if c.isDatagram {
+		return c.sendTo(buf)
+	}
 	return c.loop.poller.Trigger(c.asyncWrite, buf)
 }
 
 func (c *conn) AsyncWritev(bs [][]byte) error {
+	if c.isDatagram {
+		for _, b := range bs {
+			if err := c.sendTo(b); err != nil {
+				return err
+			}
+		}
+	}
 	return c.loop.poller.Trigger(c.asyncWritev, bs)
-}
-
-func (c *conn) SendTo(buf []byte) error {
-	return c.sendTo(buf)
 }
 
 func (c *conn) Wake() error {

@@ -21,6 +21,7 @@ package ringbuffer
 
 import (
 	"errors"
+	"io"
 
 	"github.com/panjf2000/gnet/internal/toolkit"
 	bbPool "github.com/panjf2000/gnet/pkg/pool/bytebuffer"
@@ -28,13 +29,15 @@ import (
 )
 
 const (
+	// MinRead is the minimum slice size passed to a Read call by
+	// Buffer.ReadFrom. As long as the Buffer has at least MinRead bytes beyond
+	// what is required to hold the contents of r, ReadFrom will not grow the
+	// underlying buffer.
+	MinRead = 512
 	// DefaultBufferSize is the first-time allocation on a ring-buffer.
 	DefaultBufferSize   = 1024     // 1KB
 	bufferGrowThreshold = 4 * 1024 // 4KB
 )
-
-// MaxStreamBufferCap is the default buffer size for each stream-oriented connection(TCP/Unix).
-var MaxStreamBufferCap = 64 * 1024 // 64KB
 
 // ErrIsEmpty will be returned when trying to read an empty ring-buffer.
 var ErrIsEmpty = errors.New("ring-buffer is empty")
@@ -127,7 +130,7 @@ func (rb *RingBuffer) Discard(n int) {
 		return
 	}
 
-	if n < rb.Length() {
+	if n < rb.Buffered() {
 		rb.r = (rb.r + n) % rb.size
 	} else {
 		rb.Reset()
@@ -186,6 +189,133 @@ func (rb *RingBuffer) Read(p []byte) (n int, err error) {
 	}
 
 	return
+}
+
+func (rb *RingBuffer) ReadFrom(r io.Reader) (n int64, err error) {
+	var m int
+	for {
+		if rb.Free() < MinRead {
+			rb.grow(rb.Buffered() + MinRead)
+		}
+
+		if rb.w >= rb.r {
+			m, err = r.Read(rb.buf[rb.w:])
+			if m < 0 {
+				panic("RingBuffer.ReadFrom: reader returned negative count from Read")
+			}
+			rb.isEmpty = false
+			rb.w = (rb.w + m) % rb.size
+			n += int64(m)
+			if err == io.EOF {
+				return n, nil
+			}
+			if err != nil {
+				return
+			}
+			m, err = r.Read(rb.buf[:rb.r])
+			if m < 0 {
+				panic("RingBuffer.ReadFrom: reader returned negative count from Read")
+			}
+			rb.w = (rb.w + m) % rb.size
+			n += int64(m)
+			if err == io.EOF {
+				return n, nil
+			}
+			if err != nil {
+				return
+			}
+		} else {
+			m, err = r.Read(rb.buf[rb.w:rb.r])
+			if m < 0 {
+				panic("RingBuffer.ReadFrom: reader returned negative count from Read")
+			}
+			rb.isEmpty = false
+			rb.w = (rb.w + m) % rb.size
+			n += int64(m)
+			if err == io.EOF {
+				return n, nil
+			}
+			if err != nil {
+				return
+			}
+		}
+	}
+}
+
+func (rb *RingBuffer) WriteTo(w io.Writer) (int64, error) {
+	if rb.isEmpty {
+		return 0, ErrIsEmpty
+	}
+
+	if rb.w > rb.r {
+		n := rb.w - rb.r
+		m, err := w.Write(rb.buf[rb.r : rb.r+n])
+		if m > n {
+			panic("RingBuffer.WriteTo: invalid Write count")
+		}
+		rb.r += m
+		if rb.r == rb.w {
+			rb.Reset()
+		}
+		if err != nil {
+			return int64(m), err
+		}
+		if !rb.isEmpty {
+			return int64(m), io.ErrShortWrite
+		}
+		return int64(m), nil
+	}
+
+	n := rb.size - rb.r + rb.w
+	if rb.r+n <= rb.size {
+		m, err := w.Write(rb.buf[rb.r : rb.r+n])
+		if m > n {
+			panic("RingBuffer.WriteTo: invalid Write count")
+		}
+		rb.r = (rb.r + m) % rb.size
+		if rb.r == rb.w {
+			rb.Reset()
+		}
+		if err != nil {
+			return int64(m), err
+		}
+		if !rb.isEmpty {
+			return int64(m), io.ErrShortWrite
+		}
+		return int64(m), nil
+	} else {
+		var cum int64
+		c1 := rb.size - rb.r
+		m, err := w.Write(rb.buf[rb.r:])
+		if m > c1 {
+			panic("RingBuffer.WriteTo: invalid Write count")
+		}
+		rb.r = (rb.r + m) % rb.size
+		if err != nil {
+			return int64(m), err
+		}
+		if m < c1 {
+			return int64(m), io.ErrShortWrite
+		}
+		cum += int64(m)
+		c2 := n - c1
+		m, err = w.Write(rb.buf[:c2])
+		if m > c2 {
+			panic("RingBuffer.WriteTo: invalid Write count")
+		}
+		rb.r = m
+		cum += int64(m)
+		if rb.r == rb.w {
+			rb.Reset()
+		}
+		if err != nil {
+			return cum, err
+		}
+		if !rb.isEmpty {
+			return cum, io.ErrShortWrite
+		}
+		return cum, nil
+	}
 }
 
 // ReadByte reads and returns the next byte from the input or ErrIsEmpty.
@@ -263,8 +393,8 @@ func (rb *RingBuffer) WriteByte(c byte) error {
 	return nil
 }
 
-// Length returns the length of available bytes to read.
-func (rb *RingBuffer) Length() int {
+// Buffered returns the length of available bytes to read.
+func (rb *RingBuffer) Buffered() int {
 	if rb.r == rb.w {
 		if rb.isEmpty {
 			return 0
@@ -407,7 +537,7 @@ func (rb *RingBuffer) grow(newCap int) {
 		}
 	}
 	newBuf := bsPool.Get(newCap)
-	oldLen := rb.Length()
+	oldLen := rb.Buffered()
 	_, _ = rb.Read(newBuf)
 	bsPool.Put(rb.buf)
 	rb.buf = newBuf

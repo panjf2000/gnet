@@ -17,6 +17,7 @@ package gnet
 
 import (
 	"context"
+	"io"
 	"net"
 	"strings"
 	"sync"
@@ -87,8 +88,46 @@ func (s Server) DupFd() (dupFD int, err error) {
 	return
 }
 
+type Reader interface {
+	io.Reader
+	io.WriterTo // must be non-blocking, otherwise it may block the event-loop.
+
+	// Peek returns the next n bytes without advancing the reader. The bytes stop
+	// being valid at the next read call. If Peek returns fewer than n bytes, it
+	// also returns an error explaining why the read is short. The error is
+	// ErrBufferFull if n is larger than b's buffer size.
+	//
+	// Note that the []byte buf returned by Peek() is not allowed to be passed to a new goroutine,
+	// as this []byte will be reused within event-loop.
+	// If you have to use buf in a new goroutine, then you need to make a copy of buf and pass this copy
+	// to that new goroutine.
+	Peek(n int) (buf []byte, err error)
+	Discard(n int) (discarded int, err error)
+	InboundBuffered() (n int)
+}
+
+type Writer interface {
+	io.Writer
+	io.ReaderFrom // must be non-blocking, otherwise it may block the event-loop.
+
+	Writev(bs [][]byte) (n int, err error)
+	Flush() (err error)
+	OutboundBuffered() (n int)
+
+	// AsyncWrite writes one byte slice to peer asynchronously, usually you would call it in individual goroutines
+	// instead of the event-loop goroutines.
+	AsyncWrite(buf []byte) (err error)
+
+	// AsyncWritev writes multiple byte slices to peer asynchronously, usually you would call it in individual goroutines
+	// instead of the event-loop goroutines.
+	AsyncWritev(bs [][]byte) (err error)
+}
+
 // Conn is an interface of gnet connection.
 type Conn interface {
+	Reader
+	Writer
+
 	// ================================== Non-concurrency-safe API's ==================================
 
 	// Context returns a user-defined context.
@@ -103,55 +142,22 @@ type Conn interface {
 	// RemoteAddr is the connection's remote peer address.
 	RemoteAddr() (addr net.Addr)
 
-	// Read reads all data from inbound ring-buffer without moving "read" pointer,
-	// which means it does not evict the data from buffers actually and those data will
-	// present in buffers until the ResetBuffer method is called.
-	//
-	// Note that the (buf []byte) returned by Read() is not allowed to be passed to a new goroutine,
-	// as this []byte will be reused within event-loop.
-	// If you have to use buf in a new goroutine, then you need to make a copy of buf and pass this copy
-	// to that new goroutine.
-	Read() (buf []byte)
+	// SetDeadline implements net.Conn.
+	SetDeadline(t time.Time) (err error)
 
-	// ResetBuffer resets the buffers, which means all data in inbound ring-buffer and event-loop-buffer will be evicted.
-	ResetBuffer()
+	// SetReadDeadline implements net.Conn.
+	SetReadDeadline(t time.Time) (err error)
 
-	// ReadN reads bytes with the given length from inbound ring-buffer without moving "read" pointer,
-	// which means it will not evict the data from buffers until the ShiftN method is called,
-	// it reads data from the inbound ring-buffer and returns both bytes and the size of it.
-	// If the length of the available data is less than the given "n", ReadN will return all available data,
-	// so you should make use of the variable "size" returned by ReadN() to be aware of the exact length of the returned data.
-	//
-	// Note that the []byte buf returned by ReadN() is not allowed to be passed to a new goroutine,
-	// as this []byte will be reused within event-loop.
-	// If you have to use buf in a new goroutine, then you need to make a copy of buf and pass this copy
-	// to that new goroutine.
-	ReadN(n int) (size int, buf []byte)
-
-	// ShiftN shifts "read" pointer in the internal buffers with the given length.
-	ShiftN(n int) (size int)
-
-	// BufferLength returns the length of available data in the internal buffers.
-	BufferLength() (size int)
+	// SetWriteDeadline implements net.Conn.
+	SetWriteDeadline(t time.Time) (err error)
 
 	// ==================================== Concurrency-safe API's ====================================
 
-	// SendTo writes data for UDP sockets, it allows you to send data back to UDP socket in individual goroutines.
-	SendTo(buf []byte) error
-
-	// AsyncWrite writes one byte slice to peer asynchronously, usually you would call it in individual goroutines
-	// instead of the event-loop goroutines.
-	AsyncWrite(buf []byte) error
-
-	// AsyncWritev writes multiple byte slices to peer asynchronously, usually you would call it in individual goroutines
-	// instead of the event-loop goroutines.
-	AsyncWritev(bs [][]byte) error
-
-	// Wake triggers a React event for the connection.
-	Wake() error
+	// Wake triggers a OnTraffic event for the connection.
+	Wake() (err error)
 
 	// Close closes the current connection.
-	Close() error
+	Close() (err error)
 }
 
 type (
@@ -159,47 +165,37 @@ type (
 	// Each event has an Action return value that is used manage the state
 	// of the connection and server.
 	EventHandler interface {
-		// OnInitComplete fires when the server is ready for accepting connections.
+		// OnBoot fires when the server is ready for accepting connections.
 		// The parameter server has information and various utilities.
-		OnInitComplete(server Server) (action Action)
+		OnBoot(server Server) (action Action)
 
 		// OnShutdown fires when the server is being shut down, it is called right after
 		// all event-loops and connections are closed.
 		OnShutdown(server Server)
 
-		// OnOpened fires when a new connection has been opened.
+		// OnOpen fires when a new connection has been opened.
 		// The Conn c has information about the connection such as it's local and remote address.
 		// The parameter out is the return value which is going to be sent back to the peer.
 		// It is usually not recommended to send large amounts of data back to the peer in OnOpened.
 		//
 		// Note that the bytes returned by OnOpened will be sent back to the peer without being encoded.
-		OnOpened(c Conn) (out []byte, action Action)
+		OnOpen(c Conn) (out []byte, action Action)
 
-		// OnClosed fires when a connection has been closed.
+		// OnClose fires when a connection has been closed.
 		// The parameter err is the last known connection error.
-		OnClosed(c Conn, err error) (action Action)
+		OnClose(c Conn, err error) (action Action)
 
-		// PreWrite fires just before a packet is written to the peer socket, this event function is usually where
-		// you put some code of logging/counting/reporting or any fore operations before writing data to the peer.
-		PreWrite(c Conn)
-
-		// AfterWrite fires right after a packet is written to the peer socket, this event function is usually where
-		// you put the []byte returned from React() back to your memory pool.
-		AfterWrite(c Conn, b []byte)
-
-		// React fires when a socket receives data from the peer.
-		// Call c.Read() or c.ReadN(n) of Conn c to read incoming data from the peer.
-		// The parameter out is the return value which is going to be sent back to the peer.
+		// OnTraffic fires when a server-side socket receives data from the peer.
 		//
 		// Note that the parameter packet returned from React() is not allowed to be passed to a new goroutine,
 		// as this []byte will be reused within event-loop after React() returns.
 		// If you have to use packet in a new goroutine, then you need to make a copy of buf and pass this copy
 		// to that new goroutine.
-		React(c Conn) (action Action)
+		OnTraffic(c Conn) (action Action)
 
-		// Tick fires immediately after the server starts and will fire again
+		// OnTick fires immediately after the server starts and will fire again
 		// following the duration specified by the delay return value.
-		Tick() (delay time.Duration, action Action)
+		OnTick() (delay time.Duration, action Action)
 	}
 
 	// EventServer is a built-in implementation of EventHandler which sets up each method with a default implementation,
@@ -208,9 +204,9 @@ type (
 	EventServer struct{}
 )
 
-// OnInitComplete fires when the server is ready for accepting connections.
+// OnBoot fires when the server is ready for accepting connections.
 // The parameter server has information and various utilities.
-func (es *EventServer) OnInitComplete(svr Server) (action Action) {
+func (es *EventServer) OnBoot(svr Server) (action Action) {
 	return
 }
 
@@ -219,40 +215,31 @@ func (es *EventServer) OnInitComplete(svr Server) (action Action) {
 func (es *EventServer) OnShutdown(svr Server) {
 }
 
-// OnOpened fires when a new connection has been opened.
+// OnOpen fires when a new connection has been opened.
 // The parameter out is the return value which is going to be sent back to the peer.
-func (es *EventServer) OnOpened(c Conn) (out []byte, action Action) {
+func (es *EventServer) OnOpen(c Conn) (out []byte, action Action) {
 	return
 }
 
-// OnClosed fires when a connection has been closed.
+// OnClose fires when a connection has been closed.
 // The parameter err is the last known connection error.
-func (es *EventServer) OnClosed(c Conn, err error) (action Action) {
+func (es *EventServer) OnClose(c Conn, err error) (action Action) {
 	return
 }
 
-// PreWrite fires just before a packet is written to the peer socket, this event function is usually where
-// you put some code of logging/counting/reporting or any fore operations before writing data to the peer.
-func (es *EventServer) PreWrite(c Conn) {
-}
-
-// AfterWrite fires right after a packet is written to the peer socket, this event function is usually where
-// you put the []byte's back to your memory pool.
-func (es *EventServer) AfterWrite(c Conn, b []byte) {
-}
-
-// React fires when a connection sends the server data.
-// Call c.Read() or c.ReadN(n) of Conn c to read incoming data from the peer.
-// The parameter out is the return value which is going to be sent back to the peer.
-func (es *EventServer) React(c Conn) (action Action) {
+// OnTraffic fires when a server-side socket receives data from the peer.
+func (es *EventServer) OnTraffic(c Conn) (action Action) {
 	return
 }
 
-// Tick fires immediately after the server starts and will fire again
+// OnTick fires immediately after the server starts and will fire again
 // following the duration specified by the delay return value.
-func (es *EventServer) Tick() (delay time.Duration, action Action) {
+func (es *EventServer) OnTick() (delay time.Duration, action Action) {
 	return
 }
+
+// MaxStreamBufferCap is the default buffer size for each stream-oriented connection(TCP/Unix).
+var MaxStreamBufferCap = 64 * 1024 // 64KB
 
 // Serve starts handling events for the specified address.
 //
@@ -304,7 +291,7 @@ func Serve(eventHandler EventHandler, protoAddr string, opts ...Option) (err err
 	rbc := options.ReadBufferCap
 	switch {
 	case rbc <= 0:
-		options.ReadBufferCap = ringbuffer.MaxStreamBufferCap
+		options.ReadBufferCap = MaxStreamBufferCap
 	case rbc <= ringbuffer.DefaultBufferSize:
 		options.ReadBufferCap = ringbuffer.DefaultBufferSize
 	default:

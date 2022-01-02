@@ -96,7 +96,7 @@ func (el *eventloop) open(c *conn) error {
 	c.opened = true
 	el.addConn(1)
 
-	out, action := el.eventHandler.OnOpened(c)
+	out, action := el.eventHandler.OnOpen(c)
 	if out != nil {
 		if err := c.open(out); err != nil {
 			return err
@@ -122,7 +122,7 @@ func (el *eventloop) read(c *conn) error {
 	}
 
 	c.buffer = el.buffer[:n]
-	action := el.eventHandler.React(c)
+	action := el.eventHandler.OnTraffic(c)
 	switch action {
 	case None:
 	case Close:
@@ -150,8 +150,6 @@ const (
 )
 
 func (el *eventloop) write(c *conn) error {
-	el.eventHandler.PreWrite(c)
-
 	iov := c.outboundBuffer.Peek(MaxBytesToWritePerLoop)
 	var (
 		n   int
@@ -190,7 +188,7 @@ func (el *eventloop) closeConn(c *conn, err error) (rerr error) {
 			rerr = unix.Close(c.fd)
 			delete(el.udpSockets, c.fd)
 		}
-		if el.eventHandler.OnClosed(c, err) == Shutdown {
+		if el.eventHandler.OnClose(c, err) == Shutdown {
 			return gerrors.ErrServerShutdown
 		}
 		c.releaseUDP()
@@ -232,7 +230,7 @@ func (el *eventloop) closeConn(c *conn, err error) (rerr error) {
 
 	delete(el.connections, c.fd)
 	el.addConn(-1)
-	if el.eventHandler.OnClosed(c, err) == Shutdown {
+	if el.eventHandler.OnClose(c, err) == Shutdown {
 		rerr = gerrors.ErrServerShutdown
 	}
 	c.releaseTCP()
@@ -245,7 +243,7 @@ func (el *eventloop) wake(c *conn) error {
 		return nil // ignore stale wakes.
 	}
 
-	action := el.eventHandler.React(c)
+	action := el.eventHandler.OnTraffic(c)
 
 	return el.handleAction(c, action)
 }
@@ -265,12 +263,12 @@ func (el *eventloop) ticker(ctx context.Context) {
 		}
 	}()
 	for {
-		delay, action = el.eventHandler.Tick()
+		delay, action = el.eventHandler.OnTick()
 		switch action {
 		case None:
 		case Shutdown:
 			err := el.poller.UrgentTrigger(func(_ interface{}) error { return gerrors.ErrServerShutdown }, nil)
-			el.getLogger().Debugf("stopping ticker in event-loop(%d) from Tick(), UrgentTrigger:%v", el.idx, err)
+			el.getLogger().Debugf("stopping ticker in event-loop(%d) from OnTick(), UrgentTrigger:%v", el.idx, err)
 		}
 		if timer == nil {
 			timer = time.NewTimer(delay)
@@ -315,7 +313,7 @@ func (el *eventloop) readUDP(fd int, _ netpoll.IOEvent) error {
 		c = el.udpSockets[fd]
 	}
 	c.buffer = el.buffer[:n]
-	action := el.eventHandler.React(c)
+	action := el.eventHandler.OnTraffic(c)
 	if c.peer != nil {
 		c.releaseUDP()
 	}

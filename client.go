@@ -90,7 +90,7 @@ func NewClient(eventHandler EventHandler, opts ...Option) (cli *Client, err erro
 
 // Start starts the client event-loop, handing IO events.
 func (cli *Client) Start() error {
-	cli.el.eventHandler.OnInitComplete(Server{})
+	cli.el.eventHandler.OnBoot(Server{})
 	cli.el.svr.wg.Add(1)
 	go func() {
 		cli.el.run(cli.opts.LockOSThread)

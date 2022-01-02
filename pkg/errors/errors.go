@@ -37,4 +37,8 @@ var (
 	ErrUnsupportedPlatform = errors.New("unsupported platform in gnet")
 	// ErrConnectionClosed occurs when the event-loop receives a closed connection.
 	ErrConnectionClosed = errors.New("connection is closed")
+
+	ErrBufferFull = errors.New("buffer full")
+
+	ErrUnsupportedOp = errors.New("unsupported operation")
 )
