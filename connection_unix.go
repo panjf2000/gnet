@@ -30,11 +30,9 @@ import (
 	"github.com/panjf2000/gnet/v2/internal/netpoll"
 	"github.com/panjf2000/gnet/v2/internal/socket"
 	"github.com/panjf2000/gnet/v2/pkg/buffer/elastic"
-	"github.com/panjf2000/gnet/v2/pkg/buffer/ring"
 	gerrors "github.com/panjf2000/gnet/v2/pkg/errors"
 	bbPool "github.com/panjf2000/gnet/v2/pkg/pool/bytebuffer"
 	bsPool "github.com/panjf2000/gnet/v2/pkg/pool/byteslice"
-	rbPool "github.com/panjf2000/gnet/v2/pkg/pool/ringbuffer"
 )
 
 type conn struct {
@@ -49,19 +47,18 @@ type conn struct {
 	isDatagram     bool                    // UDP protocol
 	localAddr      net.Addr                // local addr
 	remoteAddr     net.Addr                // remote addr
-	inboundBuffer  *ring.Buffer            // buffer for leftover data from the peer
+	inboundBuffer  elastic.RingBuffer      // buffer for leftover data from the peer
 	outboundBuffer *elastic.Buffer         // buffer for data that is eligible to be sent to the peer
 	pollAttachment *netpoll.PollAttachment // connection attachment for poller
 }
 
 func newTCPConn(fd int, el *eventloop, sa unix.Sockaddr, localAddr, remoteAddr net.Addr) (c *conn) {
 	c = &conn{
-		fd:            fd,
-		peer:          sa,
-		loop:          el,
-		localAddr:     localAddr,
-		remoteAddr:    remoteAddr,
-		inboundBuffer: rbPool.Get(),
+		fd:         fd,
+		peer:       sa,
+		loop:       el,
+		localAddr:  localAddr,
+		remoteAddr: remoteAddr,
 	}
 	c.outboundBuffer, _ = elastic.New(MaxStreamBufferCap)
 	c.pollAttachment = netpoll.GetPollAttachment()
@@ -83,8 +80,7 @@ func (c *conn) releaseTCP() {
 	}
 	c.localAddr = nil
 	c.remoteAddr = nil
-	rbPool.Put(c.inboundBuffer)
-	c.inboundBuffer = ring.New(0)
+	c.inboundBuffer.Done()
 	c.outboundBuffer.Release()
 	bbPool.Put(c.cache)
 	c.cache = nil
@@ -94,13 +90,12 @@ func (c *conn) releaseTCP() {
 
 func newUDPConn(fd int, el *eventloop, localAddr net.Addr, sa unix.Sockaddr, connected bool) (c *conn) {
 	c = &conn{
-		fd:            fd,
-		peer:          sa,
-		loop:          el,
-		localAddr:     localAddr,
-		remoteAddr:    socket.SockaddrToUDPAddr(sa),
-		isDatagram:    true,
-		inboundBuffer: ring.New(0),
+		fd:         fd,
+		peer:       sa,
+		loop:       el,
+		localAddr:  localAddr,
+		remoteAddr: socket.SockaddrToUDPAddr(sa),
+		isDatagram: true,
 	}
 	if connected {
 		c.peer = nil
