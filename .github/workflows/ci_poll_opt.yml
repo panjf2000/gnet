@@ -5,6 +5,7 @@ on:
     branches:
       - master
       - dev
+      - v2
     paths-ignore:
       - '**.md'
   pull_request:
@@ -24,7 +25,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: [1.15.x, 1.16.x]
+        go: [1.16.x, 1.17.x]
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os}}
     steps:
