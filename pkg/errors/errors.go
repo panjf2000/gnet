@@ -41,4 +41,6 @@ var (
 	ErrBufferFull = errors.New("buffer full")
 	// ErrUnsupportedOp occurs when calling some methods that has not been implemented yet.
 	ErrUnsupportedOp = errors.New("unsupported operation")
+	// ErrNegativeSize occurs when trying to pass a negative size to a buffer.
+	ErrNegativeSize = errors.New("negative size is invalid")
 )

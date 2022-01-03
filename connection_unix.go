@@ -56,14 +56,14 @@ type conn struct {
 
 func newTCPConn(fd int, el *eventloop, sa unix.Sockaddr, localAddr, remoteAddr net.Addr) (c *conn) {
 	c = &conn{
-		fd:             fd,
-		peer:           sa,
-		loop:           el,
-		localAddr:      localAddr,
-		remoteAddr:     remoteAddr,
-		inboundBuffer:  rbPool.Get(),
-		outboundBuffer: mixedbuffer.New(MaxStreamBufferCap),
+		fd:            fd,
+		peer:          sa,
+		loop:          el,
+		localAddr:     localAddr,
+		remoteAddr:    remoteAddr,
+		inboundBuffer: rbPool.Get(),
 	}
+	c.outboundBuffer, _ = mixedbuffer.New(MaxStreamBufferCap)
 	c.pollAttachment = netpoll.GetPollAttachment()
 	c.pollAttachment.FD, c.pollAttachment.Callback = fd, c.handleEvents
 	return
@@ -321,11 +321,10 @@ func (c *conn) Discard(n int) (int, error) {
 	bbPool.Put(c.cache)
 	c.cache = nil
 
-	if inBufferLen >= n {
-		c.inboundBuffer.Discard(n)
-		return n, nil
+	discarded, _ := c.inboundBuffer.Discard(n)
+	if discarded < inBufferLen {
+		return discarded, nil
 	}
-	c.inboundBuffer.Reset()
 
 	remaining := n - inBufferLen
 	c.buffer = c.buffer[remaining:]

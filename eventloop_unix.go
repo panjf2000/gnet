@@ -163,7 +163,7 @@ func (el *eventloop) write(c *conn) error {
 	} else {
 		n, err = unix.Write(c.fd, iov[0])
 	}
-	c.outboundBuffer.Discard(n)
+	_, _ = c.outboundBuffer.Discard(n)
 	switch err {
 	case nil:
 	case unix.EAGAIN:
@@ -211,7 +211,7 @@ func (el *eventloop) closeConn(c *conn, err error) (rerr error) {
 				el.getLogger().Warnf("closeConn: error occurs when sending data back to peer, %v", err)
 				break
 			}
-			c.outboundBuffer.Discard(n)
+			_, _ = c.outboundBuffer.Discard(n)
 		}
 	}
 

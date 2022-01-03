@@ -184,7 +184,7 @@ func (llb *LinkedListBuffer) PeekBytesListWithBytes(maxBytes int, bs ...[]byte) 
 }
 
 // Discard removes some nodes based on n bytes.
-func (llb *LinkedListBuffer) Discard(n int) {
+func (llb *LinkedListBuffer) Discard(n int) (discarded int, err error) {
 	if n <= 0 {
 		return
 	}
@@ -195,13 +195,18 @@ func (llb *LinkedListBuffer) Discard(n int) {
 		}
 		if n < b.Len() {
 			b.Buf.B = b.Buf.B[n:]
+			discarded += n
 			llb.PushFront(b)
 			break
 		}
 		n -= b.Len()
+		discarded += b.Len()
 		bbPool.Put(b.Buf)
 	}
+	return
 }
+
+const minRead = 512
 
 // ReadFrom implements io.ReaderFrom.
 func (llb *LinkedListBuffer) ReadFrom(r io.Reader) (n int64, err error) {
@@ -209,19 +214,24 @@ func (llb *LinkedListBuffer) ReadFrom(r io.Reader) (n int64, err error) {
 	for {
 		bb := bbPool.Get()
 		bb.B = bb.B[:cap(bb.B)]
+		if len(bb.B) == 0 {
+			bb.B = make([]byte, minRead)
+		}
 		m, err = r.Read(bb.B)
 		if m < 0 {
 			panic("LinkedListBuffer.ReadFrom: reader returned negative count from Read")
 		}
 		n += int64(m)
 		bb.B = bb.B[:m]
-		llb.PushBack(&ByteBuffer{Buf: bb})
 		if err == io.EOF {
+			bbPool.Put(bb)
 			return n, nil
 		}
 		if err != nil {
+			bbPool.Put(bb)
 			return
 		}
+		llb.PushBack(&ByteBuffer{Buf: bb})
 	}
 }
 

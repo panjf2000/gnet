@@ -17,6 +17,7 @@ package mixedbuffer
 import (
 	"io"
 
+	gerrors "github.com/panjf2000/gnet/v2/pkg/errors"
 	"github.com/panjf2000/gnet/v2/pkg/listbuffer"
 	rbPool "github.com/panjf2000/gnet/v2/pkg/pool/ringbuffer"
 	"github.com/panjf2000/gnet/v2/pkg/ringbuffer"
@@ -33,8 +34,11 @@ type Buffer struct {
 }
 
 // New instantiates a mixedbuffer.Buffer and returns it.
-func New(maxStaticBytes int) *Buffer {
-	return &Buffer{maxStaticBytes: maxStaticBytes, ringBuffer: rbPool.Get()}
+func New(maxStaticBytes int) (*Buffer, error) {
+	if maxStaticBytes <= 0 {
+		return nil, gerrors.ErrNegativeSize
+	}
+	return &Buffer{maxStaticBytes: maxStaticBytes, ringBuffer: rbPool.Get()}, nil
 }
 
 // Read reads data from the LinkedListBuffer.
@@ -43,6 +47,10 @@ func (mb *Buffer) Read(p []byte) (n int, err error) {
 		return mb.listBuffer.Read(p)
 	}
 	n, err = mb.ringBuffer.Read(p)
+	if mb.ringBuffer.IsEmpty() {
+		rbPool.Put(mb.ringBuffer)
+		mb.ringBuffer = nil
+	}
 	if n == len(p) {
 		return n, err
 	}
@@ -63,14 +71,13 @@ func (mb *Buffer) Peek(n int) [][]byte {
 }
 
 // Discard discards n bytes in this buffer.
-func (mb *Buffer) Discard(n int) {
+func (mb *Buffer) Discard(n int) (discarded int, err error) {
 	if mb.ringBuffer == nil {
-		mb.listBuffer.Discard(n)
-		return
+		return mb.listBuffer.Discard(n)
 	}
 
 	rbLen := mb.ringBuffer.Buffered()
-	mb.ringBuffer.Discard(n)
+	discarded, err = mb.ringBuffer.Discard(n)
 	if n <= rbLen {
 		if n == rbLen {
 			rbPool.Put(mb.ringBuffer)
@@ -81,7 +88,10 @@ func (mb *Buffer) Discard(n int) {
 	rbPool.Put(mb.ringBuffer)
 	mb.ringBuffer = nil
 	n -= rbLen
-	mb.listBuffer.Discard(n)
+	var m int
+	m, err = mb.listBuffer.Discard(n)
+	discarded += m
+	return
 }
 
 // Write appends data to this buffer.
@@ -95,10 +105,10 @@ func (mb *Buffer) Write(p []byte) (n int, err error) {
 		return len(p), nil
 	}
 	if mb.ringBuffer.Len() >= mb.maxStaticBytes {
-		freeSize := mb.ringBuffer.Available()
-		if n = len(p); n > freeSize {
-			_, _ = mb.ringBuffer.Write(p[:freeSize])
-			mb.listBuffer.PushBytesBack(p[freeSize:])
+		writable := mb.ringBuffer.Available()
+		if n = len(p); n > writable {
+			_, _ = mb.ringBuffer.Write(p[:writable])
+			mb.listBuffer.PushBytesBack(p[writable:])
 			return
 		}
 	}
@@ -121,20 +131,20 @@ func (mb *Buffer) Writev(bs [][]byte) (int, error) {
 	}
 
 	var pos, cum int
-	writableSize := mb.ringBuffer.Available()
+	writable := mb.ringBuffer.Available()
 	if mb.ringBuffer.Len() < mb.maxStaticBytes {
-		writableSize = mb.maxStaticBytes - mb.ringBuffer.Buffered()
+		writable = mb.maxStaticBytes - mb.ringBuffer.Buffered()
 	}
 	for i, b := range bs {
 		pos = i
 		cum += len(b)
-		if len(b) > writableSize {
-			_, _ = mb.ringBuffer.Write(b[:writableSize])
-			mb.listBuffer.PushBytesBack(b[writableSize:])
+		if len(b) > writable {
+			_, _ = mb.ringBuffer.Write(b[:writable])
+			mb.listBuffer.PushBytesBack(b[writable:])
 			break
 		}
 		n, _ := mb.ringBuffer.Write(b)
-		writableSize -= n
+		writable -= n
 	}
 	for pos++; pos < len(bs); pos++ {
 		cum += len(bs[pos])
@@ -155,11 +165,22 @@ func (mb *Buffer) ReadFrom(r io.Reader) (int64, error) {
 }
 
 // WriteTo implements io.WriterTo.
-func (mb *Buffer) WriteTo(w io.Writer) (int64, error) {
+func (mb *Buffer) WriteTo(w io.Writer) (n int64, err error) {
 	if mb.ringBuffer == nil {
 		return mb.listBuffer.WriteTo(w)
 	}
-	return mb.ringBuffer.WriteTo(w)
+	n, err = mb.ringBuffer.WriteTo(w)
+	if mb.ringBuffer.IsEmpty() {
+		rbPool.Put(mb.ringBuffer)
+		mb.ringBuffer = nil
+	}
+	if err != nil {
+		return
+	}
+	var m int64
+	m, err = mb.listBuffer.WriteTo(w)
+	n += m
+	return
 }
 
 // Buffered returns the number of bytes that can be read from the current buffer.
@@ -177,6 +198,18 @@ func (mb *Buffer) IsEmpty() bool {
 	}
 
 	return mb.ringBuffer.IsEmpty() && mb.listBuffer.IsEmpty()
+}
+
+// Reset resets the buffer.
+func (mb *Buffer) Reset(maxStaticBytes int) {
+	if mb.ringBuffer != nil {
+		mb.ringBuffer.Reset()
+	}
+	mb.listBuffer.Reset()
+
+	if maxStaticBytes > 0 {
+		mb.maxStaticBytes = maxStaticBytes
+	}
 }
 
 // Release frees all resource of this buffer.

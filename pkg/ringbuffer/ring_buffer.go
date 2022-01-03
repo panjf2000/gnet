@@ -123,16 +123,18 @@ func (rb *RingBuffer) peekAll() (head []byte, tail []byte) {
 }
 
 // Discard skips the next n bytes by advancing the read pointer.
-func (rb *RingBuffer) Discard(n int) {
+func (rb *RingBuffer) Discard(n int) (discarded int, err error) {
 	if n <= 0 {
-		return
+		return 0, nil
 	}
 
-	if n < rb.Buffered() {
+	discarded = rb.Buffered()
+	if n < discarded {
 		rb.r = (rb.r + n) % rb.size
-	} else {
-		rb.Reset()
+		return n, nil
 	}
+	rb.Reset()
+	return
 }
 
 // Read reads up to len(p) bytes into p. It returns the number of bytes read (0 <= n <= len(p)) and any error

@@ -20,11 +20,13 @@
 package ringbuffer
 
 import (
+	"bytes"
 	"math/rand"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRingBuffer_Write(t *testing.T) {
@@ -131,7 +133,7 @@ func TestZeroRingBuffer(t *testing.T) {
 	assert.EqualValuesf(t, DefaultBufferSize, rb.Cap(), "expect rb.Cap()=%d, but got rb.Cap()=%d", DefaultBufferSize, rb.Cap())
 	assert.Truef(t, rb.r == 0 && rb.w == 48 && rb.size == DefaultBufferSize, "expect rb.r=0, rb.w=48, rb.size=64, rb.mask=63, but got rb.r=%d, rb.w=%d, rb.size=%d", rb.r, rb.w, rb.size)
 	assert.EqualValues(t, buf, rb.ByteBuffer().Bytes(), "expect it is equal")
-	rb.Discard(48)
+	_, _ = rb.Discard(48)
 	assert.Truef(t, rb.IsEmpty() && rb.r == 0 && rb.w == 0, "expect rb is empty and rb.r=rb.w=0, but got rb.r=%d and rb.w=%d", rb.r, rb.w)
 }
 
@@ -241,7 +243,7 @@ func TestRingBuffer_Read(t *testing.T) {
 	assert.Truef(t, len(head) == 64 && tail == nil, "expect len(head)=64 and tail=nil, yet len(head)=%d and tail != nil", len(head))
 	assert.EqualValuesf(t, 0, rb.r, "expect r.r=0 but got %d", rb.r)
 	assert.EqualValues(t, []byte(strings.Repeat("1234", 16)), head)
-	rb.Discard(64)
+	_, _ = rb.Discard(64)
 	assert.EqualValuesf(t, 64, rb.r, "expect r.r=64 but got %d", rb.r)
 	_, _ = rb.Write([]byte(strings.Repeat("1234", 4)))
 	assert.EqualValuesf(t, 16, rb.w, "expect r.w=16 but got %d", rb.w)
@@ -255,8 +257,8 @@ func TestRingBuffer_Read(t *testing.T) {
 	assert.EqualValues(t, []byte(strings.Repeat("1234", 16)), head)
 	assert.EqualValues(t, []byte(strings.Repeat("1234", 4)), tail)
 
-	rb.Discard(64)
-	rb.Discard(16)
+	_, _ = rb.Discard(64)
+	_, _ = rb.Discard(16)
 	assert.True(t, rb.IsEmpty(), "should be empty")
 }
 
@@ -317,4 +319,130 @@ func TestRingBuffer_ByteInterface(t *testing.T) {
 	// check empty or full
 	assert.True(t, rb.IsEmpty(), "expect IsEmpty is true but got false")
 	assert.False(t, rb.IsFull(), "expect IsFull is false but got true")
+}
+
+func TestRingBuffer_ReadFrom(t *testing.T) {
+	rb := New(0)
+	const dataLen = 4 * 1024
+	data := make([]byte, dataLen)
+	rand.Read(data)
+	r := bytes.NewReader(data)
+	n, err := rb.ReadFrom(r)
+	require.NoError(t, err)
+	require.False(t, rb.IsEmpty())
+	require.EqualValuesf(t, dataLen, n, "ringbuffer should read %d bytes, but got %d", dataLen, n)
+	require.EqualValuesf(t, dataLen, rb.Buffered(), "ringbuffer should have %d bytes, but got %d", dataLen, rb.Buffered())
+	buf, _ := rb.Peek(-1)
+	require.EqualValues(t, data, buf)
+	buf = make([]byte, dataLen)
+	var m int
+	m, err = rb.Read(buf)
+	require.NoError(t, err)
+	require.EqualValuesf(t, dataLen, m, "ringbuffer should read %d bytes, but got %d", dataLen, m)
+	require.EqualValues(t, data, buf)
+	require.Truef(t, rb.IsEmpty(), "ringbuffer should be empty, but it isn't")
+	require.Zerof(t, rb.Buffered(), "ringbuffer should be empty, but still have %d bytes", rb.Buffered())
+
+	rb = New(0)
+	const prefixLen = 2 * 1024
+	prefix := make([]byte, prefixLen)
+	rand.Read(prefix)
+	rand.Read(data)
+	r.Reset(data)
+	m, err = rb.Write(prefix)
+	require.NoError(t, err)
+	require.EqualValuesf(t, prefixLen, m, "ringbuffer should read %d bytes, but got %d", prefixLen, m)
+	n, err = rb.ReadFrom(r)
+	require.NoError(t, err)
+	require.EqualValuesf(t, dataLen, n, "ringbuffer should read %d bytes, but got %d", dataLen, n)
+	require.EqualValuesf(t, prefixLen+dataLen, rb.Buffered(), "ringbuffer should have %d bytes, but got %d",
+		prefixLen+dataLen, rb.Buffered())
+	head, tail := rb.Peek(prefixLen)
+	require.Nil(t, tail)
+	require.EqualValues(t, prefix, head)
+	_, _ = rb.Discard(prefixLen)
+	require.EqualValuesf(t, dataLen, rb.Buffered(), "ringbuffer should have %d bytes, but got %d", dataLen, rb.Buffered())
+	head, tail = rb.Peek(-1)
+	require.Nil(t, tail)
+	require.EqualValues(t, data, head)
+	_, _ = rb.Discard(dataLen)
+	require.Truef(t, rb.IsEmpty(), "ringbuffer should be empty, but it isn't")
+	require.Zerof(t, rb.Buffered(), "ringbuffer should be empty, but still have %d bytes", rb.Buffered())
+
+	const initLen = 5 * 1024
+	rb = New(initLen)
+	rand.Read(prefix)
+	rand.Read(data)
+	r.Reset(data)
+	m, err = rb.Write(prefix)
+	require.NoError(t, err)
+	require.EqualValuesf(t, prefixLen, m, "ringbuffer should read %d bytes, but got %d", prefixLen, m)
+	const partLen = 1024
+	head, tail = rb.Peek(partLen)
+	require.Nil(t, tail)
+	require.EqualValues(t, prefix[:partLen], head)
+	_, _ = rb.Discard(partLen)
+	n, err = rb.ReadFrom(r)
+	require.NoError(t, err)
+	require.EqualValuesf(t, dataLen, n, "ringbuffer should read %d bytes, but got %d", dataLen, n)
+	head, tail = rb.Peek(-1)
+	buf = append(head, tail...)
+	require.EqualValues(t, append(prefix[partLen:], data...), buf)
+	_, _ = rb.Discard(prefixLen + dataLen - partLen)
+	require.Truef(t, rb.IsEmpty(), "ringbuffer should be empty, but it isn't")
+	require.Zerof(t, rb.Buffered(), "ringbuffer should be empty, but still have %d bytes", rb.Buffered())
+}
+
+func TestRingBuffer_WriteTo(t *testing.T) {
+	rb := New(5 * 1024)
+	const dataLen = 4 * 1024
+	data := make([]byte, dataLen)
+	rand.Read(data)
+	n, err := rb.Write(data)
+	require.NoError(t, err)
+	require.EqualValuesf(t, dataLen, n, "ringbuffer should write %d bytes, but got %d", dataLen, n)
+	buf := bytes.NewBuffer(nil)
+	var m int64
+	m, err = rb.WriteTo(buf)
+	require.NoError(t, err)
+	require.True(t, rb.IsEmpty())
+	require.EqualValuesf(t, dataLen, m, "ringbuffer should write %d bytes, but got %d", dataLen, m)
+	require.EqualValues(t, data, buf.Bytes())
+
+	buf.Reset()
+	rand.Read(data)
+	rb = New(dataLen)
+	n, err = rb.Write(data)
+	require.NoError(t, err)
+	require.EqualValuesf(t, dataLen, n, "ringbuffer should write %d bytes, but got %d", dataLen, n)
+	require.Truef(t, rb.IsFull(), "ringbuffer should be full, but it isn't")
+	m, err = rb.WriteTo(buf)
+	require.NoError(t, err)
+	require.True(t, rb.IsEmpty())
+	require.EqualValuesf(t, dataLen, m, "ringbuffer should write %d bytes, but got %d", dataLen, m)
+	require.EqualValues(t, data, buf.Bytes())
+
+	buf.Reset()
+	rb.Reset()
+	rand.Read(data)
+	n, err = rb.Write(data)
+	require.NoError(t, err)
+	require.EqualValuesf(t, dataLen, n, "ringbuffer should write %d bytes, but got %d", dataLen, n)
+	require.Truef(t, rb.IsFull(), "ringbuffer should be full, but it isn't")
+	const partLen = 1024
+	head, tail := rb.Peek(partLen)
+	require.Nil(t, tail)
+	require.EqualValues(t, data[:partLen], head)
+	_, _ = rb.Discard(partLen)
+	partData := make([]byte, partLen/2)
+	rand.Read(partData)
+	n, err = rb.Write(partData)
+	require.NoError(t, err)
+	require.EqualValuesf(t, partLen/2, n, "ringbuffer should write %d bytes, but got %d", dataLen, n)
+	require.EqualValues(t, partLen/2, rb.Available())
+	m, err = rb.WriteTo(buf)
+	require.NoError(t, err)
+	require.EqualValuesf(t, dataLen-partLen/2, m, "ringbuffer should write %d bytes, but got %d", dataLen-partLen/2, m)
+	require.EqualValues(t, append(data[partLen:], partData...), buf.Bytes())
+	require.True(t, rb.IsEmpty())
 }
