@@ -19,6 +19,7 @@ import (
 	"math/rand"
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -28,6 +29,7 @@ func TestMixedBuffer_Basic(t *testing.T) {
 	mb, _ := New(maxStaticSize)
 	const dataLen = 5 * 1024
 	data := make([]byte, dataLen)
+	rand.Seed(time.Now().Unix())
 	rand.Read(data)
 	n, err := mb.Write(data)
 	require.NoError(t, err)
@@ -115,6 +117,7 @@ func TestMixedBuffer_ReadFrom(t *testing.T) {
 	mb, _ := New(maxStaticSize)
 	const dataLen = 2 * 1024
 	data := make([]byte, dataLen)
+	rand.Seed(time.Now().Unix())
 	rand.Read(data)
 	r := bytes.NewReader(data)
 	n, err := mb.ReadFrom(r)
@@ -161,6 +164,7 @@ func TestMixedBuffer_WriteTo(t *testing.T) {
 		buf     bytes.Buffer
 	)
 
+	rand.Seed(time.Now().Unix())
 	for i := 0; i < maxBlocks; i++ {
 		n := rand.Intn(512) + 128
 		cum += n

@@ -24,6 +24,7 @@ import (
 	"math/rand"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -325,6 +326,7 @@ func TestRingBuffer_ReadFrom(t *testing.T) {
 	rb := New(0)
 	const dataLen = 4 * 1024
 	data := make([]byte, dataLen)
+	rand.Seed(time.Now().Unix())
 	rand.Read(data)
 	r := bytes.NewReader(data)
 	n, err := rb.ReadFrom(r)
@@ -397,6 +399,7 @@ func TestRingBuffer_WriteTo(t *testing.T) {
 	rb := New(5 * 1024)
 	const dataLen = 4 * 1024
 	data := make([]byte, dataLen)
+	rand.Seed(time.Now().Unix())
 	rand.Read(data)
 	n, err := rb.Write(data)
 	require.NoError(t, err)

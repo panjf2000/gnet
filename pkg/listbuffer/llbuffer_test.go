@@ -30,7 +30,7 @@ func TestLinkedListBuffer_Basic(t *testing.T) {
 		cum int
 		buf bytes.Buffer
 	)
-	rand.Seed(time.Now().UnixMilli())
+	rand.Seed(time.Now().Unix())
 	for i := 0; i < maxBlocks; i++ {
 		n := rand.Intn(1024) + 128
 		cum += n
@@ -81,6 +81,7 @@ func TestLinkedListBuffer_ReadFrom(t *testing.T) {
 	var llb LinkedListBuffer
 	const dataLen = 4 * 1024
 	data := make([]byte, dataLen)
+	rand.Seed(time.Now().Unix())
 	rand.Read(data)
 	r := bytes.NewReader(data)
 	n, err := llb.ReadFrom(r)
@@ -115,7 +116,7 @@ func TestLinkedListBuffer_WriteTo(t *testing.T) {
 		cum int
 		buf bytes.Buffer
 	)
-	rand.Seed(time.Now().UnixMilli())
+	rand.Seed(time.Now().Unix())
 	for i := 0; i < maxBlocks; i++ {
 		n := rand.Intn(1024) + 128
 		cum += n
@@ -137,7 +138,6 @@ func TestLinkedListBuffer_WriteTo(t *testing.T) {
 	buf.Reset()
 	newBuf.Reset()
 	cum = 0
-	rand.Seed(time.Now().UnixMilli())
 	for i := 0; i < maxBlocks; i++ {
 		n := rand.Intn(1024) + 128
 		cum += n
