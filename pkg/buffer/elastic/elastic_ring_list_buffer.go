@@ -33,7 +33,7 @@ type Buffer struct {
 	listBuffer     linkedlist.Buffer
 }
 
-// New instantiates a elastic.Buffer and returns it.
+// New instantiates an elastic.Buffer and returns it.
 func New(maxStaticBytes int) (*Buffer, error) {
 	if maxStaticBytes <= 0 {
 		return nil, gerrors.ErrNegativeSize
