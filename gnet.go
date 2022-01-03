@@ -24,9 +24,9 @@ import (
 	"time"
 
 	"github.com/panjf2000/gnet/v2/internal/toolkit"
+	"github.com/panjf2000/gnet/v2/pkg/buffer/ring"
 	"github.com/panjf2000/gnet/v2/pkg/errors"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
-	"github.com/panjf2000/gnet/v2/pkg/ringbuffer"
 )
 
 // Action is an action that occurs after the completion of an event.
@@ -305,8 +305,8 @@ func Run(eventHandler EventHandler, protoAddr string, opts ...Option) (err error
 	switch {
 	case rbc <= 0:
 		options.ReadBufferCap = MaxStreamBufferCap
-	case rbc <= ringbuffer.DefaultBufferSize:
-		options.ReadBufferCap = ringbuffer.DefaultBufferSize
+	case rbc <= ring.DefaultBufferSize:
+		options.ReadBufferCap = ring.DefaultBufferSize
 	default:
 		options.ReadBufferCap = toolkit.CeilToPowerOfTwo(rbc)
 	}

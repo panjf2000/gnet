@@ -17,7 +17,7 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 
-package ringbuffer
+package ring
 
 import (
 	"errors"
@@ -42,8 +42,8 @@ const (
 // ErrIsEmpty will be returned when trying to read an empty ring-buffer.
 var ErrIsEmpty = errors.New("ring-buffer is empty")
 
-// RingBuffer is a circular buffer that implement io.ReaderWriter interface.
-type RingBuffer struct {
+// Buffer is a circular buffer that implement io.ReaderWriter interface.
+type Buffer struct {
 	bs      [][]byte
 	buf     []byte
 	size    int
@@ -52,13 +52,13 @@ type RingBuffer struct {
 	isEmpty bool
 }
 
-// New returns a new RingBuffer whose buffer has the given size.
-func New(size int) *RingBuffer {
+// New returns a new Buffer whose buffer has the given size.
+func New(size int) *Buffer {
 	if size == 0 {
-		return &RingBuffer{bs: make([][]byte, 2), isEmpty: true}
+		return &Buffer{bs: make([][]byte, 2), isEmpty: true}
 	}
 	size = toolkit.CeilToPowerOfTwo(size)
-	return &RingBuffer{
+	return &Buffer{
 		bs:      make([][]byte, 2),
 		buf:     make([]byte, size),
 		size:    size,
@@ -68,7 +68,7 @@ func New(size int) *RingBuffer {
 
 // Peek returns the next n bytes without advancing the read pointer,
 // it returns all bytes when n <= 0.
-func (rb *RingBuffer) Peek(n int) (head []byte, tail []byte) {
+func (rb *Buffer) Peek(n int) (head []byte, tail []byte) {
 	if rb.isEmpty {
 		return
 	}
@@ -104,7 +104,7 @@ func (rb *RingBuffer) Peek(n int) (head []byte, tail []byte) {
 }
 
 // peekAll returns all bytes without advancing the read pointer.
-func (rb *RingBuffer) peekAll() (head []byte, tail []byte) {
+func (rb *Buffer) peekAll() (head []byte, tail []byte) {
 	if rb.isEmpty {
 		return
 	}
@@ -123,7 +123,7 @@ func (rb *RingBuffer) peekAll() (head []byte, tail []byte) {
 }
 
 // Discard skips the next n bytes by advancing the read pointer.
-func (rb *RingBuffer) Discard(n int) (discarded int, err error) {
+func (rb *Buffer) Discard(n int) (discarded int, err error) {
 	if n <= 0 {
 		return 0, nil
 	}
@@ -148,7 +148,7 @@ func (rb *RingBuffer) Discard(n int) (discarded int, err error) {
 // Callers should always process the n > 0 bytes returned before considering the error err.
 // Doing so correctly handles I/O errors that happen after reading some bytes and also both of the allowed EOF
 // behaviors.
-func (rb *RingBuffer) Read(p []byte) (n int, err error) {
+func (rb *Buffer) Read(p []byte) (n int, err error) {
 	if len(p) == 0 {
 		return 0, nil
 	}
@@ -192,7 +192,7 @@ func (rb *RingBuffer) Read(p []byte) (n int, err error) {
 }
 
 // ReadByte reads and returns the next byte from the input or ErrIsEmpty.
-func (rb *RingBuffer) ReadByte() (b byte, err error) {
+func (rb *Buffer) ReadByte() (b byte, err error) {
 	if rb.isEmpty {
 		return 0, ErrIsEmpty
 	}
@@ -214,7 +214,7 @@ func (rb *RingBuffer) ReadByte() (b byte, err error) {
 // If the length of p is greater than the writable capacity of this ring-buffer, it will allocate more memory to
 // this ring-buffer.
 // Write must not modify the slice data, even temporarily.
-func (rb *RingBuffer) Write(p []byte) (n int, err error) {
+func (rb *Buffer) Write(p []byte) (n int, err error) {
 	n = len(p)
 	if n == 0 {
 		return
@@ -251,7 +251,7 @@ func (rb *RingBuffer) Write(p []byte) (n int, err error) {
 }
 
 // WriteByte writes one byte into buffer.
-func (rb *RingBuffer) WriteByte(c byte) error {
+func (rb *Buffer) WriteByte(c byte) error {
 	if rb.Available() < 1 {
 		rb.grow(1)
 	}
@@ -267,7 +267,7 @@ func (rb *RingBuffer) WriteByte(c byte) error {
 }
 
 // Buffered returns the length of available bytes to read.
-func (rb *RingBuffer) Buffered() int {
+func (rb *Buffer) Buffered() int {
 	if rb.r == rb.w {
 		if rb.isEmpty {
 			return 0
@@ -283,17 +283,17 @@ func (rb *RingBuffer) Buffered() int {
 }
 
 // Len returns the length of the underlying buffer.
-func (rb *RingBuffer) Len() int {
+func (rb *Buffer) Len() int {
 	return len(rb.buf)
 }
 
 // Cap returns the size of the underlying buffer.
-func (rb *RingBuffer) Cap() int {
+func (rb *Buffer) Cap() int {
 	return rb.size
 }
 
 // Available returns the length of available bytes to write.
-func (rb *RingBuffer) Available() int {
+func (rb *Buffer) Available() int {
 	if rb.r == rb.w {
 		if rb.isEmpty {
 			return rb.size
@@ -309,12 +309,12 @@ func (rb *RingBuffer) Available() int {
 }
 
 // WriteString writes the contents of the string s to buffer, which accepts a slice of bytes.
-func (rb *RingBuffer) WriteString(s string) (int, error) {
+func (rb *Buffer) WriteString(s string) (int, error) {
 	return rb.Write(toolkit.StringToBytes(s))
 }
 
 // ByteBuffer returns all available read bytes. It does not move the read pointer and only copy the available data.
-func (rb *RingBuffer) ByteBuffer() *bbPool.ByteBuffer {
+func (rb *Buffer) ByteBuffer() *bbPool.ByteBuffer {
 	if rb.isEmpty {
 		return nil
 	} else if rb.w == rb.r {
@@ -341,7 +341,7 @@ func (rb *RingBuffer) ByteBuffer() *bbPool.ByteBuffer {
 
 // WithByteBuffer combines the available read bytes and the given bytes. It does not move the read pointer and
 // only copy the available data.
-func (rb *RingBuffer) WithByteBuffer(b []byte) *bbPool.ByteBuffer {
+func (rb *Buffer) WithByteBuffer(b []byte) *bbPool.ByteBuffer {
 	if rb.isEmpty {
 		return &bbPool.ByteBuffer{B: b}
 	} else if rb.w == rb.r {
@@ -370,7 +370,7 @@ func (rb *RingBuffer) WithByteBuffer(b []byte) *bbPool.ByteBuffer {
 }
 
 // ReadFrom implements io.ReaderFrom.
-func (rb *RingBuffer) ReadFrom(r io.Reader) (n int64, err error) {
+func (rb *Buffer) ReadFrom(r io.Reader) (n int64, err error) {
 	var m int
 	for {
 		if rb.Available() < MinRead {
@@ -422,7 +422,7 @@ func (rb *RingBuffer) ReadFrom(r io.Reader) (n int64, err error) {
 }
 
 // WriteTo implements io.WriterTo.
-func (rb *RingBuffer) WriteTo(w io.Writer) (int64, error) {
+func (rb *Buffer) WriteTo(w io.Writer) (int64, error) {
 	if rb.isEmpty {
 		return 0, ErrIsEmpty
 	}
@@ -499,22 +499,22 @@ func (rb *RingBuffer) WriteTo(w io.Writer) (int64, error) {
 }
 
 // IsFull tells if this ring-buffer is full.
-func (rb *RingBuffer) IsFull() bool {
+func (rb *Buffer) IsFull() bool {
 	return rb.r == rb.w && !rb.isEmpty
 }
 
 // IsEmpty tells if this ring-buffer is empty.
-func (rb *RingBuffer) IsEmpty() bool {
+func (rb *Buffer) IsEmpty() bool {
 	return rb.isEmpty
 }
 
 // Reset the read pointer and write pointer to zero.
-func (rb *RingBuffer) Reset() {
+func (rb *Buffer) Reset() {
 	rb.isEmpty = true
 	rb.r, rb.w = 0, 0
 }
 
-func (rb *RingBuffer) grow(newCap int) {
+func (rb *Buffer) grow(newCap int) {
 	if n := rb.size; n == 0 {
 		if newCap <= DefaultBufferSize {
 			newCap = DefaultBufferSize

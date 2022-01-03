@@ -15,7 +15,7 @@
 //go:build linux || freebsd || dragonfly || darwin
 // +build linux freebsd dragonfly darwin
 
-package ringbuffer
+package ring
 
 import (
 	"golang.org/x/sys/unix"
@@ -26,7 +26,7 @@ import (
 // ========================= gnet specific APIs =========================
 
 // CopyFromSocket copies data from a socket fd into ring-buffer.
-func (rb *RingBuffer) CopyFromSocket(fd int) (n int, err error) {
+func (rb *Buffer) CopyFromSocket(fd int) (n int, err error) {
 	if rb.r == rb.w {
 		if !rb.isEmpty {
 			rb.grow(rb.size + rb.size/2)
@@ -61,7 +61,7 @@ func (rb *RingBuffer) CopyFromSocket(fd int) (n int, err error) {
 }
 
 // Rewind moves the data from its tail to head and rewind its pointers of read and write.
-func (rb *RingBuffer) Rewind() (n int) {
+func (rb *Buffer) Rewind() (n int) {
 	if rb.IsEmpty() {
 		rb.Reset()
 		return

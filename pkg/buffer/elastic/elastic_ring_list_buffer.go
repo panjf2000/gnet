@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package mixedbuffer
+package elastic
 
 import (
 	"io"
 
+	"github.com/panjf2000/gnet/v2/pkg/buffer/linkedlist"
+	"github.com/panjf2000/gnet/v2/pkg/buffer/ring"
 	gerrors "github.com/panjf2000/gnet/v2/pkg/errors"
-	"github.com/panjf2000/gnet/v2/pkg/listbuffer"
 	rbPool "github.com/panjf2000/gnet/v2/pkg/pool/ringbuffer"
-	"github.com/panjf2000/gnet/v2/pkg/ringbuffer"
 )
 
 // Buffer combines ring-buffer and list-buffer.
@@ -29,11 +29,11 @@ import (
 // flexible and scalable, which helps the application reduce memory footprint.
 type Buffer struct {
 	maxStaticBytes int
-	ringBuffer     *ringbuffer.RingBuffer
-	listBuffer     listbuffer.LinkedListBuffer
+	ringBuffer     *ring.Buffer
+	listBuffer     linkedlist.Buffer
 }
 
-// New instantiates a mixedbuffer.Buffer and returns it.
+// New instantiates a elastic.Buffer and returns it.
 func New(maxStaticBytes int) (*Buffer, error) {
 	if maxStaticBytes <= 0 {
 		return nil, gerrors.ErrNegativeSize
@@ -41,7 +41,7 @@ func New(maxStaticBytes int) (*Buffer, error) {
 	return &Buffer{maxStaticBytes: maxStaticBytes, ringBuffer: rbPool.Get()}, nil
 }
 
-// Read reads data from the LinkedListBuffer.
+// Read reads data from the Buffer.
 func (mb *Buffer) Read(p []byte) (n int, err error) {
 	if mb.ringBuffer == nil {
 		return mb.listBuffer.Read(p)

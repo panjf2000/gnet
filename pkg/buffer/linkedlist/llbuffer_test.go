@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package listbuffer
+package linkedlist
 
 import (
 	"bytes"
@@ -26,7 +26,7 @@ import (
 func TestLinkedListBuffer_Basic(t *testing.T) {
 	const maxBlocks = 100
 	var (
-		llb LinkedListBuffer
+		llb Buffer
 		cum int
 		buf bytes.Buffer
 	)
@@ -78,7 +78,7 @@ func TestLinkedListBuffer_Basic(t *testing.T) {
 }
 
 func TestLinkedListBuffer_ReadFrom(t *testing.T) {
-	var llb LinkedListBuffer
+	var llb Buffer
 	const dataLen = 4 * 1024
 	data := make([]byte, dataLen)
 	rand.Seed(time.Now().Unix())
@@ -112,7 +112,7 @@ func TestLinkedListBuffer_ReadFrom(t *testing.T) {
 func TestLinkedListBuffer_WriteTo(t *testing.T) {
 	const maxBlocks = 20
 	var (
-		llb LinkedListBuffer
+		llb Buffer
 		cum int
 		buf bytes.Buffer
 	)
