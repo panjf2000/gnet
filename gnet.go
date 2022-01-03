@@ -174,7 +174,7 @@ type Conn interface {
 }
 
 type (
-	// EventHandler represents the engine events' callbacks for the Serve call.
+	// EventHandler represents the engine events' callbacks for the Run call.
 	// Each event has an Action return value that is used manage the state
 	// of the connection and engine.
 	EventHandler interface {
@@ -254,7 +254,7 @@ func (es *BuiltinEventEngine) OnTick() (delay time.Duration, action Action) {
 // MaxStreamBufferCap is the default buffer size for each stream-oriented connection(TCP/Unix).
 var MaxStreamBufferCap = 64 * 1024 // 64KB
 
-// Serve starts handling events for the specified address.
+// Run starts handling events on the specified address.
 //
 // Address should use a scheme prefix and be formatted
 // like `tcp://192.168.0.10:9851` or `unix://socket`.
@@ -268,7 +268,7 @@ var MaxStreamBufferCap = 64 * 1024 // 64KB
 //  unix  - Unix Domain Socket
 //
 // The "tcp" network scheme is assumed when one is not specified.
-func Serve(eventHandler EventHandler, protoAddr string, opts ...Option) (err error) {
+func Run(eventHandler EventHandler, protoAddr string, opts ...Option) (err error) {
 	options := loadOptions(opts...)
 
 	logging.Debugf("default logging level is %s", logging.LogLevel())

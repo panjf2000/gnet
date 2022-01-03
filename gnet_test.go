@@ -351,7 +351,7 @@ func testServe(t *testing.T, network, addr string, reuseport, reuseaddr, multico
 		nclients:   nclients,
 		workerPool: goPool.Default(),
 	}
-	err := Serve(ts,
+	err := Run(ts,
 		network+"://"+addr,
 		WithLockOSThread(async),
 		WithMulticore(multicore),
@@ -425,11 +425,11 @@ func (t *testBadAddrServer) OnBoot(_ Engine) (action Action) {
 
 func TestBadAddresses(t *testing.T) {
 	events := new(testBadAddrServer)
-	err := Serve(events, "tulip://howdy")
+	err := Run(events, "tulip://howdy")
 	assert.Error(t, err)
-	err = Serve(events, "howdy")
+	err = Run(events, "howdy")
 	assert.Error(t, err)
-	err = Serve(events, "tcp://")
+	err = Run(events, "tcp://")
 	assert.NoError(t, err)
 }
 
@@ -456,7 +456,7 @@ func testTick(network, addr string, t *testing.T) {
 	events := &testTickServer{}
 	start := time.Now()
 	opts := Options{Ticker: true}
-	err := Serve(events, network+"://"+addr, WithOptions(opts))
+	err := Run(events, network+"://"+addr, WithOptions(opts))
 	assert.NoError(t, err)
 	dur := time.Since(start)
 	if dur < 250&time.Millisecond || dur > time.Second {
@@ -517,7 +517,7 @@ func (t *testWakeConnServer) OnTick() (delay time.Duration, action Action) {
 func testWakeConn(t *testing.T, network, addr string) {
 	svr := &testWakeConnServer{tester: t, network: network, addr: addr, conn: make(chan Conn, 1)}
 	logger := zap.NewExample()
-	err := Serve(svr, network+"://"+addr, WithTicker(true), WithNumEventLoop(2*runtime.NumCPU()),
+	err := Run(svr, network+"://"+addr, WithTicker(true), WithNumEventLoop(2*runtime.NumCPU()),
 		WithLogger(logger.Sugar()))
 	assert.NoError(t, err)
 	_ = logger.Sync()
@@ -569,7 +569,7 @@ func (t *testShutdownServer) OnTick() (delay time.Duration, action Action) {
 
 func testShutdown(t *testing.T, network, addr string) {
 	events := &testShutdownServer{tester: t, network: network, addr: addr, N: 10}
-	err := Serve(events, network+"://"+addr, WithTicker(true))
+	err := Run(events, network+"://"+addr, WithTicker(true))
 	assert.NoError(t, err)
 	require.Equal(t, int(events.clients), 0, "did not call close on all clients")
 }
@@ -620,7 +620,7 @@ func (t *testCloseActionErrorServer) OnTick() (delay time.Duration, action Actio
 
 func testCloseActionError(t *testing.T, network, addr string) {
 	events := &testCloseActionErrorServer{tester: t, network: network, addr: addr}
-	err := Serve(events, network+"://"+addr, WithTicker(true))
+	err := Run(events, network+"://"+addr, WithTicker(true))
 	assert.NoError(t, err)
 }
 
@@ -664,7 +664,7 @@ func (t *testShutdownActionErrorServer) OnTick() (delay time.Duration, action Ac
 
 func testShutdownActionError(t *testing.T, network, addr string) {
 	events := &testShutdownActionErrorServer{tester: t, network: network, addr: addr}
-	err := Serve(events, network+"://"+addr, WithTicker(true))
+	err := Run(events, network+"://"+addr, WithTicker(true))
 	assert.NoError(t, err)
 }
 
@@ -706,7 +706,7 @@ func (t *testCloseActionOnOpenServer) OnTick() (delay time.Duration, action Acti
 
 func testCloseActionOnOpen(t *testing.T, network, addr string) {
 	events := &testCloseActionOnOpenServer{tester: t, network: network, addr: addr}
-	err := Serve(events, network+"://"+addr, WithTicker(true))
+	err := Run(events, network+"://"+addr, WithTicker(true))
 	assert.NoError(t, err)
 }
 
@@ -748,7 +748,7 @@ func (t *testShutdownActionOnOpenServer) OnTick() (delay time.Duration, action A
 
 func testShutdownActionOnOpen(t *testing.T, network, addr string) {
 	events := &testShutdownActionOnOpenServer{tester: t, network: network, addr: addr}
-	err := Serve(events, network+"://"+addr, WithTicker(true))
+	err := Run(events, network+"://"+addr, WithTicker(true))
 	assert.NoError(t, err)
 }
 
@@ -794,7 +794,7 @@ func (t *testUDPShutdownServer) OnTick() (delay time.Duration, action Action) {
 
 func testUDPShutdown(t *testing.T, network, addr string) {
 	svr := &testUDPShutdownServer{tester: t, network: network, addr: addr}
-	err := Serve(svr, network+"://"+addr, WithTicker(true))
+	err := Run(svr, network+"://"+addr, WithTicker(true))
 	assert.NoError(t, err)
 }
 
@@ -848,12 +848,12 @@ func (t *testCloseConnectionServer) OnTick() (delay time.Duration, action Action
 
 func testCloseConnection(t *testing.T, network, addr string) {
 	events := &testCloseConnectionServer{tester: t, network: network, addr: addr}
-	err := Serve(events, network+"://"+addr, WithTicker(true))
+	err := Run(events, network+"://"+addr, WithTicker(true))
 	assert.NoError(t, err)
 }
 
 func TestServerOptionsCheck(t *testing.T) {
-	err := Serve(&BuiltinEventEngine{}, "tcp://:3500", WithNumEventLoop(10001), WithLockOSThread(true))
+	err := Run(&BuiltinEventEngine{}, "tcp://:3500", WithNumEventLoop(10001), WithLockOSThread(true))
 	assert.EqualError(t, err, gerr.ErrTooManyEventLoopThreads.Error(), "error returned with LockOSThread option")
 }
 
@@ -910,7 +910,7 @@ func (t *testStopServer) OnTick() (delay time.Duration, action Action) {
 
 func testStop(t *testing.T, network, addr string) {
 	events := &testStopServer{tester: t, network: network, addr: addr, protoAddr: network + "://" + addr}
-	err := Serve(events, events.protoAddr, WithTicker(true))
+	err := Run(events, events.protoAddr, WithTicker(true))
 	assert.NoError(t, err)
 }
 
@@ -924,7 +924,7 @@ func TestClosedWakeUp(t *testing.T) {
 		wakeup:       make(chan struct{}),
 	}
 
-	err := Serve(events, events.protoAddr)
+	err := Run(events, events.protoAddr)
 	assert.NoError(t, err)
 }
 
@@ -1192,7 +1192,7 @@ func testSimServer(t *testing.T, addr string, nclients, packetSize, packetBatch 
 		packetSize:  packetSize,
 		packetBatch: packetBatch,
 	}
-	err := Serve(ts,
+	err := Run(ts,
 		ts.network+"://"+ts.addr,
 		WithMulticore(ts.multicore),
 		WithTicker(true),
