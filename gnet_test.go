@@ -968,9 +968,6 @@ func (s *testClosedWakeUpServer) OnTraffic(c Conn) Action {
 		close(s.wakeup)
 	}
 
-	// Actually goroutines here needed only on windows since its async actions
-	// rely on an unbuffered channel and since we already into it - this will
-	// block forever.
 	go func() { require.NoError(s.tester, c.Wake()) }()
 	go func() { require.NoError(s.tester, c.Close()) }()
 
