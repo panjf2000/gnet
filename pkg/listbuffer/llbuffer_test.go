@@ -151,6 +151,7 @@ func TestLinkedListBuffer_WriteTo(t *testing.T) {
 
 	var discarded int
 	discarded, err = llb.Discard(cum / 2)
+	require.NoError(t, err)
 	buf.Next(discarded)
 	n, err = llb.WriteTo(newBuf)
 	require.NoError(t, err)

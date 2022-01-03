@@ -264,7 +264,7 @@ func (c *conn) Next(n int) (buf []byte, err error) {
 		return
 	}
 	head, tail := c.inboundBuffer.Peek(n)
-	defer c.inboundBuffer.Discard(n)
+	defer c.inboundBuffer.Discard(n) //nolint:errcheck
 	if len(head) >= n {
 		return head[:n], err
 	}

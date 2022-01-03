@@ -1092,7 +1092,7 @@ func init() {
 // * |           body bytes              |
 // * +                                   +
 // * |            ... ...                |
-// * +-----------------------------------+
+// * +-----------------------------------+.
 type testCodec struct {
 	discardBytes int
 }
@@ -1116,7 +1116,7 @@ func (codec *testCodec) Decode(c Conn) ([]byte, error) {
 		return nil, errIncompletePacket
 	}
 
-	if bytes.Compare(magicNumberBytes, buf[:magicNumberSize]) != 0 {
+	if !bytes.Equal(magicNumberBytes, buf[:magicNumberSize]) {
 		return nil, errors.New("invalid magic number")
 	}
 
@@ -1145,7 +1145,7 @@ func (codec testCodec) Unpack(buf []byte) ([]byte, error) {
 		return nil, errIncompletePacket
 	}
 
-	if bytes.Compare(magicNumberBytes, buf[:magicNumberSize]) != 0 {
+	if !bytes.Equal(magicNumberBytes, buf[:magicNumberSize]) {
 		return nil, errors.New("invalid magic number")
 	}
 
