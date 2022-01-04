@@ -35,6 +35,7 @@ func (b *RingBuffer) instance() *ring.Buffer {
 	return b.rb
 }
 
+// Done checks and returns the internal ring-buffer to pool.
 func (b *RingBuffer) Done() {
 	if b.rb != nil {
 		rbPool.Put(b.rb)
@@ -52,13 +53,20 @@ func (b *RingBuffer) done() {
 // Peek returns the next n bytes without advancing the read pointer,
 // it returns all bytes when n <= 0.
 func (b *RingBuffer) Peek(n int) (head []byte, tail []byte) {
-	return b.instance().Peek(n)
+	if b.rb == nil {
+		return nil, nil
+	}
+	return b.rb.Peek(n)
 }
 
 // Discard skips the next n bytes by advancing the read pointer.
 func (b *RingBuffer) Discard(n int) (discarded int, err error) {
+	if b.rb == nil {
+		return 0, ring.ErrIsEmpty
+	}
+
 	defer b.done()
-	return b.instance().Discard(n)
+	return b.rb.Discard(n)
 }
 
 // Read reads up to len(p) bytes into p. It returns the number of bytes read (0 <= n <= len(p)) and any error
@@ -73,14 +81,22 @@ func (b *RingBuffer) Discard(n int) (discarded int, err error) {
 // Doing so correctly handles I/O errors that happen after reading some bytes and also both of the allowed EOF
 // behaviors.
 func (b *RingBuffer) Read(p []byte) (n int, err error) {
+	if b.rb == nil {
+		return 0, ring.ErrIsEmpty
+	}
+
 	defer b.done()
-	return b.instance().Read(p)
+	return b.rb.Read(p)
 }
 
 // ReadByte reads and returns the next byte from the input or ErrIsEmpty.
 func (b *RingBuffer) ReadByte() (byte, error) {
+	if b.rb == nil {
+		return 0, ring.ErrIsEmpty
+	}
+
 	defer b.done()
-	return b.instance().ReadByte()
+	return b.rb.ReadByte()
 }
 
 // Write writes len(p) bytes from p to the underlying buf.
@@ -100,22 +116,34 @@ func (b *RingBuffer) WriteByte(c byte) error {
 
 // Buffered returns the length of available bytes to read.
 func (b *RingBuffer) Buffered() int {
-	return b.instance().Buffered()
+	if b.rb == nil {
+		return 0
+	}
+	return b.rb.Buffered()
 }
 
 // Len returns the length of the underlying buffer.
 func (b *RingBuffer) Len() int {
-	return b.instance().Len()
+	if b.rb == nil {
+		return 0
+	}
+	return b.rb.Len()
 }
 
 // Cap returns the size of the underlying buffer.
 func (b *RingBuffer) Cap() int {
-	return b.instance().Cap()
+	if b.rb == nil {
+		return 0
+	}
+	return b.rb.Cap()
 }
 
 // Available returns the length of available bytes to write.
 func (b *RingBuffer) Available() int {
-	return b.instance().Available()
+	if b.rb == nil {
+		return 0
+	}
+	return b.rb.Available()
 }
 
 // WriteString writes the contents of the string s to buffer, which accepts a slice of bytes.
@@ -125,14 +153,23 @@ func (b *RingBuffer) WriteString(s string) (int, error) {
 
 // ByteBuffer returns all available read bytes. It does not move the read pointer and only copy the available data.
 func (b *RingBuffer) ByteBuffer() *bbPool.ByteBuffer {
-	return b.instance().ByteBuffer()
+	if b.rb == nil {
+		return nil
+	}
+	return b.rb.ByteBuffer()
 }
 
 // WithByteBuffer combines the available read bytes and the given bytes. It does not move the read pointer and
 // only copy the available data.
 func (b *RingBuffer) WithByteBuffer(p []byte) *bbPool.ByteBuffer {
+	if b.rb == nil {
+		bb := bbPool.Get()
+		_, _ = bb.Write(p)
+		return bb
+	}
+
 	defer b.done()
-	return b.instance().WithByteBuffer(p)
+	return b.rb.WithByteBuffer(p)
 }
 
 // ReadFrom implements io.ReaderFrom.
@@ -142,22 +179,35 @@ func (b *RingBuffer) ReadFrom(r io.Reader) (n int64, err error) {
 
 // WriteTo implements io.WriterTo.
 func (b *RingBuffer) WriteTo(w io.Writer) (int64, error) {
+	if b.rb == nil {
+		return 0, ring.ErrIsEmpty
+	}
+
 	defer b.done()
 	return b.instance().WriteTo(w)
 }
 
 // IsFull tells if this ring-buffer is full.
 func (b *RingBuffer) IsFull() bool {
-	return b.instance().IsFull()
+	if b.rb == nil {
+		return false
+	}
+	return b.rb.IsFull()
 }
 
 // IsEmpty tells if this ring-buffer is empty.
 func (b *RingBuffer) IsEmpty() bool {
-	return b.instance().IsEmpty()
+	if b.rb == nil {
+		return true
+	}
+	return b.rb.IsEmpty()
 }
 
 // Reset the read pointer and write pointer to zero.
 func (b *RingBuffer) Reset() {
-	b.instance().Reset()
-	b.done()
+	if b.rb == nil {
+		return
+	}
+	b.rb.Reset()
+	b.Done()
 }
