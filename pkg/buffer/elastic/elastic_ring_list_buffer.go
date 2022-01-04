@@ -137,11 +137,11 @@ func (mb *Buffer) Writev(bs [][]byte) (int, error) {
 		return n, nil
 	}
 
-	var pos, cum int
 	writable := mb.ringBuffer.Available()
 	if mb.ringBuffer.Len() < mb.maxStaticBytes {
 		writable = mb.maxStaticBytes - mb.ringBuffer.Buffered()
 	}
+	var pos, cum int
 	for i, b := range bs {
 		pos = i
 		cum += len(b)

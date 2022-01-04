@@ -43,7 +43,6 @@ type conn struct {
 	cache          *bbPool.ByteBuffer      // temporary buffer in each event-loop
 	buffer         []byte                  // buffer for the latest bytes
 	opened         bool                    // connection opened event fired
-	packets        [][]byte                // reuse it for multiple byte slices
 	isDatagram     bool                    // UDP protocol
 	localAddr      net.Addr                // local addr
 	remoteAddr     net.Addr                // remote addr
@@ -70,7 +69,6 @@ func (c *conn) releaseTCP() {
 	c.opened = false
 	c.peer = nil
 	c.ctx = nil
-	c.packets = nil
 	c.buffer = nil
 	if addr, ok := c.localAddr.(*net.TCPAddr); ok && c.localAddr != c.loop.ln.addr {
 		bsPool.Put(addr.IP)
@@ -159,46 +157,41 @@ func (c *conn) write(data []byte) (err error) {
 }
 
 func (c *conn) writev(bs [][]byte) (err error) {
-	defer func() {
-		c.packets = c.packets[:0]
-	}()
-
-	var sum int
+	var cum int
 	for _, b := range bs {
-		c.packets = append(c.packets, b)
-		sum += len(b)
+		cum += len(b)
 	}
 
 	// If there is pending data in outbound buffer, the current data ought to be appended to the outbound buffer
 	// for maintaining the sequence of network packets.
 	if !c.outboundBuffer.IsEmpty() {
-		_, _ = c.outboundBuffer.Writev(c.packets)
+		_, _ = c.outboundBuffer.Writev(bs)
 		return
 	}
 
 	var n int
-	if n, err = gio.Writev(c.fd, c.packets); err != nil {
+	if n, err = gio.Writev(c.fd, bs); err != nil {
 		// A temporary error occurs, append the data to outbound buffer, writing it back to the peer in the next round.
 		if err == unix.EAGAIN {
-			_, _ = c.outboundBuffer.Writev(c.packets)
+			_, _ = c.outboundBuffer.Writev(bs)
 			err = c.loop.poller.ModReadWrite(c.pollAttachment)
 			return
 		}
 		return c.loop.closeConn(c, os.NewSyscallError("write", err))
 	}
 	// Failed to send all data back to the peer, buffer the leftover data for the next round.
-	if n < sum {
+	if n < cum {
 		var pos int
-		for i := range c.packets {
-			np := len(c.packets[i])
-			if n < np {
-				c.packets[i] = c.packets[i][n:]
+		for i := range bs {
+			bn := len(bs[i])
+			if n < bn {
+				bs[i] = bs[i][n:]
 				pos = i
 				break
 			}
-			n -= np
+			n -= bn
 		}
-		_, _ = c.outboundBuffer.Writev(c.packets[pos:])
+		_, _ = c.outboundBuffer.Writev(bs[pos:])
 		err = c.loop.poller.ModReadWrite(c.pollAttachment)
 	}
 	return
