@@ -69,12 +69,13 @@ func (el *eventloop) activateSubReactor(lockOSThread bool) {
 					return err
 				}
 			}
+
 			// If there is pending data in outbound buffer, then we should omit this readable event
-			// and prioritize the writable events to achieve a higher performance.
+			// and prioritize the writable events to get a lower latency and may achieve a higher performance.
 			//
-			// Note that the peer may send massive amounts of data to engine by write() under blocking mode,
-			// resulting in that it won't receive any responses before the engine reads all data from the peer,
-			// in which case if the engine socket send buffer is full, we need to let it go and continue reading
+			// Note that the peer may send massive amounts of data to us by write() under blocking mode,
+			// resulting in that it won't receive any responses before we read all data from the peer,
+			// in which case if the local send buffer is full, we need to let it go and continue reading
 			// the data to prevent blocking forever.
 			if ev&netpoll.InEvents != 0 && (ev&netpoll.OutEvents == 0 || c.outboundBuffer.IsEmpty()) {
 				return el.read(c)
@@ -119,6 +120,7 @@ func (el *eventloop) run(lockOSThread bool) {
 					return err
 				}
 			}
+
 			// If there is pending data in outbound buffer, then we should omit this readable event
 			// and prioritize the writable events to get a lower latency and may achieve a higher performance.
 			//
