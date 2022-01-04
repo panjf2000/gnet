@@ -316,9 +316,8 @@ func (s *testServer) OnTraffic(c Conn) (action Action) {
 		}
 		return
 	}
-	buf, _ := c.Peek(-1)
+	buf, _ := c.Next(-1)
 	_, _ = c.Write(buf)
-	_, _ = c.Discard(-1)
 	return
 }
 

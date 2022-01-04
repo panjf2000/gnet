@@ -63,9 +63,8 @@ func (ev *clientEvents) OnTraffic(c Conn) (action Action) {
 	} else { // UDP
 		ev.packetLen = 1024
 	}
-	buf, _ := c.Peek(-1)
+	buf, _ := c.Next(-1)
 	p = append(p, buf...)
-	_, _ = c.Discard(-1)
 	if len(p) < ev.packetLen {
 		c.SetContext(p)
 		return
@@ -259,9 +258,8 @@ func (s *testClientServer) OnTraffic(c Conn) (action Action) {
 			})
 		return
 	}
-	buf, _ := c.Peek(-1)
+	buf, _ := c.Next(-1)
 	_, _ = c.Write(buf)
-	_, _ = c.Discard(-1)
 	return
 }
 
