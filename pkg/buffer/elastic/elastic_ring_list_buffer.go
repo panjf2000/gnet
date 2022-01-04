@@ -66,7 +66,10 @@ func (mb *Buffer) Peek(n int) [][]byte {
 		return mb.listBuffer.PeekBytesList(n)
 	}
 
-	head, tail := mb.ringBuffer.Peek(-1)
+	head, tail := mb.ringBuffer.Peek(n)
+	if mb.ringBuffer.Buffered() >= n {
+		return [][]byte{head, tail}
+	}
 	return mb.listBuffer.PeekBytesListWithBytes(n, head, tail)
 }
 
