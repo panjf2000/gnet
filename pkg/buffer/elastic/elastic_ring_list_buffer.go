@@ -16,6 +16,7 @@ package elastic
 
 import (
 	"io"
+	"math"
 
 	"github.com/panjf2000/gnet/v2/pkg/buffer/linkedlist"
 	"github.com/panjf2000/gnet/v2/pkg/buffer/ring"
@@ -66,6 +67,9 @@ func (mb *Buffer) Peek(n int) [][]byte {
 		return mb.listBuffer.PeekBytesList(n)
 	}
 
+	if n <= 0 {
+		n = math.MaxInt32
+	}
 	head, tail := mb.ringBuffer.Peek(n)
 	if mb.ringBuffer.Buffered() >= n {
 		return [][]byte{head, tail}
