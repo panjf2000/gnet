@@ -114,14 +114,11 @@ func (el *eventloop) open(c *conn) error {
 
 func (el *eventloop) read(c *conn) error {
 	n, err := unix.Read(c.fd, el.buffer)
-	if err != nil {
+	if n == 0 || err != nil {
 		if err == unix.EAGAIN {
 			return nil
 		}
 		return el.closeConn(c, os.NewSyscallError("read", err))
-	}
-	if n == 0 {
-		return nil
 	}
 
 	c.buffer = el.buffer[:n]
