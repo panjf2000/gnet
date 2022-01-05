@@ -60,7 +60,7 @@ func (b *RingBuffer) Peek(n int) (head []byte, tail []byte) {
 }
 
 // Discard skips the next n bytes by advancing the read pointer.
-func (b *RingBuffer) Discard(n int) (discarded int, err error) {
+func (b *RingBuffer) Discard(n int) (int, error) {
 	if b.rb == nil {
 		return 0, ring.ErrIsEmpty
 	}
@@ -80,7 +80,7 @@ func (b *RingBuffer) Discard(n int) (discarded int, err error) {
 // Callers should always process the n > 0 bytes returned before considering the error err.
 // Doing so correctly handles I/O errors that happen after reading some bytes and also both of the allowed EOF
 // behaviors.
-func (b *RingBuffer) Read(p []byte) (n int, err error) {
+func (b *RingBuffer) Read(p []byte) (int, error) {
 	if b.rb == nil {
 		return 0, ring.ErrIsEmpty
 	}
@@ -105,7 +105,10 @@ func (b *RingBuffer) ReadByte() (byte, error) {
 // If the length of p is greater than the writable capacity of this ring-buffer, it will allocate more memory to
 // this ring-buffer.
 // Write must not modify the slice data, even temporarily.
-func (b *RingBuffer) Write(p []byte) (n int, err error) {
+func (b *RingBuffer) Write(p []byte) (int, error) {
+	if len(p) == 0 {
+		return 0, nil
+	}
 	return b.instance().Write(p)
 }
 
@@ -148,6 +151,9 @@ func (b *RingBuffer) Available() int {
 
 // WriteString writes the contents of the string s to buffer, which accepts a slice of bytes.
 func (b *RingBuffer) WriteString(s string) (int, error) {
+	if len(s) == 0 {
+		return 0, nil
+	}
 	return b.instance().WriteString(s)
 }
 
@@ -173,7 +179,7 @@ func (b *RingBuffer) WithByteBuffer(p []byte) *bbPool.ByteBuffer {
 }
 
 // ReadFrom implements io.ReaderFrom.
-func (b *RingBuffer) ReadFrom(r io.Reader) (n int64, err error) {
+func (b *RingBuffer) ReadFrom(r io.Reader) (int64, error) {
 	return b.instance().ReadFrom(r)
 }
 
