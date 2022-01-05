@@ -17,12 +17,16 @@
 
 package gnet
 
-import "github.com/panjf2000/gnet/v2/internal/netpoll"
+import (
+	"golang.org/x/sys/unix"
+
+	"github.com/panjf2000/gnet/v2/internal/netpoll"
+)
 
 func (c *conn) handleEvents(_ int, filter int16) (err error) {
 	switch filter {
 	case netpoll.EVFilterSock:
-		err = c.loop.closeConn(c, nil)
+		err = c.loop.closeConn(c, unix.ECONNRESET)
 	case netpoll.EVFilterWrite:
 		if !c.outboundBuffer.IsEmpty() {
 			err = c.loop.write(c)
