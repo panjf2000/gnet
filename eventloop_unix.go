@@ -130,13 +130,6 @@ func (el *eventloop) read(c *conn) error {
 	case Shutdown:
 		return gerrors.ErrEngineShutdown
 	}
-
-	// Check the status of connection every loop since it might be closed
-	// during writing data back to the peer due to some kind of system error.
-	if !c.opened {
-		return nil
-	}
-
 	_, _ = c.inboundBuffer.Write(c.buffer)
 
 	return nil
