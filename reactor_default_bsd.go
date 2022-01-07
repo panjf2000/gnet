@@ -21,6 +21,8 @@ package gnet
 import (
 	"runtime"
 
+	"golang.org/x/sys/unix"
+
 	"github.com/panjf2000/gnet/v2/internal/netpoll"
 	"github.com/panjf2000/gnet/v2/pkg/errors"
 )
@@ -56,7 +58,7 @@ func (el *eventloop) activateSubReactor(lockOSThread bool) {
 		if c, ack := el.connections[fd]; ack {
 			switch filter {
 			case netpoll.EVFilterSock:
-				err = el.closeConn(c, nil)
+				err = el.closeConn(c, unix.ECONNRESET)
 			case netpoll.EVFilterWrite:
 				if !c.outboundBuffer.IsEmpty() {
 					err = el.write(c)
@@ -90,7 +92,7 @@ func (el *eventloop) run(lockOSThread bool) {
 		if c, ack := el.connections[fd]; ack {
 			switch filter {
 			case netpoll.EVFilterSock:
-				err = el.closeConn(c, nil)
+				err = el.closeConn(c, unix.ECONNRESET)
 			case netpoll.EVFilterWrite:
 				if !c.outboundBuffer.IsEmpty() {
 					err = el.write(c)
