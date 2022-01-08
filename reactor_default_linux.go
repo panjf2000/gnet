@@ -69,20 +69,13 @@ func (el *eventloop) activateSubReactor(lockOSThread bool) {
 					return err
 				}
 			}
-
-			// If there is pending data in outbound buffer, then we should omit this readable event
-			// and prioritize the writable events to get a lower latency and may achieve a higher performance.
-			//
-			// Note that the peer may send massive amounts of data to us by write() under blocking mode,
-			// resulting in that it won't receive any responses before we read all data from the peer,
-			// in which case if the local send buffer is full, we need to let it go and continue reading
-			// the data to prevent blocking forever.
-			if ev&netpoll.InEvents != 0 && (ev&netpoll.OutEvents == 0 || c.outboundBuffer.IsEmpty()) {
+			if ev&netpoll.InEvents != 0 {
 				return el.read(c)
 			}
 		}
 		return nil
 	})
+
 	if err == errors.ErrEngineShutdown {
 		el.engine.opts.Logger.Debugf("event-loop(%d) is exiting in terms of the demand from user, %v", el.idx, err)
 	} else if err != nil {
@@ -120,20 +113,13 @@ func (el *eventloop) run(lockOSThread bool) {
 					return err
 				}
 			}
-
-			// If there is pending data in outbound buffer, then we should omit this readable event
-			// and prioritize the writable events to get a lower latency and may achieve a higher performance.
-			//
-			// Note that the peer may send massive amounts of data to us by write() under blocking mode,
-			// resulting in that it won't receive any responses before we read all data from the peer,
-			// in which case if the local send buffer is full, we need to let it go and continue reading
-			// the data to prevent blocking forever.
-			if ev&netpoll.InEvents != 0 && (ev&netpoll.OutEvents == 0 || c.outboundBuffer.IsEmpty()) {
+			if ev&netpoll.InEvents != 0 {
 				return el.read(c)
 			}
 			return nil
 		}
 		return el.accept(fd, ev)
 	})
+
 	el.getLogger().Debugf("event-loop(%d) is exiting due to error: %v", el.idx, err)
 }
