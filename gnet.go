@@ -129,12 +129,17 @@ type Writer interface {
 
 	// AsyncWrite writes one byte slice to peer asynchronously, usually you would call it in individual goroutines
 	// instead of the event-loop goroutines.
-	AsyncWrite(buf []byte) (err error)
+	AsyncWrite(buf []byte, callback AsyncCallback) (err error)
 
 	// AsyncWritev writes multiple byte slices to peer asynchronously, usually you would call it in individual goroutines
 	// instead of the event-loop goroutines.
-	AsyncWritev(bs [][]byte) (err error)
+	AsyncWritev(bs [][]byte, callback AsyncCallback) (err error)
 }
+
+// AsyncCallback is a callback which will be invoked after the asynchronous functions has finished executing.
+//
+// Note that the parameter gnet.Conn is already released under UDP protocol, thus it's not allowed to be accessed.
+type AsyncCallback func(c Conn) error
 
 // Conn is an interface of underlying connection.
 type Conn interface {
@@ -167,10 +172,11 @@ type Conn interface {
 	// ==================================== Concurrency-safe API's ====================================
 
 	// Wake triggers a OnTraffic event for the connection.
-	Wake() (err error)
+	Wake(callback AsyncCallback) (err error)
 
-	// Close closes the current connection.
-	Close() (err error)
+	// Close closes the current connection, usually you don't need to pass a non-nil callback
+	// because you should use OnClose() instead, the callback here is only for compatibility.
+	Close(callback AsyncCallback) (err error)
 }
 
 type (

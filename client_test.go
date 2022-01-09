@@ -250,11 +250,10 @@ func (s *testClientServer) OnTraffic(c Conn) (action Action) {
 			_ = c.InboundBuffered()
 			_ = c.OutboundBuffered()
 			_, _ = c.Discard(1)
-
 		}
 		_ = s.workerPool.Submit(
 			func() {
-				_ = c.AsyncWrite(buf.Bytes())
+				_ = c.AsyncWrite(buf.Bytes(), nil)
 			})
 		return
 	}
@@ -316,7 +315,7 @@ func startGnetClient(t *testing.T, cli *Client, ev *clientEvents, network, addr 
 	rand.Seed(time.Now().UnixNano())
 	c, err := cli.Dial(network, addr)
 	require.NoError(t, err)
-	defer c.Close()
+	defer c.Close(nil)
 	var rspCh chan []byte
 	if network == "udp" {
 		rspCh = make(chan []byte, 1)
@@ -347,7 +346,7 @@ func startGnetClient(t *testing.T, cli *Client, ev *clientEvents, network, addr 
 		}
 		_, err = rand.Read(reqData)
 		require.NoError(t, err)
-		err = c.AsyncWrite(reqData)
+		err = c.AsyncWrite(reqData, nil)
 		require.NoError(t, err)
 		respData := <-rspCh
 		require.NoError(t, err)

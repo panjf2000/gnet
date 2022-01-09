@@ -301,16 +301,22 @@ func (s *testServer) OnTraffic(c Conn) (action Action) {
 						bs := make([][]byte, 2)
 						bs[0] = buf.B[:mid]
 						bs[1] = buf.B[mid:]
-						_ = c.AsyncWritev(bs)
+						_ = c.AsyncWritev(bs, func(c Conn) error {
+							logging.Debugf("conn=%s done writev", c.RemoteAddr().String())
+							return nil
+						})
 					} else {
-						_ = c.AsyncWrite(buf.Bytes())
+						_ = c.AsyncWrite(buf.Bytes(), func(c Conn) error {
+							logging.Debugf("conn=%s done write", c.RemoteAddr().String())
+							return nil
+						})
 					}
 				})
 			return
 		} else if s.network == "udp" {
 			_ = s.workerPool.Submit(
 				func() {
-					_ = c.AsyncWrite(buf.Bytes())
+					_ = c.AsyncWrite(buf.Bytes(), nil)
 				})
 			return
 		}
@@ -508,7 +514,10 @@ func (t *testWakeConnServer) OnTick() (delay time.Duration, action Action) {
 		return
 	}
 	t.c = <-t.conn
-	_ = t.c.Wake()
+	_ = t.c.Wake(func(c Conn) error {
+		logging.Debugf("conn=%s done wake", c.RemoteAddr().String())
+		return nil
+	})
 	delay = time.Millisecond * 100
 	return
 }
@@ -819,7 +828,7 @@ func (t *testCloseConnectionServer) OnTraffic(c Conn) (action Action) {
 	_, _ = c.Discard(-1)
 	go func() {
 		time.Sleep(time.Second)
-		_ = c.Close()
+		_ = c.Close(nil)
 	}()
 	return
 }
@@ -967,8 +976,8 @@ func (s *testClosedWakeUpServer) OnTraffic(c Conn) Action {
 		close(s.wakeup)
 	}
 
-	go func() { require.NoError(s.tester, c.Wake()) }()
-	go func() { require.NoError(s.tester, c.Close()) }()
+	go func() { require.NoError(s.tester, c.Wake(nil)) }()
+	go func() { require.NoError(s.tester, c.Close(nil)) }()
 
 	<-s.clientClosed
 

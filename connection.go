@@ -197,20 +197,40 @@ func (c *conn) writev(bs [][]byte) (err error) {
 	return
 }
 
-func (c *conn) asyncWrite(itf interface{}) error {
-	if !c.opened {
-		return nil
-	}
-
-	return c.write(itf.([]byte))
+type asyncWriteHook struct {
+	callback AsyncCallback
+	data     []byte
 }
 
-func (c *conn) asyncWritev(itf interface{}) error {
+func (c *conn) asyncWrite(itf interface{}) (err error) {
 	if !c.opened {
 		return nil
 	}
 
-	return c.writev(itf.([][]byte))
+	hook := itf.(*asyncWriteHook)
+	err = c.write(hook.data)
+	if hook.callback != nil {
+		_ = hook.callback(c)
+	}
+	return
+}
+
+type asyncWritevHook struct {
+	callback AsyncCallback
+	data     [][]byte
+}
+
+func (c *conn) asyncWritev(itf interface{}) (err error) {
+	if !c.opened {
+		return nil
+	}
+
+	hook := itf.(*asyncWritevHook)
+	err = c.writev(hook.data)
+	if hook.callback != nil {
+		_ = hook.callback(c)
+	}
+	return
 }
 
 func (c *conn) sendTo(buf []byte) error {
@@ -401,29 +421,48 @@ func (c *conn) RemoteAddr() net.Addr       { return c.remoteAddr }
 
 // ==================================== Concurrency-safe API's ====================================
 
-func (c *conn) AsyncWrite(buf []byte) error {
+func (c *conn) AsyncWrite(buf []byte, callback AsyncCallback) (err error) {
 	if c.isDatagram {
-		return c.sendTo(buf)
+		err = c.sendTo(buf)
+		if callback != nil {
+			_ = callback(c)
+		}
+		return
 	}
-	return c.loop.poller.Trigger(c.asyncWrite, buf)
+	return c.loop.poller.Trigger(c.asyncWrite, &asyncWriteHook{callback, buf})
 }
 
-func (c *conn) AsyncWritev(bs [][]byte) error {
+func (c *conn) AsyncWritev(bs [][]byte, callback AsyncCallback) (err error) {
 	if c.isDatagram {
 		for _, b := range bs {
-			if err := c.sendTo(b); err != nil {
-				return err
+			if err = c.sendTo(b); err != nil {
+				return
 			}
 		}
-		return nil
+		if callback != nil {
+			_ = callback(c)
+		}
+		return
 	}
-	return c.loop.poller.Trigger(c.asyncWritev, bs)
+	return c.loop.poller.Trigger(c.asyncWritev, &asyncWritevHook{callback, bs})
 }
 
-func (c *conn) Wake() error {
-	return c.loop.poller.UrgentTrigger(func(_ interface{}) error { return c.loop.wake(c) }, nil)
+func (c *conn) Wake(callback AsyncCallback) error {
+	return c.loop.poller.UrgentTrigger(func(_ interface{}) (err error) {
+		err = c.loop.wake(c)
+		if callback != nil {
+			_ = callback(c)
+		}
+		return
+	}, nil)
 }
 
-func (c *conn) Close() error {
-	return c.loop.poller.Trigger(func(_ interface{}) error { return c.loop.closeConn(c, nil) }, nil)
+func (c *conn) Close(callback AsyncCallback) error {
+	return c.loop.poller.Trigger(func(_ interface{}) (err error) {
+		err = c.loop.closeConn(c, nil)
+		if callback != nil {
+			_ = callback(c)
+		}
+		return
+	}, nil)
 }

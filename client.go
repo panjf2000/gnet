@@ -105,9 +105,9 @@ func (cli *Client) Start() error {
 
 // Stop stops the client event-loop.
 func (cli *Client) Stop() (err error) {
-	err = cli.el.poller.UrgentTrigger(func(_ interface{}) error { return gerrors.ErrEngineShutdown }, nil)
+	logging.Error(cli.el.poller.UrgentTrigger(func(_ interface{}) error { return gerrors.ErrEngineShutdown }, nil))
 	cli.el.engine.wg.Wait()
-	cli.el.poller.Close()
+	logging.Error(cli.el.poller.Close())
 	cli.el.eventHandler.OnShutdown(Engine{})
 	// Stop the ticker.
 	if cli.opts.Ticker {
@@ -199,7 +199,7 @@ func (cli *Client) Dial(network, address string) (Conn, error) {
 	}
 	err = cli.el.poller.UrgentTrigger(cli.el.register, gc)
 	if err != nil {
-		gc.Close()
+		gc.Close(nil)
 		return nil, err
 	}
 	return gc, nil
