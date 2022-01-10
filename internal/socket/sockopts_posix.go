@@ -19,6 +19,7 @@ package socket
 
 import (
 	"os"
+	"syscall"
 
 	"golang.org/x/sys/unix"
 )
@@ -57,4 +58,28 @@ func SetReuseAddr(fd, reuseAddr int) error {
 // SetIPv6Only restricts a IPv6 socket to only process IPv6 requests or both IPv4 and IPv6 requests.
 func SetIPv6Only(fd, ipv6only int) error {
 	return unix.SetsockoptInt(fd, unix.IPPROTO_IPV6, unix.IPV6_V6ONLY, ipv6only)
+}
+
+// SetLinger sets the behavior of Close on a connection which still
+// has data waiting to be sent or to be acknowledged.
+//
+// If sec < 0 (the default), the operating system finishes sending the
+// data in the background.
+//
+// If sec == 0, the operating system discards any unsent or
+// unacknowledged data.
+//
+// If sec > 0, the data is sent in the background as with sec < 0. On
+// some operating systems after sec seconds have elapsed any remaining
+// unsent data may be discarded.
+func SetLinger(fd, sec int) error {
+	var l unix.Linger
+	if sec >= 0 {
+		l.Onoff = 1
+		l.Linger = int32(sec)
+	} else {
+		l.Onoff = 0
+		l.Linger = 0
+	}
+	return unix.SetsockoptLinger(fd, syscall.SOL_SOCKET, syscall.SO_LINGER, &l)
 }

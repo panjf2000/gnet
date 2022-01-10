@@ -141,10 +141,24 @@ type Writer interface {
 // Note that the parameter gnet.Conn is already released under UDP protocol, thus it's not allowed to be accessed.
 type AsyncCallback func(c Conn) error
 
+// Socket is a set of functions which manipulate the underlying file descriptor of a connection.
+type Socket interface {
+	Fd() int
+	Dup() (int, error)
+	SetReadBuffer(bytes int) error
+	SetWriteBuffer(bytes int) error
+	SetLinger(sec int) error
+	SetKeepAlivePeriod(d time.Duration) error
+	SetNoDelay(noDelay bool) error
+	// CloseRead() error
+	// CloseWrite() error
+}
+
 // Conn is an interface of underlying connection.
 type Conn interface {
 	Reader
 	Writer
+	Socket
 
 	// ================================== Non-concurrency-safe API's ==================================
 
@@ -374,4 +388,11 @@ func parseProtoAddr(addr string) (network, address string) {
 		address = pair[1]
 	}
 	return
+}
+
+func bool2int(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
 }

@@ -419,6 +419,18 @@ func (c *conn) SetContext(ctx interface{}) { c.ctx = ctx }
 func (c *conn) LocalAddr() net.Addr        { return c.localAddr }
 func (c *conn) RemoteAddr() net.Addr       { return c.remoteAddr }
 
+// Implementation of Socket interface
+
+func (c *conn) Fd() int                        { return c.fd }
+func (c *conn) Dup() (int, error)              { return unix.Dup(c.fd) }
+func (c *conn) SetReadBuffer(bytes int) error  { return socket.SetRecvBuffer(c.fd, bytes) }
+func (c *conn) SetWriteBuffer(bytes int) error { return socket.SetSendBuffer(c.fd, bytes) }
+func (c *conn) SetLinger(sec int) error        { return socket.SetLinger(c.fd, sec) }
+func (c *conn) SetNoDelay(noDelay bool) error  { return socket.SetNoDelay(c.fd, bool2int(noDelay)) }
+func (c *conn) SetKeepAlivePeriod(d time.Duration) error {
+	return socket.SetKeepAlive(c.fd, int(d.Seconds()))
+}
+
 // ==================================== Concurrency-safe API's ====================================
 
 func (c *conn) AsyncWrite(buf []byte, callback AsyncCallback) (err error) {

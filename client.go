@@ -25,7 +25,6 @@ import (
 	"strings"
 	"sync"
 	"syscall"
-	"time"
 
 	"golang.org/x/sys/unix"
 
@@ -155,7 +154,7 @@ func (cli *Client) Dial(network, address string) (Conn, error) {
 			}
 		}
 		if cli.opts.TCPKeepAlive > 0 {
-			if err = socket.SetKeepAlive(DupFD, int(cli.opts.TCPKeepAlive/time.Second)); err != nil {
+			if err = socket.SetKeepAlive(DupFD, int(cli.opts.TCPKeepAlive.Seconds())); err != nil {
 				return nil, err
 			}
 		}
