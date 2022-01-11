@@ -735,7 +735,7 @@ func (t *testShutdownActionOnOpenServer) OnOpen(c Conn) (out []byte, action Acti
 }
 
 func (t *testShutdownActionOnOpenServer) OnShutdown(s Engine) {
-	dupFD, err := s.DupFd()
+	dupFD, err := s.Dup()
 	logging.Debugf("dup fd: %d with error: %v\n", dupFD, err)
 }
 

@@ -58,11 +58,12 @@ func (s Engine) CountConnections() (count int) {
 	return
 }
 
-// DupFd returns a copy of the underlying file descriptor of listener.
+// Dup returns a copy of the underlying file descriptor of listener.
 // It is the caller's responsibility to close dupFD when finished.
 // Closing listener does not affect dupFD, and closing dupFD does not affect listener.
-func (s Engine) DupFd() (dupFD int, err error) {
-	dupFD, sc, err := s.eng.ln.dup()
+func (s Engine) Dup() (dupFD int, err error) {
+	var sc string
+	dupFD, sc, err = s.eng.ln.dup()
 	if err != nil {
 		logging.Warnf("%s failed when duplicating new fd\n", sc)
 	}

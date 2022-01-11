@@ -422,7 +422,7 @@ func (c *conn) RemoteAddr() net.Addr       { return c.remoteAddr }
 // Implementation of Socket interface
 
 func (c *conn) Fd() int                        { return c.fd }
-func (c *conn) Dup() (int, error)              { return unix.Dup(c.fd) }
+func (c *conn) Dup() (fd int, err error)       { fd, _, err = netpoll.Dup(c.fd); return }
 func (c *conn) SetReadBuffer(bytes int) error  { return socket.SetRecvBuffer(c.fd, bytes) }
 func (c *conn) SetWriteBuffer(bytes int) error { return socket.SetSendBuffer(c.fd, bytes) }
 func (c *conn) SetLinger(sec int) error        { return socket.SetLinger(c.fd, sec) }
