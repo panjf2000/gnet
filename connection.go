@@ -262,8 +262,9 @@ func (c *conn) Read(p []byte) (n int, err error) {
 
 func (c *conn) Next(n int) (buf []byte, err error) {
 	inBufferLen := c.inboundBuffer.Buffered()
-	if totalLen := inBufferLen + len(c.buffer); totalLen < n || n <= 0 {
-		err = gerrors.ErrBufferFull
+	if totalLen := inBufferLen + len(c.buffer); n > totalLen {
+		return nil, io.ErrShortBuffer
+	} else if n <= 0 {
 		n = totalLen
 	}
 	if c.inboundBuffer.IsEmpty() {
@@ -291,8 +292,9 @@ func (c *conn) Next(n int) (buf []byte, err error) {
 
 func (c *conn) Peek(n int) (buf []byte, err error) {
 	inBufferLen := c.inboundBuffer.Buffered()
-	if totalLen := inBufferLen + len(c.buffer); totalLen < n || n <= 0 {
-		err = gerrors.ErrBufferFull
+	if totalLen := inBufferLen + len(c.buffer); n > totalLen {
+		return nil, io.ErrShortBuffer
+	} else if n <= 0 {
 		n = totalLen
 	}
 	if c.inboundBuffer.IsEmpty() {

@@ -35,10 +35,6 @@ var (
 	ErrUnsupportedUDSProtocol = errors.New("only unix is supported")
 	// ErrUnsupportedPlatform occurs when running gnet on an unsupported platform.
 	ErrUnsupportedPlatform = errors.New("unsupported platform in gnet")
-	// ErrConnectionClosed occurs when the event-loop receives a closed connection.
-	ErrConnectionClosed = errors.New("connection is closed")
-	// ErrBufferFull occurs when trying to read bytes that is larger than the buffer size.
-	ErrBufferFull = errors.New("buffer full")
 	// ErrUnsupportedOp occurs when calling some methods that has not been implemented yet.
 	ErrUnsupportedOp = errors.New("unsupported operation")
 	// ErrNegativeSize occurs when trying to pass a negative size to a buffer.
