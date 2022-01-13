@@ -1232,11 +1232,11 @@ func runClient(t *testing.T, network, addr string, packetSize, batch int) {
 	t.Logf("test duration: %ds", duration/time.Second)
 	start := time.Now()
 	for time.Since(start) < duration {
-		batchWriteAndVerify(t, c, rd, packetSize, batch)
+		batchSendAndRecv(t, c, rd, packetSize, batch)
 	}
 }
 
-func batchWriteAndVerify(t *testing.T, c net.Conn, rd *bufio.Reader, packetSize, batch int) {
+func batchSendAndRecv(t *testing.T, c net.Conn, rd *bufio.Reader, packetSize, batch int) {
 	codec := testCodec{}
 	var (
 		requests  [][]byte

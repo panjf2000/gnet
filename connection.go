@@ -130,7 +130,8 @@ func (c *conn) open(buf []byte) error {
 	return err
 }
 
-func (c *conn) write(data []byte) (err error) {
+func (c *conn) write(data []byte) (n int, err error) {
+	n = len(data)
 	// If there is pending data in outbound buffer, the current data ought to be appended to the outbound buffer
 	// for maintaining the sequence of network packets.
 	if !c.outboundBuffer.IsEmpty() {
@@ -138,28 +139,27 @@ func (c *conn) write(data []byte) (err error) {
 		return
 	}
 
-	var n int
-	if n, err = unix.Write(c.fd, data); err != nil {
+	var sent int
+	if sent, err = unix.Write(c.fd, data); err != nil {
 		// A temporary error occurs, append the data to outbound buffer, writing it back to the peer in the next round.
 		if err == unix.EAGAIN {
 			_, _ = c.outboundBuffer.Write(data)
 			err = c.loop.poller.ModReadWrite(c.pollAttachment)
 			return
 		}
-		return c.loop.closeConn(c, os.NewSyscallError("write", err))
+		return -1, c.loop.closeConn(c, os.NewSyscallError("write", err))
 	}
 	// Failed to send all data back to the peer, buffer the leftover data for the next round.
-	if n < len(data) {
-		_, _ = c.outboundBuffer.Write(data[n:])
+	if sent < n {
+		_, _ = c.outboundBuffer.Write(data[sent:])
 		err = c.loop.poller.ModReadWrite(c.pollAttachment)
 	}
 	return
 }
 
-func (c *conn) writev(bs [][]byte) (err error) {
-	var cum int
+func (c *conn) writev(bs [][]byte) (n int, err error) {
 	for _, b := range bs {
-		cum += len(b)
+		n += len(b)
 	}
 
 	// If there is pending data in outbound buffer, the current data ought to be appended to the outbound buffer
@@ -169,27 +169,27 @@ func (c *conn) writev(bs [][]byte) (err error) {
 		return
 	}
 
-	var n int
-	if n, err = gio.Writev(c.fd, bs); err != nil {
+	var sent int
+	if sent, err = gio.Writev(c.fd, bs); err != nil {
 		// A temporary error occurs, append the data to outbound buffer, writing it back to the peer in the next round.
 		if err == unix.EAGAIN {
 			_, _ = c.outboundBuffer.Writev(bs)
 			err = c.loop.poller.ModReadWrite(c.pollAttachment)
 			return
 		}
-		return c.loop.closeConn(c, os.NewSyscallError("write", err))
+		return -1, c.loop.closeConn(c, os.NewSyscallError("write", err))
 	}
 	// Failed to send all data back to the peer, buffer the leftover data for the next round.
-	if n < cum {
+	if sent < n {
 		var pos int
 		for i := range bs {
 			bn := len(bs[i])
-			if n < bn {
-				bs[i] = bs[i][n:]
+			if sent < bn {
+				bs[i] = bs[i][sent:]
 				pos = i
 				break
 			}
-			n -= bn
+			sent -= bn
 		}
 		_, _ = c.outboundBuffer.Writev(bs[pos:])
 		err = c.loop.poller.ModReadWrite(c.pollAttachment)
@@ -208,7 +208,7 @@ func (c *conn) asyncWrite(itf interface{}) (err error) {
 	}
 
 	hook := itf.(*asyncWriteHook)
-	err = c.write(hook.data)
+	_, err = c.write(hook.data)
 	if hook.callback != nil {
 		_ = hook.callback(c)
 	}
@@ -226,7 +226,7 @@ func (c *conn) asyncWritev(itf interface{}) (err error) {
 	}
 
 	hook := itf.(*asyncWritevHook)
-	err = c.writev(hook.data)
+	_, err = c.writev(hook.data)
 	if hook.callback != nil {
 		_ = hook.callback(c)
 	}
@@ -341,33 +341,24 @@ func (c *conn) Discard(n int) (int, error) {
 	return n, nil
 }
 
-func (c *conn) Write(p []byte) (n int, err error) {
+func (c *conn) Write(p []byte) (int, error) {
 	if c.isDatagram {
-		return len(p), c.sendTo(p)
-	}
-	return len(p), c.write(p)
-}
-
-func (c *conn) Writev(bs [][]byte) (n int, err error) {
-	for _, b := range bs {
-		n += len(b)
-	}
-	if c.isDatagram {
-		buf := bsPool.Get(n)
-		var m int
-		for _, b := range bs {
-			copy(buf[m:], b)
-			m += len(b)
+		if err := c.sendTo(p); err != nil {
+			return -1, err
 		}
-		err = c.sendTo(buf)
-		bsPool.Put(buf)
-		return
+		return len(p), nil
 	}
-	err = c.writev(bs)
-	return
+	return c.write(p)
 }
 
-func (c *conn) ReadFrom(r io.Reader) (n int64, err error) {
+func (c *conn) Writev(bs [][]byte) (int, error) {
+	if c.isDatagram {
+		return -1, gerrors.ErrUnsupportedOp
+	}
+	return c.writev(bs)
+}
+
+func (c *conn) ReadFrom(r io.Reader) (int64, error) {
 	return c.outboundBuffer.ReadFrom(r)
 }
 
@@ -435,28 +426,21 @@ func (c *conn) SetKeepAlivePeriod(d time.Duration) error {
 
 // ==================================== Concurrency-safe API's ====================================
 
-func (c *conn) AsyncWrite(buf []byte, callback AsyncCallback) (err error) {
+func (c *conn) AsyncWrite(buf []byte, callback AsyncCallback) error {
 	if c.isDatagram {
-		err = c.sendTo(buf)
-		if callback != nil {
-			_ = callback(c)
-		}
-		return
+		defer func() {
+			if callback != nil {
+				_ = callback(nil)
+			}
+		}()
+		return c.sendTo(buf)
 	}
 	return c.loop.poller.Trigger(c.asyncWrite, &asyncWriteHook{callback, buf})
 }
 
-func (c *conn) AsyncWritev(bs [][]byte, callback AsyncCallback) (err error) {
+func (c *conn) AsyncWritev(bs [][]byte, callback AsyncCallback) error {
 	if c.isDatagram {
-		for _, b := range bs {
-			if err = c.sendTo(b); err != nil {
-				return
-			}
-		}
-		if callback != nil {
-			_ = callback(c)
-		}
-		return
+		return gerrors.ErrUnsupportedOp
 	}
 	return c.loop.poller.Trigger(c.asyncWritev, &asyncWritevHook{callback, bs})
 }
