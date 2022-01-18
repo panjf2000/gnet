@@ -64,7 +64,7 @@ func (mb *Buffer) Read(p []byte) (n int, err error) {
 // Peek returns n bytes as [][]byte, these bytes won't be discarded until Buffer.Discard() is called.
 func (mb *Buffer) Peek(n int) [][]byte {
 	if mb.ringBuffer == nil {
-		return mb.listBuffer.PeekBytesList(n)
+		return mb.listBuffer.Peek(n)
 	}
 
 	if n <= 0 {
@@ -74,7 +74,7 @@ func (mb *Buffer) Peek(n int) [][]byte {
 	if mb.ringBuffer.Buffered() >= n {
 		return [][]byte{head, tail}
 	}
-	return mb.listBuffer.PeekBytesListWithBytes(n, head, tail)
+	return mb.listBuffer.PeekWithBytes(n, head, tail)
 }
 
 // Discard discards n bytes in this buffer.
@@ -108,14 +108,14 @@ func (mb *Buffer) Write(p []byte) (n int, err error) {
 	}
 
 	if !mb.listBuffer.IsEmpty() || mb.ringBuffer.Buffered() >= mb.maxStaticBytes {
-		mb.listBuffer.PushBytesBack(p)
+		mb.listBuffer.PushBack(p)
 		return len(p), nil
 	}
 	if mb.ringBuffer.Len() >= mb.maxStaticBytes {
 		writable := mb.ringBuffer.Available()
 		if n = len(p); n > writable {
 			_, _ = mb.ringBuffer.Write(p[:writable])
-			mb.listBuffer.PushBytesBack(p[writable:])
+			mb.listBuffer.PushBack(p[writable:])
 			return
 		}
 	}
@@ -131,7 +131,7 @@ func (mb *Buffer) Writev(bs [][]byte) (int, error) {
 	if !mb.listBuffer.IsEmpty() || mb.ringBuffer.Buffered() >= mb.maxStaticBytes {
 		var n int
 		for _, b := range bs {
-			mb.listBuffer.PushBytesBack(b)
+			mb.listBuffer.PushBack(b)
 			n += len(b)
 		}
 		return n, nil
@@ -147,7 +147,7 @@ func (mb *Buffer) Writev(bs [][]byte) (int, error) {
 		cum += len(b)
 		if len(b) > writable {
 			_, _ = mb.ringBuffer.Write(b[:writable])
-			mb.listBuffer.PushBytesBack(b[writable:])
+			mb.listBuffer.PushBack(b[writable:])
 			break
 		}
 		n, _ := mb.ringBuffer.Write(b)
@@ -155,7 +155,7 @@ func (mb *Buffer) Writev(bs [][]byte) (int, error) {
 	}
 	for pos++; pos < len(bs); pos++ {
 		cum += len(bs[pos])
-		mb.listBuffer.PushBytesBack(bs[pos])
+		mb.listBuffer.PushBack(bs[pos])
 	}
 	return cum, nil
 }

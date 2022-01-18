@@ -36,13 +36,13 @@ func TestLinkedListBuffer_Basic(t *testing.T) {
 		cum += n
 		data := make([]byte, n)
 		rand.Read(data)
-		llb.PushBytesBack(data)
+		llb.PushBack(data)
 		buf.Write(data)
 	}
 	require.EqualValues(t, maxBlocks, llb.Len())
 	require.EqualValues(t, cum, llb.Buffered())
 
-	bs := llb.PeekBytesList(cum / 4)
+	bs := llb.Peek(cum / 4)
 	var p []byte
 	for _, b := range bs {
 		p = append(p, b...)
@@ -54,7 +54,7 @@ func TestLinkedListBuffer_Basic(t *testing.T) {
 	tmpB := make([]byte, cum/16)
 	rand.Read(tmpA)
 	rand.Read(tmpB)
-	bs = llb.PeekBytesListWithBytes(cum/4, tmpA, tmpB)
+	bs = llb.PeekWithBytes(cum/4, tmpA, tmpB)
 	p = p[:0]
 	for _, b := range bs {
 		p = append(p, b...)
@@ -93,7 +93,7 @@ func TestLinkedListBuffer_ReadFrom(t *testing.T) {
 	const headLen = 256
 	head := make([]byte, headLen)
 	rand.Read(head)
-	llb.PushBytesBack(head)
+	llb.PushBack(head)
 	rand.Read(data)
 	r.Reset(data)
 	n, err = llb.ReadFrom(r)
@@ -122,7 +122,7 @@ func TestLinkedListBuffer_WriteTo(t *testing.T) {
 		cum += n
 		data := make([]byte, n)
 		rand.Read(data)
-		llb.PushBytesBack(data)
+		llb.PushBack(data)
 		buf.Write(data)
 	}
 	require.EqualValues(t, maxBlocks, llb.Len())
@@ -143,7 +143,7 @@ func TestLinkedListBuffer_WriteTo(t *testing.T) {
 		cum += n
 		data := make([]byte, n)
 		rand.Read(data)
-		llb.PushBytesBack(data)
+		llb.PushBack(data)
 		buf.Write(data)
 	}
 	require.EqualValues(t, maxBlocks, llb.Len())
