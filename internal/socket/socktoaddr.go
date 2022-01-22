@@ -25,6 +25,8 @@ import (
 	bsPool "github.com/panjf2000/gnet/v2/pkg/pool/byteslice"
 )
 
+var ipv4InIPv6Prefix = []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff}
+
 // SockaddrToTCPOrUnixAddr converts a Sockaddr to a net.TCPAddr or net.UnixAddr.
 // Returns nil if conversion fails.
 func SockaddrToTCPOrUnixAddr(sa unix.Sockaddr) net.Addr {
@@ -59,9 +61,8 @@ func SockaddrToUDPAddr(sa unix.Sockaddr) net.Addr {
 // It returns nil if conversion fails.
 func sockaddrInet4ToIP(sa *unix.SockaddrInet4) net.IP {
 	ip := bsPool.Get(16)
-	// V4InV6Prefix
-	ip[10] = 0xff
-	ip[11] = 0xff
+	// ipv4InIPv6Prefix
+	copy(ip[0:12], ipv4InIPv6Prefix)
 	copy(ip[12:16], sa.Addr[:])
 	return ip
 }
