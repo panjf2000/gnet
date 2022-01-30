@@ -18,7 +18,6 @@ import (
 	"io"
 
 	"github.com/panjf2000/gnet/v2/pkg/buffer/ring"
-	bbPool "github.com/panjf2000/gnet/v2/pkg/pool/bytebuffer"
 	rbPool "github.com/panjf2000/gnet/v2/pkg/pool/ringbuffer"
 )
 
@@ -157,25 +156,12 @@ func (b *RingBuffer) WriteString(s string) (int, error) {
 	return b.instance().WriteString(s)
 }
 
-// ByteBuffer returns all available read bytes. It does not move the read pointer and only copy the available data.
-func (b *RingBuffer) ByteBuffer() *bbPool.ByteBuffer {
+// Bytes returns all available read bytes. It does not move the read pointer and only copy the available data.
+func (b *RingBuffer) Bytes() []byte {
 	if b.rb == nil {
 		return nil
 	}
-	return b.rb.ByteBuffer()
-}
-
-// WithByteBuffer combines the available read bytes and the given bytes. It does not move the read pointer and
-// only copy the available data.
-func (b *RingBuffer) WithByteBuffer(p []byte) *bbPool.ByteBuffer {
-	if b.rb == nil {
-		bb := bbPool.Get()
-		_, _ = bb.Write(p)
-		return bb
-	}
-
-	defer b.done()
-	return b.rb.WithByteBuffer(p)
+	return b.rb.Bytes()
 }
 
 // ReadFrom implements io.ReaderFrom.

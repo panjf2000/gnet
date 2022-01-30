@@ -24,7 +24,6 @@ import (
 	"io"
 
 	"github.com/panjf2000/gnet/v2/internal/toolkit"
-	bbPool "github.com/panjf2000/gnet/v2/pkg/pool/bytebuffer"
 	bsPool "github.com/panjf2000/gnet/v2/pkg/pool/byteslice"
 )
 
@@ -313,58 +312,28 @@ func (rb *Buffer) WriteString(s string) (int, error) {
 	return rb.Write(toolkit.StringToBytes(s))
 }
 
-// ByteBuffer returns all available read bytes. It does not move the read pointer and only copy the available data.
-func (rb *Buffer) ByteBuffer() *bbPool.ByteBuffer {
+// Bytes returns all available read bytes. It does not move the read pointer and only copy the available data.
+func (rb *Buffer) Bytes() []byte {
 	if rb.isEmpty {
 		return nil
 	} else if rb.w == rb.r {
-		bb := bbPool.Get()
-		_, _ = bb.Write(rb.buf[rb.r:])
-		_, _ = bb.Write(rb.buf[:rb.w])
+		var bb []byte
+		bb = append(bb, rb.buf[rb.r:]...)
+		bb = append(bb, rb.buf[:rb.w]...)
 		return bb
 	}
 
-	bb := bbPool.Get()
+	var bb []byte
 	if rb.w > rb.r {
-		_, _ = bb.Write(rb.buf[rb.r:rb.w])
+		bb = append(bb, rb.buf[rb.r:rb.w]...)
 		return bb
 	}
 
-	_, _ = bb.Write(rb.buf[rb.r:])
+	bb = append(bb, rb.buf[rb.r:]...)
 
 	if rb.w != 0 {
-		_, _ = bb.Write(rb.buf[:rb.w])
+		bb = append(bb, rb.buf[:rb.w]...)
 	}
-
-	return bb
-}
-
-// WithByteBuffer combines the available read bytes and the given bytes. It does not move the read pointer and
-// only copy the available data.
-func (rb *Buffer) WithByteBuffer(b []byte) *bbPool.ByteBuffer {
-	if rb.isEmpty {
-		return &bbPool.ByteBuffer{B: b}
-	} else if rb.w == rb.r {
-		bb := bbPool.Get()
-		_, _ = bb.Write(rb.buf[rb.r:])
-		_, _ = bb.Write(rb.buf[:rb.w])
-		_, _ = bb.Write(b)
-		return bb
-	}
-
-	bb := bbPool.Get()
-	if rb.w > rb.r {
-		_, _ = bb.Write(rb.buf[rb.r:rb.w])
-		_, _ = bb.Write(b)
-		return bb
-	}
-
-	_, _ = bb.Write(rb.buf[rb.r:])
-
-	if rb.w != 0 {
-		_, _ = bb.Write(rb.buf[:rb.w])
-	}
-	_, _ = bb.Write(b)
 
 	return bb
 }

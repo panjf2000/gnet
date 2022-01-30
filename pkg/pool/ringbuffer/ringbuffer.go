@@ -77,7 +77,7 @@ func (p *Pool) Get() *RingBuffer {
 
 // Put returns byte buffer to the pool.
 //
-// ByteBuffer.B mustn't be touched after returning it to the pool,
+// RingBuffer mustn't be touched after returning it to the pool,
 // otherwise, data races will occur.
 func Put(b *RingBuffer) { builtinPool.Put(b) }
 
