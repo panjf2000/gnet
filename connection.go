@@ -42,9 +42,9 @@ type conn struct {
 	cache          []byte                  // temporary buffer in each event-loop
 	buffer         []byte                  // buffer for the latest bytes
 	opened         bool                    // connection opened event fired
-	isDatagram     bool                    // UDP protocol
 	localAddr      net.Addr                // local addr
 	remoteAddr     net.Addr                // remote addr
+	isDatagram     bool                    // UDP protocol
 	inboundBuffer  elastic.RingBuffer      // buffer for leftover data from the peer
 	outboundBuffer *elastic.Buffer         // buffer for data that is eligible to be sent to the peer
 	pollAttachment *netpoll.PollAttachment // connection attachment for poller

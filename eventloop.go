@@ -138,22 +138,17 @@ func (el *eventloop) read(c *conn) error {
 	return nil
 }
 
-const (
-	// MaxBytesToWritePerLoop is the maximum amount of bytes to be sent in one system call.
-	MaxBytesToWritePerLoop = 64 * 1024
-	// MaxIovSize is IOV_MAX.
-	MaxIovSize = 1024
-)
+const iovMax = 1024
 
 func (el *eventloop) write(c *conn) error {
-	iov := c.outboundBuffer.Peek(MaxBytesToWritePerLoop)
+	iov := c.outboundBuffer.Peek(-1)
 	var (
 		n   int
 		err error
 	)
 	if len(iov) > 1 {
-		if len(iov) > MaxIovSize {
-			iov = iov[:MaxIovSize]
+		if len(iov) > iovMax {
+			iov = iov[:iovMax]
 		}
 		n, err = io.Writev(c.fd, iov)
 	} else {
@@ -199,8 +194,8 @@ func (el *eventloop) closeConn(c *conn, err error) (rerr error) {
 	if !c.outboundBuffer.IsEmpty() {
 		for !c.outboundBuffer.IsEmpty() {
 			iov := c.outboundBuffer.Peek(0)
-			if len(iov) > MaxIovSize {
-				iov = iov[:MaxIovSize]
+			if len(iov) > iovMax {
+				iov = iov[:iovMax]
 			}
 			n, err := io.Writev(c.fd, iov)
 			if err != nil && err != unix.EAGAIN {

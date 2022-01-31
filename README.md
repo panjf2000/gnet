@@ -32,7 +32,7 @@ English | [🇨🇳中文](README_ZH.md)
 - [x] Built-in goroutine pool powered by the library [ants](https://github.com/panjf2000/ants)
 - [x] Lock-free during the entire runtime
 - [x] Concise and easy-to-use APIs
-- [x] Efficient, reusable and scalable memory buffer: Ring-Buffer, Linked-List-Buffer and Mixed-Buffer
+- [x] Efficient, reusable and elastic memory buffer: (Elastic-)Ring-Buffer, Linked-List-Buffer and Elastic-Mixed-Buffer
 - [x] Supporting multiple protocols/IPC mechanism: `TCP`, `UDP` and `Unix Domain Socket`
 - [x] Supporting multiple load-balancing algorithms: `Round-Robin`, `Source-Addr-Hash` and `Least-Connections`
 - [x] Supporting two event-driven mechanisms: `epoll` on **Linux** and `kqueue` on **FreeBSD/DragonFly/Darwin**
