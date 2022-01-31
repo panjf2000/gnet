@@ -31,7 +31,6 @@ import (
 	"github.com/panjf2000/gnet/v2/internal/socket"
 	"github.com/panjf2000/gnet/v2/pkg/buffer/elastic"
 	gerrors "github.com/panjf2000/gnet/v2/pkg/errors"
-	bbPool "github.com/panjf2000/gnet/v2/pkg/pool/bytebuffer"
 	bsPool "github.com/panjf2000/gnet/v2/pkg/pool/byteslice"
 )
 
@@ -40,7 +39,7 @@ type conn struct {
 	ctx            interface{}             // user-defined context
 	peer           unix.Sockaddr           // remote socket address
 	loop           *eventloop              // connected event-loop
-	cache          *bbPool.ByteBuffer      // temporary buffer in each event-loop
+	cache          []byte                  // temporary buffer in each event-loop
 	buffer         []byte                  // buffer for the latest bytes
 	opened         bool                    // connection opened event fired
 	isDatagram     bool                    // UDP protocol
@@ -80,7 +79,7 @@ func (c *conn) releaseTCP() {
 	c.remoteAddr = nil
 	c.inboundBuffer.Done()
 	c.outboundBuffer.Release()
-	bbPool.Put(c.cache)
+	bsPool.Put(c.cache)
 	c.cache = nil
 	netpoll.PutPollAttachment(c.pollAttachment)
 	c.pollAttachment = nil
@@ -243,7 +242,7 @@ func (c *conn) sendTo(buf []byte) error {
 func (c *conn) resetBuffer() {
 	c.buffer = c.buffer[:0]
 	c.inboundBuffer.Reset()
-	bbPool.Put(c.cache)
+	bsPool.Put(c.cache)
 	c.cache = nil
 }
 
@@ -277,17 +276,25 @@ func (c *conn) Next(n int) (buf []byte, err error) {
 	if len(head) >= n {
 		return head[:n], err
 	}
-	c.cache = bbPool.Get()
-	_, _ = c.cache.Write(head)
-	_, _ = c.cache.Write(tail)
+	switch {
+	case c.cache == nil:
+		c.cache = bsPool.Get(n)
+	case len(c.cache) >= n:
+		c.cache = c.cache[:n]
+	case len(c.cache) < n:
+		bsPool.Put(c.cache)
+		c.cache = bsPool.Get(n)
+	}
+	copy(c.cache, head)
+	copy(c.cache[len(head):], tail)
 	if inBufferLen >= n {
-		return c.cache.B, err
+		return c.cache, err
 	}
 
 	remaining := n - inBufferLen
-	_, _ = c.cache.Write(c.buffer[:remaining])
+	copy(c.cache[inBufferLen:], c.buffer[:remaining])
 	c.buffer = c.buffer[remaining:]
-	return c.cache.B, err
+	return c.cache, err
 }
 
 func (c *conn) Peek(n int) (buf []byte, err error) {
@@ -304,16 +311,16 @@ func (c *conn) Peek(n int) (buf []byte, err error) {
 	if len(head) >= n {
 		return head[:n], err
 	}
-	c.cache = bbPool.Get()
-	_, _ = c.cache.Write(head)
-	_, _ = c.cache.Write(tail)
+	c.cache = bsPool.Get(n)
+	copy(c.cache, head)
+	copy(c.cache[len(head):], tail)
 	if inBufferLen >= n {
-		return c.cache.B, err
+		return c.cache, err
 	}
 
 	remaining := n - inBufferLen
-	_, _ = c.cache.Write(c.buffer[:remaining])
-	return c.cache.B, err
+	copy(c.cache[inBufferLen:], c.buffer[:remaining])
+	return c.cache, err
 }
 
 func (c *conn) Discard(n int) (int, error) {
@@ -328,7 +335,7 @@ func (c *conn) Discard(n int) (int, error) {
 		return n, nil
 	}
 
-	bbPool.Put(c.cache)
+	bsPool.Put(c.cache)
 	c.cache = nil
 
 	discarded, _ := c.inboundBuffer.Discard(n)
