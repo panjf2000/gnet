@@ -277,7 +277,7 @@ func (s *testClientServer) OnTick() (delay time.Duration, action Action) {
 	return
 }
 
-func testServeWithGnetClient(t *testing.T, network, addr string, reuseport, reuseaddr, multicore, async bool, nclients int, lb LoadBalancing) {
+func testServeWithGnetClient(t *testing.T, network, addr string, reusePort, reuseaddr, multicore, async bool, nclients int, lb LoadBalancing) {
 	ts := &testClientServer{
 		tester:     t,
 		network:    network,
@@ -302,7 +302,7 @@ func testServeWithGnetClient(t *testing.T, network, addr string, reuseport, reus
 		network+"://"+addr,
 		WithLockOSThread(async),
 		WithMulticore(multicore),
-		WithReusePort(reuseport),
+		WithReusePort(reusePort),
 		WithReuseAddr(reuseaddr),
 		WithTicker(true),
 		WithTCPKeepAlive(time.Minute*1),
@@ -351,7 +351,6 @@ func startGnetClient(t *testing.T, cli *Client, ev *clientEvents, network, addr 
 		respData := <-rspCh
 		require.NoError(t, err)
 		if !async {
-			// require.Equalf(t, reqData, respData, "response mismatch with protocol:%s, multi-core:%t, content of bytes: %d vs %d", network, multicore, string(reqData), string(respData))
 			require.Equalf(
 				t,
 				reqData,
