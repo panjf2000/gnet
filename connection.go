@@ -39,7 +39,6 @@ type conn struct {
 	ctx            interface{}             // user-defined context
 	peer           unix.Sockaddr           // remote socket address
 	loop           *eventloop              // connected event-loop
-	cache          []byte                  // temporary buffer in each event-loop
 	buffer         []byte                  // buffer for the latest bytes
 	opened         bool                    // connection opened event fired
 	localAddr      net.Addr                // local addr
@@ -79,8 +78,6 @@ func (c *conn) releaseTCP() {
 	c.remoteAddr = nil
 	c.inboundBuffer.Done()
 	c.outboundBuffer.Release()
-	bsPool.Put(c.cache)
-	c.cache = nil
 	netpoll.PutPollAttachment(c.pollAttachment)
 	c.pollAttachment = nil
 }
@@ -242,8 +239,6 @@ func (c *conn) sendTo(buf []byte) error {
 func (c *conn) resetBuffer() {
 	c.buffer = c.buffer[:0]
 	c.inboundBuffer.Reset()
-	bsPool.Put(c.cache)
-	c.cache = nil
 }
 
 // ================================== Non-concurrency-safe API's ==================================
@@ -276,25 +271,17 @@ func (c *conn) Next(n int) (buf []byte, err error) {
 	if len(head) >= n {
 		return head[:n], err
 	}
-	switch {
-	case c.cache == nil:
-		c.cache = bsPool.Get(n)
-	case len(c.cache) >= n:
-		c.cache = c.cache[:n]
-	case len(c.cache) < n:
-		bsPool.Put(c.cache)
-		c.cache = bsPool.Get(n)
-	}
-	copy(c.cache, head)
-	copy(c.cache[len(head):], tail)
+	c.loop.cache.Reset()
+	c.loop.cache.Write(head)
+	c.loop.cache.Write(tail)
 	if inBufferLen >= n {
-		return c.cache, err
+		return c.loop.cache.Bytes(), err
 	}
 
 	remaining := n - inBufferLen
-	copy(c.cache[inBufferLen:], c.buffer[:remaining])
+	c.loop.cache.Write(c.buffer[:remaining])
 	c.buffer = c.buffer[remaining:]
-	return c.cache, err
+	return c.loop.cache.Bytes(), err
 }
 
 func (c *conn) Peek(n int) (buf []byte, err error) {
@@ -311,16 +298,16 @@ func (c *conn) Peek(n int) (buf []byte, err error) {
 	if len(head) >= n {
 		return head[:n], err
 	}
-	c.cache = bsPool.Get(n)
-	copy(c.cache, head)
-	copy(c.cache[len(head):], tail)
+	c.loop.cache.Reset()
+	c.loop.cache.Write(head)
+	c.loop.cache.Write(tail)
 	if inBufferLen >= n {
-		return c.cache, err
+		return c.loop.cache.Bytes(), err
 	}
 
 	remaining := n - inBufferLen
-	copy(c.cache[inBufferLen:], c.buffer[:remaining])
-	return c.cache, err
+	c.loop.cache.Write(c.buffer[:remaining])
+	return c.loop.cache.Bytes(), err
 }
 
 func (c *conn) Discard(n int) (int, error) {
@@ -334,9 +321,6 @@ func (c *conn) Discard(n int) (int, error) {
 		c.buffer = c.buffer[n:]
 		return n, nil
 	}
-
-	bsPool.Put(c.cache)
-	c.cache = nil
 
 	discarded, _ := c.inboundBuffer.Discard(n)
 	if discarded < inBufferLen {

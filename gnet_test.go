@@ -1052,7 +1052,6 @@ func (s *simServer) OnTraffic(c Conn) (action Action) {
 			return Close
 		}
 		packet, _ := codec.Encode(data)
-		codec.Discard(c)
 		packets = append(packets, packet)
 	}
 	if n := len(packets); n > 1 {
@@ -1101,9 +1100,7 @@ func init() {
 // * +                                   +
 // * |            ... ...                |
 // * +-----------------------------------+.
-type testCodec struct {
-	discardBytes int
-}
+type testCodec struct{}
 
 func (codec testCodec) Encode(buf []byte) ([]byte, error) {
 	bodyOffset := magicNumberSize + bodySize
@@ -1134,17 +1131,9 @@ func (codec *testCodec) Decode(c Conn) ([]byte, error) {
 		return nil, errIncompletePacket
 	}
 	buf, _ = c.Peek(msgLen)
-	codec.discardBytes = msgLen
+	_, _ = c.Discard(msgLen)
 
 	return buf[bodyOffset:msgLen], nil
-}
-
-func (codec *testCodec) Discard(c Conn) {
-	if codec.discardBytes <= 0 {
-		return
-	}
-	_, _ = c.Discard(codec.discardBytes)
-	codec.discardBytes = 0
 }
 
 func (codec testCodec) Unpack(buf []byte) ([]byte, error) {
