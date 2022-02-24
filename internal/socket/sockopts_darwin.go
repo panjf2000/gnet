@@ -22,9 +22,9 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// SetKeepAlive sets whether the operating system should send
+// SetKeepAlivePeriod sets whether the operating system should send
 // keep-alive messages on the connection and sets period between keep-alive's.
-func SetKeepAlive(fd, secs int) error {
+func SetKeepAlivePeriod(fd, secs int) error {
 	if secs <= 0 {
 		return errors.New("invalid time duration")
 	}

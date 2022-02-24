@@ -144,12 +144,48 @@ type AsyncCallback func(c Conn) error
 
 // Socket is a set of functions which manipulate the underlying file descriptor of a connection.
 type Socket interface {
+	// Fd returns the underlying file descriptor.
 	Fd() int
+
+	// Dup returns a copy of the underlying file descriptor.
+	// It is the caller's responsibility to close fd when finished.
+	// Closing c does not affect fd, and closing fd does not affect c.
+	//
+	// The returned file descriptor is different from the
+	// connection's. Attempting to change properties of the original
+	// using this duplicate may or may not have the desired effect.
 	Dup() (int, error)
+
+	// SetReadBuffer sets the size of the operating system's
+	// receive buffer associated with the connection.
 	SetReadBuffer(bytes int) error
+
+	// SetWriteBuffer sets the size of the operating system's
+	// transmit buffer associated with the connection.
 	SetWriteBuffer(bytes int) error
+
+	// SetLinger sets the behavior of Close on a connection which still
+	// has data waiting to be sent or to be acknowledged.
+	//
+	// If sec < 0 (the default), the operating system finishes sending the
+	// data in the background.
+	//
+	// If sec == 0, the operating system discards any unsent or
+	// unacknowledged data.
+	//
+	// If sec > 0, the data is sent in the background as with sec < 0. On
+	// some operating systems after sec seconds have elapsed any remaining
+	// unsent data may be discarded.
 	SetLinger(sec int) error
+
+	// SetKeepAlivePeriod tells operating system to send keep-alive messages on the connection
+	// and sets period between TCP keep-alive probes.
 	SetKeepAlivePeriod(d time.Duration) error
+
+	// SetNoDelay controls whether the operating system should delay
+	// packet transmission in hopes of sending fewer packets (Nagle's
+	// algorithm).
+	// The default is true (no delay), meaning that data is sent as soon as possible after a Write.
 	SetNoDelay(noDelay bool) error
 	// CloseRead() error
 	// CloseWrite() error

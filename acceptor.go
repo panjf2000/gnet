@@ -44,7 +44,7 @@ func (eng *engine) accept(fd int, _ netpoll.IOEvent) error {
 
 	remoteAddr := socket.SockaddrToTCPOrUnixAddr(sa)
 	if eng.opts.TCPKeepAlive > 0 && eng.ln.network == "tcp" {
-		err = socket.SetKeepAlive(nfd, int(eng.opts.TCPKeepAlive.Seconds()))
+		err = socket.SetKeepAlivePeriod(nfd, int(eng.opts.TCPKeepAlive.Seconds()))
 		logging.Error(err)
 	}
 
@@ -78,7 +78,7 @@ func (el *eventloop) accept(fd int, ev netpoll.IOEvent) error {
 
 	remoteAddr := socket.SockaddrToTCPOrUnixAddr(sa)
 	if el.engine.opts.TCPKeepAlive > 0 && el.ln.network == "tcp" {
-		err = socket.SetKeepAlive(nfd, int(el.engine.opts.TCPKeepAlive/time.Second))
+		err = socket.SetKeepAlivePeriod(nfd, int(el.engine.opts.TCPKeepAlive/time.Second))
 		logging.Error(err)
 	}
 
