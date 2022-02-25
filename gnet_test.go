@@ -525,8 +525,14 @@ func (t *testWakeConnServer) OnTick() (delay time.Duration, action Action) {
 func testWakeConn(t *testing.T, network, addr string) {
 	svr := &testWakeConnServer{tester: t, network: network, addr: addr, conn: make(chan Conn, 1)}
 	logger := zap.NewExample()
-	err := Run(svr, network+"://"+addr, WithTicker(true), WithNumEventLoop(2*runtime.NumCPU()),
-		WithLogger(logger.Sugar()), WithReadBufferCap(2000), WithWriteBufferCap(2000))
+	err := Run(svr, network+"://"+addr,
+		WithTicker(true),
+		WithNumEventLoop(2*runtime.NumCPU()),
+		WithLogger(logger.Sugar()),
+		WithSocketRecvBuffer(4*1024),
+		WithSocketSendBuffer(4*1024),
+		WithReadBufferCap(2000),
+		WithWriteBufferCap(2000))
 	assert.NoError(t, err)
 	_ = logger.Sync()
 }
