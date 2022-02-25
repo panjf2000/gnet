@@ -31,6 +31,7 @@ import (
 	"github.com/panjf2000/gnet/v2/internal/netpoll"
 	"github.com/panjf2000/gnet/v2/internal/socket"
 	"github.com/panjf2000/gnet/v2/internal/toolkit"
+	"github.com/panjf2000/gnet/v2/pkg/buffer/ring"
 	gerrors "github.com/panjf2000/gnet/v2/pkg/errors"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
 )
@@ -74,11 +75,26 @@ func NewClient(eventHandler EventHandler, opts ...Option) (cli *Client, err erro
 	el.ln = eng.ln
 	el.engine = eng
 	el.poller = p
-	if rbc := options.ReadBufferCap; rbc <= 0 {
-		options.ReadBufferCap = 0x10000
-	} else {
+
+	rbc := options.ReadBufferCap
+	switch {
+	case rbc <= 0:
+		options.ReadBufferCap = MaxStreamBufferCap
+	case rbc <= ring.DefaultBufferSize:
+		options.ReadBufferCap = ring.DefaultBufferSize
+	default:
 		options.ReadBufferCap = toolkit.CeilToPowerOfTwo(rbc)
 	}
+	wbc := options.WriteBufferCap
+	switch {
+	case wbc <= 0:
+		options.WriteBufferCap = MaxStreamBufferCap
+	case wbc <= ring.DefaultBufferSize:
+		options.WriteBufferCap = ring.DefaultBufferSize
+	default:
+		options.WriteBufferCap = toolkit.CeilToPowerOfTwo(wbc)
+	}
+
 	el.buffer = make([]byte, options.ReadBufferCap)
 	el.udpSockets = make(map[int]*conn)
 	el.connections = make(map[int]*conn)

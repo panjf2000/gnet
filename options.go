@@ -66,11 +66,20 @@ type Options struct {
 	// ============================= Options for both server-side and client-side =============================
 
 	// ReadBufferCap is the maximum number of bytes that can be read from the peer when the readable event comes.
-	// The default value is 64KB, it can be reduced to avoid starving the subsequent connections.
+	// The default value is 64KB, it can either be reduced to avoid starving the subsequent connections or increase
+	// to read more data from a socket.
 	//
 	// Note that ReadBufferCap will always be converted to the least power of two integer value greater than
 	// or equal to its real amount.
 	ReadBufferCap int
+
+	// WriteBufferCap is the maximum number of bytes that a static outbound buffer can hold,
+	// if the data exceeds this value, the overflow will be stored in the elastic linked list buffer.
+	// The default value is 64KB.
+	//
+	// Note that WriteBufferCap will always be converted to the least power of two integer value greater than
+	// or equal to its real amount.
+	WriteBufferCap int
 
 	// LockOSThread is used to determine whether each I/O event-loop is associated to an OS thread, it is useful when you
 	// need some kind of mechanisms like thread local storage, or invoke certain C libraries (such as graphics lib: GLib)
@@ -137,6 +146,13 @@ func WithLockOSThread(lockOSThread bool) Option {
 func WithReadBufferCap(readBufferCap int) Option {
 	return func(opts *Options) {
 		opts.ReadBufferCap = readBufferCap
+	}
+}
+
+// WithWriteBufferCap sets up WriteBufferCap for pending bytes.
+func WithWriteBufferCap(writeBufferCap int) Option {
+	return func(opts *Options) {
+		opts.WriteBufferCap = writeBufferCap
 	}
 }
 

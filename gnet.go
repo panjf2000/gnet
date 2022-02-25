@@ -358,6 +358,7 @@ func Run(eventHandler EventHandler, protoAddr string, opts ...Option) (err error
 			"while you are trying to set up %d\n", options.NumEventLoop)
 		return errors.ErrTooManyEventLoopThreads
 	}
+
 	rbc := options.ReadBufferCap
 	switch {
 	case rbc <= 0:
@@ -366,6 +367,15 @@ func Run(eventHandler EventHandler, protoAddr string, opts ...Option) (err error
 		options.ReadBufferCap = ring.DefaultBufferSize
 	default:
 		options.ReadBufferCap = toolkit.CeilToPowerOfTwo(rbc)
+	}
+	wbc := options.WriteBufferCap
+	switch {
+	case wbc <= 0:
+		options.WriteBufferCap = MaxStreamBufferCap
+	case wbc <= ring.DefaultBufferSize:
+		options.WriteBufferCap = ring.DefaultBufferSize
+	default:
+		options.WriteBufferCap = toolkit.CeilToPowerOfTwo(wbc)
 	}
 
 	network, addr := parseProtoAddr(protoAddr)
