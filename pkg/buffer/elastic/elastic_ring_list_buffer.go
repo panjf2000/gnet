@@ -48,10 +48,6 @@ func (mb *Buffer) Read(p []byte) (n int, err error) {
 		return mb.listBuffer.Read(p)
 	}
 	n, err = mb.ringBuffer.Read(p)
-	if mb.ringBuffer.IsEmpty() {
-		rbPool.Put(mb.ringBuffer)
-		mb.ringBuffer = nil
-	}
 	if n == len(p) {
 		return n, err
 	}
@@ -83,18 +79,13 @@ func (mb *Buffer) Discard(n int) (discarded int, err error) {
 		return mb.listBuffer.Discard(n)
 	}
 
-	rbLen := mb.ringBuffer.Buffered()
+	staticLen := mb.ringBuffer.Buffered()
 	discarded, err = mb.ringBuffer.Discard(n)
-	if n <= rbLen {
-		if n == rbLen {
-			rbPool.Put(mb.ringBuffer)
-			mb.ringBuffer = nil
-		}
+	if n <= staticLen {
 		return
 	}
-	rbPool.Put(mb.ringBuffer)
-	mb.ringBuffer = nil
-	n -= rbLen
+
+	n -= staticLen
 	var m int
 	m, err = mb.listBuffer.Discard(n)
 	discarded += m
@@ -176,12 +167,7 @@ func (mb *Buffer) WriteTo(w io.Writer) (n int64, err error) {
 	if mb.ringBuffer == nil {
 		return mb.listBuffer.WriteTo(w)
 	}
-	n, err = mb.ringBuffer.WriteTo(w)
-	if mb.ringBuffer.IsEmpty() {
-		rbPool.Put(mb.ringBuffer)
-		mb.ringBuffer = nil
-	}
-	if err != nil {
+	if n, err = mb.ringBuffer.WriteTo(w); err != nil {
 		return
 	}
 	var m int64

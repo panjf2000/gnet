@@ -61,7 +61,7 @@ func TestMixedBuffer_Basic(t *testing.T) {
 	n, err = mb.Discard(rbn)
 	require.NoError(t, err)
 	require.EqualValues(t, rbn, n)
-	require.Nil(t, mb.ringBuffer)
+	require.NotNil(t, mb.ringBuffer)
 	bs = mb.Peek(newDataLen - rbn)
 	p = bs[0]
 	require.EqualValues(t, data[rbn:], p)
@@ -108,7 +108,7 @@ func TestMixedBuffer_Basic(t *testing.T) {
 	require.EqualValues(t, cum, n)
 	require.EqualValues(t, buf.Bytes(), p)
 
-	require.Nil(t, mb.ringBuffer)
+	require.NotNil(t, mb.ringBuffer)
 	require.True(t, mb.IsEmpty())
 }
 
@@ -149,7 +149,7 @@ func TestMixedBuffer_ReadFrom(t *testing.T) {
 	require.NoError(t, err)
 	require.EqualValues(t, dataLen, m)
 
-	require.Nil(t, mb.ringBuffer)
+	require.NotNil(t, mb.ringBuffer)
 	require.True(t, mb.IsEmpty())
 }
 
@@ -190,6 +190,6 @@ func TestMixedBuffer_WriteTo(t *testing.T) {
 	require.EqualValues(t, cum, m)
 	require.EqualValues(t, buf.Bytes(), newBuf.Bytes())
 
-	require.Nil(t, mb.ringBuffer)
+	require.NotNil(t, mb.ringBuffer)
 	require.True(t, mb.IsEmpty())
 }
