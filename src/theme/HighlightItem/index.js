@@ -63,7 +63,7 @@ function HighlightItem({authorGithub, colorize, dateString, description, heading
       <TimeAgo title={formattedDate} pubdate="pubdate" datetime={date} />
     </span>
     <span className="separator"> / </span>
-    <span className="author-title">Gnet creator</span>
+    <span className="author-title">gnet creator</span>
   </>;
 
   return (

@@ -1,7 +1,7 @@
 const path = require("path");
 
 module.exports = {
-  title: "Gnet",
+  title: "gnet",
   tagline:
     "A high-performance, lightweight, non-blocking, event-driven networking framework written in pure Go",
   url: "https://gnet.host",
@@ -13,14 +13,17 @@ module.exports = {
     metadata: require("./metadata"),
   },
   themeConfig: {
+    themeConfig: {
+        sidebarCollapsible: true,
+    },
     navbar: {
       hideOnScroll: true,
       logo: {
-        alt: "Gnet",
+        alt: "gnet",
         src: "img/logo-light.svg",
       },
       links: [
-        { to: "docs/", label: "Documentations", position: "left" },
+        { to: "docs/", label: "Docs", position: "left" },
         { to: "blog/", label: "Blog", position: "left" },
         { to: "highlights/", label: "Highlights", position: "right" },
         { to: "community/", label: "Community", position: "right" },
@@ -42,8 +45,8 @@ module.exports = {
           title: "About",
           items: [
             {
-              label: "What is Gnet?",
-              to: "docs/about/what-is-gnet/",
+              label: "What is gnet?",
+              to: "docs/about/overview/",
             },
             {
               label: "The Team",
@@ -82,14 +85,15 @@ module.exports = {
         },
       ],
       logo: {
-        alt: "Gnet",
+        alt: "gnet",
         src: "/img/footer-logo.svg",
         href: "https://github.com/panjf2000/gnet/",
       },
       copyright: `Copyright © ${new Date().getFullYear()} Andy Pan`,
     },
     algolia: {
-      apiKey: "a9aa400312a1e718f717e1164d912086",
+      appId: "XAU0LZRY7D",
+      apiKey: "16718218c3285345ca7d01dd0589b411",
       indexName: "gnet",
       algoliaOptions: {}, // Optional, if provided by Algolia
     },
@@ -114,7 +118,7 @@ module.exports = {
     ],
     ["@docusaurus/plugin-content-pages", {}],
     path.resolve(__dirname, "./plugins/highlights"),
-    // [path.resolve(__dirname, "./plugins/sitemap"), {}],
+    ["@docusaurus/plugin-content-pages", {}],
   ],
   scripts: [],
   stylesheets: [

@@ -16,14 +16,14 @@ module.exports = {
     "author_github": "https://github.com/panjf2000",
     "date": "2020-03-14",
     "description": "gnet 是一个高性能、轻量级、非阻塞的事件驱动 Go 网络框架。",
-    "id": "presenting-gnet-cn",
-    "path": "website/blog/2020-03-14-presenting-gnet-cn.md",
-    "permalink": "/blog/2020-03-14-presenting-gnet-cn/",
+    "id": "announcing-gnet-v1-cn",
+    "path": "website/blog/2020-03-14-announcing-gnet-v1-cn.md",
+    "permalink": "/blog/2020-03-14-announcing-gnet-v1-cn/",
     "tags": [
       "type: 官宣",
       "domain: 展示"
     ],
-    "title": "Presenting Gnet"
+    "title": "Introduction to gnet v1"
   },
   "post_tags": [
     "type: 官宣",

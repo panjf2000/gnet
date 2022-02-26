@@ -1,119 +1,34 @@
 ---
-last_modified_on: "2020-03-13"
-id: presenting-gnet
-title: Presenting Gnet
-description: "Hello World! We present you, gnet!"
+id: doc-for-gnet-v1-cn
+last_modified_on: "2020-03-14"
+title: "gnet v1 文档"
+description: "最快的 Go 网络框架 gnet 来啦！"
 author_github: https://github.com/panjf2000
-tags: ["type: announcement", "domain: presentation"]
+tags: ["type: 官宣", "domain: 展示"]
 ---
 
-<p align="center">
-<img src="https://raw.githubusercontent.com/panjf2000/logos/master/gnet/logo.png" alt="gnet" />
-</p>
+# 🎉 开始使用
 
-# 📖 Introduction
+## 前提
 
-`gnet` is an event-driven networking framework that is fast and lightweight. It makes direct [epoll](https://en.wikipedia.org/wiki/Epoll) and [kqueue](https://en.wikipedia.org/wiki/Kqueue) syscalls rather than using the standard Go [net](https://golang.org/pkg/net/) package and works in a similar manner as [netty](https://github.com/netty/netty) and [libuv](https://github.com/libuv/libuv), which makes `gnet` achieve a much higher performance than Go [net](https://golang.org/pkg/net/).
+`gnet` 需要 Go 版本 >= 1.9。
 
-`gnet` is not designed to displace the standard Go [net](https://golang.org/pkg/net/) package, but to create a networking server framework for Go that performs on par with [Redis](http://redis.io) and [Haproxy](http://www.haproxy.org) for networking packets handling.
-
-`gnet` sells itself as a high-performance, lightweight, non-blocking, event-driven networking framework written in pure Go which works on transport layer with TCP/UDP protocols and Unix Domain Socket , so it allows developers to implement their own protocols(HTTP, RPC, WebSocket, Redis, etc.) of application layer upon `gnet` for building  diversified network applications, for instance, you get an HTTP Server or Web Framework if you implement HTTP protocol upon `gnet` while you have a Redis Server done with the implementation of Redis protocol upon `gnet` and so on.
-
-**`gnet` derives from the project: `evio` while having a much higher performance and more features.**
-
-# 🚀 Features
-
-- [x] [High-performance](#-performance) event-loop under networking model of multiple threads/goroutines
-- [x] Built-in goroutine pool powered by the library [ants](https://github.com/panjf2000/ants)
-- [x] Built-in memory pool with bytes powered by the library [bytebufferpool](https://github.com/valyala/bytebufferpool)
-- [x] Lock-free during the entire runtime
-- [x] Concise and easy-to-use APIs
-- [x] Efficient, reusable and scalable memory buffer: Ring-Buffer
-- [x] Supporting multiple protocols/IPC mechanism: `TCP`, `UDP` and `Unix Domain Socket`
-- [x] Supporting multiple load-balancing algorithms: `Round-Robin`, `Source-Addr-Hash` and `Least-Connections`
-- [x] Supporting two event-driven mechanisms: `epoll` on **Linux** and `kqueue` on **FreeBSD/DragonFly/Darwin**
-- [x] Supporting asynchronous write operation
-- [x] Flexible ticker event
-- [x] SO_REUSEPORT socket option
-- [x] Built-in multiple codecs to encode/decode network frames into/from TCP stream: LineBasedFrameCodec, DelimiterBasedFrameCodec, FixedLengthFrameCodec and LengthFieldBasedFrameCodec, referencing [netty codec](https://netty.io/4.1/api/io/netty/handler/codec/package-summary.html), also supporting customized codecs
-- [x] Supporting Windows platform with ~~event-driven mechanism of IOCP~~ Go stdlib: net
-- [ ] Implementation of `gnet` Client
-
-# 💡 Key Designs
-
-## Networking Model of Multiple Threads/Goroutines
-### Multiple Reactors
-
-`gnet` redesigns and implements a new built-in networking model of multiple threads/goroutines: 『multiple reactors』 which is also the default networking model of multiple threads in `netty`, Here's the schematic diagram:
-
-<p align="center">
-<img alt="multi_reactor" src="https://raw.githubusercontent.com/panjf2000/illustrations/master/go/multi-reactors.png" />
-</p>
-
-and it works as the following sequence diagram:
-<p align="center">
-<img alt="reactor" src="https://raw.githubusercontent.com/panjf2000/illustrations/master/go/multi-reactors-sequence-diagram.png" />
-</p>
-
-### Multiple Reactors + Goroutine Pool
-
-You may ask me a question: what if my business logic in `EventHandler.React`  contains some blocking code which leads to blocking in event-loop of `gnet`, what is the solution for this kind of situation？
-
-As you know, there is a most important tenet when writing code under `gnet`: you should never block the event-loop goroutine in the `EventHandler.React`, which is also the most important tenet in `netty`, otherwise, it will result in a low throughput in your `gnet` server.
-
-And the solution to that could be found in the subsequent networking model of multiple threads/goroutines in `gnet`: 『multiple reactors with thread/goroutine pool』which pulls you out from the blocking mire, it will construct a worker-pool with fixed capacity and put those blocking jobs in `EventHandler.React` into the worker-pool to make the event-loop goroutines non-blocking.
-
-The networking model:『multiple reactors with thread/goroutine pool』dissolves the blocking jobs by introducing a goroutine pool, as shown below:
-
-<p align="center">
-<img alt="multi_reactor_thread_pool" src="https://raw.githubusercontent.com/panjf2000/illustrations/master/go/multi-reactors%2Bthread-pool.png" />
-</p>
-
-and it works as the following sequence diagram:
-<p align="center">
-<img alt="multi-reactors" src="https://raw.githubusercontent.com/panjf2000/illustrations/master/go/multi-reactors%2Bthread-pool-sequence-diagram.png" />
-</p>
-
-`gnet` implements the networking model:『multiple reactors with thread/goroutine pool』by the aid of a high-performance goroutine pool called [ants](https://github.com/panjf2000/ants) that allows you to manage and recycle a massive number of goroutines in your concurrent programs, the full features and usages in `ants` are documented [here](https://pkg.go.dev/github.com/panjf2000/ants/v2?tab=doc).
-
-`gnet` integrates `ants` and provides the `pool.goroutine.Default()` method that you can call to instantiate a `ants` pool where you are able to put your blocking code logic and call the function `gnet.Conn.AsyncWrite([]byte)` to send out data asynchronously after you finish the blocking process and get the output data, which makes the goroutine of event-loop non-blocking.
-
-The details about integrating `gnet`  with `ants` are shown [here](#echo-server-with-blocking-logic).
-
-## Reusable and auto-scaling Ring Buffer
-
-There are two ring-buffers inside `gnet`: inbound buffer and outbound buffer to buffer and manage inbound/outbound network data, ring-buffer inside gnet is designed and tuned to reuse memory and be auto-scaling on demand.
-
-The purpose of implementing inbound and outbound ring-buffers in `gnet` is to transfer the logic of buffering and managing network data based on application protocol upon TCP stream from business server to framework and unify the network data buffer, which minimizes the complexity of business code so that developers are able to concentrate on business logic instead of the underlying implementation.
-
-<p align="center">
-<img src="https://raw.githubusercontent.com/panjf2000/illustrations/master/go/ring-buffer.gif" />
-</p>
-
-
-# 🎉 Getting Started
-
-## Prerequisites
-
-`gnet` requires Go 1.9 or later.
-
-## Installation
+## 安装
 
 ```powershell
 go get -u github.com/panjf2000/gnet
 ```
 
-`gnet` is available as a Go module, with [Go 1.11 Modules](https://github.com/golang/go/wiki/Modules) support (Go 1.11+), just simply `import "github.com/panjf2000/gnet"` in your source code and `go [build|run|test]` will download the necessary dependencies automatically.
+`gnet` 支持作为一个 Go module 被导入，基于 [Go 1.11 Modules](https://github.com/golang/go/wiki/Modules) (Go 1.11+)，只需要在你的项目里直接 `import "github.com/panjf2000/gnet"`，然后运行 `go [build|run|test]` 自动下载和构建需要的依赖包。
 
-## Usage Examples
+## 使用示例
 
-**The detailed documentation is located here: [docs of gnet](https://pkg.go.dev/github.com/panjf2000/gnet?tab=doc), but let's pass through the brief instructions first.**
+**详细的文档在这里: [gnet 接口文档](https://pkg.go.dev/github.com/panjf2000/gnet?tab=doc)，不过下面我们先来了解下使用 `gnet` 的简略方法。**
 
-It is easy to create a network server with `gnet`. All you have to do is just to make your implementation of `gnet.EventHandler` interface and register your event-handler functions to it, then pass it to the `gnet.Serve` function along with the binding address(es). Each connection is represented as a `gnet.Conn` interface that is passed to various events to differentiate the clients. At any point you can close a connection or shutdown the server by return a `Close` or `Shutdown` action from an event function.
+用 `gnet` 来构建网络服务器是非常简单的，只需要实现 `gnet.EventHandler`接口然后把你关心的事件函数注册到里面，最后把它连同监听地址一起传递给 `gnet.Serve` 函数就完成了。在服务器开始工作之后，每一条到来的网络连接会在各个事件之间传递，如果你想在某个事件中关闭某条连接或者关掉整个服务器的话，直接在事件函数里把 `gnet.Action` 设置成 `Close` 或者 `Shutdown` 就行了。
 
-The simplest example to get you started playing with `gnet` would be the echo server. So here you are, a simplest echo server upon `gnet` that is listening on port 9000:
-
-### Echo server without blocking logic
+Echo 服务器是一种最简单网络服务器，把它作为 `gnet` 的入门例子在再合适不过了，下面是一个最简单的 echo server，它监听了 9000 端口：
+### 不带阻塞逻辑的 echo 服务器
 
 <details>
 	<summary> Old version(&lt;=v1.0.0-rc.4)  </summary>
@@ -168,9 +83,9 @@ func main() {
 }
 ```
 
-As you can see, this example of echo server only sets up the `EventHandler.React` function where you commonly write your main business code and it will be called once the server receives input data from a client. What you should know is that the input parameter: `frame` is a complete packet which has been decoded by the codec, as a general rule, you should implement the `gnet` [codec interface](https://pkg.go.dev/github.com/panjf2000/gnet?tab=doc#ICodec) as the business codec to packet and unpacket TCP stream, but if you don't, your `gnet` server is going to work with the [default codec](https://pkg.go.dev/github.com/panjf2000/gnet?tab=doc#BuiltInFrameCodec) under the acquiescence, which means all data inculding latest data and previous data in buffer will be stored in the input parameter: `frame` when `EventHandler.React` is being triggered. The output data will be then encoded and sent back to that client by assigning the `out` variable and returning it after your business code finish processing data(in this case, it just echo the data back).
+正如你所见，上面的例子里 `gnet` 实例只注册了一个 `EventHandler.React` 事件。一般来说，主要的业务逻辑代码会写在这个事件方法里，这个方法会在服务器接收到客户端写过来的数据之时被调用，此时的输入参数: `frame` 已经是解码过后的一个完整的网络数据包，一般来说你需要实现 `gnet` 的 [codec 接口](https://pkg.go.dev/github.com/panjf2000/gnet?tab=doc#ICodec)作为你自己的业务编解码器来处理 TCP 组包和分包的问题，如果你不实现那个接口的话，那么 `gnet` 将会使用[默认的 codec](https://pkg.go.dev/github.com/panjf2000/gnet?tab=doc#BuiltInFrameCodec)，这意味着在 `EventHandler.React` 被触发调用之时输入参数: `frame` 里存储的是所有网络数据：包括最新的以及还在 buffer 里的旧数据，然后处理输入数据（这里只是把数据 echo 回去）并且在处理完之后把需要输出的数据赋值给 `out` 变量并返回，接着输出的数据会经过编码，最后被写回客户端。
 
-### Echo server with blocking logic
+### 带阻塞逻辑的 echo 服务器
 
 <details>
 	<summary> Old version(&lt;=v1.0.0-rc.4)  </summary>
@@ -251,9 +166,9 @@ func main() {
 }
 ```
 
-Like I said in the 『Multiple Reactors + Goroutine Pool』section, if there are blocking code in your business logic, then you ought to turn them into non-blocking code in any way, for instance, you can wrap them into a goroutine, but it will result in a massive amount of goroutines if massive traffic is passing through your server so I would suggest you utilize a goroutine pool like [ants](https://github.com/panjf2000/ants) to manage those goroutines and reduce the cost of system resources.
+正如我在『主从多 Reactors + 线程/Go程池』那一节所说的那样，如果你的业务逻辑里包含阻塞代码，那么你应该把这些阻塞代码变成非阻塞的，比如通过把这部分代码放到独立的 goroutines 去运行，但是要注意一点，如果你的服务器处理的流量足够的大，那么这种做法将会导致创建大量的 goroutines 极大地消耗系统资源，所以我一般建议你用 goroutine pool 来做 goroutines 的复用和管理，以及节省系统资源。
 
-**All gnet examples:**
+**各种 gnet 示例:**
 
 <details>
 	<summary> TCP Echo Server </summary>
@@ -851,16 +766,16 @@ func main() {
 ```
 </details>
 
-
 <details>
 	<summary> Custom Codec Demo with Client/Server </summary>
 
 **protocol intro:**
 
 ```go
-// CustomLengthFieldProtocol : custom protocol
-// custom protocol header contains Version, ActionType and DataLength fields
-// its payload is Data field
+// CustomLengthFieldProtocol 
+// 测试用的协议，由以下字段构成:
+// version+actionType+dataLength+data
+// 其中 version+actionType+dataLength 为 header，data 为 payload
 type CustomLengthFieldProtocol struct {
 	Version    uint16
 	ActionType uint16
@@ -875,7 +790,7 @@ func (cc *CustomLengthFieldProtocol) Encode(c gnet.Conn, buf []byte) ([]byte, er
 
 	buffer := bytes.NewBuffer(result)
 
-	// take out the param that `React()` event saved.
+	// 取出`React()`时存入的参数
 	item := c.Context().(CustomLengthFieldProtocol)
 
 
@@ -926,47 +841,45 @@ func (cc *CustomLengthFieldProtocol) Decode(c gnet.Conn) ([]byte, error) {
 		protocolLen := headerLen + dataLen
 		if dataSize, data := c.ReadN(protocolLen); dataSize == protocolLen {
 			c.ShiftN(protocolLen)
-			// log.Println("parse success:", data, dataSize)
 
 			// return the payload of the data
 			return data[headerLen:], nil
 		}
-		// log.Println("not enough payload data:", dataLen, protocolLen, dataSize)
 		return nil, errors.New("not enough payload data")
 
 	}
-	// log.Println("not enough header data:", size)
 	return nil, errors.New("not enough header data")
 }
 ```
 
 **Client/Server:**
-[Check out the source code](https://github.com/gnet-io/gnet-examples/tree/master/examples/custom_codec).
+[查看源码](https://github.com/gnet-io/gnet-examples/tree/master/examples/custom_codec).
 </details>
 
-**For more details, check out here: [all examples of gnet](https://github.com/gnet-io/gnet-examples/tree/master/examples).**
+**更详细的代码在这里: [全部 gnet 示例](https://github.com/gnet-io/gnet-examples)。**
 
-## I/O Events
+## I/O 事件
 
-Current supported I/O events in `gnet`:
+ `gnet` 目前支持的 I/O 事件如下：
 
-- `EventHandler.OnInitComplete` fires when the server has been initialized and ready to accept new connections.
-- `EventHandler.OnOpened` fires once a connection has been opened.
-- `EventHandler.OnClosed` fires after a connection has been closed.
-- `EventHandler.React` fires when the server receives inbound data from a socket/connection. (usually it is where you write the code of business logic)
-- `EventHandler.Tick` fires right after the server starts and then fires every specified interval.
-- `EventHandler.PreWrite` fires just before any data has been written to client.
+- `EventHandler.OnInitComplete` 当 server 初始化完成之后调用。
+- `EventHandler.OnOpened` 当连接被打开的时候调用。
+- `EventHandler.OnClosed` 当连接被关闭的之后调用。
+- `EventHandler.React` 当 server 端接收到从 client 端发送来的数据的时候调用。（你的核心业务代码一般是写在这个方法里）
+- `EventHandler.Tick` 服务器启动的时候会调用一次，之后就以给定的时间间隔定时调用一次，是一个定时器方法。
+- `EventHandler.PreWrite` 预先写数据方法，在 server 端写数据回 client 端之前调用。
 
-## poll_opt mode
+## poll_opt 模式
 
-By default, `gnet` utilizes the standard package `golang.org/x/sys/unix` to implement pollers with `epoll` or `kqueue`, where a HASH MAP of `fd->conn` is introduced to help retrieve connections by file descriptors returned from pollers, but now the user can run `go build` with build tags `poll_opt`, like this: `go build -tags=poll_opt`, and `gnet` then switch to the optimized implementations of pollers that invoke the system calls of `epoll` or `kqueue` directly and add file descriptors to the interest list along with storing the corresponding connection pointers into `epoll_data` or `kevent`, in which case `gnet` can get rid of the HASH MAP of `fd->conn` and regain each connection pointer by the conversion of `void*` pointer in the I/O event-looping. In theory, it ought to achieve a higher performance with this optimization. 
+默认情况下，`gnet` 使用官方包 `golang.org/x/sys/unix` 实现基于 `epoll` 和 `kqueue` 的网络轮询器 poller，这种实现需要引入一个 `fd->conn` 哈希表，通过它可以用文件描述符 `fd` 找到对应的 `connection` 结构体，但现在用户可以在 `go build` 编译项目的时候加入构建标签 `poll_opt`，像这样：`go build -tags=poll_opt`，然后 `gnet` 会切换到另一种优化的实现，直接调用 `epoll` 或 `kqueue` 的系统调用，将文件描述符添加到监控列表中，同时将相应的 connection 结构体指针存储到 `epoll_data` 或 `kevent` 中，在这种情况下，`gnet` 就能在 I/O 事件循环中摆脱掉 `fd->conn` 哈希表，将 `void*` 指针转换成 `connection` 结构体指针，通过这种优化，理论上应该可以得到更高的性能。
 
-See [#230](https://github.com/panjf2000/gnet/pull/230) for code details.
+代码细节请浏览 [#230](https://github.com/panjf2000/gnet/pull/230)。
 
-## Ticker
+## 定时器
 
-The `EventHandler.Tick` event fires ticks at a specified interval. 
-The first tick fires right after the gnet server starts up and if you intend to set up a ticker event, don't forget to pass an option: `gnet.WithTicker(true)` to `gnet.Serve`.
+`EventHandler.Tick` 会每隔一段时间触发一次，间隔时间你可以自己控制，设定返回的 `delay` 变量就行。
+
+定时器的第一次触发是在 gnet server 启动之后，如果你要设置定时器，别忘了设置 option 选项：`WithTicker(true)`。
 
 ```go
 events.Tick = func() (delay time.Duration, action Action){
@@ -976,56 +889,56 @@ events.Tick = func() (delay time.Duration, action Action){
 }
 ```
 
-## UDP
+## UDP 支持
 
-`gnet` supports UDP protocol so the `gnet.Serve` method can bind to UDP addresses. 
+`gnet` 支持 UDP 协议，所以在 `gnet.Serve` 里绑定允许绑定 UDP 地址，`gnet` 的 UDP 支持有如下的特性：
 
-- All incoming and outgoing packets will not be buffered but read and sent directly, which means all functions of `gnet.Conn` that manipulate the internal buffers are not available; users should use the `frame []byte` from the `gnet.React(frame []byte, c gnet.Conn)` as the UDP packet instead calling functions of `gnet.Conn`, like `c.Read()`, `c.ResetBuffer()`, `c.BufferLength()` and so on, to process data.
-- The `EventHandler.OnOpened` and `EventHandler.OnClosed` events are not available for UDP sockets, only the `React` event.
-- The UDP equivalents of  `AsyncWrite([]byte)` in TCP is `SendTo([]byte)`.
+- 网络数据的读入和写出不做缓冲，会一次性读写客户端，也就是说 `gnet.Conn` 所有那些操作内部的 buffer 的函数都不可用，比如 `c.Read()`, `c.ResetBuffer()`, `c.BufferLength()` 和其他 buffer 相关的函数；使用者不能调用上述那些函数去操作数据，而应该直接使用 `gnet.React(frame []byte, c gnet.Conn)` 函数入参中的 `frame []byte` 作为 UDP 数据包。
+- `EventHandler.OnOpened` 和 `EventHandler.OnClosed` 这两个事件在 UDP 下不可用，唯一可用的事件是 `React`。
+- TCP 里的异步写操作是 `AsyncWrite([]byte)` 方法，而在 UDP 里对应的方法是  `SendTo([]byte)`。
 
-## Unix Domain Socket
+## Unix Domain Socket 支持
 
-`gnet` also supports UDS(Unix Domain Socket), just pass the UDS addresses like "unix://xxx" to the `gnet.Serve` method and you could play with it.
+`gnet` 还支持 UDS(Unix Domain Socket) 机制，只需要把类似 "unix://xxx" 的 UDS 地址传参给 `gnet.Serve` 函数绑定就行了。
 
-It is nothing different from making use of TCP when doing stuff with UDS, so the `gnet` UDS servers are able to leverage all event functions which are available under TCP protocol.
+在 `gnet` 里使用 UDS 和使用 TCP 没有什么不同，所有 TCP 协议下可以使用的事件函数都可以在 UDS 中使用。
 
-## Multi-threads
+## 使用多核
 
-The `gnet.WithMulticore(true)` indicates whether the server will be effectively created with multi-cores, if so, then you must take care of synchronizing memory between all event callbacks, otherwise, it will run the server with a single thread. The number of threads in the server will be automatically assigned to the value of `runtime.NumCPU()`.
+`gnet.WithMulticore(true)` 参数指定了 `gnet` 是否会使用多核来进行服务，如果是 `true` 的话就会使用多核，否则就是单核运行，利用的核心数一般是机器的 CPU 数量。
 
-## Load Balancing
+## 负载均衡
 
-`gnet` currently supports three load balancing algorithms: `Round-Robin`, `Source-Addr-Hash` and `Least-Connections`, you are able to decide which algorithm to use by passing the functional option `LB` (RoundRobin/LeastConnections/SourceAddrHash) to `gnet.Serve`.
+`gnet` 目前支持三种负载均衡算法：`Round-Robin(轮询)`、`Source-Addr-Hash(源地址哈希)` 和 `Least-Connections(最少连接数)`，你可以通过传递 functional option 的 `LB` (RoundRobin/LeastConnections/SourceAddrHash) 的值给 `gnet.Serve` 来指定要使用的负载均衡算法。
 
-If the load balancing algorithm is not specified explicitly, `gnet` will use `Round-Robin` by default.
+如果没有显示地指定，那么 `gnet` 将会使用 `Round-Robin` 作为默认的负载均衡算法。
 
-## SO_REUSEPORT
+## SO_REUSEPORT 端口复用
 
-`gnet` server is able to utilize the [SO_REUSEPORT](https://lwn.net/Articles/542629/) option which allows multiple sockets on the same host to bind to the same port and the OS kernel takes care of the load balancing for you, it wakes one socket per `connect` event coming to resolved the `thundering herd`.
+服务器支持 [SO_REUSEPORT](https://lwn.net/Articles/542629/) 端口复用特性，允许多个 sockets 监听同一个端口，然后内核会帮你做好负载均衡，每次只唤醒一个 socket 来处理 `connect` 请求，避免惊群效应。
 
-By default, `gnet` is not going to be haunted by the `thundering herd` under its networking model:『multiple reactors』which gets only **one** main reactor to listen on "address:port" and accept new sockets. So this `SO_REUSEPORT` option is trivial in `gnet` but note that it will fall back to the old networking model of `evio` when you enable the `SO_REUSEPORT` option.
+默认情况下，`gnet` 不会有惊群效应，因为 `gnet` 默认的网络模型是主从多 Reactors，只会有一个主 reactor 在监听端口以及接收新连接。所以，开不开启 `SO_REUSEPORT` 选项是无关紧要的，只是开启了这个选项之后 `gnet` 的网络模型将会切换成 `evio` 的旧网络模型，这一点需要注意一下。
 
-Just use functional options to set up `SO_REUSEPORT` and you can enjoy this feature:
+开启这个功能也很简单，使用 functional options 设置一下即可：
 
 ```go
 gnet.Serve(events, "tcp://:9000", gnet.WithMulticore(true), gnet.WithReusePort(true)))
 ```
 
-## Multiple built-in codecs for TCP stream
+## 多种内置的 TCP 流编解码器
 
-There are multiple built-in codecs in `gnet` which allow you to encode/decode frames into/from TCP stream.
+`gnet` 内置了多种用于 TCP 流分包的编解码器。
 
-So far `gnet` has four kinds of built-in codecs: LineBasedFrameCodec, DelimiterBasedFrameCodec, FixedLengthFrameCodec and LengthFieldBasedFrameCodec, which generally meets most scenarios, but still `gnet` allows users to customize their own codecs in their `gnet` servers by implementing the interface [gnet.ICodec](https://pkg.go.dev/github.com/panjf2000/gnet?tab=doc#ICodec) and replacing the default codec in `gnet` with customized codec via functional options.
+目前一共实现了 4 种常见的编解码器：LineBasedFrameCodec, DelimiterBasedFrameCodec, FixedLengthFrameCodec 和 LengthFieldBasedFrameCodec，基本上能满足大多数应用场景的需求了；而且 `gnet` 还允许用户实现自己的编解码器：只需要实现 [gnet.ICodec](https://pkg.go.dev/github.com/panjf2000/gnet?tab=doc#ICodec) 接口，并通过 functional options 替换掉内部默认的编解码器即可。
 
-Here is an [example](https://github.com/gnet-io/gnet-examples/tree/master/examples/codec) with codec, showing you how to leverage codec to encode/decode network frames into/from TCP stream.
+这里有一个使用编解码器对 TCP 流分包的[例子](https://github.com/gnet-io/gnet-examples/tree/master/examples/codec)。
 
-# 📊 Performance
+# 📊 性能测试
 
-## Benchmarks on TechEmpower
+## TechEmpower 性能测试
 
 ```powershell
-# Hardware Environment
+# 硬件环境
 CPU: 28 HT Cores Intel(R) Xeon(R) Gold 5120 CPU @ 2.20GHz
 Mem: 32GB RAM
 OS : Ubuntu 18.04.3 4.15.0-88-generic #88-Ubuntu
@@ -1033,18 +946,18 @@ Net: Switched 10-gigabit ethernet
 Go : go1.14.x linux/amd64
 ```
 
-![All languages](https://raw.githubusercontent.com/panjf2000/illustrations/master/benchmark/techempower-all.jpg)
+![All language](https://raw.githubusercontent.com/panjf2000/illustrations/master/benchmark/techempower-all.jpg)
 
-This is the ***top 50*** on the framework ranking of all programming languages consists of a total of ***422 frameworks*** from all over the world where `gnet` is the ***runner-up***.
+这是包含全部编程语言框架的性能排名***前 50*** 的结果，总榜单包含了全世界共计 ***422 个框架***，其中 `gnet` 排名***第二***。
 
 
 ![Golang](https://raw.githubusercontent.com/panjf2000/illustrations/master/benchmark/techempower-go.png)
 
-This is the full framework ranking of Go and `gnet` tops all the other frameworks, which makes `gnet` the ***fastest*** networking framework in Go.
+这是 Go 语言分类下的全部排名，`gnet` 超越了其他所有框架，位列第一，是***最快***的 Go 网络框架。
 
-To see the full ranking list, visit [TechEmpower Plaintext Benchmark](https://www.techempower.com/benchmarks/#section=test&runid=53c6220a-e110-466c-a333-2e879fea21ad&hw=ph&test=plaintext).
+完整的排行可以通过 [TechEmpower Plaintext Benchmark](https://www.techempower.com/benchmarks/#section=test&runid=53c6220a-e110-466c-a333-2e879fea21ad&hw=ph&test=plaintext) 查看。
 
-## Contrasts to the similar networking libraries
+## 同类型的网络库性能对比
 
 ## On Linux (epoll)
 
@@ -1098,17 +1011,17 @@ Test duration   : 15s
 
 ![](https://github.com/panjf2000/gnet_benchmarks/raw/master/results/echo_packet_macos.png)
 
-# ️🚨 License
+# ️🚨 证书
 
-Source code in `gnet` is available under the [MIT License](https://github.com/panjf2000/gnet/blob/master/LICENSE).
+`gnet` 的源码允许用户在遵循 [MIT 开源证书](https://github.com/panjf2000/gnet/blob/master/LICENSE) 规则的前提下使用。
 
-# 👏 Contributors
+# 👏 贡献者
 
-Please read the [Contributing Guidelines](https://github.com/panjf2000/gnet/blob/master/CONTRIBUTING.md) before opening a PR and thank you to all the developers who already made contributions to `gnet`!
+请在提 PR 之前仔细阅读 [Contributing Guidelines](https://github.com/panjf2000/gnet/blob/master/CONTRIBUTING.md)，感谢那些为 `gnet` 贡献过代码的开发者！
 
 [![](https://opencollective.com/gnet/contributors.svg?width=890&button=false)](https://github.com/panjf2000/gnet/graphs/contributors)
 
-# 🙏 Acknowledgments
+# 🙏 致谢
 
 - [evio](https://github.com/tidwall/evio)
 - [netty](https://github.com/netty/netty)
@@ -1118,7 +1031,7 @@ Please read the [Contributing Guidelines](https://github.com/panjf2000/gnet/blob
 - [goframe](https://github.com/smallnest/goframe)
 - [ringbuffer](https://github.com/smallnest/ringbuffer)
 
-# ⚓ Relevant Articles
+# ⚓ 相关文章
 
 - [A Million WebSockets and Go](https://www.freecodecamp.org/news/million-websockets-and-go-cc58418460bb/)
 - [Going Infinite, handling 1M websockets connections in Go](https://speakerdeck.com/eranyanay/going-infinite-handling-1m-websockets-connections-in-go)
@@ -1126,29 +1039,29 @@ Please read the [Contributing Guidelines](https://github.com/panjf2000/gnet/blob
 - [gnet: 一个轻量级且高性能的 Golang 网络库](https://strikefreedom.top/go-event-loop-networking-library-gnet)
 - [最快的 Go 网络框架 gnet 来啦！](https://strikefreedom.top/releasing-gnet-v1-with-techempower)
 
-# 🎡 Use cases
+# 🎡 用户案例
 
-The following companies/organizations use `gnet` as the underlying network service in production.
+以下公司/组织在生产环境上使用了 `gnet` 作为底层网络服务。
 
 <a href="https://www.tencent.com"><img src="https://img.taohuawu.club/gallery/tencent_logo.png" width="250" align="middle"/></a>&nbsp;&nbsp;<a href="https://www.iqiyi.com" target="_blank"><img src="https://img.taohuawu.club/gallery/iqiyi-logo.png" width="200" align="middle"/></a>&nbsp;&nbsp;<a href="https://www.mi.com" target="_blank"><img src="https://img.taohuawu.club/gallery/mi-logo.png" width="150" align="middle"/></a>&nbsp;&nbsp;<a href="https://www.360.com" target="_blank"><img src="https://img.taohuawu.club/gallery/360-logo.png" width="200" align="middle"/></a>&nbsp;&nbsp;<a href="https://tieba.baidu.com/" target="_blank"><img src="https://img.taohuawu.club/gallery/baidu-tieba-logo.png" width="200" align="middle"/></a>&nbsp;&nbsp;<a href="https://game.qq.com/" target="_blank"><img src="https://img.taohuawu.club/gallery/tencent-games-logo.png" width="200" align="middle"/></a>
 
-If your projects are also using `gnet`, feel free to open a [pull request](https://github.com/panjf2000/gnet/pulls) refreshing this list of use cases.
+如果你的项目也在使用 `gnet`，欢迎给我提 [Pull Request](https://github.com/panjf2000/gnet/pulls) 来更新这份用户案例列表。
 
-# 💰 Backers
+# 💰 支持
 
-Support us with a monthly donation and help us continue our activities.
+如果有意向，可以通过每个月定量的少许捐赠来支持这个项目。
 
 <a href="https://opencollective.com/gnet#backers" target="_blank"><img src="https://opencollective.com/gnet/backers.svg" /></a>
 
-# 💎 Sponsors
+# 💎 赞助
 
-Become a bronze sponsor with a monthly donation of $10 and get your logo on our README on Github.
+每月定量捐赠 10 刀即可成为本项目的赞助者，届时您的 logo 或者 link 可以展示在本项目的 README 上。
 
 <a href="https://opencollective.com/gnet#sponsors" target="_blank"><img src="https://opencollective.com/gnet/sponsors.svg" /></a>
 
-# ☕️ Buy me a coffee
+# ☕️ 打赏
 
-> Please be sure to leave your name, Github account or other social media accounts when you donate by the following means so that I can add it to the list of donors as a token of my appreciation.
+> 当您通过以下方式进行捐赠时，请务必留下姓名、Github账号或其他社交媒体账号，以便我将其添加到捐赠者名单中，以表谢意。
 
 <table><tr>
 <td><img src="https://raw.githubusercontent.com/panjf2000/illustrations/master/payments/WeChatPay.JPG" width="250" /></td>
@@ -1156,19 +1069,19 @@ Become a bronze sponsor with a monthly donation of $10 and get your logo on our 
 <td><a href="https://www.paypal.me/R136a1X" target="_blank"><img src="https://raw.githubusercontent.com/panjf2000/illustrations/master/payments/PayPal.JPG" width="250" /></a></td>
 </tr></table>
 
-# 💴 Patrons
+# 💴 资助者
 
 <a target="_blank" href="https://github.com/patrick-othmer"><img src="https://avatars1.githubusercontent.com/u/8964313" width="100" alt="Patrick Othmer" /></a>&nbsp;&nbsp;<a target="_blank" href="https://github.com/panjf2000/gnet"><img src="https://avatars2.githubusercontent.com/u/50285334" width="100" alt="Jimmy" /></a>&nbsp;&nbsp;<a target="_blank" href="https://github.com/cafra"><img src="https://avatars0.githubusercontent.com/u/13758306" width="100" alt="ChenZhen" /></a>&nbsp;&nbsp;<a target="_blank" href="https://github.com/yangwenmai"><img src="https://avatars0.githubusercontent.com/u/1710912" width="100" alt="Mai Yang" /></a>&nbsp;&nbsp;<a target="_blank" href="https://github.com/BeijingWks"><img src="https://avatars3.githubusercontent.com/u/33656339" width="100" alt="王开帅" /></a>&nbsp;&nbsp;<a target="_blank" href="https://github.com/refs"><img src="https://avatars3.githubusercontent.com/u/6905948" width="100" alt="Unger Alejandro" /></a>&nbsp;&nbsp;<a target="_blank" href="https://github.com/Swaggadan"><img src="https://avatars.githubusercontent.com/u/137142" width="100" alt="Swaggadan" /></a>&nbsp;<a target="_blank" href="https://github.com/Wuvist"><img src="https://avatars.githubusercontent.com/u/657796" width="100" alt="Weng Wei" /></a>
 
-# 🔑 JetBrains OS licenses
+# 🔑 JetBrains 开源证书支持
 
-`gnet` had been being developed with `GoLand` IDE under the **free JetBrains Open Source license(s)** granted by JetBrains s.r.o., hence I would like to express my thanks here.
+`gnet` 项目一直以来都是在 JetBrains 公司旗下的 GoLand 集成开发环境中进行开发，基于 **free JetBrains Open Source license(s)** 正版免费授权，在此表达我的谢意。
 <a href="https://www.jetbrains.com/?from=gnet" target="_blank"><img src="https://raw.githubusercontent.com/panjf2000/illustrations/master/jetbrains/jetbrains-variant-4.png" width="250" align="middle" /></a>
 
-# 🔋 Sponsorship
+# 🔋 赞助商
 
 <p>
-	<h3>This project is supported by:</h3>
+	<h3>本项目由以下机构赞助：</h3>
 	<a href="https://www.digitalocean.com/"><img src="https://opensource.nyc3.cdn.digitaloceanspaces.com/attribution/assets/SVG/DO_Logo_horizontal_blue.svg" width="201px" />
 	</a>
 </p>

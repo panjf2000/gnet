@@ -26,7 +26,7 @@ const features = [
     icon: 'zap',
     description: (
       <>
-        Built in <a href="https://www.golang.org/">Go</a>, Gnet is <a href="#performance">ultra fast and
+        Built in <a href="https://www.golang.org/">Go</a>, gnet is <a href="#performance">ultra fast and
         memory efficient</a>. It's designed to create a networking server framework for Go that performs on par with Redis and Haproxy for networking packets handling.
       </>
     ),
@@ -36,7 +36,7 @@ const features = [
     icon: 'unlock',
     description: (
       <>
-        Gnet is lock-free during the entire runtime, which speeds gnet up regardless of the synchronization issue.
+        gnet is lock-free during the entire runtime, which speeds gnet up regardless of the synchronization issue.
       </>
     ),
   },
@@ -45,7 +45,7 @@ const features = [
     icon: 'codepen',
     description: (
       <>
-        Gnet provides concise and easy-to-use APIs for users, it only exposes the essential APIs and takes over most of the tough work for users,
+        gnet provides concise and easy-to-use APIs for users, it only exposes the essential APIs and takes over most of the tough work for users,
         minimizes the complexity of business code so that developers are able to concentrate on business logic instead of the underlying implementation.
       </>
     ),
@@ -55,7 +55,7 @@ const features = [
     icon: 'shuffle',
     description: (
       <>
-        Gnet supports multiple protocols/IPC mechanism: TCP, UDP and Unix Domain Socket, enabling you to develop
+        gnet supports multiple protocols/IPC mechanism: TCP, UDP and Unix Domain Socket, enabling you to develop
         a variety of networking applications.
       </>
     ),
@@ -65,7 +65,7 @@ const features = [
     icon: 'code',
     description: (
       <>
-        Gnet is devised as a cross-platform framework, as a result, it works faultlessly on multiple platforms: Linux, FreeBSD, DragonFly BSD, Windows.
+        gnet is devised as a cross-platform framework, as a result, it works faultlessly on multiple platforms: Linux, FreeBSD, DragonFly BSD, Windows.
       </>
     ),
   },
@@ -74,7 +74,7 @@ const features = [
     icon: 'shield',
     description: (
       <>
-        Gnet supports multiple load-balancing algorithms: Round-Robin, Source-Addr-Hash and Least-Connections,
+        gnet supports multiple load-balancing algorithms: Round-Robin, Source-Addr-Hash and Least-Connections,
         enabling users to choose the most suitable load-balancing algorithm based on their business scenarios.
       </>
     ),
@@ -100,7 +100,7 @@ function Features({ features }) {
   return (
     <section className={styles.features}>
       <div className="container">
-        <AnchoredH2 id="features">Why Gnet?</AnchoredH2>
+        <AnchoredH2 id="features">Why gnet?</AnchoredH2>
         {rows}
       </div>
     </section>
@@ -278,7 +278,7 @@ function Home() {
           </div>
           <SVG src="/img/diagram.svg" width="100%" />
           <p className="hero--subsubtitle">
-            Gnet is the <strong><em>fastest networking framework</em></strong> in Go.
+            gnet is the <strong><em>fastest networking framework</em></strong> in Go.
           </p>
         </div>
       </header>

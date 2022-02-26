@@ -58,17 +58,17 @@ function Footer() {
           <div className="row footer__links">
             <div className="col col--5 footer__col">
               <div className="margin-bottom--md">
-                <SVG className="navbar__logo" src="/img/logo-light.svg" alt="Gnet" width="150" height="auto" />
+                <SVG className="navbar__logo" src="/img/logo-light.svg" alt="gnet" width="150" height="auto" />
               </div>
               <div className="margin-bottom--md">
                 <MailingListForm description={false} width="150px" />
               </div>
               <div>
-                <a href="https://twitter.com/_andy_pan" target="_blank"><i className="feather icon-twitter" alt="Gnet's Twitter"></i></a>
+                <a href="https://twitter.com/_andy_pan" target="_blank"><i className="feather icon-twitter" alt="gnet's Twitter"></i></a>
                 &nbsp;&nbsp;&nbsp;&nbsp;
-                <a href="https://github.com/panjf2000/gnet" target="_blank"><i className="feather icon-github" alt="Gnet's Github Repo"></i></a>
+                <a href="https://github.com/panjf2000/gnet" target="_blank"><i className="feather icon-github" alt="gnet's Github Repo"></i></a>
                 &nbsp;&nbsp;&nbsp;&nbsp;
-                <a href="https://strikefreedom.top/rss.xml" target="_blank"><i className="feather icon-rss" alt="Gnet's RSS feed"></i></a>
+                <a href="https://strikefreedom.top/rss.xml" target="_blank"><i className="feather icon-rss" alt="gnet's RSS feed"></i></a>
               </div>
             </div>
             {links.map((linkItem, i) => (

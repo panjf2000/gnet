@@ -45,10 +45,10 @@ function HighlightListPage(props) {
   //
 
   return (
-    <Layout title="Highlights" description="The latest Gnet features and updates.">
+    <Layout title="Highlights" description="The latest gnet features and updates.">
       <header className="hero hero--clean">
         <div className="container container--xs">
-          <h1>Gnet Highlights</h1>
+          <h1>gnet Highlights</h1>
           <div className="hero--subtitle">
             New features &amp; updates. Follow <a href="https://twitter.com/_andy_pan" target="_blank"> <i className="feather icon-twitter"></i> @_andy_pan</a> for real-time updates!
           </div>

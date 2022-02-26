@@ -25,7 +25,7 @@ function HighlightTagListPage(props) {
   const groupedTags = _.groupBy(enrichedTags, 'category');
 
   return (
-    <Layout title="Tags" description="Gnet highlight tags">
+    <Layout title="Tags" description="gnet highlight tags">
       <header className="hero hero--clean">
         <div className="container">
           <h1>All Highlight Tags</h1>

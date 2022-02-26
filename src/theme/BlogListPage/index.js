@@ -26,12 +26,12 @@ function BlogListPage(props) {
   viewedNewPost();
 
   return (
-    <Layout title={title} description="Gnet blog posts, articles, and tips from the Gnet core team.">
+    <Layout title={title} description="gnet blog posts, articles, and tips from the gnet core team.">
       <div className="blog-list container">
         <div className="blog-list--filters">
           <a href="/blog/rss.xml" style={{float: 'right', fontSize: '1.5em', marginTop: '0px', marginLeft: '-30px', width: '30px'}}><i className="feather icon-rss"></i></a>
-          <h1>The Gnet Blog</h1>
-          <p>Gnet is a high-performance, lightweight, non-blocking, event-driven networking framework written in pure Go, created by <Link to="https://github.com/panjf2000">Andy Pan</Link>.</p>
+          <h1>The gnet Blog</h1>
+          <p>gnet is a high-performance, lightweight, non-blocking, event-driven networking framework written in pure Go, created by <Link to="https://github.com/panjf2000">Andy Pan</Link>.</p>
 
           <div className="margin-vert--lg">
             <CTA github={false} size="s" inline={true} style="highlight" />
