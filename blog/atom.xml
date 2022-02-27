@@ -1,24 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
     <id>https://gnet.host/blog</id>
-    <title>Gnet Blog</title>
+    <title>gnet Blog</title>
     <updated>2020-03-14T00:00:00.000Z</updated>
     <generator>https://github.com/jpmonette/feed</generator>
     <link rel="alternate" href="https://gnet.host/blog"/>
-    <subtitle>Gnet Blog</subtitle>
+    <subtitle>gnet Blog</subtitle>
     <icon>https://gnet.host/favicon.ico</icon>
     <rights>Copyright © 2022 Andy Pan.</rights>
     <entry>
-        <title type="html"><![CDATA[Gnet 导视]]></title>
-        <id>presenting-gnet-cn</id>
-        <link href="https://gnet.host/blog/presenting-gnet-cn"/>
+        <title type="html"><![CDATA[官宣 gnet v1.0.0]]></title>
+        <id>announcing-gnet-v1-cn</id>
+        <link href="https://gnet.host/blog/announcing-gnet-v1-cn"/>
         <updated>2020-03-14T00:00:00.000Z</updated>
         <summary type="html"><![CDATA[最快的 Go 网络框架 gnet 来啦！]]></summary>
     </entry>
     <entry>
-        <title type="html"><![CDATA[Presenting Gnet]]></title>
-        <id>presenting-gnet</id>
-        <link href="https://gnet.host/blog/presenting-gnet"/>
+        <title type="html"><![CDATA[Announcing gnet v1.0.0]]></title>
+        <id>announcing-gnet-v1</id>
+        <link href="https://gnet.host/blog/announcing-gnet-v1"/>
         <updated>2020-03-13T00:00:00.000Z</updated>
         <summary type="html"><![CDATA[Hello World! We present you, gnet!]]></summary>
     </entry>

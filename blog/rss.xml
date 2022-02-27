@@ -1,24 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <rss version="2.0">
     <channel>
-        <title>Gnet Blog</title>
+        <title>gnet Blog</title>
         <link>https://gnet.host/blog</link>
-        <description>Gnet Blog</description>
+        <description>gnet Blog</description>
         <lastBuildDate>Sat, 14 Mar 2020 00:00:00 GMT</lastBuildDate>
         <docs>https://validator.w3.org/feed/docs/rss2.html</docs>
         <generator>https://github.com/jpmonette/feed</generator>
         <copyright>Copyright © 2022 Andy Pan.</copyright>
         <item>
-            <title><![CDATA[Gnet 导视]]></title>
-            <link>https://gnet.host/blog/presenting-gnet-cn</link>
-            <guid>presenting-gnet-cn</guid>
+            <title><![CDATA[官宣 gnet v1.0.0]]></title>
+            <link>https://gnet.host/blog/announcing-gnet-v1-cn</link>
+            <guid>announcing-gnet-v1-cn</guid>
             <pubDate>Sat, 14 Mar 2020 00:00:00 GMT</pubDate>
             <description><![CDATA[最快的 Go 网络框架 gnet 来啦！]]></description>
         </item>
         <item>
-            <title><![CDATA[Presenting Gnet]]></title>
-            <link>https://gnet.host/blog/presenting-gnet</link>
-            <guid>presenting-gnet</guid>
+            <title><![CDATA[Announcing gnet v1.0.0]]></title>
+            <link>https://gnet.host/blog/announcing-gnet-v1</link>
+            <guid>announcing-gnet-v1</guid>
             <pubDate>Fri, 13 Mar 2020 00:00:00 GMT</pubDate>
             <description><![CDATA[Hello World! We present you, gnet!]]></description>
         </item>
