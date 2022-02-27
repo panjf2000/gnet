@@ -16,7 +16,7 @@ function Contact() {
         <div className="container container--fluid">
           <h1>Contact</h1>
           <div className="hero--subtitle">
-            gnet is an open-source software developed by <a href="https://github.com/panjf2000">Andy Pan</a>. You can contact the author using any of the options below.
+            gnet is an open-source software created by <a href="https://github.com/panjf2000">Andy Pan</a>. You can contact the author using any of the options below.
           </div>
         </div>
       </header>

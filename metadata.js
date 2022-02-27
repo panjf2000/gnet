@@ -1,24 +1,24 @@
 module.exports = {
   "latest_highlight": {
     "author_github": "https://github.com/panjf2000",
-    "date": "2021-12-05",
-    "description": "Released v1.6.0",
+    "date": "2022-02-27",
+    "description": "Release of v2.0.0",
     "hide_on_release_notes": false,
-    "id": "2021-12-05-released-1-6-0",
-    "path": "website/highlights/2021-12-05-released-1-6-0.md",
-    "permalink": "/highlights/2021-12-05-released-1-6-0/",
+    "id": "2022-02-27-release-of-gnet-v2",
+    "path": "website/highlights/2022-02-27-release-of-gnet-v2.md",
+    "permalink": "/highlights/2022-02-27-release-of-gnet-v2/",
     "tags": [
       "release",
     ],
-    "title": "Released v1.6.0"
+    "title": "Release of v2.0.0"
   },
   "latest_post": {
     "author_github": "https://github.com/panjf2000",
-    "date": "2020-03-14",
-    "description": "gnet 是一个高性能、轻量级、非阻塞的事件驱动 Go 网络框架。",
-    "id": "announcing-gnet-v1-cn",
-    "path": "website/blog/2020-03-14-announcing-gnet-v1-cn.md",
-    "permalink": "/blog/2020-03-14-announcing-gnet-v1-cn/",
+    "date": "2022-02-27",
+    "description": "Hello World! We present you, gnet v2.0.0!",
+    "id": "announcing-gnet-v2",
+    "path": "website/blog/2022-02-27-announcing-gnet-v2.md",
+    "permalink": "/blog/2022-02-27-announcing-gnet-v2/",
     "tags": [
       "type: 官宣",
       "domain: 展示"
