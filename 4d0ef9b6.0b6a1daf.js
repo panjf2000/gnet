@@ -1,0 +1,1 @@
+(window.webpackJsonp=window.webpackJsonp||[]).push([[28],{171:function(i){i.exports=JSON.parse('{"allTagsPath":"/highlights/tags","slug":"type-optimization","name":"type: optimization","count":1,"permalink":"/highlights/tags/type-optimization"}')}}]);
