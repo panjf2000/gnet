@@ -39,6 +39,14 @@
 - [x] 灵活的事件定时器
 - [x] 实现 `gnet` 客户端
 
+# 🎡 用户案例
+
+以下公司/组织在生产环境上使用了 `gnet` 作为底层网络服务。
+
+<a href="https://www.tencent.com"><img src="http://img.taohuawu.club/gallery/tencent_logo.png" width="250" align="middle"/></a>&nbsp;&nbsp;<a href="https://www.iqiyi.com" target="_blank"><img src="http://img.taohuawu.club/gallery/iqiyi-logo.png" width="200" align="middle"/></a>&nbsp;&nbsp;<a href="https://www.mi.com" target="_blank"><img src="http://img.taohuawu.club/gallery/mi-logo.png" width="150" align="middle"/></a>&nbsp;&nbsp;<a href="https://www.360.com" target="_blank"><img src="http://img.taohuawu.club/gallery/360-logo.png" width="200" align="middle"/></a>&nbsp;&nbsp;<a href="https://tieba.baidu.com/" target="_blank"><img src="http://img.taohuawu.club/gallery/baidu-tieba-logo.png" width="200" align="middle"/></a>&nbsp;&nbsp;<a href="https://game.qq.com/" target="_blank"><img src="http://img.taohuawu.club/gallery/tencent-games-logo.jpeg" width="200" align="middle"/></a>
+
+如果你的项目也在使用 `gnet`，欢迎给我提 Pull Request 来更新这份用户案例列表。
+
 # 📊 性能测试
 
 ## TechEmpower 性能测试
@@ -138,14 +146,6 @@ Test duration   : 15s
 - [Go netpoller 原生网络模型之源码全面揭秘](https://strikefreedom.top/go-netpoll-io-multiplexing-reactor)
 - [gnet: 一个轻量级且高性能的 Golang 网络库](https://strikefreedom.top/go-event-loop-networking-library-gnet)
 - [最快的 Go 网络框架 gnet 来啦！](https://strikefreedom.top/releasing-gnet-v1-with-techempower)
-
-# 🎡 用户案例
-
-以下公司/组织在生产环境上使用了 `gnet` 作为底层网络服务。
-
-<a href="https://www.tencent.com"><img src="http://img.taohuawu.club/gallery/tencent_logo.png" width="250" align="middle"/></a>&nbsp;&nbsp;<a href="https://www.iqiyi.com" target="_blank"><img src="http://img.taohuawu.club/gallery/iqiyi-logo.png" width="200" align="middle"/></a>&nbsp;&nbsp;<a href="https://www.mi.com" target="_blank"><img src="http://img.taohuawu.club/gallery/mi-logo.png" width="150" align="middle"/></a>&nbsp;&nbsp;<a href="https://www.360.com" target="_blank"><img src="http://img.taohuawu.club/gallery/360-logo.png" width="200" align="middle"/></a>&nbsp;&nbsp;<a href="https://tieba.baidu.com/" target="_blank"><img src="http://img.taohuawu.club/gallery/baidu-tieba-logo.png" width="200" align="middle"/></a>&nbsp;&nbsp;<a href="https://game.qq.com/" target="_blank"><img src="http://img.taohuawu.club/gallery/tencent-games-logo.jpeg" width="200" align="middle"/></a>
-
-如果你的项目也在使用 `gnet`，欢迎给我提 Pull Request 来更新这份用户案例列表。
 
 # 💰 支持
 
