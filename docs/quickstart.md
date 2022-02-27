@@ -67,5 +67,5 @@ As you can see, this example of echo server only sets up the `EventHandler.OnTra
 
 There are two ways for users to retrieve data in `OnTraffic()`, one is to call `Conn.Peek(int)` and `Conn.Discard(int)`，the other is to call `Conn.Next(int)` , the former returns the next n bytes without advancing underlying connection buffer while the latter returns a slice containing the next n bytes from the buffer, advancing the buffer as if the bytes had been returned by `Conn.Read([]byte)`.
 
-For more API's of `gnet.Conn`, please visit [gnet API Docs](https://pkg.go.dev/github.com/panjf2000/gnet).
+For more API's of `gnet.Conn` see [gnet API Docs](https://pkg.go.dev/github.com/panjf2000/gnet) and for more examples see [gnet examples](https://github.com/gnet-io/gnet-examples).
 
