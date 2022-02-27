@@ -41,8 +41,8 @@ In a word, if performance is not your top priority and you intend to take care o
 
 There are some examples powered by gnet framework, go check out those source code and get an initial perception about developing networking applications based on gnet, after that, you might want to read the documentations of gnet to learn all its APIs and try to write a demo application.
 
-[Examples for gnet](https://github.com/gnet-io/gnet-examples)
-[Documentations](https://gnet.host/docs/)
+- [Examples for gnet](https://github.com/gnet-io/gnet-examples)
+- [Documentations](https://gnet.host/docs/)
 
 ..., etc.
 
