@@ -18,16 +18,16 @@ module.exports = {
     "description": "Hello World! We present you, gnet v2.0.0!",
     "id": "announcing-gnet-v2",
     "path": "website/blog/2022-02-27-announcing-gnet-v2.md",
-    "permalink": "/blog/2022-02-27-announcing-gnet-v2/",
+    "permalink": "/blog/announcing-gnet-v2/",
     "tags": [
       "type: 官宣",
       "domain: 展示"
     ],
-    "title": "Introduction to gnet v1"
+    "title": "Announcing gnet v2.0.0"
   },
   "post_tags": [
-    "type: 官宣",
-    "domain: 展示"
+    "type: announcement",
+    "domain: presentation"
   ],
   "team": [
     {
