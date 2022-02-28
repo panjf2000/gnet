@@ -39,6 +39,22 @@ English | [🇨🇳中文](README_ZH.md)
 - [x] Flexible ticker event
 - [x] Implementation of `gnet` Client
 
+# 🎬 Getting started
+
+`gnet` is available as a Go module and we highly recommend that you use `gnet` via [Go Modules](https://go.dev/blog/using-go-modules), with Go 1.11 Modules enabled (Go 1.11+), you can just simply add `import "github.com/panjf2000/gnet"` to the codebase and run `go mod download/go mod tidy` or `go [build|run|test]` to download the necessary dependencies automatically.
+
+## With v2 
+
+```powershell
+go get -u github.com/panjf2000/gnet/v2
+```
+
+## With v1
+
+```powershell
+go get -u github.com/panjf2000/gnet
+```
+
 # 🎡 Use cases
 
 The following companies/organizations use `gnet` as the underlying network service in production.
@@ -124,10 +140,6 @@ Test duration   : 15s
 ![](https://github.com/panjf2000/gnet_benchmarks/raw/master/results/echo_conn_macos.png)
 
 ![](https://github.com/panjf2000/gnet_benchmarks/raw/master/results/echo_packet_macos.png)
-
-# 🏛 Website
-
-Please visit the [official website](https://gnet.host/blog/presenting-gnet/) for more details about architecture, usage and other information of `gnet`.
 
 # ⚠️ License
 

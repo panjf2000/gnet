@@ -39,6 +39,22 @@
 - [x] 灵活的事件定时器
 - [x] 实现 `gnet` 客户端
 
+# 🎬 开始
+
+`gnet` 是一个 Go module，而且我们也强烈推荐通过 [Go Modules](https://go.dev/blog/using-go-modules) 来使用 `gnet`，在开启 Go Modules 支持（Go 1.11+）之后可以通过简单地在代码中写 `import "github.com/panjf2000/gnet"` 来引入 `gnet`，然后执行 `go mod download/go mod tidy` 或者 `go [build|run|test]` 这些命令来自动下载所依赖的包。
+
+## 使用 v2 
+
+```powershell
+go get -u github.com/panjf2000/gnet/v2
+```
+
+## 使用 v1
+
+```powershell
+go get -u github.com/panjf2000/gnet
+```
+
 # 🎡 用户案例
 
 以下公司/组织在生产环境上使用了 `gnet` 作为底层网络服务。
@@ -124,10 +140,6 @@ Test duration   : 15s
 ![](https://github.com/panjf2000/gnet_benchmarks/raw/master/results/echo_conn_macos.png)
 
 ![](https://github.com/panjf2000/gnet_benchmarks/raw/master/results/echo_packet_macos.png)
-
-# 🏛 官网
-
-关于 `gnet` 的架构设计、使用方法以及其他更多的信息和细节，请访问[官网](https://gnet.host/blog/presenting-gnet-cn/)。
 
 # ⚠️ 证书
 
