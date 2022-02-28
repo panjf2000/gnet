@@ -231,7 +231,7 @@ function UseCases() {
   return (
     <section className={styles.usecases}>
       <div className="container">
-        <AnchoredH2 id="usecases">User cases</AnchoredH2>
+        <AnchoredH2 id="usecases">Use cases</AnchoredH2>
         <div className="sub-title">The following companies/organizations use <code>gnet</code> as the underlying network service in production.</div>
         <a href="https://www.tencent.com"><img src="https://img.taohuawu.club/gallery/tencent_logo.png" width="300" align="middle"/></a>
         <a href="https://www.iqiyi.com" target="_blank"><img src="https://img.taohuawu.club/gallery/iqiyi-logo.png" width="300" align="middle"/></a>
@@ -240,7 +240,7 @@ function UseCases() {
         <a href="https://tieba.baidu.com" target="_blank"><img src="https://img.taohuawu.club/gallery/baidu-tieba-logo.png" width="300" align="middle"/></a>
         <a href="https://game.qq.com" target="_blank"><img src="https://img.taohuawu.club/gallery/tencent-games-logo.png" width="300" align="middle"/></a>
         <br />
-        <p className="hero--subtitle">If your projects are also using <code>gnet</code>, feel free to open a <Link to="https://github.com/panjf2000/gnet/pulls">pull request</Link> to refresh this list of user cases.</p>
+        <p className="hero--subtitle">If your projects are also using <code>gnet</code>, feel free to open a <Link to="https://github.com/panjf2000/gnet/pulls">pull request</Link> refreshing this list.</p>
       </div>
     </section>
   );
