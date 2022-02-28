@@ -15,7 +15,7 @@ P.S. Follow me on Twitter [@_andy_pan](https://twitter.com/_andy_pan) to get the
 
 ## Features
 
-- The built-in codecs have been deprecated and removed, to reduce the complexity for keeping gnet simple. From a lot of feedback we've received, this feature does not bring convenience and benefits to users, thus, I decided to take it off from gnet. Cutting those codecs off makes the code on top of gnet more holistic and straightforward, see a [simple example](https://github.com/gnet-io/gnet-examples/tree/v2/simple_protocol) for details.
+- The built-in codecs have been deprecated and removed, to reduce the complexity and keep gnet simple. From a lot of feedback we've received, this feature does not bring convenience and benefits to users, thus, I decided to take it off from gnet. Cutting those codecs off makes the code on top of gnet more holistic and straightforward, see a [simple example](https://github.com/gnet-io/gnet-examples/tree/v2/simple_protocol) for details.
 - `gnet.Conn` now implements `io.Reader`, `io.Writer`, `io.ReaderFrom`, `io.WriterTo` and `net.Conn`, apart from that, it also implements the `gnet.Socket` interface, providing more API's for users to manipulate the connections.
 - gnet now supports vectored I/O, allowing users to read from a vector of buffers and write to a single data stream, a vectored I/O implementation can provide improved performance over a linear I/O implementation via internal optimizations. API's for vectored I/O in gnet are `Conn.Writev([][]byte)` and `Conn.AsyncWritev([][]byte, AsyncCallback)`.
 
