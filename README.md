@@ -45,7 +45,7 @@ The following companies/organizations use `gnet` as the underlying network servi
 
 <a href="https://www.tencent.com"><img src="http://img.taohuawu.club/gallery/tencent_logo.png" width="250" align="middle"/></a>&nbsp;&nbsp;<a href="https://www.iqiyi.com" target="_blank"><img src="http://img.taohuawu.club/gallery/iqiyi-logo.png" width="200" align="middle"/></a>&nbsp;&nbsp;<a href="https://www.mi.com" target="_blank"><img src="http://img.taohuawu.club/gallery/mi-logo.png" width="150" align="middle"/></a>&nbsp;&nbsp;<a href="https://www.360.com" target="_blank"><img src="http://img.taohuawu.club/gallery/360-logo.png" width="200" align="middle"/></a>&nbsp;&nbsp;<a href="https://tieba.baidu.com/" target="_blank"><img src="http://img.taohuawu.club/gallery/baidu-tieba-logo.png" width="200" align="middle"/></a>&nbsp;&nbsp;<a href="https://game.qq.com/" target="_blank"><img src="http://img.taohuawu.club/gallery/tencent-games-logo.jpeg" width="200" align="middle"/></a>
 
-If you have `gnet` integrated into projects, feel free to open a pull request refreshing this list of use cases.
+If you have `gnet` integrated into projects, feel free to open a pull request refreshing this list.
 
 # 📊 Performance
 
