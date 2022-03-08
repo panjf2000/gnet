@@ -36,7 +36,7 @@ type Poller struct {
 	fd                  int    // epoll fd
 	wfd                 int    // wake fd
 	wfdBuf              []byte // wfd buffer to read packet
-	netpollWakeSig      int32
+	wakeupCall          int32
 	asyncTaskQueue      queue.AsyncTaskQueue // queue with low priority
 	priorAsyncTaskQueue queue.AsyncTaskQueue // queue with high priority
 }
@@ -90,7 +90,7 @@ func (p *Poller) UrgentTrigger(fn queue.TaskFunc, arg interface{}) (err error) {
 	task := queue.GetTask()
 	task.Run, task.Arg = fn, arg
 	p.priorAsyncTaskQueue.Enqueue(task)
-	if atomic.CompareAndSwapInt32(&p.netpollWakeSig, 0, 1) {
+	if atomic.CompareAndSwapInt32(&p.wakeupCall, 0, 1) {
 		for _, err = unix.Write(p.wfd, b); err == unix.EINTR || err == unix.EAGAIN; _, err = unix.Write(p.wfd, b) {
 		}
 	}
@@ -105,7 +105,7 @@ func (p *Poller) Trigger(fn queue.TaskFunc, arg interface{}) (err error) {
 	task := queue.GetTask()
 	task.Run, task.Arg = fn, arg
 	p.asyncTaskQueue.Enqueue(task)
-	if atomic.CompareAndSwapInt32(&p.netpollWakeSig, 0, 1) {
+	if atomic.CompareAndSwapInt32(&p.wakeupCall, 0, 1) {
 		for _, err = unix.Write(p.wfd, b); err == unix.EINTR || err == unix.EAGAIN; _, err = unix.Write(p.wfd, b) {
 		}
 	}
@@ -172,8 +172,8 @@ func (p *Poller) Polling(callback func(fd int, ev uint32) error) error {
 				}
 				queue.PutTask(task)
 			}
-			atomic.StoreInt32(&p.netpollWakeSig, 0)
-			if (!p.asyncTaskQueue.IsEmpty() || !p.priorAsyncTaskQueue.IsEmpty()) && atomic.CompareAndSwapInt32(&p.netpollWakeSig, 0, 1) {
+			atomic.StoreInt32(&p.wakeupCall, 0)
+			if (!p.asyncTaskQueue.IsEmpty() || !p.priorAsyncTaskQueue.IsEmpty()) && atomic.CompareAndSwapInt32(&p.wakeupCall, 0, 1) {
 				for _, err = unix.Write(p.wfd, b); err == unix.EINTR || err == unix.EAGAIN; _, err = unix.Write(p.wfd, b) {
 				}
 			}
