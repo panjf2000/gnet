@@ -33,12 +33,12 @@ import (
 
 // Poller represents a poller which is in charge of monitoring file-descriptors.
 type Poller struct {
-	fd                  int    // epoll fd
-	wfd                 int    // wake fd
-	wfdBuf              []byte // wfd buffer to read packet
-	wakeupCall          int32
-	asyncTaskQueue      queue.AsyncTaskQueue // queue with low priority
-	priorAsyncTaskQueue queue.AsyncTaskQueue // queue with high priority
+	fd                   int    // epoll fd
+	efd                  int    // eventfd
+	efdBuf               []byte // efd buffer to read an 8-byte integer
+	wakeupCall           int32
+	asyncTaskQueue       queue.AsyncTaskQueue // queue with low priority
+	urgentAsyncTaskQueue queue.AsyncTaskQueue // queue with high priority
 }
 
 // OpenPoller instantiates a poller.
@@ -49,20 +49,20 @@ func OpenPoller() (poller *Poller, err error) {
 		err = os.NewSyscallError("epoll_create1", err)
 		return
 	}
-	if poller.wfd, err = unix.Eventfd(0, unix.EFD_NONBLOCK|unix.EFD_CLOEXEC); err != nil {
+	if poller.efd, err = unix.Eventfd(0, unix.EFD_NONBLOCK|unix.EFD_CLOEXEC); err != nil {
 		_ = poller.Close()
 		poller = nil
 		err = os.NewSyscallError("eventfd", err)
 		return
 	}
-	poller.wfdBuf = make([]byte, 8)
-	if err = poller.AddRead(&PollAttachment{FD: poller.wfd}); err != nil {
+	poller.efdBuf = make([]byte, 8)
+	if err = poller.AddRead(&PollAttachment{FD: poller.efd}); err != nil {
 		_ = poller.Close()
 		poller = nil
 		return
 	}
 	poller.asyncTaskQueue = queue.NewLockFreeQueue()
-	poller.priorAsyncTaskQueue = queue.NewLockFreeQueue()
+	poller.urgentAsyncTaskQueue = queue.NewLockFreeQueue()
 	return
 }
 
@@ -71,7 +71,7 @@ func (p *Poller) Close() error {
 	if err := os.NewSyscallError("close", unix.Close(p.fd)); err != nil {
 		return err
 	}
-	return os.NewSyscallError("close", unix.Close(p.wfd))
+	return os.NewSyscallError("close", unix.Close(p.efd))
 }
 
 // Make the endianness of bytes compatible with more linux OSs under different processor-architectures,
@@ -81,17 +81,18 @@ var (
 	b        = (*(*[8]byte)(unsafe.Pointer(&u)))[:]
 )
 
-// UrgentTrigger puts task into priorAsyncTaskQueue and wakes up the poller which is waiting for network-events,
-// then the poller will get tasks from priorAsyncTaskQueue and run them.
+// UrgentTrigger puts task into urgentAsyncTaskQueue and wakes up the poller which is waiting for network-events,
+// then the poller will get tasks from urgentAsyncTaskQueue and run them.
 //
-// Note that priorAsyncTaskQueue is a queue with high-priority and its size is expected to be small,
+// Note that urgentAsyncTaskQueue is a queue with high-priority and its size is expected to be small,
 // so only those urgent tasks should be put into this queue.
 func (p *Poller) UrgentTrigger(fn queue.TaskFunc, arg interface{}) (err error) {
 	task := queue.GetTask()
 	task.Run, task.Arg = fn, arg
-	p.priorAsyncTaskQueue.Enqueue(task)
+	p.urgentAsyncTaskQueue.Enqueue(task)
 	if atomic.CompareAndSwapInt32(&p.wakeupCall, 0, 1) {
-		for _, err = unix.Write(p.wfd, b); err == unix.EINTR || err == unix.EAGAIN; _, err = unix.Write(p.wfd, b) {
+		if _, err = unix.Write(p.efd, b); err == unix.EAGAIN {
+			err = nil
 		}
 	}
 	return os.NewSyscallError("write", err)
@@ -106,7 +107,8 @@ func (p *Poller) Trigger(fn queue.TaskFunc, arg interface{}) (err error) {
 	task.Run, task.Arg = fn, arg
 	p.asyncTaskQueue.Enqueue(task)
 	if atomic.CompareAndSwapInt32(&p.wakeupCall, 0, 1) {
-		for _, err = unix.Write(p.wfd, b); err == unix.EINTR || err == unix.EAGAIN; _, err = unix.Write(p.wfd, b) {
+		if _, err = unix.Write(p.efd, b); err == unix.EAGAIN {
+			err = nil
 		}
 	}
 	return os.NewSyscallError("write", err)
@@ -115,7 +117,7 @@ func (p *Poller) Trigger(fn queue.TaskFunc, arg interface{}) (err error) {
 // Polling blocks the current goroutine, waiting for network-events.
 func (p *Poller) Polling(callback func(fd int, ev uint32) error) error {
 	el := newEventList(InitPollEventsCap)
-	var wakenUp bool
+	var doChores bool
 
 	msec := -1
 	for {
@@ -132,7 +134,7 @@ func (p *Poller) Polling(callback func(fd int, ev uint32) error) error {
 
 		for i := 0; i < n; i++ {
 			ev := &el.events[i]
-			if fd := int(ev.Fd); fd != p.wfd {
+			if fd := int(ev.Fd); fd != p.efd {
 				switch err = callback(fd, ev.Events); err {
 				case nil:
 				case errors.ErrAcceptSocket, errors.ErrEngineShutdown:
@@ -140,16 +142,16 @@ func (p *Poller) Polling(callback func(fd int, ev uint32) error) error {
 				default:
 					logging.Warnf("error occurs in event-loop: %v", err)
 				}
-			} else { // poller is awaken to run tasks in queues.
-				wakenUp = true
-				_, _ = unix.Read(p.wfd, p.wfdBuf)
+			} else { // poller is awakened to run tasks in queues.
+				doChores = true
+				_, _ = unix.Read(p.efd, p.efdBuf)
 			}
 		}
 
-		if wakenUp {
-			wakenUp = false
-			task := p.priorAsyncTaskQueue.Dequeue()
-			for ; task != nil; task = p.priorAsyncTaskQueue.Dequeue() {
+		if doChores {
+			doChores = false
+			task := p.urgentAsyncTaskQueue.Dequeue()
+			for ; task != nil; task = p.urgentAsyncTaskQueue.Dequeue() {
 				switch err = task.Run(task.Arg); err {
 				case nil:
 				case errors.ErrEngineShutdown:
@@ -173,8 +175,11 @@ func (p *Poller) Polling(callback func(fd int, ev uint32) error) error {
 				queue.PutTask(task)
 			}
 			atomic.StoreInt32(&p.wakeupCall, 0)
-			if (!p.asyncTaskQueue.IsEmpty() || !p.priorAsyncTaskQueue.IsEmpty()) && atomic.CompareAndSwapInt32(&p.wakeupCall, 0, 1) {
-				for _, err = unix.Write(p.wfd, b); err == unix.EINTR || err == unix.EAGAIN; _, err = unix.Write(p.wfd, b) {
+			if (!p.asyncTaskQueue.IsEmpty() || !p.urgentAsyncTaskQueue.IsEmpty()) && atomic.CompareAndSwapInt32(&p.wakeupCall, 0, 1) {
+				switch _, err = unix.Write(p.efd, b); err {
+				case nil, unix.EAGAIN:
+				default:
+					doChores = true
 				}
 			}
 		}

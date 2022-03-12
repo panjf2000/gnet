@@ -33,10 +33,10 @@ import (
 
 // Poller represents a poller which is in charge of monitoring file-descriptors.
 type Poller struct {
-	fd                  int
-	wakeupCall          int32
-	asyncTaskQueue      queue.AsyncTaskQueue // queue with low priority
-	priorAsyncTaskQueue queue.AsyncTaskQueue // queue with high priority
+	fd                   int
+	wakeupCall           int32
+	asyncTaskQueue       queue.AsyncTaskQueue // queue with low priority
+	urgentAsyncTaskQueue queue.AsyncTaskQueue // queue with high priority
 }
 
 // OpenPoller instantiates a poller.
@@ -58,7 +58,7 @@ func OpenPoller() (poller *Poller, err error) {
 		return
 	}
 	poller.asyncTaskQueue = queue.NewLockFreeQueue()
-	poller.priorAsyncTaskQueue = queue.NewLockFreeQueue()
+	poller.urgentAsyncTaskQueue = queue.NewLockFreeQueue()
 	return
 }
 
@@ -67,23 +67,24 @@ func (p *Poller) Close() error {
 	return os.NewSyscallError("close", unix.Close(p.fd))
 }
 
-var wakeChanges = []unix.Kevent_t{{
+var note = []unix.Kevent_t{{
 	Ident:  0,
 	Filter: unix.EVFILT_USER,
 	Fflags: unix.NOTE_TRIGGER,
 }}
 
-// UrgentTrigger puts task into priorAsyncTaskQueue and wakes up the poller which is waiting for network-events,
-// then the poller will get tasks from priorAsyncTaskQueue and run them.
+// UrgentTrigger puts task into urgentAsyncTaskQueue and wakes up the poller which is waiting for network-events,
+// then the poller will get tasks from urgentAsyncTaskQueue and run them.
 //
-// Note that priorAsyncTaskQueue is a queue with high-priority and its size is expected to be small,
+// Note that urgentAsyncTaskQueue is a queue with high-priority and its size is expected to be small,
 // so only those urgent tasks should be put into this queue.
 func (p *Poller) UrgentTrigger(fn queue.TaskFunc, arg interface{}) (err error) {
 	task := queue.GetTask()
 	task.Run, task.Arg = fn, arg
-	p.priorAsyncTaskQueue.Enqueue(task)
+	p.urgentAsyncTaskQueue.Enqueue(task)
 	if atomic.CompareAndSwapInt32(&p.wakeupCall, 0, 1) {
-		for _, err = unix.Kevent(p.fd, wakeChanges, nil, nil); err == unix.EINTR || err == unix.EAGAIN; _, err = unix.Kevent(p.fd, wakeChanges, nil, nil) {
+		if _, err = unix.Kevent(p.fd, note, nil, nil); err == unix.EAGAIN {
+			err = nil
 		}
 	}
 	return os.NewSyscallError("kevent trigger", err)
@@ -98,7 +99,8 @@ func (p *Poller) Trigger(fn queue.TaskFunc, arg interface{}) (err error) {
 	task.Run, task.Arg = fn, arg
 	p.asyncTaskQueue.Enqueue(task)
 	if atomic.CompareAndSwapInt32(&p.wakeupCall, 0, 1) {
-		for _, err = unix.Kevent(p.fd, wakeChanges, nil, nil); err == unix.EINTR || err == unix.EAGAIN; _, err = unix.Kevent(p.fd, wakeChanges, nil, nil) {
+		if _, err = unix.Kevent(p.fd, note, nil, nil); err == unix.EAGAIN {
+			err = nil
 		}
 	}
 	return os.NewSyscallError("kevent trigger", err)
@@ -109,9 +111,9 @@ func (p *Poller) Polling(callback func(fd int, filter int16) error) error {
 	el := newEventList(InitPollEventsCap)
 
 	var (
-		ts      unix.Timespec
-		tsp     *unix.Timespec
-		wakenUp bool
+		ts       unix.Timespec
+		tsp      *unix.Timespec
+		doChores bool
 	)
 	for {
 		n, err := unix.Kevent(p.fd, nil, el.events, tsp)
@@ -140,15 +142,15 @@ func (p *Poller) Polling(callback func(fd int, filter int16) error) error {
 				default:
 					logging.Warnf("error occurs in event-loop: %v", err)
 				}
-			} else { // poller is awaken to run tasks in queues.
-				wakenUp = true
+			} else { // poller is awakened to run tasks in queues.
+				doChores = true
 			}
 		}
 
-		if wakenUp {
-			wakenUp = false
-			task := p.priorAsyncTaskQueue.Dequeue()
-			for ; task != nil; task = p.priorAsyncTaskQueue.Dequeue() {
+		if doChores {
+			doChores = false
+			task := p.urgentAsyncTaskQueue.Dequeue()
+			for ; task != nil; task = p.urgentAsyncTaskQueue.Dequeue() {
 				switch err = task.Run(task.Arg); err {
 				case nil:
 				case errors.ErrEngineShutdown:
@@ -172,8 +174,11 @@ func (p *Poller) Polling(callback func(fd int, filter int16) error) error {
 				queue.PutTask(task)
 			}
 			atomic.StoreInt32(&p.wakeupCall, 0)
-			if (!p.asyncTaskQueue.IsEmpty() || !p.priorAsyncTaskQueue.IsEmpty()) && atomic.CompareAndSwapInt32(&p.wakeupCall, 0, 1) {
-				for _, err = unix.Kevent(p.fd, wakeChanges, nil, nil); err == unix.EINTR || err == unix.EAGAIN; _, err = unix.Kevent(p.fd, wakeChanges, nil, nil) {
+			if (!p.asyncTaskQueue.IsEmpty() || !p.urgentAsyncTaskQueue.IsEmpty()) && atomic.CompareAndSwapInt32(&p.wakeupCall, 0, 1) {
+				switch _, err = unix.Kevent(p.fd, note, nil, nil); err {
+				case nil, unix.EAGAIN:
+				default:
+					doChores = true
 				}
 			}
 		}
