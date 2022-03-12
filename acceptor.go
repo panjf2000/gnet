@@ -35,7 +35,7 @@ func (eng *engine) accept(fd int, _ netpoll.IOEvent) error {
 		if err == unix.EAGAIN {
 			return nil
 		}
-		eng.opts.Logger.Errorf("Accept() fails due to error: %v", err)
+		eng.opts.Logger.Errorf("Accept() failed due to error: %v", err)
 		return errors.ErrAcceptSocket
 	}
 	if err = os.NewSyscallError("fcntl nonblock", unix.SetNonblock(nfd, true)); err != nil {
@@ -53,6 +53,7 @@ func (eng *engine) accept(fd int, _ netpoll.IOEvent) error {
 
 	err = el.poller.UrgentTrigger(el.register, c)
 	if err != nil {
+		eng.opts.Logger.Errorf("UrgentTrigger() failed due to error: %v", err)
 		_ = unix.Close(nfd)
 		c.releaseTCP()
 	}
@@ -69,7 +70,7 @@ func (el *eventloop) accept(fd int, ev netpoll.IOEvent) error {
 		if err == unix.EAGAIN {
 			return nil
 		}
-		el.getLogger().Errorf("Accept() fails due to error: %v", err)
+		el.getLogger().Errorf("Accept() failed due to error: %v", err)
 		return os.NewSyscallError("accept", err)
 	}
 	if err = os.NewSyscallError("fcntl nonblock", unix.SetNonblock(nfd, true)); err != nil {
