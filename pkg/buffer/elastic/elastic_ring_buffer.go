@@ -201,5 +201,4 @@ func (b *RingBuffer) Reset() {
 		return
 	}
 	b.rb.Reset()
-	b.Done()
 }

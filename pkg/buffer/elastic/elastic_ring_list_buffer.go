@@ -19,9 +19,7 @@ import (
 	"math"
 
 	"github.com/panjf2000/gnet/v2/pkg/buffer/linkedlist"
-	"github.com/panjf2000/gnet/v2/pkg/buffer/ring"
 	gerrors "github.com/panjf2000/gnet/v2/pkg/errors"
-	rbPool "github.com/panjf2000/gnet/v2/pkg/pool/ringbuffer"
 )
 
 // Buffer combines ring-buffer and list-buffer.
@@ -30,7 +28,7 @@ import (
 // flexible and scalable, which helps the application reduce memory footprint.
 type Buffer struct {
 	maxStaticBytes int
-	ringBuffer     *ring.Buffer
+	ringBuffer     RingBuffer
 	listBuffer     linkedlist.Buffer
 }
 
@@ -39,14 +37,11 @@ func New(maxStaticBytes int) (*Buffer, error) {
 	if maxStaticBytes <= 0 {
 		return nil, gerrors.ErrNegativeSize
 	}
-	return &Buffer{maxStaticBytes: maxStaticBytes, ringBuffer: rbPool.Get()}, nil
+	return &Buffer{maxStaticBytes: maxStaticBytes}, nil
 }
 
 // Read reads data from the Buffer.
 func (mb *Buffer) Read(p []byte) (n int, err error) {
-	if mb.ringBuffer == nil {
-		return mb.listBuffer.Read(p)
-	}
 	n, err = mb.ringBuffer.Read(p)
 	if n == len(p) {
 		return n, err
@@ -59,10 +54,6 @@ func (mb *Buffer) Read(p []byte) (n int, err error) {
 
 // Peek returns n bytes as [][]byte, these bytes won't be discarded until Buffer.Discard() is called.
 func (mb *Buffer) Peek(n int) [][]byte {
-	if mb.ringBuffer == nil {
-		return mb.listBuffer.Peek(n)
-	}
-
 	if n <= 0 {
 		n = math.MaxInt32
 	}
@@ -75,17 +66,12 @@ func (mb *Buffer) Peek(n int) [][]byte {
 
 // Discard discards n bytes in this buffer.
 func (mb *Buffer) Discard(n int) (discarded int, err error) {
-	if mb.ringBuffer == nil {
-		return mb.listBuffer.Discard(n)
-	}
-
-	staticLen := mb.ringBuffer.Buffered()
 	discarded, err = mb.ringBuffer.Discard(n)
-	if n <= staticLen {
+	if n <= discarded {
 		return
 	}
 
-	n -= staticLen
+	n -= discarded
 	var m int
 	m, err = mb.listBuffer.Discard(n)
 	discarded += m
@@ -94,10 +80,6 @@ func (mb *Buffer) Discard(n int) (discarded int, err error) {
 
 // Write appends data to this buffer.
 func (mb *Buffer) Write(p []byte) (n int, err error) {
-	if mb.ringBuffer == nil && mb.listBuffer.IsEmpty() {
-		mb.ringBuffer = rbPool.Get()
-	}
-
 	if !mb.listBuffer.IsEmpty() || mb.ringBuffer.Buffered() >= mb.maxStaticBytes {
 		mb.listBuffer.PushBack(p)
 		return len(p), nil
@@ -115,10 +97,6 @@ func (mb *Buffer) Write(p []byte) (n int, err error) {
 
 // Writev appends multiple byte slices to this buffer.
 func (mb *Buffer) Writev(bs [][]byte) (int, error) {
-	if mb.ringBuffer == nil && mb.listBuffer.IsEmpty() {
-		mb.ringBuffer = rbPool.Get()
-	}
-
 	if !mb.listBuffer.IsEmpty() || mb.ringBuffer.Buffered() >= mb.maxStaticBytes {
 		var n int
 		for _, b := range bs {
@@ -153,9 +131,6 @@ func (mb *Buffer) Writev(bs [][]byte) (int, error) {
 
 // ReadFrom implements io.ReaderFrom.
 func (mb *Buffer) ReadFrom(r io.Reader) (int64, error) {
-	if mb.ringBuffer == nil && mb.listBuffer.IsEmpty() {
-		mb.ringBuffer = rbPool.Get()
-	}
 	if !mb.listBuffer.IsEmpty() || mb.ringBuffer.Buffered() >= mb.maxStaticBytes {
 		return mb.listBuffer.ReadFrom(r)
 	}
@@ -164,9 +139,6 @@ func (mb *Buffer) ReadFrom(r io.Reader) (int64, error) {
 
 // WriteTo implements io.WriterTo.
 func (mb *Buffer) WriteTo(w io.Writer) (n int64, err error) {
-	if mb.ringBuffer == nil {
-		return mb.listBuffer.WriteTo(w)
-	}
 	if n, err = mb.ringBuffer.WriteTo(w); err != nil {
 		return
 	}
@@ -178,28 +150,18 @@ func (mb *Buffer) WriteTo(w io.Writer) (n int64, err error) {
 
 // Buffered returns the number of bytes that can be read from the current buffer.
 func (mb *Buffer) Buffered() int {
-	if mb.ringBuffer == nil {
-		return mb.listBuffer.Buffered()
-	}
 	return mb.ringBuffer.Buffered() + mb.listBuffer.Buffered()
 }
 
 // IsEmpty indicates whether this buffer is empty.
 func (mb *Buffer) IsEmpty() bool {
-	if mb.ringBuffer == nil {
-		return mb.listBuffer.IsEmpty()
-	}
-
 	return mb.ringBuffer.IsEmpty() && mb.listBuffer.IsEmpty()
 }
 
 // Reset resets the buffer.
 func (mb *Buffer) Reset(maxStaticBytes int) {
-	if mb.ringBuffer != nil {
-		mb.ringBuffer.Reset()
-	}
+	mb.ringBuffer.Reset()
 	mb.listBuffer.Reset()
-
 	if maxStaticBytes > 0 {
 		mb.maxStaticBytes = maxStaticBytes
 	}
@@ -207,10 +169,6 @@ func (mb *Buffer) Reset(maxStaticBytes int) {
 
 // Release frees all resource of this buffer.
 func (mb *Buffer) Release() {
-	if mb.ringBuffer != nil {
-		rbPool.Put(mb.ringBuffer)
-		mb.ringBuffer = nil
-	}
-
+	mb.ringBuffer.Done()
 	mb.listBuffer.Reset()
 }
