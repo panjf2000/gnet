@@ -367,7 +367,7 @@ func (c *conn) WriteTo(w io.Writer) (n int64, err error) {
 	var m int
 	m, err = w.Write(c.buffer)
 	c.buffer = c.buffer[m:]
-	return int64(m), err
+	return n + int64(m), err
 }
 
 func (c *conn) Flush() error {
