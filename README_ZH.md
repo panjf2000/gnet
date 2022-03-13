@@ -14,7 +14,7 @@
 <a title="Tag" target="_blank" href="https://github.com/panjf2000/gnet/tags"><img src="https://img.shields.io/github/v/tag/panjf2000/gnet?color=%23ff8936&logo=fitbit&style=flat-square" /></a>
 </p>
 
-[英文](README.md) | 🇨🇳中文
+[英文](README.md) | 中文
 
 # 📖 简介
 
