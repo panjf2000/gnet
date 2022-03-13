@@ -354,20 +354,16 @@ func (c *conn) ReadFrom(r io.Reader) (int64, error) {
 }
 
 func (c *conn) WriteTo(w io.Writer) (n int64, err error) {
-	if c.inboundBuffer.IsEmpty() {
-		var m int
-		m, err = w.Write(c.buffer)
-		c.buffer = c.buffer[m:]
-		return int64(m), err
-	}
-	n, err = c.inboundBuffer.WriteTo(w)
-	if err != nil {
-		return
+	if !c.inboundBuffer.IsEmpty() {
+		if n, err = c.inboundBuffer.WriteTo(w); err != nil {
+			return
+		}
 	}
 	var m int
 	m, err = w.Write(c.buffer)
+	n += int64(m)
 	c.buffer = c.buffer[m:]
-	return n + int64(m), err
+	return
 }
 
 func (c *conn) Flush() error {
