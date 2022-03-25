@@ -834,7 +834,7 @@ func (t *testCloseConnectionServer) OnTraffic(c Conn) (action Action) {
 	_, _ = c.Discard(-1)
 	go func() {
 		time.Sleep(time.Second)
-		_ = c.Close(nil)
+		_ = c.Close()
 	}()
 	return
 }
@@ -983,7 +983,7 @@ func (s *testClosedWakeUpServer) OnTraffic(c Conn) Action {
 	}
 
 	go func() { require.NoError(s.tester, c.Wake(nil)) }()
-	go func() { require.NoError(s.tester, c.Close(nil)) }()
+	go func() { require.NoError(s.tester, c.Close()) }()
 
 	<-s.clientClosed
 

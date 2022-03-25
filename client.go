@@ -214,7 +214,7 @@ func (cli *Client) Dial(network, address string) (Conn, error) {
 	}
 	err = cli.el.poller.UrgentTrigger(cli.el.register, gc)
 	if err != nil {
-		gc.Close(nil)
+		gc.Close()
 		return nil, err
 	}
 	return gc, nil
