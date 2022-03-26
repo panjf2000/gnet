@@ -442,12 +442,19 @@ func (c *conn) Wake(callback AsyncCallback) error {
 	}, nil)
 }
 
-func (c *conn) Close(callback AsyncCallback) error {
+func (c *conn) CloseWithCallback(callback AsyncCallback) error {
 	return c.loop.poller.Trigger(func(_ interface{}) (err error) {
 		err = c.loop.closeConn(c, nil)
 		if callback != nil {
 			_ = callback(c)
 		}
+		return
+	}, nil)
+}
+
+func (c *conn) Close() error {
+	return c.loop.poller.Trigger(func(_ interface{}) (err error) {
+		err = c.loop.closeConn(c, nil)
 		return
 	}, nil)
 }

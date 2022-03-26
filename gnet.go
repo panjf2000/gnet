@@ -227,7 +227,10 @@ type Conn interface {
 
 	// Close closes the current connection, usually you don't need to pass a non-nil callback
 	// because you should use OnClose() instead, the callback here is only for compatibility.
-	Close(callback AsyncCallback) (err error)
+	CloseWithCallback(callback AsyncCallback) (err error)
+
+	// Close closes the current connection, implements net.Conn.
+	Close() (err error)
 }
 
 type (
