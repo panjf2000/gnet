@@ -250,8 +250,13 @@ func (c *conn) Read(p []byte) (n int, err error) {
 		return n, nil
 	}
 	n, _ = c.inboundBuffer.Read(p)
-	n += copy(p[n:], c.buffer)
-	return c.Discard(n)
+	if n == len(p) {
+		return
+	}
+	m := copy(p[n:], c.buffer)
+	n += m
+	c.buffer = c.buffer[m:]
+	return
 }
 
 func (c *conn) Next(n int) (buf []byte, err error) {
