@@ -225,7 +225,7 @@ type Conn interface {
 	// Wake triggers a OnTraffic event for the connection.
 	Wake(callback AsyncCallback) (err error)
 
-	// Close closes the current connection, usually you don't need to pass a non-nil callback
+	// CloseWithCallback closes the current connection, usually you don't need to pass a non-nil callback
 	// because you should use OnClose() instead, the callback here is only for compatibility.
 	CloseWithCallback(callback AsyncCallback) (err error)
 
@@ -247,11 +247,10 @@ type (
 		OnShutdown(eng Engine)
 
 		// OnOpen fires when a new connection has been opened.
-		// The Conn c has information about the connection such as it's local and remote address.
-		// The parameter out is the return value which is going to be sent back to the peer.
-		// It is usually not recommended to send large amounts of data back to the peer in OnOpened.
 		//
-		// Note that the bytes returned by OnOpened will be sent back to the peer without being encoded.
+		// The Conn c has information about the connection such as its local and remote addresses.
+		// The parameter out is the return value which is going to be sent back to the peer.
+		// Sending large amounts of data back to the peer in OnOpen is usually not recommended.
 		OnOpen(c Conn) (out []byte, action Action)
 
 		// OnClose fires when a connection has been closed.
@@ -260,10 +259,10 @@ type (
 
 		// OnTraffic fires when a socket receives data from the peer.
 		//
-		// Note that the parameter packet returned from React() is not allowed to be passed to a new goroutine,
-		// as this []byte will be reused within event-loop after React() returns.
-		// If you have to use packet in a new goroutine, then you need to make a copy of buf and pass this copy
-		// to that new goroutine.
+		// Note that the []byte returned from Conn.Peek(int)/Conn.Next(int) is not allowed to be passed to a new goroutine,
+		// as this []byte will be reused within event-loop after OnTraffic() returns.
+		// If you have to use this []byte in a new goroutine, you should either make a copy of it or call Conn.Read([]byte)
+		// to read data into your own []byte, then pass the new []byte to the new goroutine.
 		OnTraffic(c Conn) (action Action)
 
 		// OnTick fires immediately after the engine starts and will fire again
