@@ -22,7 +22,6 @@ import (
 	"errors"
 	"net"
 	"strconv"
-	"strings"
 	"sync"
 	"syscall"
 
@@ -141,6 +140,11 @@ func (cli *Client) Dial(network, address string) (Conn, error) {
 	if err != nil {
 		return nil, err
 	}
+	return cli.Enroll(c)
+}
+
+// Enroll converts a net.Conn to gnet.Conn and then adds it into Client.
+func (cli *Client) Enroll(c net.Conn) (Conn, error) {
 	defer c.Close()
 
 	sc, ok := c.(syscall.Conn)
@@ -152,9 +156,9 @@ func (cli *Client) Dial(network, address string) (Conn, error) {
 		return nil, errors.New("failed to get syscall.RawConn from net.Conn")
 	}
 
-	var DupFD int
+	var dupFD int
 	e := rc.Control(func(fd uintptr) {
-		DupFD, err = unix.Dup(int(fd))
+		dupFD, err = unix.Dup(int(fd))
 	})
 	if err != nil {
 		return nil, err
@@ -163,26 +167,13 @@ func (cli *Client) Dial(network, address string) (Conn, error) {
 		return nil, e
 	}
 
-	if strings.HasPrefix(network, "tcp") {
-		if cli.opts.TCPNoDelay == TCPDelay {
-			if err = socket.SetNoDelay(DupFD, 0); err != nil {
-				return nil, err
-			}
-		}
-		if cli.opts.TCPKeepAlive > 0 {
-			if err = socket.SetKeepAlivePeriod(DupFD, int(cli.opts.TCPKeepAlive.Seconds())); err != nil {
-				return nil, err
-			}
-		}
-	}
-
 	if cli.opts.SocketSendBuffer > 0 {
-		if err = socket.SetSendBuffer(DupFD, cli.opts.SocketSendBuffer); err != nil {
+		if err = socket.SetSendBuffer(dupFD, cli.opts.SocketSendBuffer); err != nil {
 			return nil, err
 		}
 	}
 	if cli.opts.SocketRecvBuffer > 0 {
-		if err = socket.SetRecvBuffer(DupFD, cli.opts.SocketRecvBuffer); err != nil {
+		if err = socket.SetRecvBuffer(dupFD, cli.opts.SocketRecvBuffer); err != nil {
 			return nil, err
 		}
 	}
@@ -197,18 +188,28 @@ func (cli *Client) Dial(network, address string) (Conn, error) {
 			return nil, err
 		}
 		ua := c.LocalAddr().(*net.UnixAddr)
-		ua.Name = c.RemoteAddr().String() + "." + strconv.Itoa(DupFD)
-		gc = newTCPConn(DupFD, cli.el, sockAddr, c.LocalAddr(), c.RemoteAddr())
+		ua.Name = c.RemoteAddr().String() + "." + strconv.Itoa(dupFD)
+		gc = newTCPConn(dupFD, cli.el, sockAddr, c.LocalAddr(), c.RemoteAddr())
 	case *net.TCPConn:
+		if cli.opts.TCPNoDelay == TCPDelay {
+			if err = socket.SetNoDelay(dupFD, 0); err != nil {
+				return nil, err
+			}
+		}
+		if cli.opts.TCPKeepAlive > 0 {
+			if err = socket.SetKeepAlivePeriod(dupFD, int(cli.opts.TCPKeepAlive.Seconds())); err != nil {
+				return nil, err
+			}
+		}
 		if sockAddr, _, _, _, err = socket.GetTCPSockAddr(c.RemoteAddr().Network(), c.RemoteAddr().String()); err != nil {
 			return nil, err
 		}
-		gc = newTCPConn(DupFD, cli.el, sockAddr, c.LocalAddr(), c.RemoteAddr())
+		gc = newTCPConn(dupFD, cli.el, sockAddr, c.LocalAddr(), c.RemoteAddr())
 	case *net.UDPConn:
 		if sockAddr, _, _, _, err = socket.GetUDPSockAddr(c.RemoteAddr().Network(), c.RemoteAddr().String()); err != nil {
 			return nil, err
 		}
-		gc = newUDPConn(DupFD, cli.el, c.LocalAddr(), sockAddr, true)
+		gc = newUDPConn(dupFD, cli.el, c.LocalAddr(), sockAddr, true)
 	default:
 		return nil, gerrors.ErrUnsupportedProtocol
 	}
