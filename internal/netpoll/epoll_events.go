@@ -59,6 +59,6 @@ func (el *eventList) expand() {
 func (el *eventList) shrink() {
 	if newSize := el.size >> 1; newSize >= MinPollEventsCap {
 		el.size = newSize
-		el.events = make([]epollevent, newSize)
+		el.events = el.events[:newSize]
 	}
 }
