@@ -219,7 +219,7 @@ func (el *eventloop) closeConn(c *conn, err error) (rerr error) {
 				iov = iov[:MaxIovSize]
 			}
 			n, err := io.Writev(c.fd, iov)
-			if err != nil && err != unix.EAGAIN {
+			if err != nil {
 				el.getLogger().Warnf("closeConn: error occurs when sending data back to peer, %v", err)
 				break
 			}
