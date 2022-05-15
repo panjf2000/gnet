@@ -36,18 +36,18 @@ import (
 )
 
 type conn struct {
-	fd             int                     // file descriptor
 	ctx            interface{}             // user-defined context
 	peer           unix.Sockaddr           // remote socket address
-	loop           *eventloop              // connected event-loop
-	buffer         []byte                  // buffer for the latest bytes
-	opened         bool                    // connection opened event fired
 	localAddr      net.Addr                // local addr
 	remoteAddr     net.Addr                // remote addr
-	isDatagram     bool                    // UDP protocol
-	inboundBuffer  elastic.RingBuffer      // buffer for leftover data from the peer
+	loop           *eventloop              // connected event-loop
 	outboundBuffer *elastic.Buffer         // buffer for data that is eligible to be sent to the peer
 	pollAttachment *netpoll.PollAttachment // connection attachment for poller
+	inboundBuffer  elastic.RingBuffer      // buffer for leftover data from the peer
+	buffer         []byte                  // buffer for the latest bytes
+	fd             int                     // file descriptor
+	isDatagram     bool                    // UDP protocol
+	opened         bool                    // connection opened event fired
 }
 
 func newTCPConn(fd int, el *eventloop, sa unix.Sockaddr, localAddr, remoteAddr net.Addr) (c *conn) {
