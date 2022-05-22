@@ -17,7 +17,9 @@
 
 package netpoll
 
-import "sync"
+import (
+	"sync"
+)
 
 var pollAttachmentPool = sync.Pool{New: func() interface{} { return new(PollAttachment) }}
 
@@ -31,12 +33,14 @@ func PutPollAttachment(pa *PollAttachment) {
 	if pa == nil {
 		return
 	}
-	pa.FD, pa.Callback = 0, nil
+	pa.FD, pa.Callback, pa.Events = 0, nil, 0
 	pollAttachmentPool.Put(pa)
 }
 
 // PollAttachment is the user data which is about to be stored in "void *ptr" of epoll_data or "void *udata" of kevent.
 type PollAttachment struct {
-	FD       int
+	FD int
+	// Used to cache read/write event and avoid extra epoll_ctl syscalls
+	Events   uint32
 	Callback PollEventHandler
 }

@@ -200,30 +200,58 @@ const (
 
 // AddReadWrite registers the given file-descriptor with readable and writable events to the poller.
 func (p *Poller) AddReadWrite(pa *PollAttachment) error {
+	if pa.Events&readWriteEvents != 0 {
+		return nil
+	}
+	pa.Events |= readWriteEvents
 	return os.NewSyscallError("epoll_ctl add",
 		unix.EpollCtl(p.fd, unix.EPOLL_CTL_ADD, pa.FD, &unix.EpollEvent{Fd: int32(pa.FD), Events: readWriteEvents}))
 }
 
 // AddRead registers the given file-descriptor with readable event to the poller.
 func (p *Poller) AddRead(pa *PollAttachment) error {
+	if pa.Events&readEvents != 0 {
+		return nil
+	}
+	pa.Events |= readEvents
+	if pa.Events != readEvents {
+		return os.NewSyscallError("epoll_ctl mod",
+			unix.EpollCtl(p.fd, unix.EPOLL_CTL_MOD, pa.FD, &unix.EpollEvent{Fd: int32(pa.FD), Events: pa.Events}))
+	}
 	return os.NewSyscallError("epoll_ctl add",
 		unix.EpollCtl(p.fd, unix.EPOLL_CTL_ADD, pa.FD, &unix.EpollEvent{Fd: int32(pa.FD), Events: readEvents}))
 }
 
 // AddWrite registers the given file-descriptor with writable event to the poller.
 func (p *Poller) AddWrite(pa *PollAttachment) error {
+	if pa.Events&writeEvents != 0 {
+		return nil
+	}
+	pa.Events |= writeEvents
+	if pa.Events != writeEvents {
+		return os.NewSyscallError("epoll_ctl mod",
+			unix.EpollCtl(p.fd, unix.EPOLL_CTL_MOD, pa.FD, &unix.EpollEvent{Fd: int32(pa.FD), Events: pa.Events}))
+	}
 	return os.NewSyscallError("epoll_ctl add",
 		unix.EpollCtl(p.fd, unix.EPOLL_CTL_ADD, pa.FD, &unix.EpollEvent{Fd: int32(pa.FD), Events: writeEvents}))
 }
 
 // ModRead renews the given file-descriptor with readable event in the poller.
 func (p *Poller) ModRead(pa *PollAttachment) error {
+	if pa.Events == readEvents {
+		return nil
+	}
+	pa.Events = readEvents
 	return os.NewSyscallError("epoll_ctl mod",
 		unix.EpollCtl(p.fd, unix.EPOLL_CTL_MOD, pa.FD, &unix.EpollEvent{Fd: int32(pa.FD), Events: readEvents}))
 }
 
 // ModReadWrite renews the given file-descriptor with readable and writable events in the poller.
 func (p *Poller) ModReadWrite(pa *PollAttachment) error {
+	if pa.Events == readWriteEvents {
+		return nil
+	}
+	pa.Events = readWriteEvents
 	return os.NewSyscallError("epoll_ctl mod",
 		unix.EpollCtl(p.fd, unix.EPOLL_CTL_MOD, pa.FD, &unix.EpollEvent{Fd: int32(pa.FD), Events: readWriteEvents}))
 }
