@@ -71,11 +71,11 @@ func udsSocket(proto, addr string, passive bool, sockOpts ...Option) (fd int, ne
 		}
 	}
 
-	if err = os.NewSyscallError("bind", unix.Bind(fd, sa)); err != nil {
-		return
-	}
-
 	if passive {
+		if err = os.NewSyscallError("bind", unix.Bind(fd, sa)); err != nil {
+			return
+		}
+
 		// Set backlog size to the maximum.
 		err = os.NewSyscallError("listen", unix.Listen(fd, listenerBacklogMaxSize))
 	} else {
