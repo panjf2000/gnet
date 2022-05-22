@@ -121,6 +121,10 @@ func udpSocket(proto, addr string, connect bool, sockOpts ...Option) (fd int, ne
 		return
 	}
 	defer func() {
+		// ignore EINPROGRESS for non-blocking socket connect, should be processed by caller
+		if t, ok := err.(*os.SyscallError); ok && t.Err == unix.EINPROGRESS {
+			return
+		}
 		if err != nil {
 			_ = unix.Close(fd)
 		}
@@ -143,10 +147,10 @@ func udpSocket(proto, addr string, connect bool, sockOpts ...Option) (fd int, ne
 		}
 	}
 
-	err = os.NewSyscallError("bind", unix.Bind(fd, sa))
-
 	if connect {
 		err = os.NewSyscallError("connect", unix.Connect(fd, sa))
+	} else {
+		err = os.NewSyscallError("bind", unix.Bind(fd, sa))
 	}
 
 	return

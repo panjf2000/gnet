@@ -60,6 +60,11 @@ func udsSocket(proto, addr string, passive bool, sockOpts ...Option) (fd int, ne
 		return
 	}
 	defer func() {
+		// ignore EINPROGRESS for non-blocking socket connect, should be processed by caller
+		// though there is less situation for EINPROGRESS when using unix socket
+		if t, ok := err.(*os.SyscallError); ok && t.Err == unix.EINPROGRESS {
+			return
+		}
 		if err != nil {
 			_ = unix.Close(fd)
 		}
