@@ -124,10 +124,10 @@ func tcpSocket(proto, addr string, passive bool, sockOpts ...Option) (fd int, ne
 	}
 	defer func() {
 		// ignore EINPROGRESS for non-blocking socket connect, should be processed by caller
-		if t, ok := err.(*os.SyscallError); ok && t.Err == unix.EINPROGRESS {
-			return
-		}
 		if err != nil {
+			if err, ok := err.(*os.SyscallError); ok && err.Err == unix.EINPROGRESS {
+				return
+			}
 			_ = unix.Close(fd)
 		}
 	}()
