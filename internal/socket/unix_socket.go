@@ -60,7 +60,12 @@ func udsSocket(proto, addr string, passive bool, sockOpts ...Option) (fd int, ne
 		return
 	}
 	defer func() {
+		// ignore EINPROGRESS for non-blocking socket connect, should be processed by caller
+		// though there is less situation for EINPROGRESS when using unix socket
 		if err != nil {
+			if err, ok := err.(*os.SyscallError); ok && err.Err == unix.EINPROGRESS {
+				return
+			}
 			_ = unix.Close(fd)
 		}
 	}()
@@ -71,11 +76,11 @@ func udsSocket(proto, addr string, passive bool, sockOpts ...Option) (fd int, ne
 		}
 	}
 
-	if err = os.NewSyscallError("bind", unix.Bind(fd, sa)); err != nil {
-		return
-	}
-
 	if passive {
+		if err = os.NewSyscallError("bind", unix.Bind(fd, sa)); err != nil {
+			return
+		}
+
 		// Set backlog size to the maximum.
 		err = os.NewSyscallError("listen", unix.Listen(fd, listenerBacklogMaxSize))
 	} else {
