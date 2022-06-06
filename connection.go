@@ -293,7 +293,7 @@ func (c *conn) Next(n int) (buf []byte, err error) {
 	c.loop.cache.Write(head)
 	c.loop.cache.Write(tail)
 	if inBufferLen >= n {
-		return c.loop.cache.Bytes(), err
+		return c.loop.cache.Bytes()[:n], err
 	}
 
 	remaining := n - inBufferLen
@@ -320,7 +320,7 @@ func (c *conn) Peek(n int) (buf []byte, err error) {
 	c.loop.cache.Write(head)
 	c.loop.cache.Write(tail)
 	if inBufferLen >= n {
-		return c.loop.cache.Bytes(), err
+		return c.loop.cache.Bytes()[:n], err
 	}
 
 	remaining := n - inBufferLen
