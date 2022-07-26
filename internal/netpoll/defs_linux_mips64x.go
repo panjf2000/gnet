@@ -2,9 +2,10 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-//go:build (mips64 || mips64le) && linux
+//go:build (mips64 || mips64le) && linux && poll_opt
 // +build mips64 mips64le
 // +build linux
+// +build poll_opt
 
 package netpoll
 
