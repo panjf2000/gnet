@@ -932,7 +932,7 @@ func testStop(t *testing.T, network, addr string) {
 func TestClosedWakeUp(t *testing.T) {
 	events := &testClosedWakeUpServer{
 		tester:             t,
-		BuiltinEventEngine: &BuiltinEventEngine{}, network: "tcp", addr: ":8888", protoAddr: "tcp://:8888",
+		BuiltinEventEngine: &BuiltinEventEngine{}, network: "tcp", addr: ":9998", protoAddr: "tcp://:9998",
 		clientClosed: make(chan struct{}),
 		serverClosed: make(chan struct{}),
 		wakeup:       make(chan struct{}),

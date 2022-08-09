@@ -260,7 +260,10 @@ func (c *conn) Read(p []byte) (n int, err error) {
 	if c.inboundBuffer.IsEmpty() {
 		n = copy(p, c.buffer)
 		c.buffer = c.buffer[n:]
-		return n, nil
+		if n == 0 && len(p) > 0 {
+			err = io.EOF
+		}
+		return
 	}
 	n, _ = c.inboundBuffer.Read(p)
 	if n == len(p) {
@@ -353,7 +356,7 @@ func (c *conn) Discard(n int) (int, error) {
 func (c *conn) Write(p []byte) (int, error) {
 	if c.isDatagram {
 		if err := c.sendTo(p); err != nil {
-			return -1, err
+			return 0, err
 		}
 		return len(p), nil
 	}
@@ -362,7 +365,7 @@ func (c *conn) Write(p []byte) (int, error) {
 
 func (c *conn) Writev(bs [][]byte) (int, error) {
 	if c.isDatagram {
-		return -1, gerrors.ErrUnsupportedOp
+		return 0, gerrors.ErrUnsupportedOp
 	}
 	return c.writev(bs)
 }
