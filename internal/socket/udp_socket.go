@@ -43,38 +43,14 @@ func GetUDPSockAddr(proto, addr string) (sa unix.Sockaddr, family int, udpAddr *
 
 	switch udpVersion {
 	case "udp4":
-		sa4 := &unix.SockaddrInet4{Port: udpAddr.Port}
-
-		if udpAddr.IP != nil {
-			if len(udpAddr.IP) == 16 {
-				copy(sa4.Addr[:], udpAddr.IP[12:16]) // copy last 4 bytes of slice to array
-			} else {
-				copy(sa4.Addr[:], udpAddr.IP) // copy all bytes of slice to array
-			}
-		}
-
-		sa, family = sa4, unix.AF_INET
+		family = unix.AF_INET
+		sa, err = ipToSockaddr(family, udpAddr.IP, udpAddr.Port, "")
 	case "udp6":
 		ipv6only = true
 		fallthrough
 	case "udp":
-		sa6 := &unix.SockaddrInet6{Port: udpAddr.Port}
-
-		if udpAddr.IP != nil {
-			copy(sa6.Addr[:], udpAddr.IP) // copy all bytes of slice to array
-		}
-
-		if udpAddr.Zone != "" {
-			var iface *net.Interface
-			iface, err = net.InterfaceByName(udpAddr.Zone)
-			if err != nil {
-				return
-			}
-
-			sa6.ZoneId = uint32(iface.Index)
-		}
-
-		sa, family = sa6, unix.AF_INET6
+		family = unix.AF_INET6
+		sa, err = ipToSockaddr(family, udpAddr.IP, udpAddr.Port, udpAddr.Zone)
 	default:
 		err = errors.ErrUnsupportedProtocol
 	}

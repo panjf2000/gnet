@@ -45,38 +45,14 @@ func GetTCPSockAddr(proto, addr string) (sa unix.Sockaddr, family int, tcpAddr *
 
 	switch tcpVersion {
 	case "tcp4":
-		sa4 := &unix.SockaddrInet4{Port: tcpAddr.Port}
-
-		if tcpAddr.IP != nil {
-			if len(tcpAddr.IP) == 16 {
-				copy(sa4.Addr[:], tcpAddr.IP[12:16]) // copy last 4 bytes of slice to array
-			} else {
-				copy(sa4.Addr[:], tcpAddr.IP) // copy all bytes of slice to array
-			}
-		}
-
-		sa, family = sa4, unix.AF_INET
+		family = unix.AF_INET
+		sa, err = ipToSockaddr(family, tcpAddr.IP, tcpAddr.Port, "")
 	case "tcp6":
 		ipv6only = true
 		fallthrough
 	case "tcp":
-		sa6 := &unix.SockaddrInet6{Port: tcpAddr.Port}
-
-		if tcpAddr.IP != nil {
-			copy(sa6.Addr[:], tcpAddr.IP) // copy all bytes of slice to array
-		}
-
-		if tcpAddr.Zone != "" {
-			var iface *net.Interface
-			iface, err = net.InterfaceByName(tcpAddr.Zone)
-			if err != nil {
-				return
-			}
-
-			sa6.ZoneId = uint32(iface.Index)
-		}
-
-		sa, family = sa6, unix.AF_INET6
+		family = unix.AF_INET6
+		sa, err = ipToSockaddr(family, tcpAddr.IP, tcpAddr.Port, tcpAddr.Zone)
 	default:
 		err = errors.ErrUnsupportedProtocol
 	}
