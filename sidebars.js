@@ -16,6 +16,11 @@ module.exports = {
     },
     {
       type: 'category',
+      label: 'Quickstart',
+      items: ["quickstart"],
+    },
+    {
+      type: 'category',
       label: 'Tutorial',
       items: [
         {
@@ -26,11 +31,6 @@ module.exports = {
           ],
         },
       ],
-    },
-    {
-      type: 'category',
-      label: 'Quickstart',
-      items: ["quickstart"],
     },
     {
       type: 'category',
