@@ -15,7 +15,7 @@ If you're not familiar with how gnet works, go back and read [this](https://gnet
 
 ### Either loop read data in OnTraffic() or invoke c.Wake() regularly
 
-Despite the fact that gnet leverages epoll/kqueue with level-triggered mode under the hook, OnTraffic() won't be invoked constantly even though there is data left in the inbound buffer of a connection.
+Despite the fact that gnet leverages epoll/kqueue with level-triggered mode under the hook, OnTraffic() won't be invoked constantly given there is data left in the inbound buffer of a connection, OnTraffic() is only invoked when the connection has new data arriving, which is like edge-triggered mode from the user's point of view.
 
 Thus, you should loop call c.Read()/c.Peek()/c.Next() for a connection in OnTraffic() to drain the inbound buffer of incoming data, but if you don't, then make sure you call c.Wake() periodically, otherwise you may never get a chance to read the rest of the data sent by the peer endpoint (client or server) unless the peer endpoint sends new data over.
 
