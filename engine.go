@@ -281,3 +281,7 @@ func serve(eventHandler EventHandler, listener *listener, options *Options, prot
 
 	return nil
 }
+
+func Serve(eventHandler EventHandler, listener *listener, options *Options, protoAddr string) error {
+	return serve(eventHandler, listener, options, protoAddr)
+}

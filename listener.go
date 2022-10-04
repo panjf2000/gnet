@@ -78,6 +78,10 @@ func (ln *listener) close() {
 		})
 }
 
+func (ln *listener) GetFD() int {
+	return ln.fd
+}
+
 func initListener(network, addr string, options *Options) (l *listener, err error) {
 	var sockOpts []socket.Option
 	if options.ReusePort || strings.HasPrefix(network, "udp") {
@@ -103,4 +107,8 @@ func initListener(network, addr string, options *Options) (l *listener, err erro
 	l = &listener{network: network, address: addr, sockOpts: sockOpts}
 	err = l.normalize()
 	return
+}
+
+func InitListener(network, addr string, options *Options) (l *listener, err error) {
+	return initListener(network, addr, options)
 }
