@@ -18,9 +18,11 @@
 package socket
 
 import (
+	"net"
 	"os"
 	"syscall"
 
+	"github.com/panjf2000/gnet/v2/pkg/errors"
 	"golang.org/x/sys/unix"
 )
 
@@ -82,4 +84,105 @@ func SetLinger(fd, sec int) error {
 		l.Linger = 0
 	}
 	return unix.SetsockoptLinger(fd, syscall.SOL_SOCKET, syscall.SO_LINGER, &l)
+}
+
+// SetMulticastMembership returns with a socket option function based on the IP
+// version. Returns nil when multicast membership cannot be applied.
+func SetMulticastMembership(proto, addr string) func(int, int) error {
+	var udpVersion string
+	udpAddr, err := net.ResolveUDPAddr(proto, addr)
+	if err != nil || !udpAddr.IP.IsMulticast() {
+		return nil
+	}
+
+	udpVersion, err = determineUDPProto(proto, udpAddr)
+	if err != nil {
+		return nil
+	}
+
+	switch udpVersion {
+	case "udp4":
+		return func(fd int, ifIndex int) error {
+			return SetIPv4MulticastMembership(fd, udpAddr.IP, ifIndex)
+		}
+	case "udp6":
+		return func(fd int, ifIndex int) error {
+			return SetIPv6MulticastMembership(fd, udpAddr.IP, ifIndex)
+		}
+	default:
+		return nil
+	}
+}
+
+// SetIPv4MulticastMemership joins fd to the specified multicast IPv4 address.
+// ifIndex is the index of the interface where the multicast datagrams will be
+// received. If ifIndex is 0 then the operating system will choose the default,
+// it is usually needed when the host has multiple network interfaces configured.
+func SetIPv4MulticastMembership(fd int, mcast net.IP, ifIndex int) error {
+	// Multicast interfaces are selected by IP address on IPv4 (and by index on IPv6)
+	ip, err := interfaceFirstIPv4Addr(ifIndex)
+	if err != nil {
+		return err
+	}
+
+	mreq := &unix.IPMreq{}
+	copy(mreq.Multiaddr[:], mcast.To4())
+	copy(mreq.Interface[:], ip.To4())
+
+	if ifIndex > 0 {
+		if err := os.NewSyscallError("setsockopt", unix.SetsockoptInet4Addr(fd, syscall.IPPROTO_IP, syscall.IP_MULTICAST_IF, mreq.Interface)); err != nil {
+			return err
+		}
+	}
+
+	if err := os.NewSyscallError("setsockopt", unix.SetsockoptByte(fd, syscall.IPPROTO_IP, syscall.IP_MULTICAST_LOOP, 0)); err != nil {
+		return err
+	}
+	return os.NewSyscallError("setsockopt", unix.SetsockoptIPMreq(fd, syscall.IPPROTO_IP, syscall.IP_ADD_MEMBERSHIP, mreq))
+}
+
+// SetIPv6MulticastMemership joins fd to the specified multicast IPv6 address.
+// ifIndex is the index of the interface where the multicast datagrams will be
+// received. If ifIndex is 0 then the operating system will choose the default,
+// it is usually needed when the host has multiple network interfaces configured.
+func SetIPv6MulticastMembership(fd int, mcast net.IP, ifIndex int) error {
+	mreq := &unix.IPv6Mreq{}
+	mreq.Interface = uint32(ifIndex)
+	copy(mreq.Multiaddr[:], mcast.To16())
+
+	if ifIndex > 0 {
+		if err := os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, syscall.IPPROTO_IPV6, syscall.IPV6_MULTICAST_IF, ifIndex)); err != nil {
+			return err
+		}
+	}
+
+	if err := os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, syscall.IPPROTO_IPV6, syscall.IPV6_MULTICAST_LOOP, 0)); err != nil {
+		return err
+	}
+	return os.NewSyscallError("setsockopt", unix.SetsockoptIPv6Mreq(fd, syscall.IPPROTO_IPV6, syscall.IPV6_JOIN_GROUP, mreq))
+}
+
+// interfaceFirstIPv4Addr returns the first IPv4 address of the interface.
+func interfaceFirstIPv4Addr(ifIndex int) (net.IP, error) {
+	if ifIndex == 0 {
+		return net.IP([]byte{0, 0, 0, 0}), nil
+	}
+	iface, err := net.InterfaceByIndex(ifIndex)
+	if err != nil {
+		return nil, err
+	}
+	addrs, err := iface.Addrs()
+	if err != nil {
+		return nil, err
+	}
+	for _, addr := range addrs {
+		ip, _, err := net.ParseCIDR(addr.String())
+		if err != nil {
+			return nil, err
+		}
+		if ip.To4() != nil {
+			return ip, nil
+		}
+	}
+	return nil, errors.ErrNoIPv4AddressOnInterface
 }

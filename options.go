@@ -63,6 +63,9 @@ type Options struct {
 	// ReusePort indicates whether to set up the SO_REUSEPORT socket option.
 	ReusePort bool
 
+	// MulticastInterfaceIndex is the index of the interface name where the multicast UDP addresses will be bound to.
+	MulticastInterfaceIndex int
+
 	// ============================= Options for both server-side and client-side =============================
 
 	// ReadBufferCap is the maximum number of bytes that can be read from the peer when the readable event comes.
@@ -237,5 +240,12 @@ func WithLogLevel(lvl logging.Level) Option {
 func WithLogger(logger logging.Logger) Option {
 	return func(opts *Options) {
 		opts.Logger = logger
+	}
+}
+
+// WithMulticastInterfaceIndex sets the interface name where UDP multicast sockets will be bound to.
+func WithMulticastInterfaceIndex(idx int) Option {
+	return func(opts *Options) {
+		opts.MulticastInterfaceIndex = idx
 	}
 }

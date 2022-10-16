@@ -100,6 +100,12 @@ func initListener(network, addr string, options *Options) (l *listener, err erro
 		sockOpt := socket.Option{SetSockOpt: socket.SetSendBuffer, Opt: options.SocketSendBuffer}
 		sockOpts = append(sockOpts, sockOpt)
 	}
+	if strings.HasPrefix(network, "udp") {
+		if sockoptFn := socket.SetMulticastMembership(network, addr); sockoptFn != nil {
+			sockOpt := socket.Option{SetSockOpt: sockoptFn, Opt: options.MulticastInterfaceIndex}
+			sockOpts = append(sockOpts, sockOpt)
+		}
+	}
 	l = &listener{network: network, address: addr, sockOpts: sockOpts}
 	err = l.normalize()
 	return
