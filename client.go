@@ -65,13 +65,13 @@ func NewClient(eventHandler EventHandler, opts ...Option) (cli *Client, err erro
 	eng := new(engine)
 	eng.opts = options
 	eng.eventHandler = eventHandler
-	eng.ln = &listener{network: "udp"}
+	eng.listeners = make(map[int]*listener)
 	eng.cond = sync.NewCond(&sync.Mutex{})
 	if options.Ticker {
 		eng.tickerCtx, eng.cancelTicker = context.WithCancel(context.Background())
 	}
 	el := new(eventloop)
-	el.ln = eng.ln
+	el.listeners = eng.listeners
 	el.engine = eng
 	el.poller = p
 

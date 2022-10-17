@@ -37,16 +37,16 @@ import (
 )
 
 type eventloop struct {
-	ln           *listener       // listener
-	idx          int             // loop index in the engine loops list
-	cache        bytes.Buffer    // temporary buffer for scattered bytes
-	engine       *engine         // engine in loop
-	poller       *netpoll.Poller // epoll or kqueue
-	buffer       []byte          // read packet buffer whose capacity is set by user, default value is 64KB
-	connCount    int32           // number of active connections in event-loop
-	udpSockets   map[int]*conn   // client-side UDP socket map: fd -> conn
-	connections  map[int]*conn   // TCP connection map: fd -> conn
-	eventHandler EventHandler    // user eventHandler
+	listeners    map[int]*listener // listeners
+	idx          int               // loop index in the engine loops list
+	cache        bytes.Buffer      // temporary buffer for scattered bytes
+	engine       *engine           // engine in loop
+	poller       *netpoll.Poller   // epoll or kqueue
+	buffer       []byte            // read packet buffer whose capacity is set by user, default value is 64KB
+	connCount    int32             // number of active connections in event-loop
+	udpSockets   map[int]*conn     // client-side UDP socket map: fd -> conn
+	connections  map[int]*conn     // TCP connection map: fd -> conn
+	eventHandler EventHandler      // user eventHandler
 }
 
 func (el *eventloop) getLogger() logging.Logger {
@@ -68,6 +68,12 @@ func (el *eventloop) closeAllSockets() {
 	}
 	for _, c := range el.udpSockets {
 		_ = el.closeConn(c, nil)
+	}
+}
+
+func (el *eventloop) closeAllListeners() {
+	for _, ln := range el.listeners {
+		ln.close()
 	}
 }
 
@@ -177,7 +183,7 @@ func (el *eventloop) write(c *conn) error {
 func (el *eventloop) closeConn(c *conn, err error) (rerr error) {
 	if addr := c.localAddr; addr != nil && strings.HasPrefix(c.localAddr.Network(), "udp") {
 		rerr = el.poller.Delete(c.fd)
-		if c.fd != el.ln.fd {
+		if _, ok := el.listeners[c.fd]; !ok {
 			rerr = unix.Close(c.fd)
 			delete(el.udpSockets, c.fd)
 		}
@@ -300,8 +306,8 @@ func (el *eventloop) readUDP(fd int, _ netpoll.IOEvent) error {
 			fd, el.idx, os.NewSyscallError("recvfrom", err))
 	}
 	var c *conn
-	if fd == el.ln.fd {
-		c = newUDPConn(fd, el, el.ln.addr, sa, false)
+	if ln, ok := el.listeners[fd]; ok {
+		c = newUDPConn(fd, el, ln.addr, sa, false)
 	} else {
 		c = el.udpSockets[fd]
 	}
