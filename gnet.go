@@ -140,7 +140,7 @@ type Writer interface {
 // AsyncCallback is a callback which will be invoked after the asynchronous functions has finished executing.
 //
 // Note that the parameter gnet.Conn is already released under UDP protocol, thus it's not allowed to be accessed.
-type AsyncCallback func(c Conn) error
+type AsyncCallback func(c Conn, err error) error
 
 // Socket is a set of functions which manipulate the underlying file descriptor of a connection.
 type Socket interface {
@@ -318,13 +318,14 @@ var MaxStreamBufferCap = 64 * 1024 // 64KB
 // Address should use a scheme prefix and be formatted
 // like `tcp://192.168.0.10:9851` or `unix://socket`.
 // Valid network schemes:
-//  tcp   - bind to both IPv4 and IPv6
-//  tcp4  - IPv4
-//  tcp6  - IPv6
-//  udp   - bind to both IPv4 and IPv6
-//  udp4  - IPv4
-//  udp6  - IPv6
-//  unix  - Unix Domain Socket
+//
+//	tcp   - bind to both IPv4 and IPv6
+//	tcp4  - IPv4
+//	tcp6  - IPv6
+//	udp   - bind to both IPv4 and IPv6
+//	udp4  - IPv4
+//	udp6  - IPv6
+//	unix  - Unix Domain Socket
 //
 // The "tcp" network scheme is assumed when one is not specified.
 func Run(eventHandler EventHandler, protoAddr string, opts ...Option) (err error) {

@@ -219,7 +219,7 @@ func (c *conn) asyncWrite(itf interface{}) (err error) {
 	hook := itf.(*asyncWriteHook)
 	_, err = c.write(hook.data)
 	if hook.callback != nil {
-		_ = hook.callback(c)
+		_ = hook.callback(c, err)
 	}
 	return
 }
@@ -237,7 +237,7 @@ func (c *conn) asyncWritev(itf interface{}) (err error) {
 	hook := itf.(*asyncWritevHook)
 	_, err = c.writev(hook.data)
 	if hook.callback != nil {
-		_ = hook.callback(c)
+		_ = hook.callback(c, err)
 	}
 	return
 }
@@ -438,7 +438,7 @@ func (c *conn) AsyncWrite(buf []byte, callback AsyncCallback) error {
 	if c.isDatagram {
 		defer func() {
 			if callback != nil {
-				_ = callback(nil)
+				_ = callback(nil, nil)
 			}
 		}()
 		return c.sendTo(buf)
@@ -457,7 +457,7 @@ func (c *conn) Wake(callback AsyncCallback) error {
 	return c.loop.poller.UrgentTrigger(func(_ interface{}) (err error) {
 		err = c.loop.wake(c)
 		if callback != nil {
-			_ = callback(c)
+			_ = callback(c, err)
 		}
 		return
 	}, nil)
@@ -467,7 +467,7 @@ func (c *conn) CloseWithCallback(callback AsyncCallback) error {
 	return c.loop.poller.Trigger(func(_ interface{}) (err error) {
 		err = c.loop.closeConn(c, nil)
 		if callback != nil {
-			_ = callback(c)
+			_ = callback(c, err)
 		}
 		return
 	}, nil)
