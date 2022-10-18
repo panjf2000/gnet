@@ -278,35 +278,35 @@ type (
 
 // OnBoot fires when the engine is ready for accepting connections.
 // The parameter engine has information and various utilities.
-func (es *BuiltinEventEngine) OnBoot(_ Engine) (action Action) {
+func (*BuiltinEventEngine) OnBoot(_ Engine) (action Action) {
 	return
 }
 
 // OnShutdown fires when the engine is being shut down, it is called right after
 // all event-loops and connections are closed.
-func (es *BuiltinEventEngine) OnShutdown(_ Engine) {
+func (*BuiltinEventEngine) OnShutdown(_ Engine) {
 }
 
 // OnOpen fires when a new connection has been opened.
 // The parameter out is the return value which is going to be sent back to the peer.
-func (es *BuiltinEventEngine) OnOpen(_ Conn) (out []byte, action Action) {
+func (*BuiltinEventEngine) OnOpen(_ Conn) (out []byte, action Action) {
 	return
 }
 
 // OnClose fires when a connection has been closed.
 // The parameter err is the last known connection error.
-func (es *BuiltinEventEngine) OnClose(_ Conn, _ error) (action Action) {
+func (*BuiltinEventEngine) OnClose(_ Conn, _ error) (action Action) {
 	return
 }
 
 // OnTraffic fires when a local socket receives data from the peer.
-func (es *BuiltinEventEngine) OnTraffic(_ Conn) (action Action) {
+func (*BuiltinEventEngine) OnTraffic(_ Conn) (action Action) {
 	return
 }
 
 // OnTick fires immediately after the engine starts and will fire again
 // following the duration specified by the delay return value.
-func (es *BuiltinEventEngine) OnTick() (delay time.Duration, action Action) {
+func (*BuiltinEventEngine) OnTick() (delay time.Duration, action Action) {
 	return
 }
 
