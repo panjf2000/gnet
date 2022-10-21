@@ -44,6 +44,9 @@
 - [x] 支持两种事件驱动机制：**Linux** 里的 `epoll` 以及 **FreeBSD/DragonFly/Darwin** 里的 `kqueue`
 - [x] 灵活的事件定时器
 - [x] 实现 `gnet` 客户端
+- [ ] 支持 **Windows** 平台 ([gnet v1](https://github.com/panjf2000/gnet/tree/1.x) 支持 Windows，v2 暂时不支持)
+- [ ] 支持 **TLS**
+- [ ] 支持 [io_uring](https://kernel.dk/io_uring.pdf)
 
 # 🎬 开始
 

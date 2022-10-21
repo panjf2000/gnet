@@ -44,6 +44,9 @@ Please read [<u>*How To Ask Questions The Smart Way*</u>](http://www.catb.org/~e
 - [x] Supporting two event-driven mechanisms: `epoll` on **Linux** and `kqueue` on **FreeBSD/DragonFly/Darwin**
 - [x] Flexible ticker event
 - [x] Implementation of `gnet` Client
+- [ ] **Windows** platform support ([gnet v1](https://github.com/panjf2000/gnet/tree/1.x) is available on Windows, v2 not yet)
+- [ ] **TLS** support
+- [ ] [io_uring](https://kernel.dk/io_uring.pdf) support
 
 # 🎬 Getting started
 
