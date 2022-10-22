@@ -69,10 +69,12 @@ func (c *conn) releaseTCP() {
 	c.peer = nil
 	c.ctx = nil
 	c.buffer = nil
-	if addr, ok := c.localAddr.(*net.TCPAddr); ok && c.localAddr != c.loop.ln.addr {
-		bsPool.Put(addr.IP)
-		if len(addr.Zone) > 0 {
-			bsPool.Put(toolkit.StringToBytes(addr.Zone))
+	if addr, ok := c.localAddr.(*net.TCPAddr); ok {
+		if _, ok := c.loop.listeners[c.fd]; !ok {
+			bsPool.Put(addr.IP)
+			if len(addr.Zone) > 0 {
+				bsPool.Put(toolkit.StringToBytes(addr.Zone))
+			}
 		}
 	}
 	if addr, ok := c.remoteAddr.(*net.TCPAddr); ok {
@@ -106,10 +108,12 @@ func newUDPConn(fd int, el *eventloop, localAddr net.Addr, sa unix.Sockaddr, con
 
 func (c *conn) releaseUDP() {
 	c.ctx = nil
-	if addr, ok := c.localAddr.(*net.UDPAddr); ok && c.localAddr != c.loop.ln.addr {
-		bsPool.Put(addr.IP)
-		if len(addr.Zone) > 0 {
-			bsPool.Put(toolkit.StringToBytes(addr.Zone))
+	if addr, ok := c.localAddr.(*net.UDPAddr); ok {
+		if _, ok := c.loop.listeners[c.fd]; !ok {
+			bsPool.Put(addr.IP)
+			if len(addr.Zone) > 0 {
+				bsPool.Put(toolkit.StringToBytes(addr.Zone))
+			}
 		}
 	}
 	if addr, ok := c.remoteAddr.(*net.UDPAddr); ok {

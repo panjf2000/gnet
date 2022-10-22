@@ -29,7 +29,7 @@ import (
 )
 
 type engine struct {
-	ln           *listener          // the listener for accepting new connections
+	listeners    map[int]*listener  // listeners for accepting new connections
 	lb           loadBalancer       // event-loops for handling events
 	wg           sync.WaitGroup     // event-loop close WaitGroup
 	opts         *Options           // options with engine
@@ -92,28 +92,34 @@ func (eng *engine) startSubReactors() {
 }
 
 func (eng *engine) activateEventLoops(numEventLoop int) (err error) {
-	network, address := eng.ln.network, eng.ln.address
-	ln := eng.ln
-	eng.ln = nil
+	listeners := eng.listeners
+	eng.listeners = nil
 	var striker *eventloop
 	// Create loops locally and bind the listeners.
 	for i := 0; i < numEventLoop; i++ {
 		if i > 0 {
-			if ln, err = initListener(network, address, eng.opts); err != nil {
-				return
+			ls := make(map[int]*listener, len(listeners))
+			for _, ln := range listeners {
+				if ln, err = initListener(ln.network, ln.address, eng.opts); err != nil {
+					return
+				}
+				ls[ln.fd] = ln
 			}
+			listeners = ls
 		}
 		var p *netpoll.Poller
 		if p, err = netpoll.OpenPoller(); err == nil {
 			el := new(eventloop)
-			el.ln = ln
+			el.listeners = listeners
 			el.engine = eng
 			el.poller = p
 			el.buffer = make([]byte, eng.opts.ReadBufferCap)
 			el.connections = make(map[int]*conn)
 			el.eventHandler = eng.eventHandler
-			if err = el.poller.AddRead(el.ln.packPollAttachment(el.accept)); err != nil {
-				return
+			for _, ln := range listeners {
+				if err = el.poller.AddRead(ln.packPollAttachment(el.accept)); err != nil {
+					return
+				}
 			}
 			eng.lb.register(el)
 
@@ -138,7 +144,7 @@ func (eng *engine) activateReactors(numEventLoop int) error {
 	for i := 0; i < numEventLoop; i++ {
 		if p, err := netpoll.OpenPoller(); err == nil {
 			el := new(eventloop)
-			el.ln = eng.ln
+			el.listeners = eng.listeners
 			el.engine = eng
 			el.poller = p
 			el.buffer = make([]byte, eng.opts.ReadBufferCap)
@@ -155,13 +161,15 @@ func (eng *engine) activateReactors(numEventLoop int) error {
 
 	if p, err := netpoll.OpenPoller(); err == nil {
 		el := new(eventloop)
-		el.ln = eng.ln
+		el.listeners = eng.listeners
 		el.idx = -1
 		el.engine = eng
 		el.poller = p
 		el.eventHandler = eng.eventHandler
-		if err = el.poller.AddRead(eng.ln.packPollAttachment(eng.accept)); err != nil {
-			return err
+		for _, ln := range eng.listeners {
+			if err = el.poller.AddRead(ln.packPollAttachment(eng.accept)); err != nil {
+				return err
+			}
 		}
 		eng.mainLoop = el
 
@@ -184,7 +192,12 @@ func (eng *engine) activateReactors(numEventLoop int) error {
 }
 
 func (eng *engine) start(numEventLoop int) error {
-	if eng.opts.ReusePort || eng.ln.network == "udp" {
+	network := ""
+	for _, ln := range eng.listeners {
+		network = ln.network
+		break
+	}
+	if eng.opts.ReusePort || network == "udp" {
 		return eng.activateEventLoops(numEventLoop)
 	}
 
@@ -207,7 +220,7 @@ func (eng *engine) stop(s Engine) {
 	})
 
 	if eng.mainLoop != nil {
-		eng.ln.close()
+		eng.mainLoop.closeAllListeners()
 		err := eng.mainLoop.poller.UrgentTrigger(func(_ interface{}) error { return errors.ErrEngineShutdown }, nil)
 		if err != nil {
 			eng.opts.Logger.Errorf("failed to call UrgentTrigger on main event-loop when stopping engine: %v", err)
@@ -234,7 +247,7 @@ func (eng *engine) stop(s Engine) {
 	atomic.StoreInt32(&eng.inShutdown, 1)
 }
 
-func serve(eventHandler EventHandler, listener *listener, options *Options, protoAddr string) error {
+func serve(eventHandler EventHandler, listeners map[int]*listener, options *Options, protoAddr string) error {
 	// Figure out the proper number of event-loops/goroutines to run.
 	numEventLoop := 1
 	if options.Multicore {
@@ -247,7 +260,7 @@ func serve(eventHandler EventHandler, listener *listener, options *Options, prot
 	eng := new(engine)
 	eng.opts = options
 	eng.eventHandler = eventHandler
-	eng.ln = listener
+	eng.listeners = listeners
 
 	switch options.LB {
 	case RoundRobin:

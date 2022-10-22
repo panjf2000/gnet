@@ -61,9 +61,17 @@ func (s Engine) CountConnections() (count int) {
 // Dup returns a copy of the underlying file descriptor of listener.
 // It is the caller's responsibility to close dupFD when finished.
 // Closing listener does not affect dupFD, and closing dupFD does not affect listener.
+// Returns error when engine has multiple listeners.
 func (s Engine) Dup() (dupFD int, err error) {
+	if len(s.eng.listeners) > 1 {
+		return -1, errors.ErrUnsupportedOp
+	}
+	var ln *listener
+	for _, ln = range s.eng.listeners {
+		break
+	}
 	var sc string
-	dupFD, sc, err = s.eng.ln.dup()
+	dupFD, sc, err = ln.dup()
 	if err != nil {
 		logging.Warnf("%s failed when duplicating new fd\n", sc)
 	}
@@ -381,15 +389,19 @@ func Run(eventHandler EventHandler, protoAddr string, opts ...Option) (err error
 		options.WriteBufferCap = toolkit.CeilToPowerOfTwo(wbc)
 	}
 
-	network, addr := parseProtoAddr(protoAddr)
+	network, addrs := parseProtoAddr(protoAddr)
 
-	var ln *listener
-	if ln, err = initListener(network, addr, options); err != nil {
-		return
+	listeners := make(map[int]*listener)
+	for _, addr := range strings.Split(addrs, ",") {
+		var ln *listener
+		if ln, err = initListener(network, addr, options); err != nil {
+			return
+		}
+		listeners[ln.fd] = ln
+		defer ln.close()
 	}
-	defer ln.close()
 
-	return serve(eventHandler, ln, options, protoAddr)
+	return serve(eventHandler, listeners, options, protoAddr)
 }
 
 var (

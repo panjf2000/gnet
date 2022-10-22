@@ -42,14 +42,15 @@ func (eng *engine) accept(fd int, _ netpoll.IOEvent) error {
 		return err
 	}
 
+	ln := eng.listeners[fd]
 	remoteAddr := socket.SockaddrToTCPOrUnixAddr(sa)
-	if eng.opts.TCPKeepAlive > 0 && eng.ln.network == "tcp" {
+	if eng.opts.TCPKeepAlive > 0 && ln.network == "tcp" {
 		err = socket.SetKeepAlivePeriod(nfd, int(eng.opts.TCPKeepAlive.Seconds()))
 		logging.Error(err)
 	}
 
 	el := eng.lb.next(remoteAddr)
-	c := newTCPConn(nfd, el, sa, el.ln.addr, remoteAddr)
+	c := newTCPConn(nfd, el, sa, el.listeners[fd].addr, remoteAddr)
 
 	err = el.poller.UrgentTrigger(el.register, c)
 	if err != nil {
@@ -61,11 +62,12 @@ func (eng *engine) accept(fd int, _ netpoll.IOEvent) error {
 }
 
 func (el *eventloop) accept(fd int, ev netpoll.IOEvent) error {
-	if el.ln.network == "udp" {
+	ln := el.listeners[fd]
+	if len(el.listeners) == 0 || ln.network == "udp" {
 		return el.readUDP(fd, ev)
 	}
 
-	nfd, sa, err := unix.Accept(el.ln.fd)
+	nfd, sa, err := unix.Accept(fd)
 	if err != nil {
 		if err == unix.EAGAIN {
 			return nil
@@ -78,12 +80,12 @@ func (el *eventloop) accept(fd int, ev netpoll.IOEvent) error {
 	}
 
 	remoteAddr := socket.SockaddrToTCPOrUnixAddr(sa)
-	if el.engine.opts.TCPKeepAlive > 0 && el.ln.network == "tcp" {
+	if el.engine.opts.TCPKeepAlive > 0 && ln.network == "tcp" {
 		err = socket.SetKeepAlivePeriod(nfd, int(el.engine.opts.TCPKeepAlive/time.Second))
 		logging.Error(err)
 	}
 
-	c := newTCPConn(nfd, el, sa, el.ln.addr, remoteAddr)
+	c := newTCPConn(nfd, el, sa, ln.addr, remoteAddr)
 	if err = el.poller.AddRead(c.pollAttachment); err != nil {
 		return err
 	}

@@ -67,7 +67,7 @@ func (el *eventloop) run(lockOSThread bool) {
 
 	defer func() {
 		el.closeAllSockets()
-		el.ln.close()
+		el.closeAllListeners()
 		el.engine.signalShutdown()
 	}()
 
