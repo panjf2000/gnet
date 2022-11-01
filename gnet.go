@@ -70,6 +70,28 @@ func (s Engine) Dup() (dupFD int, err error) {
 	return
 }
 
+// Stop this specific Engine
+func (s Engine) Stop(ctx context.Context) error {
+	if s.eng.isInShutdown() {
+		return errors.ErrEngineInShutdown
+	}
+
+	s.eng.signalShutdown()
+
+	ticker := time.NewTicker(shutdownPollInterval)
+	defer ticker.Stop()
+	for {
+		if s.eng.isInShutdown() {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+		}
+	}
+}
+
 // Reader is an interface that consists of a number of methods for reading that Conn must implement.
 type Reader interface {
 	// ================================== Non-concurrency-safe API's ==================================
