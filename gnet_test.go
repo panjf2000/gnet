@@ -937,13 +937,13 @@ type testStopEngine struct {
 	tester                   *testing.T
 	network, addr, protoAddr string
 	eng                      Engine
-	stopIter                 int
+	stopIter                 int64
 	name                     string
-	exchngCount              int
+	exchngCount              int64
 }
 
-func (s *testStopEngine) OnBoot(eng Engine) (action Action) {
-	s.eng = eng
+func (t *testStopEngine) OnBoot(eng Engine) (action Action) {
+	t.eng = eng
 	return
 }
 
@@ -956,7 +956,7 @@ func (t *testStopEngine) OnTraffic(c Conn) (action Action) {
 	buf, _ := c.Peek(-1)
 	_, _ = c.Write(buf)
 	_, _ = c.Discard(-1)
-	t.exchngCount++
+	atomic.AddInt64(&t.exchngCount, 1)
 	return
 }
 
@@ -971,7 +971,8 @@ func (t *testStopEngine) OnTick() (delay time.Duration, action Action) {
 		_, err = conn.Read(data)
 		require.NoError(t.tester, err)
 
-		if t.stopIter <= 0 {
+		iter := atomic.LoadInt64(&t.stopIter)
+		if iter <= 0 {
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 			defer cancel()
 			logging.Debugf("stop engine...", t.eng.Stop(ctx))
@@ -979,7 +980,7 @@ func (t *testStopEngine) OnTick() (delay time.Duration, action Action) {
 			_, err = conn.Read(data)
 			require.Error(t.tester, err)
 		}
-		t.stopIter--
+		atomic.AddInt64(&t.stopIter, -1)
 	}()
 	return
 }
@@ -1006,9 +1007,9 @@ func testEngineStop(t *testing.T, network, addr string) {
 	err = <-result2
 	assert.NoError(t, err)
 	// make sure that each handler processed at least 1
-	require.Greater(t, events1.exchngCount, 0)
-	require.Greater(t, events2.exchngCount, 0)
-	require.Equal(t, 2+1+5+1, events1.exchngCount+events2.exchngCount)
+	require.Greater(t, events1.exchngCount, int64(0))
+	require.Greater(t, events2.exchngCount, int64(0))
+	require.Equal(t, int64(2+1+5+1), events1.exchngCount+events2.exchngCount)
 }
 
 // Test should not panic when we wake-up server_closed conn.

@@ -70,7 +70,8 @@ func (s Engine) Dup() (dupFD int, err error) {
 	return
 }
 
-// Stop this specific Engine
+// Stop gracefully shuts down this Engine without interrupting any active event-loops,
+// it waits indefinitely for connections and event-loops to be closed and then shuts down.
 func (s Engine) Stop(ctx context.Context) error {
 	if s.eng.isInShutdown() {
 		return errors.ErrEngineInShutdown
@@ -423,6 +424,7 @@ var (
 
 // Stop gracefully shuts down the engine without interrupting any active event-loops,
 // it waits indefinitely for connections and event-loops to be closed and then shuts down.
+// Deprecated: The global Stop only stops last registered Engine for the specified protocol and port combination. Use the Engine Stop function to shutdown an Engine received in the OnBoot event.
 func Stop(ctx context.Context, protoAddr string) error {
 	var eng *engine
 	if s, ok := allEngines.Load(protoAddr); ok {
