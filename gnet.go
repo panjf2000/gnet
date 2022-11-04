@@ -70,6 +70,29 @@ func (s Engine) Dup() (dupFD int, err error) {
 	return
 }
 
+// Stop gracefully shuts down this Engine without interrupting any active event-loops,
+// it waits indefinitely for connections and event-loops to be closed and then shuts down.
+func (s Engine) Stop(ctx context.Context) error {
+	if s.eng.isInShutdown() {
+		return errors.ErrEngineInShutdown
+	}
+
+	s.eng.signalShutdown()
+
+	ticker := time.NewTicker(shutdownPollInterval)
+	defer ticker.Stop()
+	for {
+		if s.eng.isInShutdown() {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+		}
+	}
+}
+
 // Reader is an interface that consists of a number of methods for reading that Conn must implement.
 type Reader interface {
 	// ================================== Non-concurrency-safe API's ==================================
@@ -401,6 +424,7 @@ var (
 
 // Stop gracefully shuts down the engine without interrupting any active event-loops,
 // it waits indefinitely for connections and event-loops to be closed and then shuts down.
+// Deprecated: The global Stop only shuts down the last registered Engine with the same protocol and IP:Port as the previous Engine's, which can lead to leaks of Engine if you invoke gnet.Run multiple times using the same protocol and IP:Port under the condition that WithReuseAddr(true) and WithReusePort(true) are enabled. Use Engine.Stop instead.
 func Stop(ctx context.Context, protoAddr string) error {
 	var eng *engine
 	if s, ok := allEngines.Load(protoAddr); ok {
