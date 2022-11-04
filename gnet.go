@@ -51,6 +51,10 @@ type Engine struct {
 
 // CountConnections counts the number of currently active connections and returns it.
 func (s Engine) CountConnections() (count int) {
+	if s.eng == nil {
+		return -1
+	}
+
 	s.eng.lb.iterate(func(i int, el *eventloop) bool {
 		count += int(el.loadConn())
 		return true
@@ -62,6 +66,10 @@ func (s Engine) CountConnections() (count int) {
 // It is the caller's responsibility to close dupFD when finished.
 // Closing listener does not affect dupFD, and closing dupFD does not affect listener.
 func (s Engine) Dup() (dupFD int, err error) {
+	if s.eng == nil {
+		return -1, errors.ErrEmptyEngine
+	}
+
 	var sc string
 	dupFD, sc, err = s.eng.ln.dup()
 	if err != nil {
@@ -73,6 +81,9 @@ func (s Engine) Dup() (dupFD int, err error) {
 // Stop gracefully shuts down this Engine without interrupting any active event-loops,
 // it waits indefinitely for connections and event-loops to be closed and then shuts down.
 func (s Engine) Stop(ctx context.Context) error {
+	if s.eng == nil {
+		return errors.ErrEmptyEngine
+	}
 	if s.eng.isInShutdown() {
 		return errors.ErrEngineInShutdown
 	}

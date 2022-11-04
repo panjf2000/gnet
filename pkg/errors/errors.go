@@ -17,6 +17,8 @@ package errors
 import "errors"
 
 var (
+	// ErrEmptyEngine occurs when trying to do something with an empty engine.
+	ErrEmptyEngine = errors.New("the internal engine is empty")
 	// ErrEngineShutdown occurs when server is closing.
 	ErrEngineShutdown = errors.New("server is going to be shutdown")
 	// ErrEngineInShutdown occurs when attempting to shut the server down more than once.
