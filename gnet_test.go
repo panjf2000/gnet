@@ -1010,6 +1010,8 @@ func testEngineStop(t *testing.T, network, addr string) {
 	require.Greater(t, events1.exchngCount, int64(0))
 	require.Greater(t, events2.exchngCount, int64(0))
 	require.Equal(t, int64(2+1+5+1), events1.exchngCount+events2.exchngCount)
+	// stop an already stopped engine
+	require.Equal(t, gerr.ErrEngineInShutdown, events1.eng.Stop(context.Background()))
 }
 
 // Test should not panic when we wake-up server_closed conn.

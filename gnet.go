@@ -424,7 +424,7 @@ var (
 
 // Stop gracefully shuts down the engine without interrupting any active event-loops,
 // it waits indefinitely for connections and event-loops to be closed and then shuts down.
-// Deprecated: The global Stop only stops last registered Engine for the specified protocol and port combination. Use the Engine Stop function to shutdown an Engine received in the OnBoot event.
+// Deprecated: The global Stop only shuts down the last registered Engine with the same protocol and IP:Port as the previous Engine's, which can lead to leaks of Engine if you invoke gnet.Run multiple times using the same protocol and IP:Port under conditions that enable WithReuseAddr(true) and WithReusePort(true).
 func Stop(ctx context.Context, protoAddr string) error {
 	var eng *engine
 	if s, ok := allEngines.Load(protoAddr); ok {
