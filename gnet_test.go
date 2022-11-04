@@ -412,7 +412,7 @@ func startClient(t *testing.T, network, addr string, multicore, async bool) {
 	}
 }
 
-// NOTE: TestServeMulticast can fail with "write: no buffer space available" on wifi interface
+// NOTE: TestServeMulticast can fail with "write: no buffer space available" on wifi interface.
 func TestServeMulticast(t *testing.T) {
 	// 224.0.0.169 is an unassigned address from the Local Network Control Block
 	// https://www.iana.org/assignments/multicast-addresses/multicast-addresses.xhtml#multicast-addresses-1
