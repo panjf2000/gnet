@@ -431,7 +431,7 @@ func TestServeMulticast(t *testing.T) {
 	t.Run("IPv6", func(t *testing.T) {
 		iface, err := findLoopbackInterface()
 		require.NoError(t, err)
-		// ff02::3 is an unassigned address from Link-Local Scope Multicast Addressess
+		// ff02::3 is an unassigned address from Link-Local Scope Multicast Addresses
 		// https://www.iana.org/assignments/ipv6-multicast-addresses/ipv6-multicast-addresses.xhtml#link-local
 		t.Run("udp-multicast", func(t *testing.T) {
 			testMulticast(t, fmt.Sprintf("[ff02::3%%%s]:9991", iface.Name), false, false, iface.Index, 10)
