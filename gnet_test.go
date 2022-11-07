@@ -429,8 +429,11 @@ func TestServeMulticast(t *testing.T) {
 		})
 	})
 	t.Run("IPv6", func(t *testing.T) {
-		iface, err := findMulticastInterface()
+		iface, err := findLoopbackInterface()
 		require.NoError(t, err)
+		if iface.Flags&net.FlagMulticast != net.FlagMulticast {
+			t.Skip("multicast is not supported on loopback interface")
+		}
 		// ff02::3 is an unassigned address from Link-Local Scope Multicast Addresses
 		// https://www.iana.org/assignments/ipv6-multicast-addresses/ipv6-multicast-addresses.xhtml#link-local
 		t.Run("udp-multicast", func(t *testing.T) {
@@ -445,16 +448,13 @@ func TestServeMulticast(t *testing.T) {
 	})
 }
 
-func findMulticastInterface() (*net.Interface, error) {
+func findLoopbackInterface() (*net.Interface, error) {
 	ifaces, err := net.Interfaces()
 	if err != nil {
 		return nil, err
 	}
 	for _, iface := range ifaces {
 		if iface.Flags&net.FlagLoopback == net.FlagLoopback {
-			continue
-		}
-		if iface.Flags&net.FlagUp&net.FlagMulticast == net.FlagUp&net.FlagMulticast {
 			return &iface, nil
 		}
 	}
@@ -560,7 +560,7 @@ func (t *testMulticastBindServer) OnTick() (delay time.Duration, action Action) 
 
 func TestMulticastBindIPv4(t *testing.T) {
 	ts := &testMulticastBindServer{}
-	iface, err := findMulticastInterface()
+	iface, err := findLoopbackInterface()
 	require.NoError(t, err)
 	err = Run(ts, "udp://224.0.0.169:9991",
 		WithMulticastInterfaceIndex(iface.Index),
@@ -570,7 +570,7 @@ func TestMulticastBindIPv4(t *testing.T) {
 
 func TestMulticastBindIPv6(t *testing.T) {
 	ts := &testMulticastBindServer{}
-	iface, err := findMulticastInterface()
+	iface, err := findLoopbackInterface()
 	require.NoError(t, err)
 	err = Run(ts, fmt.Sprintf("udp://[ff02::3%%%s]:9991", iface.Name),
 		WithMulticastInterfaceIndex(iface.Index),
