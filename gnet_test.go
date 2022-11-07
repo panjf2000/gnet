@@ -431,6 +431,9 @@ func TestServeMulticast(t *testing.T) {
 	t.Run("IPv6", func(t *testing.T) {
 		iface, err := findLoopbackInterface()
 		require.NoError(t, err)
+		if iface.Flags&net.FlagMulticast != net.FlagMulticast {
+			t.Skip("multicast is not supported on loopback interface")
+		}
 		// ff02::3 is an unassigned address from Link-Local Scope Multicast Addresses
 		// https://www.iana.org/assignments/ipv6-multicast-addresses/ipv6-multicast-addresses.xhtml#link-local
 		t.Run("udp-multicast", func(t *testing.T) {
@@ -451,11 +454,11 @@ func findLoopbackInterface() (*net.Interface, error) {
 		return nil, err
 	}
 	for _, iface := range ifaces {
-		if iface.Flags&(net.FlagLoopback|net.FlagMulticast) == net.FlagLoopback|net.FlagMulticast {
+		if iface.Flags&net.FlagLoopback == net.FlagLoopback {
 			return &iface, nil
 		}
 	}
-	return nil, errors.New("no loopback interface that supports multicast")
+	return nil, errors.New("no loopback interface")
 }
 
 func testMulticast(t *testing.T, addr string, reuseport, reuseaddr bool, index, nclients int) {
