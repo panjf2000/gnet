@@ -88,14 +88,8 @@ func SetLinger(fd, sec int) error {
 
 // SetMulticastMembership returns with a socket option function based on the IP
 // version. Returns nil when multicast membership cannot be applied.
-func SetMulticastMembership(proto, addr string) func(int, int) error {
-	var udpVersion string
-	udpAddr, err := net.ResolveUDPAddr(proto, addr)
-	if err != nil || !udpAddr.IP.IsMulticast() {
-		return nil
-	}
-
-	udpVersion, err = determineUDPProto(proto, udpAddr)
+func SetMulticastMembership(proto string, udpAddr *net.UDPAddr) func(int, int) error {
+	udpVersion, err := determineUDPProto(proto, udpAddr)
 	if err != nil {
 		return nil
 	}

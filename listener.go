@@ -101,9 +101,12 @@ func initListener(network, addr string, options *Options) (l *listener, err erro
 		sockOpts = append(sockOpts, sockOpt)
 	}
 	if strings.HasPrefix(network, "udp") {
-		if sockoptFn := socket.SetMulticastMembership(network, addr); sockoptFn != nil {
-			sockOpt := socket.Option{SetSockOpt: sockoptFn, Opt: options.MulticastInterfaceIndex}
-			sockOpts = append(sockOpts, sockOpt)
+		udpAddr, err := net.ResolveUDPAddr(network, addr)
+		if err == nil && udpAddr.IP.IsMulticast() {
+			if sockoptFn := socket.SetMulticastMembership(network, udpAddr); sockoptFn != nil {
+				sockOpt := socket.Option{SetSockOpt: sockoptFn, Opt: options.MulticastInterfaceIndex}
+				sockOpts = append(sockOpts, sockOpt)
+			}
 		}
 	}
 	l = &listener{network: network, address: addr, sockOpts: sockOpts}
