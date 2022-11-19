@@ -1,4 +1,4 @@
-name: Tests
+name: Run tests
 
 on:
   push:
@@ -19,25 +19,50 @@ env:
   GOPROXY: "https://proxy.golang.org"
 
 jobs:
+  lint:
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+    name: Run golangci-lint
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: '^1.16'
+
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup and run golangci-lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: v1.50.1
+          args: -v -E gofumpt -E gocritic -E misspell -E revive -E godot
   test:
-    name: Go-Test
+    needs: lint
     strategy:
       fail-fast: false
       matrix:
-        go: [1.16.x, 1.17.x]
+        go: [1.16, 1.17, 1.18, 1.19]
         os: [ubuntu-latest, macos-latest]
-    runs-on: ${{ matrix.os}}
+    name: Go ${{ matrix.go }} @ ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
     steps:
-      - name: Installing Go
-        uses: actions/setup-go@v2
+      - name: Checkout repository
+        uses: actions/checkout@v3
         with:
-          go-version: ${{ matrix.go }}
+          ref: ${{ github.ref }}
 
-      - name: Checkout code
-        uses: actions/checkout@v2
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: '^1.16'
 
       - name: Print Go environment
-        id: vars
+        id: go-env
         run: |
           printf "Using go at: $(which go)\n"
           printf "Go version: $(go version)\n"
@@ -46,29 +71,30 @@ jobs:
           printf "\n\nSystem environment:\n\n"
           env
           # Calculate the short SHA1 hash of the git commit
-          echo "::set-output name=short_sha::$(git rev-parse --short HEAD)"
-          echo "::set-output name=go_cache::$(go env GOCACHE)"
+          echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "GO_CACHE=$(go env GOCACHE)" >> $GITHUB_OUTPUT
 
       - name: Cache go modules
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: |
-            ${{ steps.vars.outputs.go_cache }}
+            ${{ steps.go-env.outputs.GO_CACHE }}
             ~/go/pkg/mod
           key: ${{ runner.os }}-${{ matrix.go }}-go-ci-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-${{ matrix.go }}-go-ci
 
       - name: Run unit tests for packages
-        run: go test $(go list ./... | tail -n +2)
+        run: go test -race $(go list ./... | tail -n +2)
 
-      - name: Run integration testing
-        run: go test -v -race -coverprofile="coverage.report" -covermode=atomic -timeout 5m
+      - name: Run integration tests
+        run: go test -v -race -coverprofile="codecov.report" -covermode=atomic -timeout 5m
 
       - name: Upload the code coverage report to codecov.io
-        uses: codecov/codecov-action@v2
+        uses: codecov/codecov-action@v3
         with:
-          files: ./coverage.report
+          files: ./codecov.report
           flags: unittests
           name: codecov-gnet
+          fail_ci_if_error: true
           verbose: true
