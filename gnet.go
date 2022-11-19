@@ -423,7 +423,7 @@ func Run(eventHandler EventHandler, protoAddr string, opts ...Option) (err error
 	}
 	defer ln.close()
 
-	return serve(eventHandler, ln, options, protoAddr)
+	return run(eventHandler, ln, options, protoAddr)
 }
 
 var (
