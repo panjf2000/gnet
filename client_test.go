@@ -304,7 +304,7 @@ func testServeWithGnetClient(t *testing.T, network, addr string, reuseport, reus
 
 	err = ts.client.Start()
 	assert.NoError(t, err)
-	defer ts.client.Stop()
+	defer ts.client.Stop() //nolint:errcheck
 
 	err = Run(ts,
 		network+"://"+addr,
