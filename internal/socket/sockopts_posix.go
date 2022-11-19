@@ -22,8 +22,9 @@ import (
 	"os"
 	"syscall"
 
-	"github.com/panjf2000/gnet/v2/pkg/errors"
 	"golang.org/x/sys/unix"
+
+	"github.com/panjf2000/gnet/v2/pkg/errors"
 )
 
 // SetNoDelay controls whether the operating system should delay
@@ -108,7 +109,7 @@ func SetMulticastMembership(proto string, udpAddr *net.UDPAddr) func(int, int) e
 	}
 }
 
-// SetIPv4MulticastMemership joins fd to the specified multicast IPv4 address.
+// SetIPv4MulticastMembership joins fd to the specified multicast IPv4 address.
 // ifIndex is the index of the interface where the multicast datagrams will be
 // received. If ifIndex is 0 then the operating system will choose the default,
 // it is usually needed when the host has multiple network interfaces configured.
@@ -135,7 +136,7 @@ func SetIPv4MulticastMembership(fd int, mcast net.IP, ifIndex int) error {
 	return os.NewSyscallError("setsockopt", unix.SetsockoptIPMreq(fd, syscall.IPPROTO_IP, syscall.IP_ADD_MEMBERSHIP, mreq))
 }
 
-// SetIPv6MulticastMemership joins fd to the specified multicast IPv6 address.
+// SetIPv6MulticastMembership joins fd to the specified multicast IPv6 address.
 // ifIndex is the index of the interface where the multicast datagrams will be
 // received. If ifIndex is 0 then the operating system will choose the default,
 // it is usually needed when the host has multiple network interfaces configured.
