@@ -83,7 +83,7 @@ body:
     id: how-to-reproduce
     attributes:
       label: How to Reproduce
-      description: Steps to reproduce the result
+      description: Steps to reproduce the result.
       placeholder: Tell us step by step how we can replicate this bug and what we should see in the end.
       value: |
         Steps to reproduce the behavior:
