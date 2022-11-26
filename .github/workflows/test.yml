@@ -85,7 +85,7 @@ jobs:
             ${{ runner.os }}-${{ matrix.go }}-go-ci
 
       - name: Run unit tests for packages
-        run: go test -race $(go list ./... | tail -n +2)
+        run: go test $(go list ./... | tail -n +2)
 
       - name: Run integration tests
         run: go test -v -race -coverprofile="codecov.report" -covermode=atomic -timeout 5m
