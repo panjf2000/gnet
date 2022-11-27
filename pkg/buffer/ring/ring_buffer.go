@@ -23,7 +23,8 @@ import (
 	"errors"
 	"io"
 
-	"github.com/panjf2000/gnet/v2/internal/toolkit"
+	"github.com/panjf2000/gnet/v2/internal/bs"
+	"github.com/panjf2000/gnet/v2/internal/math"
 	bsPool "github.com/panjf2000/gnet/v2/pkg/pool/byteslice"
 )
 
@@ -56,7 +57,7 @@ func New(size int) *Buffer {
 	if size == 0 {
 		return &Buffer{bs: make([][]byte, 2), isEmpty: true}
 	}
-	size = toolkit.CeilToPowerOfTwo(size)
+	size = math.CeilToPowerOfTwo(size)
 	return &Buffer{
 		bs:      make([][]byte, 2),
 		buf:     make([]byte, size),
@@ -309,7 +310,7 @@ func (rb *Buffer) Available() int {
 
 // WriteString writes the contents of the string s to buffer, which accepts a slice of bytes.
 func (rb *Buffer) WriteString(s string) (int, error) {
-	return rb.Write(toolkit.StringToBytes(s))
+	return rb.Write(bs.StringToBytes(s))
 }
 
 // Bytes returns all available read bytes. It does not move the read pointer and only copy the available data.
@@ -488,7 +489,7 @@ func (rb *Buffer) grow(newCap int) {
 		if newCap <= DefaultBufferSize {
 			newCap = DefaultBufferSize
 		} else {
-			newCap = toolkit.CeilToPowerOfTwo(newCap)
+			newCap = math.CeilToPowerOfTwo(newCap)
 		}
 	} else {
 		doubleCap := n + n

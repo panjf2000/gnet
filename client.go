@@ -27,9 +27,9 @@ import (
 
 	"golang.org/x/sys/unix"
 
+	"github.com/panjf2000/gnet/v2/internal/math"
 	"github.com/panjf2000/gnet/v2/internal/netpoll"
 	"github.com/panjf2000/gnet/v2/internal/socket"
-	"github.com/panjf2000/gnet/v2/internal/toolkit"
 	"github.com/panjf2000/gnet/v2/pkg/buffer/ring"
 	gerrors "github.com/panjf2000/gnet/v2/pkg/errors"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
@@ -82,7 +82,7 @@ func NewClient(eventHandler EventHandler, opts ...Option) (cli *Client, err erro
 	case rbc <= ring.DefaultBufferSize:
 		options.ReadBufferCap = ring.DefaultBufferSize
 	default:
-		options.ReadBufferCap = toolkit.CeilToPowerOfTwo(rbc)
+		options.ReadBufferCap = math.CeilToPowerOfTwo(rbc)
 	}
 	wbc := options.WriteBufferCap
 	switch {
@@ -91,7 +91,7 @@ func NewClient(eventHandler EventHandler, opts ...Option) (cli *Client, err erro
 	case wbc <= ring.DefaultBufferSize:
 		options.WriteBufferCap = ring.DefaultBufferSize
 	default:
-		options.WriteBufferCap = toolkit.CeilToPowerOfTwo(wbc)
+		options.WriteBufferCap = math.CeilToPowerOfTwo(wbc)
 	}
 
 	el.buffer = make([]byte, options.ReadBufferCap)

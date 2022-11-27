@@ -26,10 +26,10 @@ import (
 
 	"golang.org/x/sys/unix"
 
+	"github.com/panjf2000/gnet/v2/internal/bs"
 	gio "github.com/panjf2000/gnet/v2/internal/io"
 	"github.com/panjf2000/gnet/v2/internal/netpoll"
 	"github.com/panjf2000/gnet/v2/internal/socket"
-	"github.com/panjf2000/gnet/v2/internal/toolkit"
 	"github.com/panjf2000/gnet/v2/pkg/buffer/elastic"
 	gerrors "github.com/panjf2000/gnet/v2/pkg/errors"
 	bsPool "github.com/panjf2000/gnet/v2/pkg/pool/byteslice"
@@ -72,13 +72,13 @@ func (c *conn) releaseTCP() {
 	if addr, ok := c.localAddr.(*net.TCPAddr); ok && c.localAddr != c.loop.ln.addr {
 		bsPool.Put(addr.IP)
 		if len(addr.Zone) > 0 {
-			bsPool.Put(toolkit.StringToBytes(addr.Zone))
+			bsPool.Put(bs.StringToBytes(addr.Zone))
 		}
 	}
 	if addr, ok := c.remoteAddr.(*net.TCPAddr); ok {
 		bsPool.Put(addr.IP)
 		if len(addr.Zone) > 0 {
-			bsPool.Put(toolkit.StringToBytes(addr.Zone))
+			bsPool.Put(bs.StringToBytes(addr.Zone))
 		}
 	}
 	c.localAddr = nil
@@ -109,13 +109,13 @@ func (c *conn) releaseUDP() {
 	if addr, ok := c.localAddr.(*net.UDPAddr); ok && c.localAddr != c.loop.ln.addr {
 		bsPool.Put(addr.IP)
 		if len(addr.Zone) > 0 {
-			bsPool.Put(toolkit.StringToBytes(addr.Zone))
+			bsPool.Put(bs.StringToBytes(addr.Zone))
 		}
 	}
 	if addr, ok := c.remoteAddr.(*net.UDPAddr); ok {
 		bsPool.Put(addr.IP)
 		if len(addr.Zone) > 0 {
-			bsPool.Put(toolkit.StringToBytes(addr.Zone))
+			bsPool.Put(bs.StringToBytes(addr.Zone))
 		}
 	}
 	c.localAddr = nil

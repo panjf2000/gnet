@@ -23,7 +23,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/panjf2000/gnet/v2/internal/toolkit"
+	"github.com/panjf2000/gnet/v2/internal/math"
 	"github.com/panjf2000/gnet/v2/pkg/buffer/ring"
 	"github.com/panjf2000/gnet/v2/pkg/errors"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
@@ -403,7 +403,7 @@ func Run(eventHandler EventHandler, protoAddr string, opts ...Option) (err error
 	case rbc <= ring.DefaultBufferSize:
 		options.ReadBufferCap = ring.DefaultBufferSize
 	default:
-		options.ReadBufferCap = toolkit.CeilToPowerOfTwo(rbc)
+		options.ReadBufferCap = math.CeilToPowerOfTwo(rbc)
 	}
 	wbc := options.WriteBufferCap
 	switch {
@@ -412,7 +412,7 @@ func Run(eventHandler EventHandler, protoAddr string, opts ...Option) (err error
 	case wbc <= ring.DefaultBufferSize:
 		options.WriteBufferCap = ring.DefaultBufferSize
 	default:
-		options.WriteBufferCap = toolkit.CeilToPowerOfTwo(wbc)
+		options.WriteBufferCap = math.CeilToPowerOfTwo(wbc)
 	}
 
 	network, addr := parseProtoAddr(protoAddr)

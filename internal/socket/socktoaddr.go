@@ -22,7 +22,7 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"github.com/panjf2000/gnet/v2/internal/toolkit"
+	"github.com/panjf2000/gnet/v2/internal/bs"
 	bsPool "github.com/panjf2000/gnet/v2/pkg/pool/byteslice"
 )
 
@@ -101,5 +101,5 @@ func int2decimal(i uint) string {
 		bp--
 		b[bp] = byte(i%10) + '0'
 	}
-	return toolkit.BytesToString(b[bp:])
+	return bs.BytesToString(b[bp:])
 }

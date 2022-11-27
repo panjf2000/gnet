@@ -18,7 +18,7 @@ import (
 	"hash/crc32"
 	"net"
 
-	"github.com/panjf2000/gnet/v2/internal/toolkit"
+	"github.com/panjf2000/gnet/v2/internal/bs"
 )
 
 // LoadBalancing represents the type of load-balancing algorithm.
@@ -141,7 +141,7 @@ func (lb *sourceAddrHashLoadBalancer) register(el *eventloop) {
 
 // hash converts a string to a unique hash code.
 func (lb *sourceAddrHashLoadBalancer) hash(s string) int {
-	v := int(crc32.ChecksumIEEE(toolkit.StringToBytes(s)))
+	v := int(crc32.ChecksumIEEE(bs.StringToBytes(s)))
 	if v >= 0 {
 		return v
 	}
