@@ -403,15 +403,15 @@ func (c *conn) OutboundBuffered() int {
 	return c.outboundBuffer.Buffered()
 }
 
-func (c *conn) SetDeadline(_ time.Time) error {
+func (*conn) SetDeadline(_ time.Time) error {
 	return gerrors.ErrUnsupportedOp
 }
 
-func (c *conn) SetReadDeadline(_ time.Time) error {
+func (*conn) SetReadDeadline(_ time.Time) error {
 	return gerrors.ErrUnsupportedOp
 }
 
-func (c *conn) SetWriteDeadline(_ time.Time) error {
+func (*conn) SetWriteDeadline(_ time.Time) error {
 	return gerrors.ErrUnsupportedOp
 }
 

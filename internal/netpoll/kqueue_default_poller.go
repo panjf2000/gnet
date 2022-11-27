@@ -233,6 +233,6 @@ func (p *Poller) ModReadWrite(pa *PollAttachment) error {
 }
 
 // Delete removes the given file-descriptor from the poller.
-func (p *Poller) Delete(_ int) error {
+func (*Poller) Delete(_ int) error {
 	return nil
 }
