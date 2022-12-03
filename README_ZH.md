@@ -16,12 +16,6 @@
 
 [英文](README.md) | 中文
 
-### ⚠️ 在你提交任何关于 gnet 的 Github issue 之前
-
-请先阅读[《提问的智慧》](https://github.com/ryanhanwu/How-To-Ask-Questions-The-Smart-Way/blob/main/README-zh_CN.md)，然后再正式提交 issue。
-
-**另外，请按照 Github issue 的模板填写而不是自己随便填，否则你的 issue 可能不会被受理，甚至可能被直接关闭**。
-
 # 📖 简介
 
 `gnet` 是一个基于事件驱动的高性能和轻量级网络框架。它直接使用 [epoll](https://en.wikipedia.org/wiki/Epoll) 和 [kqueue](https://en.wikipedia.org/wiki/Kqueue) 系统调用而非标准 Go 网络包：[net](https://golang.org/pkg/net/) 来构建网络应用，它的工作原理类似两个开源的网络库：[netty](https://github.com/netty/netty) 和 [libuv](https://github.com/libuv/libuv)，这也使得 `gnet` 达到了一个远超 Go [net](https://golang.org/pkg/net/) 的性能表现。
