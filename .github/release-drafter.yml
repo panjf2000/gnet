@@ -3,8 +3,7 @@ tag-template: v$RESOLVED_VERSION
 categories:
     - title: 🧨 Breaking changes
       labels:
-          - proposal
-          - new feature
+          - breaking changes
     - title: 🚀 Features
       labels:
           - proposal
@@ -76,5 +75,5 @@ template: |
     $CHANGES
 
     **Full Changelog**: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...v$RESOLVED_VERSION
-
-    Thanks all $CONTRIBUTORS for making this release possible.
+  
+    Thanks to all these contributors: $CONTRIBUTORS for making this release possible.
