@@ -23,6 +23,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"strings"
 	"sync/atomic"
@@ -304,6 +305,11 @@ func (el *eventloop) readUDP(fd int, _ netpoll.IOEvent) error {
 		c = newUDPConn(fd, el, el.ln.addr, sa, false)
 	} else {
 		c = el.udpSockets[fd]
+		if c.RemoteAddr() == nil {
+			addr := sa.(*unix.SockaddrInet4).Addr
+			port := sa.(*unix.SockaddrInet4).Port
+			c.remoteAddr = &net.UDPAddr{IP: addr[:], Port: port}
+		}
 	}
 	c.buffer = el.buffer[:n]
 	action := el.eventHandler.OnTraffic(c)

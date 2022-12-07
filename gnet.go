@@ -27,6 +27,7 @@ import (
 	"github.com/panjf2000/gnet/v2/pkg/buffer/ring"
 	"github.com/panjf2000/gnet/v2/pkg/errors"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
+	"golang.org/x/sys/unix"
 )
 
 // Action is an action that occurs after the completion of an event.
@@ -153,6 +154,9 @@ type Writer interface {
 
 	// Writev writes multiple byte slices to peer synchronously, you must call it in the current goroutine.
 	Writev(bs [][]byte) (n int, err error)
+
+	// WriteToUDP writes multiple byte slices to peer synchronously, you must call it in the current goroutine.
+	WriteToUDP(p []byte, sa unix.Sockaddr) (int, error)
 
 	// Flush writes any buffered data to the underlying connection, you must call it in the current goroutine.
 	Flush() (err error)

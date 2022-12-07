@@ -362,6 +362,15 @@ func (c *conn) Write(p []byte) (int, error) {
 	}
 	return c.write(p)
 }
+func (c *conn) WriteToUDP(p []byte, sa unix.Sockaddr) (int, error) {
+	if c.isDatagram {
+		if err := unix.Sendto(c.fd, p, 0, sa); err != nil {
+			return 0, err
+		}
+		return len(p), nil
+	}
+	return c.write(p)
+}
 
 func (c *conn) Writev(bs [][]byte) (int, error) {
 	if c.isDatagram {

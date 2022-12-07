@@ -206,8 +206,10 @@ func (cli *Client) Enroll(c net.Conn) (Conn, error) {
 		}
 		gc = newTCPConn(dupFD, cli.el, sockAddr, c.LocalAddr(), c.RemoteAddr())
 	case *net.UDPConn:
-		if sockAddr, _, _, _, err = socket.GetUDPSockAddr(c.RemoteAddr().Network(), c.RemoteAddr().String()); err != nil {
-			return nil, err
+		if c.RemoteAddr() != nil {
+			if sockAddr, _, _, _, err = socket.GetUDPSockAddr(c.RemoteAddr().Network(), c.RemoteAddr().String()); err != nil {
+				return nil, err
+			}
 		}
 		gc = newUDPConn(dupFD, cli.el, c.LocalAddr(), sockAddr, true)
 	default:
