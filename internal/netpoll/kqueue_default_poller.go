@@ -194,8 +194,8 @@ func (p *Poller) Polling(callback func(fd int, filter int16) error) error {
 // AddReadWrite registers the given file-descriptor with readable and writable events to the poller.
 func (p *Poller) AddReadWrite(pa *PollAttachment) error {
 	_, err := unix.Kevent(p.fd, []unix.Kevent_t{
-		{Ident: uint64(pa.FD), Flags: unix.EV_ADD, Filter: unix.EVFILT_READ},
-		{Ident: uint64(pa.FD), Flags: unix.EV_ADD, Filter: unix.EVFILT_WRITE},
+		{Ident: keventIdent(pa.FD), Flags: unix.EV_ADD, Filter: unix.EVFILT_READ},
+		{Ident: keventIdent(pa.FD), Flags: unix.EV_ADD, Filter: unix.EVFILT_WRITE},
 	}, nil, nil)
 	return os.NewSyscallError("kevent add", err)
 }
@@ -203,7 +203,7 @@ func (p *Poller) AddReadWrite(pa *PollAttachment) error {
 // AddRead registers the given file-descriptor with readable event to the poller.
 func (p *Poller) AddRead(pa *PollAttachment) error {
 	_, err := unix.Kevent(p.fd, []unix.Kevent_t{
-		{Ident: uint64(pa.FD), Flags: unix.EV_ADD, Filter: unix.EVFILT_READ},
+		{Ident: keventIdent(pa.FD), Flags: unix.EV_ADD, Filter: unix.EVFILT_READ},
 	}, nil, nil)
 	return os.NewSyscallError("kevent add", err)
 }
@@ -211,7 +211,7 @@ func (p *Poller) AddRead(pa *PollAttachment) error {
 // AddWrite registers the given file-descriptor with writable event to the poller.
 func (p *Poller) AddWrite(pa *PollAttachment) error {
 	_, err := unix.Kevent(p.fd, []unix.Kevent_t{
-		{Ident: uint64(pa.FD), Flags: unix.EV_ADD, Filter: unix.EVFILT_WRITE},
+		{Ident: keventIdent(pa.FD), Flags: unix.EV_ADD, Filter: unix.EVFILT_WRITE},
 	}, nil, nil)
 	return os.NewSyscallError("kevent add", err)
 }
@@ -219,7 +219,7 @@ func (p *Poller) AddWrite(pa *PollAttachment) error {
 // ModRead renews the given file-descriptor with readable event in the poller.
 func (p *Poller) ModRead(pa *PollAttachment) error {
 	_, err := unix.Kevent(p.fd, []unix.Kevent_t{
-		{Ident: uint64(pa.FD), Flags: unix.EV_DELETE, Filter: unix.EVFILT_WRITE},
+		{Ident: keventIdent(pa.FD), Flags: unix.EV_DELETE, Filter: unix.EVFILT_WRITE},
 	}, nil, nil)
 	return os.NewSyscallError("kevent delete", err)
 }
@@ -227,7 +227,7 @@ func (p *Poller) ModRead(pa *PollAttachment) error {
 // ModReadWrite renews the given file-descriptor with readable and writable events in the poller.
 func (p *Poller) ModReadWrite(pa *PollAttachment) error {
 	_, err := unix.Kevent(p.fd, []unix.Kevent_t{
-		{Ident: uint64(pa.FD), Flags: unix.EV_ADD, Filter: unix.EVFILT_WRITE},
+		{Ident: keventIdent(pa.FD), Flags: unix.EV_ADD, Filter: unix.EVFILT_WRITE},
 	}, nil, nil)
 	return os.NewSyscallError("kevent add", err)
 }
