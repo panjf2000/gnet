@@ -1427,14 +1427,17 @@ func TestSimServer(t *testing.T) {
 	t.Run("packet-size=1024,batch=20", func(t *testing.T) {
 		testSimServer(t, ":7203", 10, 1024, 20)
 	})
-	t.Run("packet-size=64*1024,batch=5", func(t *testing.T) {
-		testSimServer(t, ":7204", 10, 64*1024, 5)
+	t.Run("packet-size=64*1024,batch=10", func(t *testing.T) {
+		testSimServer(t, ":7204", 10, 64*1024, 10)
 	})
-	t.Run("packet-size=128*1024,batch=3", func(t *testing.T) {
-		testSimServer(t, ":7205", 10, 128*1024, 3)
+	t.Run("packet-size=128*1024,batch=5", func(t *testing.T) {
+		testSimServer(t, ":7205", 10, 128*1024, 5)
 	})
-	t.Run("packet-size=1024*1024,batch=1", func(t *testing.T) {
-		testSimServer(t, ":7206", 10, 1024*1024, 1)
+	t.Run("packet-size=512*1024,batch=3", func(t *testing.T) {
+		testSimServer(t, ":7206", 10, 512*1024, 3)
+	})
+	t.Run("packet-size=1024*1024,batch=2", func(t *testing.T) {
+		testSimServer(t, ":7207", 10, 1024*1024, 2)
 	})
 }
 
