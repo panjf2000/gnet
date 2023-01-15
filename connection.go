@@ -69,17 +69,11 @@ func (c *conn) releaseTCP() {
 	c.peer = nil
 	c.ctx = nil
 	c.buffer = nil
-	if addr, ok := c.localAddr.(*net.TCPAddr); ok && c.localAddr != c.loop.ln.addr {
-		bsPool.Put(addr.IP)
-		if len(addr.Zone) > 0 {
-			bsPool.Put(bs.StringToBytes(addr.Zone))
-		}
+	if addr, ok := c.localAddr.(*net.TCPAddr); ok && c.localAddr != c.loop.ln.addr && len(addr.Zone) > 0 {
+		bsPool.Put(bs.StringToBytes(addr.Zone))
 	}
-	if addr, ok := c.remoteAddr.(*net.TCPAddr); ok {
-		bsPool.Put(addr.IP)
-		if len(addr.Zone) > 0 {
-			bsPool.Put(bs.StringToBytes(addr.Zone))
-		}
+	if addr, ok := c.remoteAddr.(*net.TCPAddr); ok && len(addr.Zone) > 0 {
+		bsPool.Put(bs.StringToBytes(addr.Zone))
 	}
 	c.localAddr = nil
 	c.remoteAddr = nil
@@ -106,17 +100,11 @@ func newUDPConn(fd int, el *eventloop, localAddr net.Addr, sa unix.Sockaddr, con
 
 func (c *conn) releaseUDP() {
 	c.ctx = nil
-	if addr, ok := c.localAddr.(*net.UDPAddr); ok && c.localAddr != c.loop.ln.addr {
-		bsPool.Put(addr.IP)
-		if len(addr.Zone) > 0 {
-			bsPool.Put(bs.StringToBytes(addr.Zone))
-		}
+	if addr, ok := c.localAddr.(*net.UDPAddr); ok && c.localAddr != c.loop.ln.addr && len(addr.Zone) > 0 {
+		bsPool.Put(bs.StringToBytes(addr.Zone))
 	}
-	if addr, ok := c.remoteAddr.(*net.UDPAddr); ok {
-		bsPool.Put(addr.IP)
-		if len(addr.Zone) > 0 {
-			bsPool.Put(bs.StringToBytes(addr.Zone))
-		}
+	if addr, ok := c.remoteAddr.(*net.UDPAddr); ok && len(addr.Zone) > 0 {
+		bsPool.Put(bs.StringToBytes(addr.Zone))
 	}
 	c.localAddr = nil
 	c.remoteAddr = nil

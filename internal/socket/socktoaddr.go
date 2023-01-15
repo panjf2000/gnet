@@ -26,18 +26,14 @@ import (
 	bsPool "github.com/panjf2000/gnet/v2/pkg/pool/byteslice"
 )
 
-var ipv4InIPv6Prefix = []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff}
-
 // SockaddrToTCPOrUnixAddr converts a Sockaddr to a net.TCPAddr or net.UnixAddr.
 // Returns nil if conversion fails.
 func SockaddrToTCPOrUnixAddr(sa unix.Sockaddr) net.Addr {
 	switch sa := sa.(type) {
 	case *unix.SockaddrInet4:
-		ip := sockaddrInet4ToIP(sa)
-		return &net.TCPAddr{IP: ip, Port: sa.Port}
+		return &net.TCPAddr{IP: sa.Addr[0:], Port: sa.Port}
 	case *unix.SockaddrInet6:
-		ip, zone := sockaddrInet6ToIPAndZone(sa)
-		return &net.TCPAddr{IP: ip, Port: sa.Port, Zone: zone}
+		return &net.TCPAddr{IP: sa.Addr[0:], Port: sa.Port, Zone: ip6ZoneToString(sa.ZoneId)}
 	case *unix.SockaddrUnix:
 		return &net.UnixAddr{Name: sa.Name, Net: "unix"}
 	}
@@ -49,57 +45,39 @@ func SockaddrToTCPOrUnixAddr(sa unix.Sockaddr) net.Addr {
 func SockaddrToUDPAddr(sa unix.Sockaddr) net.Addr {
 	switch sa := sa.(type) {
 	case *unix.SockaddrInet4:
-		ip := sockaddrInet4ToIP(sa)
-		return &net.UDPAddr{IP: ip, Port: sa.Port}
+		return &net.UDPAddr{IP: sa.Addr[0:], Port: sa.Port}
 	case *unix.SockaddrInet6:
-		ip, zone := sockaddrInet6ToIPAndZone(sa)
-		return &net.UDPAddr{IP: ip, Port: sa.Port, Zone: zone}
+		return &net.UDPAddr{IP: sa.Addr[0:], Port: sa.Port, Zone: ip6ZoneToString(sa.ZoneId)}
 	}
 	return nil
 }
 
-// sockaddrInet4ToIPAndZone converts a SockaddrInet4 to a net.IP.
-// It returns nil if conversion fails.
-func sockaddrInet4ToIP(sa *unix.SockaddrInet4) net.IP {
-	ip := bsPool.Get(16)
-	// ipv4InIPv6Prefix
-	copy(ip[0:12], ipv4InIPv6Prefix)
-	copy(ip[12:16], sa.Addr[:])
-	return ip
-}
-
-// sockaddrInet6ToIPAndZone converts a SockaddrInet6 to a net.IP with IPv6 Zone.
-// It returns nil if conversion fails.
-func sockaddrInet6ToIPAndZone(sa *unix.SockaddrInet6) (net.IP, string) {
-	ip := bsPool.Get(16)
-	copy(ip, sa.Addr[:])
-	return ip, ip6ZoneToString(int(sa.ZoneId))
-}
-
-// ip6ZoneToString converts an IP6 Zone unix int to a net string
+// ip6ZoneToString converts an IP6 Zone unix int to a net string,
 // returns "" if zone is 0.
-func ip6ZoneToString(zone int) string {
+func ip6ZoneToString(zone uint32) string {
 	if zone == 0 {
 		return ""
 	}
-	if ifi, err := net.InterfaceByIndex(zone); err == nil {
+	if ifi, err := net.InterfaceByIndex(int(zone)); err == nil {
 		return ifi.Name
 	}
-	return int2decimal(uint(zone))
+	return uint2decimalStr(uint(zone))
 }
 
-// Convert int to decimal string.
-func int2decimal(i uint) string {
-	if i == 0 {
+// uint2decimalStr converts val to a decimal string.
+func uint2decimalStr(val uint) string {
+	if val == 0 { // avoid string allocation
 		return "0"
 	}
-
-	// Assemble decimal in reverse order.
-	b := bsPool.Get(32)
-	bp := len(b)
-	for ; i > 0; i /= 10 {
-		bp--
-		b[bp] = byte(i%10) + '0'
+	buf := bsPool.Get(20) // big enough for 64bit value base 10
+	i := len(buf) - 1
+	for val >= 10 {
+		q := val / 10
+		buf[i] = byte('0' + val - q*10)
+		i--
+		val = q
 	}
-	return bs.BytesToString(b[bp:])
+	// val < 10
+	buf[i] = byte('0' + val)
+	return bs.BytesToString(buf[i:])
 }
