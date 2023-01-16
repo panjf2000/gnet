@@ -5,6 +5,7 @@ require (
 	github.com/stretchr/testify v1.8.1
 	github.com/valyala/bytebufferpool v1.0.0
 	go.uber.org/zap v1.21.0
+	golang.org/x/crypto v0.0.0-20201016220609-9e8e0b390897
 	golang.org/x/sys v0.3.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 )

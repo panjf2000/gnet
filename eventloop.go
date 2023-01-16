@@ -126,6 +126,42 @@ func (el *eventloop) read(c *conn) error {
 		return el.closeConn(c, os.NewSyscallError("read", err))
 	}
 
+	if c.tlsconn != nil {
+		c.tlsconn.RawWrite(el.buffer[:n])
+		if !c.tlsconn.HandshakeComplete() {
+			//先判断是否足够一条消息
+			data := c.tlsconn.RawData()
+			if len(data) < 5 || len(data) < 5+int(data[3])<<8|int(data[4]) {
+				return nil
+			}
+			if err = c.tlsconn.Handshake(); err != nil {
+				return el.closeConn(c, os.NewSyscallError("TLS handshake", err))
+			}
+			if !c.tlsconn.HandshakeComplete() || len(c.tlsconn.RawData()) == 0 { //握手没成功，或者握手成功，但是没有数据黏包了
+				c.Flush()
+				return nil
+			}
+		}
+
+		if err = c.tlsconn.ReadFrame(); err != nil {
+			return el.closeConn(c, os.NewSyscallError("TLS read", err))
+		}
+
+		if c.inboundBuffer.IsEmpty() {
+			return nil
+		}
+
+		action := el.eventHandler.OnTraffic(c)
+		switch action {
+		case None:
+		case Close:
+			return el.closeConn(c, nil)
+		case Shutdown:
+			return gerrors.ErrEngineShutdown
+		}
+		return nil
+	}
+
 	c.buffer = el.buffer[:n]
 	action := el.eventHandler.OnTraffic(c)
 	switch action {

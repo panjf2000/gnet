@@ -50,6 +50,11 @@ func (eng *engine) accept(fd int, _ netpoll.IOEvent) error {
 
 	el := eng.lb.next(remoteAddr)
 	c := newTCPConn(nfd, el, sa, el.ln.addr, remoteAddr)
+	if el.engine.opts.TLSconfig != nil {
+		if err = c.UpgradeTLS(el.engine.opts.TLSconfig); err != nil {
+			return err
+		}
+	}
 
 	err = el.poller.UrgentTrigger(el.register, c)
 	if err != nil {
@@ -84,6 +89,11 @@ func (el *eventloop) accept(fd int, ev netpoll.IOEvent) error {
 	}
 
 	c := newTCPConn(nfd, el, sa, el.ln.addr, remoteAddr)
+	if el.engine.opts.TLSconfig != nil {
+		if err = c.UpgradeTLS(el.engine.opts.TLSconfig); err != nil {
+			return err
+		}
+	}
 	if err = el.poller.AddRead(c.pollAttachment); err != nil {
 		return err
 	}

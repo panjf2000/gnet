@@ -33,6 +33,7 @@ import (
 	"github.com/panjf2000/gnet/v2/pkg/buffer/elastic"
 	gerrors "github.com/panjf2000/gnet/v2/pkg/errors"
 	bsPool "github.com/panjf2000/gnet/v2/pkg/pool/byteslice"
+	"github.com/panjf2000/gnet/v2/pkg/tls"
 )
 
 type conn struct {
@@ -48,6 +49,7 @@ type conn struct {
 	fd             int                     // file descriptor
 	isDatagram     bool                    // UDP protocol
 	opened         bool                    // connection opened event fired
+	tlsconn        *tls.Conn               // tls connection
 }
 
 func newTCPConn(fd int, el *eventloop, sa unix.Sockaddr, localAddr, remoteAddr net.Addr) (c *conn) {
@@ -129,6 +131,17 @@ func (c *conn) open(buf []byte) error {
 
 func (c *conn) write(data []byte) (n int, err error) {
 	n = len(data)
+
+	if c.tlsconn != nil {
+		// use tls to encrypt the data before sending it
+		c.tlsconn.Write(data)
+		// err = c.loop.poller.ModReadWrite(c.pollAttachment)
+		// n = 0
+		// also working
+		err = c.loop.write(c)
+		return
+	} 
+
 	// If there is pending data in outbound buffer, the current data ought to be appended to the outbound buffer
 	// for maintaining the sequence of network packets.
 	if !c.outboundBuffer.IsEmpty() {
@@ -157,6 +170,18 @@ func (c *conn) write(data []byte) (n int, err error) {
 func (c *conn) writev(bs [][]byte) (n int, err error) {
 	for _, b := range bs {
 		n += len(b)
+	}
+
+	if c.tlsconn != nil {
+		for _, b := range bs {
+			// use tls to encrypt the data before sending it
+			c.tlsconn.Write(b)
+		}
+		// err = c.loop.poller.ModReadWrite(c.pollAttachment)
+		// n = 0
+		// also working
+		err = c.loop.write(c)
+		return
 	}
 
 	// If there is pending data in outbound buffer, the current data ought to be appended to the outbound buffer
@@ -466,4 +491,25 @@ func (c *conn) Close() error {
 		err = c.loop.closeConn(c, nil)
 		return
 	}, nil)
+}
+
+func (c *conn) UpgradeTLS(config *tls.Config) (err error) {
+	c.tlsconn, err = tls.Server(c, &c.inboundBuffer, c.outboundBuffer, config.Clone())
+
+	//很有可能握手包在UpgradeTls之前发过来了，这里把inboundBuffer剩余数据当做握手数据处理
+	if c.inboundBuffer.Len() > 0 {
+		c.tlsconn.RawWrite(c.inboundBuffer.Bytes())
+		c.inboundBuffer.Reset()
+		if err := c.tlsconn.Handshake(); err != nil {
+			return err
+		}
+	}
+
+	//握手失败的关了
+	time.AfterFunc(time.Second*5, func() {
+		if c.opened && (c.tlsconn == nil || !c.tlsconn.HandshakeComplete()) {
+			c.Close()
+		}
+	})
+	return err
 }
