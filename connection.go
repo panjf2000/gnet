@@ -376,7 +376,7 @@ func (c *conn) WriteTo(w io.Writer) (n int64, err error) {
 }
 
 func (c *conn) Flush() error {
-	if c.outboundBuffer.IsEmpty() {
+	if c.outboundBuffer == nil || c.outboundBuffer.IsEmpty() {
 		return nil
 	}
 
