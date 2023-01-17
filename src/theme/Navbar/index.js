@@ -33,7 +33,7 @@ function navLinkAttributes(label, right) {
       return attrs;
 
     case 'github':
-      attrs.badge = '7.2k';
+      attrs.badge = '7.3k';
       attrs.hideText = false;
       attrs.icon = 'github';
       return attrs;
