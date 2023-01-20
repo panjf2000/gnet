@@ -228,6 +228,11 @@ func (el *eventloop) closeConn(c *conn, err error) (rerr error) {
 		return
 	}
 
+	// clost the TLS connection by sending the alert
+	if c.tlsconn != nil {
+		c.tlsconn.Close()
+	}
+
 	// Send residual data in buffer back to the peer before actually closing the connection.
 	if !c.outboundBuffer.IsEmpty() {
 		for !c.outboundBuffer.IsEmpty() {

@@ -21,49 +21,76 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net"
+	"os"
 	"strings"
 
 	"github.com/panjf2000/gnet/v2/pkg/buffer/elastic"
 )
 
-type conn interface {
-	Write([]byte) (int, error)
-	RemoteAddr() net.Addr
-}
-
 // Server returns a new TLS server side connection
 // using conn as the underlying transport.
 // The configuration config must be non-nil and must include
 // at least one certificate or else set GetCertificate.
-func Server(c conn, in *elastic.RingBuffer, out *elastic.Buffer, config *Config) (*Conn, error) {
-	tlsconn := &Conn{
-		conn:    c,
+func ServerGnet(conn net.Conn, in *elastic.RingBuffer, out *elastic.Buffer, config *Config) *Conn {
+	c := &Conn{
+		conn:    conn,
 		config:  config,
 		input:   in,
 		sendBuf: out,
-		outBuf:  []byte{0, 3, 3, 0, 0},
 	}
-
-	return tlsconn, nil
-}
-func Client(c conn, in *elastic.RingBuffer, out *elastic.Buffer, config *Config) *Conn {
-	tlsconn := &Conn{
-		conn:     c,
-		config:   config,
-		input:    in,
-		sendBuf:  out,
-		outBuf:   []byte{0, 3, 3, 0, 0},
-		isClient: true,
-	}
-	return tlsconn
+	c.handshakeFn = c.serverHandshake
+	return c
 }
 
 // Client returns a new TLS client side connection
 // using conn as the underlying transport.
 // The config cannot be nil: users must set either ServerName or
 // InsecureSkipVerify in the config.
+func ClientGnet(conn net.Conn, in *elastic.RingBuffer, out *elastic.Buffer, config *Config) *Conn {
+	c := &Conn{
+		conn:     conn,
+		config:   config,
+		input:    in,
+		sendBuf:  out,
+		isClient: true,
+	}
+	c.handshakeFn = c.clientHandshake
+	return c
+}
+
+// Server returns a new TLS server side connection
+// using conn as the underlying transport.
+// The configuration config must be non-nil and must include
+// at least one certificate or else set GetCertificate.
+func Server(conn net.Conn, config *Config) *Conn {
+	sendBuf, _ := elastic.New(65536)
+	c := &Conn{
+		conn:    conn,
+		config:  config,
+		input:   new(elastic.RingBuffer),
+		sendBuf: sendBuf,
+	}
+	c.handshakeFn = c.serverHandshake
+	return c
+}
+
+// Client returns a new TLS client side connection
+// using conn as the underlying transport.
+// The config cannot be nil: users must set either ServerName or
+// InsecureSkipVerify in the config.
+func Client(conn net.Conn, config *Config) *Conn {
+	sendBuf, _ := elastic.New(65536)
+	c := &Conn{
+		conn:     conn,
+		config:   config,
+		input:    new(elastic.RingBuffer),
+		sendBuf:  sendBuf,
+		isClient: true,
+	}
+	c.handshakeFn = c.clientHandshake
+	return c
+}
 
 type timeoutError struct{}
 
@@ -77,11 +104,11 @@ func (timeoutError) Temporary() bool { return true }
 // form a certificate chain. On successful return, Certificate.Leaf will
 // be nil because the parsed form of the certificate is not retained.
 func LoadX509KeyPair(certFile, keyFile string) (Certificate, error) {
-	certPEMBlock, err := ioutil.ReadFile(certFile)
+	certPEMBlock, err := os.ReadFile(certFile)
 	if err != nil {
 		return Certificate{}, err
 	}
-	keyPEMBlock, err := ioutil.ReadFile(keyFile)
+	keyPEMBlock, err := os.ReadFile(keyFile)
 	if err != nil {
 		return Certificate{}, err
 	}
@@ -183,7 +210,7 @@ func X509KeyPair(certPEMBlock, keyPEMBlock []byte) (Certificate, error) {
 }
 
 // Attempt to parse the given private key DER block. OpenSSL 0.9.8 generates
-// PKCS#1 private keys by default, while OpenSSL 1.0.0 generates PKCS#8 keys.
+// PKCS #1 private keys by default, while OpenSSL 1.0.0 generates PKCS #8 keys.
 // OpenSSL ecparam generates SEC1 EC private keys for ECDSA. We try all three.
 func parsePrivateKey(der []byte) (crypto.PrivateKey, error) {
 	if key, err := x509.ParsePKCS1PrivateKey(der); err == nil {

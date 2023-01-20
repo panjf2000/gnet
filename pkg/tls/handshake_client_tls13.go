@@ -6,7 +6,9 @@ package tls
 
 import (
 	"bytes"
+	"context"
 	"crypto"
+	"crypto/ecdh"
 	"crypto/hmac"
 	"crypto/rsa"
 	"errors"
@@ -16,9 +18,10 @@ import (
 
 type clientHandshakeStateTLS13 struct {
 	c           *Conn
+	ctx         context.Context
 	serverHello *serverHelloMsg
 	hello       *clientHelloMsg
-	ecdheParams ecdheParameters
+	ecdheKey    *ecdh.PrivateKey
 
 	session     *ClientSessionState
 	earlySecret []byte
@@ -34,10 +37,14 @@ type clientHandshakeStateTLS13 struct {
 	cacheKey      string
 }
 
-// handshake requires hs.c, hs.hello, hs.serverHello, hs.ecdheParams, and,
+// handshake requires hs.c, hs.hello, hs.serverHello, hs.ecdheKey, and,
 // optionally, hs.session, hs.earlySecret and hs.binderKey to be set.
 func (hs *clientHandshakeStateTLS13) handshake() error {
 	c := hs.c
+
+	if needFIPS() {
+		return errors.New("tls: internal error: TLS 1.3 reached in FIPS mode")
+	}
 
 	// The server must not select TLS 1.3 in a renegotiation. See RFC 8446,
 	// sections 4.1.2 and 4.1.3.
@@ -46,7 +53,7 @@ func (hs *clientHandshakeStateTLS13) handshake() error {
 	}
 
 	// Consistency check on the presence of a keyShare and its parameters.
-	if hs.ecdheParams == nil || len(hs.hello.keyShares) != 1 {
+	if hs.ecdheKey == nil || len(hs.hello.keyShares) != 1 {
 		return c.sendAlert(alertInternalError)
 	}
 
@@ -65,8 +72,10 @@ func (hs *clientHandshakeStateTLS13) handshake() error {
 			return err
 		}
 	}
+
 	hs.transcript.Write(hs.serverHello.marshal())
 
+	//c.buffering = true
 	if err := hs.processServerHello(); err != nil {
 		return err
 	}
@@ -192,6 +201,7 @@ func (hs *clientHandshakeStateTLS13) processHelloRetryRequest() error {
 	if hs.serverHello.cookie != nil {
 		hs.hello.cookie = hs.serverHello.cookie
 	}
+
 	if hs.serverHello.serverShare.group != 0 {
 		c.sendAlert(alertDecodeError)
 		return errors.New("tls: received malformed key_share extension")
@@ -212,21 +222,21 @@ func (hs *clientHandshakeStateTLS13) processHelloRetryRequest() error {
 			c.sendAlert(alertIllegalParameter)
 			return errors.New("tls: server selected unsupported group")
 		}
-		if hs.ecdheParams.CurveID() == curveID {
+		if sentID, _ := curveIDForCurve(hs.ecdheKey.Curve()); sentID == curveID {
 			c.sendAlert(alertIllegalParameter)
 			return errors.New("tls: server sent an unnecessary HelloRetryRequest key_share")
 		}
-		if _, ok := curveForCurveID(curveID); curveID != X25519 && !ok {
+		if _, ok := curveForCurveID(curveID); !ok {
 			c.sendAlert(alertInternalError)
 			return errors.New("tls: CurvePreferences includes unsupported curve")
 		}
-		params, err := generateECDHEParameters(c.config.rand(), curveID)
+		key, err := generateECDHEKey(c.config.rand(), curveID)
 		if err != nil {
 			c.sendAlert(alertInternalError)
 			return err
 		}
-		hs.ecdheParams = params
-		hs.hello.keyShares = []keyShare{{group: curveID, data: params.PublicKey()}}
+		hs.ecdheKey = key
+		hs.hello.keyShares = []keyShare{{group: curveID, data: key.PublicKey().Bytes()}}
 	}
 
 	hs.hello.raw = nil
@@ -300,7 +310,7 @@ func (hs *clientHandshakeStateTLS13) processServerHello() error {
 		c.sendAlert(alertIllegalParameter)
 		return errors.New("tls: server did not send a key share")
 	}
-	if hs.serverHello.serverShare.group != hs.ecdheParams.CurveID() {
+	if sentID, _ := curveIDForCurve(hs.ecdheKey.Curve()); hs.serverHello.serverShare.group != sentID {
 		c.sendAlert(alertIllegalParameter)
 		return errors.New("tls: server selected unsupported group")
 	}
@@ -338,8 +348,13 @@ func (hs *clientHandshakeStateTLS13) processServerHello() error {
 func (hs *clientHandshakeStateTLS13) establishHandshakeKeys() error {
 	c := hs.c
 
-	sharedKey := hs.ecdheParams.SharedKey(hs.serverHello.serverShare.data)
-	if sharedKey == nil {
+	peerKey, err := hs.ecdheKey.Curve().NewPublicKey(hs.serverHello.serverShare.data)
+	if err != nil {
+		c.sendAlert(alertIllegalParameter)
+		return errors.New("tls: invalid server key share")
+	}
+	sharedKey, err := hs.ecdheKey.ECDH(peerKey)
+	if err != nil {
 		c.sendAlert(alertIllegalParameter)
 		return errors.New("tls: invalid server key share")
 	}
@@ -358,7 +373,7 @@ func (hs *clientHandshakeStateTLS13) establishHandshakeKeys() error {
 		serverHandshakeTrafficLabel, hs.transcript)
 	c.in.setTrafficSecret(hs.suite, serverSecret)
 
-	err := c.config.writeKeyLog(keyLogLabelClientHandshake, hs.hello.random, clientSecret)
+	err = c.config.writeKeyLog(keyLogLabelClientHandshake, hs.hello.random, clientSecret)
 	if err != nil {
 		c.sendAlert(alertInternalError)
 		return err
@@ -390,9 +405,9 @@ func (hs *clientHandshakeStateTLS13) readServerParameters() error {
 	}
 	hs.transcript.Write(encryptedExtensions.marshal())
 
-	if len(encryptedExtensions.alpnProtocol) != 0 && len(hs.hello.alpnProtocols) == 0 {
+	if err := checkALPN(hs.hello.alpnProtocols, encryptedExtensions.alpnProtocol); err != nil {
 		c.sendAlert(alertUnsupportedExtension)
-		return errors.New("tls: server advertised unrequested ALPN extension")
+		return err
 	}
 	c.clientProtocol = encryptedExtensions.alpnProtocol
 
@@ -464,7 +479,7 @@ func (hs *clientHandshakeStateTLS13) readServerCertificate() error {
 	}
 
 	// See RFC 8446, Section 4.4.3.
-	if !isSupportedSignatureAlgorithm(certVerify.signatureAlgorithm, supportedSignatureAlgorithms) {
+	if !isSupportedSignatureAlgorithm(certVerify.signatureAlgorithm, supportedSignatureAlgorithms()) {
 		c.sendAlert(alertIllegalParameter)
 		return errors.New("tls: certificate used with invalid signature algorithm")
 	}

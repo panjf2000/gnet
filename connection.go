@@ -134,13 +134,13 @@ func (c *conn) write(data []byte) (n int, err error) {
 
 	if c.tlsconn != nil {
 		// use tls to encrypt the data before sending it
-		c.tlsconn.Write(data)
+		n, _ = c.tlsconn.Write(data)
 		// err = c.loop.poller.ModReadWrite(c.pollAttachment)
 		// n = 0
 		// also working
 		err = c.loop.write(c)
 		return
-	} 
+	}
 
 	// If there is pending data in outbound buffer, the current data ought to be appended to the outbound buffer
 	// for maintaining the sequence of network packets.
@@ -494,11 +494,13 @@ func (c *conn) Close() error {
 }
 
 func (c *conn) UpgradeTLS(config *tls.Config) (err error) {
-	c.tlsconn, err = tls.Server(c, &c.inboundBuffer, c.outboundBuffer, config.Clone())
+	c.tlsconn = tls.ServerGnet(c, &c.inboundBuffer, c.outboundBuffer, config.Clone())
 
 	//很有可能握手包在UpgradeTls之前发过来了，这里把inboundBuffer剩余数据当做握手数据处理
 	if c.inboundBuffer.Len() > 0 {
-		c.tlsconn.RawWrite(c.inboundBuffer.Bytes())
+		head, tail := c.inboundBuffer.Peek(-1)
+		c.tlsconn.RawWrite(head)
+		c.tlsconn.RawWrite(tail)
 		c.inboundBuffer.Reset()
 		if err := c.tlsconn.Handshake(); err != nil {
 			return err
