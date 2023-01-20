@@ -95,12 +95,15 @@ type Conn struct {
 	clientProtocol string
 
 	// input/output
+	// By using the elastic MsgBuffer the tls conn not longer holds the actual buffer when the connection is idle.
+	// This can significantly optimize the memory usage, especially when the server connecting millions of clients
+	// where most of them are idle.
 	in, out  halfConn
-	rawInput MsgBuffer           // raw input, starting with a record header
+	rawInput EMsgBuffer          // raw input, starting with a record header
 	input    *elastic.RingBuffer // a buffer for decrypted records pointer to the inboundBuffer of gnet.conn
-	hand      MsgBuffer          // handshake data waiting to be read
+	hand     EMsgBuffer          // handshake data waiting to be read
 	// buffering bool               // whether records are buffered in sendBuf
-	sendBuf   *elastic.Buffer    // a buffer for records waiting to be sent also point to the outboundBuffer of gnet.conn
+	sendBuf *elastic.Buffer // a buffer for records waiting to be sent also point to the outboundBuffer of gnet.conn
 
 	// bytesSent counts the bytes of application data sent.
 	// packetsSent counts packets.
@@ -657,7 +660,8 @@ func (c *Conn) readRecordOrCCS(expectChangeCipherSpec bool) error {
 	}
 
 	// Process message.
-	c.rawInput.Shift(recordHeaderLen + n)
+	c.rawInput.DiscardWithoutDone(recordHeaderLen + n)
+	defer c.rawInput.DoneIfEmpty()
 	data, typ, err := c.in.decrypt(hdr[:recordHeaderLen+n])
 	if err != nil {
 		return c.in.setErrorLocked(c.sendAlert(err.(alert)))
@@ -968,7 +972,7 @@ func (c *Conn) readHandshake() (interface{}, error) {
 		}
 	}
 
-	data := c.hand.PreBytes(4)
+	data := c.hand.Peek(4)
 	n := int(data[1])<<16 | int(data[2])<<8 | int(data[3])
 	if n > maxHandshake {
 		c.sendAlertLocked(alertInternalError)
@@ -979,7 +983,8 @@ func (c *Conn) readHandshake() (interface{}, error) {
 			return nil, err
 		}
 	}
-	data = c.hand.Next(4 + n)
+	data = c.hand.Peek(4 + n)
+	defer c.hand.Discard(4 + n)
 	var m handshakeMessage
 	switch data[0] {
 	case typeHelloRequest:
@@ -1112,7 +1117,6 @@ func (c *Conn) ReadFrame() error {
 func (c *Conn) RawData() []byte {
 	return c.rawInput.Bytes()
 }
-
 
 // handleRenegotiation processes a HelloRequest handshake message.
 func (c *Conn) handleRenegotiation() error {
