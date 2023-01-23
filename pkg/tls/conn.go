@@ -614,7 +614,8 @@ func (c *Conn) readChangeCipherSpec() error {
 // ktlsInBufPool pools the buffers used by ktlsReadRecord.
 var ktlsInBufPool = sync.Pool{
 	New: func() any {
-		return new([maxPlaintext]byte)
+		buf := make([]byte, maxPlaintext)
+		return &buf
 	},
 }
 
@@ -657,8 +658,8 @@ func (c *Conn) readRecordOrCCS(expectChangeCipherSpec bool) error {
 			// to the heap, causing an allocation. Instead, we keep around the
 			// pointer to the slice header returned by Get, which is already on the
 			// heap, and overwrite and return that.
-			*dataPtr = data
-			ktlsInBufPool.Put(data)
+			*dataPtr = data[:maxPlaintext]
+			ktlsInBufPool.Put(dataPtr)
 		}()
 		if typ, n, err = ktlsReadRecord(c.conn.(Socket).Fd(), data); err != nil {
 			return err
