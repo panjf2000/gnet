@@ -255,13 +255,13 @@ func ktlsEnableAES128GCM(fd int, version uint16, opt int, skip bool, key, iv, se
 	}
 
 	if !skip {
-		err = syscall.SetsockoptString(int(fd), syscall.SOL_TCP, TCP_ULP, "tls")
+		err = syscall.SetsockoptString(fd, syscall.SOL_TCP, TCP_ULP, "tls")
 		if err != nil {
 			Debugln("kTLS: setsockopt(SOL_TCP, TCP_ULP) failed:", err)
 			return
 		}
 	}
-	err = syscall.SetsockoptString(int(fd), SOL_TLS, opt,
+	err = syscall.SetsockoptString(fd, SOL_TLS, opt,
 		string((*[kTLSCryptoInfoSize_AES_GCM_128]byte)(unsafe.Pointer(&cryptoInfo))[:]))
 	if err != nil {
 		Debugf("kTLS: setsockopt(SOL_TLS, %d) failed: %s", opt, err)
@@ -322,13 +322,13 @@ func ktlsEnableAES256GCM(fd int, version uint16, opt int, skip bool, key, iv, se
 	}
 
 	if !skip {
-		err = syscall.SetsockoptString(int(fd), syscall.SOL_TCP, TCP_ULP, "tls")
+		err = syscall.SetsockoptString(fd, syscall.SOL_TCP, TCP_ULP, "tls")
 		if err != nil {
 			Debugln("kTLS: setsockopt(SOL_TCP, TCP_ULP) failed:", err)
 			return
 		}
 	}
-	err = syscall.SetsockoptString(int(fd), SOL_TLS, opt,
+	err = syscall.SetsockoptString(fd, SOL_TLS, opt,
 		string((*[kTLSCryptoInfoSize_AES_GCM_256]byte)(unsafe.Pointer(&cryptoInfo))[:]))
 	if err != nil {
 		Debugf("kTLS: setsockopt(SOL_TLS, %d) failed: %s", opt, err)
@@ -372,13 +372,13 @@ func ktlsEnableCHACHA20POLY1305(fd int, version uint16, opt int, skip bool, key,
 	}
 
 	if !skip {
-		err = syscall.SetsockoptString(int(fd), syscall.SOL_TCP, TCP_ULP, "tls")
+		err = syscall.SetsockoptString(fd, syscall.SOL_TCP, TCP_ULP, "tls")
 		if err != nil {
 			Debugln("kTLS: setsockopt(SOL_TCP, TCP_ULP) failed:", err)
 			return
 		}
 	}
-	err = syscall.SetsockoptString(int(fd), SOL_TLS, opt,
+	err = syscall.SetsockoptString(fd, SOL_TLS, opt,
 		string((*[kTLSCryptoInfoSize_CHACHA20_POLY1305]byte)(unsafe.Pointer(&cryptoInfo))[:]))
 	if err != nil {
 		Debugf("kTLS: setsockopt(SOL_TLS, %d) failed: %s", opt, err)
