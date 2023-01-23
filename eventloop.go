@@ -240,7 +240,7 @@ func (el *eventloop) closeConn(c *conn, err error) (rerr error) {
 		return
 	}
 
-	// clost the TLS connection by sending the alert
+	// close the TLS connection by sending the alert
 	if c.tlsconn != nil {
 		c.tlsconn.Close()
 	}

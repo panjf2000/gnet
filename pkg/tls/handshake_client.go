@@ -33,7 +33,7 @@ type clientHandshakeState struct {
 	finishedHash finishedHash
 	masterSecret []byte
 	session      *ClientSessionState
-	oldsession   *ClientSessionState
+	oldSession   *ClientSessionState
 	cacheKey     string
 }
 
@@ -240,7 +240,7 @@ func (c *Conn) clientHandshake(ctx context.Context) (err error) {
 			serverHello: serverHello,
 			hello:       hello,
 			session:     hs13.session,
-			oldsession:  hs13.session,
+			oldSession:  hs13.session,
 			cacheKey:    hs13.cacheKey,
 		}
 		c.hs = hs
@@ -486,7 +486,7 @@ func (hs *clientHandshakeState) handshake() error {
 	// If we had a successful handshake and hs.session is different from
 	// the one already cached - cache a new one.
 
-	if hs.cacheKey != "" && hs.session != nil && hs.oldsession != hs.session {
+	if hs.cacheKey != "" && hs.session != nil && hs.oldSession != hs.session {
 		c.config.ClientSessionCache.Put(hs.cacheKey, hs.session)
 	}
 	// Enable kernel TLS if possible
