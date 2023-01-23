@@ -20,8 +20,10 @@ const (
 	TCP_ULP = 31
 	SOL_TLS = 282
 
-	TLS_TX = 1
-	TLS_RX = 2
+	TLS_TX               = 1
+	TLS_RX               = 2
+	TLS_TX_ZEROCOPY_RO   = 3 // TX zerocopy (only sendfile now)
+	TLS_RX_EXPECT_NO_PAD = 4 // Attempt opportunistic zero-copy, TLS 1.3 only
 
 	TLS_SET_RECORD_TYPE = 1
 	TLS_GET_RECORD_TYPE = 2
