@@ -651,7 +651,7 @@ func (c *Conn) readRecordOrCCS(expectChangeCipherSpec bool) error {
 
 	if _, ok := c.in.cipher.(kTLSCipher); ok {
 		dataPtr := ktlsInBufPool.Get().(*[]byte)
-		data := *dataPtr
+		data = *dataPtr
 		defer func() {
 			// You might be tempted to simplify this by just passing &outBuf to Put,
 			// but that would make the local copy of the outBuf slice header escape
