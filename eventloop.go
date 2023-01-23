@@ -114,7 +114,36 @@ func (el *eventloop) open(c *conn) error {
 	return el.handleAction(c, action)
 }
 
+func (el *eventloop) readTLS(c *conn) error {
+	if err := c.tlsconn.ReadFrame(); err != nil {
+		return el.closeConn(c, os.NewSyscallError("TLS read", err))
+	}
+
+	if c.inboundBuffer.IsEmpty() {
+		return nil
+	}
+
+	action := el.eventHandler.OnTraffic(c)
+	switch action {
+	case None:
+	case Close:
+		return el.closeConn(c, nil)
+	case Shutdown:
+		return gerrors.ErrEngineShutdown
+	}
+	return nil
+}
+
 func (el *eventloop) read(c *conn) error {
+	// detected whether kernel TLS RX is enabled
+	// This only happens after TLS handshake is completed.
+	// Therefore, no need to call c.tlsconn.HandshakeComplete()
+	// In addition, all data are copied directly from kernel to the buffer,
+	// meaning no need to call unix.read(c.fd, el.buffer)
+	if c.tlsconn != nil && c.tlsconn.IsKTLSRXEnabled() {
+		return el.readTLS(c)
+	}
+
 	n, err := unix.Read(c.fd, el.buffer)
 	if err != nil || n == 0 {
 		if err == unix.EAGAIN {
@@ -142,24 +171,7 @@ func (el *eventloop) read(c *conn) error {
 				return nil
 			}
 		}
-
-		if err = c.tlsconn.ReadFrame(); err != nil {
-			return el.closeConn(c, os.NewSyscallError("TLS read", err))
-		}
-
-		if c.inboundBuffer.IsEmpty() {
-			return nil
-		}
-
-		action := el.eventHandler.OnTraffic(c)
-		switch action {
-		case None:
-		case Close:
-			return el.closeConn(c, nil)
-		case Shutdown:
-			return gerrors.ErrEngineShutdown
-		}
-		return nil
+		return el.readTLS(c)
 	}
 
 	c.buffer = el.buffer[:n]
