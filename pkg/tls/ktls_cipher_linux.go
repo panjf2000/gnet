@@ -124,8 +124,8 @@ func ktlsEnableAES(
 		Debugln("kTLS: TLS_TX unsupported key length")
 	}
 
-	// Try to enable Kernel TLS RX
-	if !kTLSSupportRX {
+	// Try to enable Kernel TLS RX for TLS 1.2 or TLS 1.3 (TLS 1.3 RX is disabled on kernel < 5.19 )
+	if !kTLSSupportRX || (version == VersionTLS13 && !kTLSSupportTLS13RX) {
 		return nil
 	}
 	if len(inKey) == keyLen {
@@ -140,9 +140,9 @@ func ktlsEnableAES(
 			// TODO: safe to enable only if the remote end is trusted, otherwise
 			// it is an attack vector to doubling the TLS processing cost.
 			// See: https://docs.kernel.org/networking/tls.html#tls-rx-expect-no-pad
-			// if version == VersionTLS13 {
-			// 	ktlsEnableRxExpectNoPad(sock.Fd())
-			// }
+			if version == VersionTLS13 {
+				ktlsEnableRxExpectNoPad(sock.Fd())
+			}
 		} else {
 			Debugln("kTLS: TLS_RX unsupported connection type")
 		}
@@ -177,8 +177,8 @@ func ktlsEnableCHACHA20(c *Conn, version uint16, inKey, outKey, inIV, outIV []by
 		Debugln("kTLS: TLS_TX unsupported connection type")
 	}
 
-	// Try to enable Kernel TLS RX
-	if !kTLSSupportRX {
+	// Try to enable Kernel TLS RX for TLS 1.2 or TLS 1.3 (TLS 1.3 RX is disabled on kernel < 5.19 )
+	if !kTLSSupportRX || (version == VersionTLS13 && !kTLSSupportTLS13RX) {
 		return nil
 	}
 	if sock, ok := c.conn.(Socket); ok {
@@ -194,9 +194,9 @@ func ktlsEnableCHACHA20(c *Conn, version uint16, inKey, outKey, inIV, outIV []by
 		// TODO: safe to enable only if the remote end is trusted, otherwise
 		// it is an attack vector to doubling the TLS processing cost.
 		// See: https://docs.kernel.org/networking/tls.html#tls-rx-expect-no-pad
-		// if version == VersionTLS13 {
-		// 	ktlsEnableRxExpectNoPad(sock.Fd())
-		// }
+		if version == VersionTLS13 {
+			ktlsEnableRxExpectNoPad(sock.Fd())
+		}
 	} else {
 		Debugln("kTLS: TLS_RX unsupported connection type")
 	}
@@ -389,6 +389,9 @@ func ktlsEnableCHACHA20POLY1305(fd int, version uint16, opt int, skip bool, key,
 }
 
 func ktlsEnableTxZerocopySendfile(fd int) (err error) {
+	if !kTLSSupportZEROCOPY {
+		return nil
+	}
 	err = syscall.SetsockoptInt(int(fd), SOL_TLS, TLS_TX_ZEROCOPY_RO, 1)
 	if err != nil {
 		Debugf("kTLS: TLS_TX Zerocopy Sendfile not Enabled. Error: %s", err)
@@ -399,6 +402,9 @@ func ktlsEnableTxZerocopySendfile(fd int) (err error) {
 }
 
 func ktlsEnableRxExpectNoPad(fd int) (err error) {
+	if !kTLSSupportNOPAD {
+		return nil
+	}
 	err = syscall.SetsockoptInt(int(fd), SOL_TLS, TLS_RX_EXPECT_NO_PAD, 1)
 	if err != nil {
 		Debugf("kTLS: TLS_RX Expect No Pad not Enabled. Error: %s", err)

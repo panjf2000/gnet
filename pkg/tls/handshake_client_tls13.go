@@ -109,6 +109,7 @@ func (hs *clientHandshakeStateTLS13) handshake() error {
 	if err := c.enableKernelTLS(c.cipherSuite, c.in.key, c.out.key, c.in.iv, c.out.iv); err != nil {
 		return err
 	}
+
 	return nil
 }
 
