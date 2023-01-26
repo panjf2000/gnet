@@ -938,7 +938,7 @@ func (c *Conn) write(data []byte) (int, error) {
 }
 
 func (c *Conn) flush() (int, error) {
-	if c.sendBuf.Buffered() == 0 {
+	if c.sendBuf.IsEmpty() {
 		return 0, nil
 	}
 	n, err := c.conn.Write(nil)
