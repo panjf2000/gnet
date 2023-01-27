@@ -187,7 +187,6 @@ func ktlsEnableCHACHA20(c *Conn, version uint16, inKey, outKey, inIV, outIV []by
 			Debugln("kTLS: TLS_RX error enabling:", err)
 			return err
 		}
-		ulpEnabled = true
 		Debugln("kTLS: TLS_RX enabled")
 		c.in.cipher = kTLSCipher{}
 		// Only enable the TLS_RX_EXPECT_NO_PAD for TLS 1.3
