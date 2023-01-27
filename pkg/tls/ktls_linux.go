@@ -64,6 +64,10 @@ func init() {
 	}
 	kTLSSupport = true && kTLSEnabled
 	Debugf("kTLS Enabled Status: %v\n", kTLSSupport)
+	// no need to check further, as KTLS is disabled
+	if !kTLSSupport {
+		return
+	}
 
 	var uname syscall.Utsname
 	if err := syscall.Uname(&uname); err != nil {
