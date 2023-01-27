@@ -167,7 +167,6 @@ func (el *eventloop) read(c *conn) error {
 				return el.closeConn(c, os.NewSyscallError("TLS handshake", err))
 			}
 			if !c.tlsconn.HandshakeComplete() || len(c.tlsconn.RawData()) == 0 { //握手没成功，或者握手成功，但是没有数据黏包了
-				c.Flush()
 				return nil
 			}
 		}
@@ -241,8 +240,34 @@ func (el *eventloop) closeConn(c *conn, err error) (rerr error) {
 	}
 
 	// close the TLS connection by sending the alert
+	//
+	// tlsconn.Close() is called only if err == nil.
+	// Notice tlsconn.Close() eventually calls gnetConn.write().
+	// gnetConn.write() is possible to call c.loop.closeConn() again if unix.Write() returns an error other than unix.EAGAIN,
+	// which creates a cycle. The error message could be "broken pipe" or "connection reset by peer" indicating
+	// the socket is no longer valid.
+	//
+	// This implies that once "err is not nil", it will create a cycle, and run the code in an infinite loop.
+	// Therefore, we use "if err == nil" to detect the cycle and break it.
 	if c.tlsconn != nil {
-		c.tlsconn.Close()
+		// The default call graph results calling gnet.writeTLS(). See below
+		//
+		// tlsconn.Close() -> tlsconn.sendAlertLocked() -> tlsconn.writeRecordLocked() -> tlsconn.write() ->
+		// gnetConn.Write() (Here tlsEnabled is true, implying to run the TLS version) ->
+		// gnetConn.writeTLS() -> tlsconn.Write() -> tlsconn.writeRecordLocked() -> tlsconn.write() ->
+		// gnetConn.Write() (Here tlsEnabled is false, implying to run the plaintext version) ->
+		// gnetConn.write()
+		//
+		// Therefore, the closing message is encrypted twice which is not correct.
+		// To resolve the issue, we disable the TLS before closing. Then, when tlsconn.Close()
+		// calls gnetConn.Write(), which immediately runs the plaintext version. This means
+		// the encrypted data is written to the socket directly instead of being encrypted one more time.
+		c.tlsEnabled = false
+		if err == nil {
+			c.tlsconn.Close()
+		}
+		c.tlsconn = nil
+		// TODO: create a sync.pool to manage the TLS connection
 	}
 
 	// Send residual data in buffer back to the peer before actually closing the connection.

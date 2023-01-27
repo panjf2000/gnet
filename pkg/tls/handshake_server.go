@@ -79,7 +79,7 @@ func (hs *serverHandshakeState) handshake() error {
 		}
 
 		// For an overview of TLS handshaking, see RFC 5246, Section 7.3.
-		//c.buffering = true
+		c.buffering = true
 	}
 
 	if hs.checkForResumption() {
@@ -143,7 +143,7 @@ func (hs *serverHandshakeState) handshake() error {
 				return err
 			}
 			c.clientFinishedIsFirst = true
-			//c.buffering = true
+			c.buffering = true
 			if err := hs.sendSessionTicket(); err != nil {
 				return err
 			}

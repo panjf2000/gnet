@@ -26,6 +26,7 @@ import (
 type Socket interface {
 	// Fd returns the underlying file descriptor.
 	Fd() int
+	Flush() error
 }
 
 // A Conn represents a secured connection.
@@ -104,12 +105,12 @@ type Conn struct {
 	// By using the elastic MsgBuffer the tls conn not longer holds the actual buffer when the connection is idle.
 	// This can significantly optimize the memory usage, especially when the server connecting millions of clients
 	// where most of them are idle.
-	in, out  halfConn
-	rawInput EMsgBuffer          // raw input, starting with a record header
-	input    *elastic.RingBuffer // a buffer for decrypted records pointer to the inboundBuffer of gnet.conn
-	hand     EMsgBuffer          // handshake data waiting to be read
-	// buffering bool               // whether records are buffered in sendBuf
-	sendBuf *elastic.Buffer // a buffer for records waiting to be sent also point to the outboundBuffer of gnet.conn
+	in, out   halfConn
+	rawInput  EMsgBuffer          // raw input, starting with a record header
+	input     *elastic.RingBuffer // a buffer for decrypted records pointer to the inboundBuffer of gnet.conn
+	hand      EMsgBuffer          // handshake data waiting to be read
+	buffering bool                // whether records are buffered in sendBuf
+	sendBuf   *elastic.Buffer     // a buffer for records waiting to be sent also point to the outboundBuffer of gnet.conn
 
 	// bytesSent counts the bytes of application data sent.
 	// packetsSent counts packets.
@@ -930,20 +931,24 @@ func (c *Conn) maxPayloadSizeForWrite(typ recordType) int {
 }
 
 func (c *Conn) write(data []byte) (int, error) {
-	//必须把所有数据往buf写
-	n := len(data)
-	c.sendBuf.Write(data)
+	if c.buffering {
+		_, _ = c.sendBuf.Write(data)
+		return len(data), nil
+	}
+
+	n, err := c.conn.Write(data)
 	c.bytesSent += int64(n)
-	return n, nil
+	return n, err
 }
 
 func (c *Conn) flush() (int, error) {
 	if c.sendBuf.IsEmpty() {
 		return 0, nil
 	}
-	n, err := c.conn.Write(nil)
+	n := c.sendBuf.Buffered()
 	c.bytesSent += int64(n)
-	// c.buffering = false
+	err := c.conn.(Socket).Flush()
+	c.buffering = false
 	return n, err
 }
 

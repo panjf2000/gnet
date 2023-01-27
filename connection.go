@@ -50,6 +50,7 @@ type conn struct {
 	isDatagram     bool                    // UDP protocol
 	opened         bool                    // connection opened event fired
 	tlsconn        *tls.Conn               // tls connection
+	tlsEnabled     bool                    // whether TLS is enabled
 }
 
 func newTCPConn(fd int, el *eventloop, sa unix.Sockaddr, localAddr, remoteAddr net.Addr) (c *conn) {
@@ -83,6 +84,7 @@ func (c *conn) releaseTCP() {
 	c.outboundBuffer.Release()
 	netpoll.PutPollAttachment(c.pollAttachment)
 	c.pollAttachment = nil
+	c.tlsEnabled = false
 }
 
 func newUDPConn(fd int, el *eventloop, localAddr net.Addr, sa unix.Sockaddr, connected bool) (c *conn) {
@@ -129,18 +131,21 @@ func (c *conn) open(buf []byte) error {
 	return err
 }
 
+func (c *conn) writeTLS(data []byte) (n int, err error) {
+	// temporarily disable the TLS connection.
+	c.tlsEnabled = false
+	// use tls to encrypt the data before sending it.
+	// tlsconn will implicitly call gnet.Write (but it runs the plaintext version) to sent the data.
+	// unsent data will be buffered
+	n, err = c.tlsconn.Write(data)
+	// re-enable the TLS connection if data is sent or is buffered
+	// Otherwise, the connection is closed (c.loop.closeConn() is called).
+	c.tlsEnabled = true
+	return
+}
+
 func (c *conn) write(data []byte) (n int, err error) {
 	n = len(data)
-
-	if c.tlsconn != nil {
-		// use tls to encrypt the data before sending it
-		n, _ = c.tlsconn.Write(data)
-		// err = c.loop.poller.ModReadWrite(c.pollAttachment)
-		// n = 0
-		// also working
-		err = c.loop.write(c)
-		return
-	}
 
 	// If there is pending data in outbound buffer, the current data ought to be appended to the outbound buffer
 	// for maintaining the sequence of network packets.
@@ -167,21 +172,37 @@ func (c *conn) write(data []byte) (n int, err error) {
 	return
 }
 
-func (c *conn) writev(bs [][]byte) (n int, err error) {
+func (c *conn) writevTLS(bs [][]byte) (n int, err error) {
 	for _, b := range bs {
 		n += len(b)
 	}
 
-	if c.tlsconn != nil {
-		for _, b := range bs {
-			// use tls to encrypt the data before sending it
-			c.tlsconn.Write(b)
+	// temporarily disable the TLS connection.
+	c.tlsEnabled = false
+	// use tls to encrypt the data before sending it.
+	// tlsconn will implicitly call gnet.Write (but it runs the plaintext version) to sent the data.
+	// unsent data will be buffered
+	sent := 0
+	var sentN int
+	for _, b := range bs {
+		sentN, err = c.tlsconn.Write(b)
+		if sentN < 0 {
+			// the connection is closed (c.loop.closeConn() is called).
+			return sent, err
 		}
-		// err = c.loop.poller.ModReadWrite(c.pollAttachment)
-		// n = 0
-		// also working
-		err = c.loop.write(c)
-		return
+		sent += sentN
+	}
+
+	// re-enable the TLS connection if data is sent or is buffered
+	// Otherwise, the connection is closed (c.loop.closeConn() is called).
+	c.tlsEnabled = true
+
+	return
+}
+
+func (c *conn) writev(bs [][]byte) (n int, err error) {
+	for _, b := range bs {
+		n += len(b)
 	}
 
 	// If there is pending data in outbound buffer, the current data ought to be appended to the outbound buffer
@@ -230,7 +251,11 @@ func (c *conn) asyncWrite(itf interface{}) (err error) {
 	}
 
 	hook := itf.(*asyncWriteHook)
-	_, err = c.write(hook.data)
+	if c.tlsEnabled {
+		_, err = c.writeTLS(hook.data)
+	} else {
+		_, err = c.write(hook.data)
+	}
 	if hook.callback != nil {
 		_ = hook.callback(c, err)
 	}
@@ -248,7 +273,11 @@ func (c *conn) asyncWritev(itf interface{}) (err error) {
 	}
 
 	hook := itf.(*asyncWritevHook)
-	_, err = c.writev(hook.data)
+	if c.tlsEnabled {
+		_, err = c.writevTLS(hook.data)
+	} else {
+		_, err = c.writev(hook.data)
+	}
 	if hook.callback != nil {
 		_ = hook.callback(c, err)
 	}
@@ -373,12 +402,18 @@ func (c *conn) Write(p []byte) (int, error) {
 		}
 		return len(p), nil
 	}
+	if c.tlsEnabled {
+		return c.writeTLS(p)
+	}
 	return c.write(p)
 }
 
 func (c *conn) Writev(bs [][]byte) (int, error) {
 	if c.isDatagram {
 		return 0, gerrors.ErrUnsupportedOp
+	}
+	if c.tlsEnabled {
+		return c.writevTLS(bs)
 	}
 	return c.writev(bs)
 }
@@ -494,7 +529,9 @@ func (c *conn) Close() error {
 }
 
 func (c *conn) UpgradeTLS(config *tls.Config) (err error) {
+	// TODO: create a sync.pool to manage the TLS connection
 	c.tlsconn = tls.ServerGnet(c, &c.inboundBuffer, c.outboundBuffer, config.Clone())
+	c.tlsEnabled = true
 
 	//很有可能握手包在UpgradeTls之前发过来了，这里把inboundBuffer剩余数据当做握手数据处理
 	if c.inboundBuffer.Len() > 0 {

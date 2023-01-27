@@ -61,7 +61,7 @@ func (hs *serverHandshakeStateTLS13) handshake() error {
 		if err := hs.pickCertificate(); err != nil {
 			return err
 		}
-		//c.buffering = true
+		c.buffering = true
 		if err := hs.sendServerParameters(); err != nil {
 			return err
 		}

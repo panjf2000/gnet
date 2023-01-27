@@ -418,7 +418,7 @@ func (hs *clientHandshakeState) handshake() error {
 		hs.finishedHash.Write(hs.hello.marshal())
 		hs.finishedHash.Write(hs.serverHello.marshal())
 		c.handshakeStatus = 3
-		//c.buffering = true
+		c.buffering = true
 	}
 
 	if c.didResume {

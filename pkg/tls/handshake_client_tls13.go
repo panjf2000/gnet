@@ -75,7 +75,7 @@ func (hs *clientHandshakeStateTLS13) handshake() error {
 
 	hs.transcript.Write(hs.serverHello.marshal())
 
-	//c.buffering = true
+	c.buffering = true
 	if err := hs.processServerHello(); err != nil {
 		return err
 	}
