@@ -50,7 +50,7 @@ type conn struct {
 	isDatagram     bool                    // UDP protocol
 	opened         bool                    // connection opened event fired
 	tlsconn        *tls.Conn               // tls connection
-	tlsEnabled     bool                    // whether TLS is enabled
+	// tlsEnabled     bool                    // whether TLS is enabled
 }
 
 func newTCPConn(fd int, el *eventloop, sa unix.Sockaddr, localAddr, remoteAddr net.Addr) (c *conn) {
@@ -84,7 +84,7 @@ func (c *conn) releaseTCP() {
 	c.outboundBuffer.Release()
 	netpoll.PutPollAttachment(c.pollAttachment)
 	c.pollAttachment = nil
-	c.tlsEnabled = false
+	// c.tlsEnabled = false
 }
 
 func newUDPConn(fd int, el *eventloop, localAddr net.Addr, sa unix.Sockaddr, connected bool) (c *conn) {
@@ -133,14 +133,14 @@ func (c *conn) open(buf []byte) error {
 
 func (c *conn) writeTLS(data []byte) (n int, err error) {
 	// temporarily disable the TLS connection.
-	c.tlsEnabled = false
+	// c.tlsEnabled = false
 	// use tls to encrypt the data before sending it.
 	// tlsconn will implicitly call gnet.Write (but it runs the plaintext version) to sent the data.
 	// unsent data will be buffered
 	n, err = c.tlsconn.Write(data)
 	// re-enable the TLS connection if data is sent or is buffered
 	// Otherwise, the connection is closed (c.loop.closeConn() is called).
-	c.tlsEnabled = true
+	// c.tlsEnabled = true
 	return
 }
 
@@ -178,7 +178,7 @@ func (c *conn) writevTLS(bs [][]byte) (n int, err error) {
 	}
 
 	// temporarily disable the TLS connection.
-	c.tlsEnabled = false
+	// c.tlsEnabled = false
 	// use tls to encrypt the data before sending it.
 	// tlsconn will implicitly call gnet.Write (but it runs the plaintext version) to sent the data.
 	// unsent data will be buffered
@@ -195,7 +195,7 @@ func (c *conn) writevTLS(bs [][]byte) (n int, err error) {
 
 	// re-enable the TLS connection if data is sent or is buffered
 	// Otherwise, the connection is closed (c.loop.closeConn() is called).
-	c.tlsEnabled = true
+	// c.tlsEnabled = true
 
 	return
 }
@@ -251,7 +251,7 @@ func (c *conn) asyncWrite(itf interface{}) (err error) {
 	}
 
 	hook := itf.(*asyncWriteHook)
-	if c.tlsEnabled {
+	if c.tlsconn != nil {
 		_, err = c.writeTLS(hook.data)
 	} else {
 		_, err = c.write(hook.data)
@@ -273,7 +273,7 @@ func (c *conn) asyncWritev(itf interface{}) (err error) {
 	}
 
 	hook := itf.(*asyncWritevHook)
-	if c.tlsEnabled {
+	if c.tlsconn != nil {
 		_, err = c.writevTLS(hook.data)
 	} else {
 		_, err = c.writev(hook.data)
@@ -402,9 +402,15 @@ func (c *conn) Write(p []byte) (int, error) {
 		}
 		return len(p), nil
 	}
-	if c.tlsEnabled {
+	if c.tlsconn != nil {
 		return c.writeTLS(p)
 	}
+	return c.write(p)
+}
+
+// Expose the plaintext write API which should only be used
+// by tlsconn.Write().
+func (c *conn) WriteTCP(p []byte) (int, error) {
 	return c.write(p)
 }
 
@@ -412,7 +418,7 @@ func (c *conn) Writev(bs [][]byte) (int, error) {
 	if c.isDatagram {
 		return 0, gerrors.ErrUnsupportedOp
 	}
-	if c.tlsEnabled {
+	if c.tlsconn != nil {
 		return c.writevTLS(bs)
 	}
 	return c.writev(bs)
@@ -530,14 +536,14 @@ func (c *conn) Close() error {
 
 func (c *conn) UpgradeTLS(config *tls.Config) (err error) {
 	// TODO: create a sync.pool to manage the TLS connection
-	c.tlsconn = tls.ServerGnet(c, &c.inboundBuffer, c.outboundBuffer, config.Clone())
-	c.tlsEnabled = true
+	c.tlsconn = tls.Server(c, config.Clone())
+	// c.tlsEnabled = true
 
 	//很有可能握手包在UpgradeTls之前发过来了，这里把inboundBuffer剩余数据当做握手数据处理
 	if c.inboundBuffer.Len() > 0 {
 		head, tail := c.inboundBuffer.Peek(-1)
-		c.tlsconn.RawWrite(head)
-		c.tlsconn.RawWrite(tail)
+		c.tlsconn.RawInputSet(head)
+		c.tlsconn.RawInputSet(tail)
 		c.inboundBuffer.Reset()
 		if err := c.tlsconn.Handshake(); err != nil {
 			return err

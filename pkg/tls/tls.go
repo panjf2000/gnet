@@ -24,52 +24,16 @@ import (
 	"net"
 	"os"
 	"strings"
-
-	"github.com/panjf2000/gnet/v2/pkg/buffer/elastic"
 )
 
 // Server returns a new TLS server side connection
 // using conn as the underlying transport.
 // The configuration config must be non-nil and must include
 // at least one certificate or else set GetCertificate.
-func ServerGnet(conn net.Conn, in *elastic.RingBuffer, out *elastic.Buffer, config *Config) *Conn {
-	c := &Conn{
-		conn:    conn,
-		config:  config,
-		input:   in,
-		sendBuf: out,
-	}
-	c.handshakeFn = c.serverHandshake
-	return c
-}
-
-// Client returns a new TLS client side connection
-// using conn as the underlying transport.
-// The config cannot be nil: users must set either ServerName or
-// InsecureSkipVerify in the config.
-func ClientGnet(conn net.Conn, in *elastic.RingBuffer, out *elastic.Buffer, config *Config) *Conn {
-	c := &Conn{
-		conn:     conn,
-		config:   config,
-		input:    in,
-		sendBuf:  out,
-		isClient: true,
-	}
-	c.handshakeFn = c.clientHandshake
-	return c
-}
-
-// Server returns a new TLS server side connection
-// using conn as the underlying transport.
-// The configuration config must be non-nil and must include
-// at least one certificate or else set GetCertificate.
 func Server(conn net.Conn, config *Config) *Conn {
-	sendBuf, _ := elastic.New(65536)
 	c := &Conn{
-		conn:    conn,
-		config:  config,
-		input:   new(elastic.RingBuffer),
-		sendBuf: sendBuf,
+		conn:   conn,
+		config: config,
 	}
 	c.handshakeFn = c.serverHandshake
 	return c
@@ -80,12 +44,9 @@ func Server(conn net.Conn, config *Config) *Conn {
 // The config cannot be nil: users must set either ServerName or
 // InsecureSkipVerify in the config.
 func Client(conn net.Conn, config *Config) *Conn {
-	sendBuf, _ := elastic.New(65536)
 	c := &Conn{
 		conn:     conn,
 		config:   config,
-		input:    new(elastic.RingBuffer),
-		sendBuf:  sendBuf,
 		isClient: true,
 	}
 	c.handshakeFn = c.clientHandshake

@@ -7,6 +7,7 @@
 package tls
 
 import (
+	"bytes"
 	"context"
 	"crypto/cipher"
 	"crypto/subtle"
@@ -18,15 +19,13 @@ import (
 	"net"
 	"sync"
 	"time"
-
-	"github.com/panjf2000/gnet/v2/pkg/buffer/elastic"
 )
 
 // Socket is a set of functions which manipulate the underlying file descriptor of a connection.
 type Socket interface {
 	// Fd returns the underlying file descriptor.
 	Fd() int
-	Flush() error
+	WriteTCP([]byte) (int, error)
 }
 
 // A Conn represents a secured connection.
@@ -106,11 +105,12 @@ type Conn struct {
 	// This can significantly optimize the memory usage, especially when the server connecting millions of clients
 	// where most of them are idle.
 	in, out   halfConn
-	rawInput  EMsgBuffer          // raw input, starting with a record header
-	input     *elastic.RingBuffer // a buffer for decrypted records pointer to the inboundBuffer of gnet.conn
-	hand      EMsgBuffer          // handshake data waiting to be read
-	buffering bool                // whether records are buffered in sendBuf
-	sendBuf   *elastic.Buffer     // a buffer for records waiting to be sent also point to the outboundBuffer of gnet.conn
+	rawInput  LazyBuffer   // raw input, starting with a record header
+	input     bytes.Reader // a buffer for decrypted records pointer to the inboundBuffer of gnet.conn
+	data      []byte       // buffer to hold all decrypted data
+	hand      LazyBuffer   // handshake data waiting to be read
+	buffering bool         // whether records are buffered in sendBuf
+	sendBuf   LazyBuffer   // a buffer for records waiting to be sent also point to the outboundBuffer of gnet.conn
 
 	// bytesSent counts the bytes of application data sent.
 	// packetsSent counts packets.
@@ -599,18 +599,12 @@ func (c *Conn) newRecordHeaderError(conn net.Conn, msg string) (err RecordHeader
 }
 
 func (c *Conn) readRecord() error {
-	if c.rawInput.Len() > recordHeaderLen {
-		return c.readRecordOrCCS(false)
-	}
-	return io.EOF
+	return c.readRecordOrCCS(false)
 }
 
 func (c *Conn) readChangeCipherSpec() error {
-	c.input.Reset()
-	if c.rawInput.Len() > recordHeaderLen {
-		return c.readRecordOrCCS(true)
-	}
-	return io.EOF
+	return c.readRecordOrCCS(true)
+
 }
 
 // ktlsInBufPool pools the buffers used by ktlsReadRecord.
@@ -642,35 +636,32 @@ func (c *Conn) readRecordOrCCS(expectChangeCipherSpec bool) error {
 	handshakeComplete := c.HandshakeComplete()
 
 	var (
-		typ  recordType
-		data []byte
-		// record []byte
-		hdr  []byte
-		n    int
-		vers uint16
-		err  error
+		typ    recordType
+		data   []byte
+		record []byte
+		hdr    []byte
+		n      int
+		vers   uint16
+		err    error
 	)
 
 	if _, ok := c.in.cipher.(kTLSCipher); ok {
-		dataPtr := ktlsInBufPool.Get().(*[]byte)
-		data = *dataPtr
-		defer func() {
-			// You might be tempted to simplify this by just passing &outBuf to Put,
-			// but that would make the local copy of the outBuf slice header escape
-			// to the heap, causing an allocation. Instead, we keep around the
-			// pointer to the slice header returned by Get, which is already on the
-			// heap, and overwrite and return that.
-			*dataPtr = data[:maxPlaintext]
-			ktlsInBufPool.Put(dataPtr)
-		}()
+		if c.rawInput.Len() < maxPlaintext {
+			c.rawInput.Extend(maxPlaintext - c.rawInput.Len())
+		}
+		data = c.rawInput.Bytes()[:maxPlaintext]
 		if typ, n, err = ktlsReadRecord(c.conn.(Socket).Fd(), data); err != nil {
 			return err
 		}
-		data = data[:n]
+		data = c.rawInput.Next(n)
 		// TODO: process the data here instead of goto processMessage
 		// && try to use ktlsReadRecord to write data directly into input
 		// rather than copy it later.
 		goto processMessage
+	}
+
+	if c.rawInput.Len() <= recordHeaderLen {
+		return io.EOF
 	}
 
 	hdr = c.rawInput.Bytes()
@@ -713,9 +704,8 @@ func (c *Conn) readRecordOrCCS(expectChangeCipherSpec bool) error {
 	}
 
 	// Process message.
-	c.rawInput.DiscardWithoutDone(recordHeaderLen + n)
-	defer c.rawInput.DoneIfEmpty()
-	data, typ, err = c.in.decrypt(hdr[:recordHeaderLen+n])
+	record = c.rawInput.Next(recordHeaderLen + n)
+	data, typ, err = c.in.decrypt(record)
 	if err != nil {
 		return c.in.setErrorLocked(c.sendAlert(err.(alert)))
 	}
@@ -799,13 +789,14 @@ processMessage:
 		// Note that data is owned by c.rawInput, following the Next call above,
 		// to avoid copying the plaintext. This is safe because c.rawInput is
 		// not read from or written to until c.input is drained.
-		c.input.Write(data)
+		c.input.Reset(data)
+		c.data = data
 
 	case recordTypeHandshake:
 		if len(data) == 0 || expectChangeCipherSpec {
 			return c.in.setErrorLocked(c.sendAlert(alertUnexpectedMessage))
 		}
-		c.hand.Write(data)
+		c.hand.Set(data)
 	}
 
 	return nil
@@ -819,11 +810,7 @@ func (c *Conn) retryReadRecord(expectChangeCipherSpec bool) error {
 		c.sendAlert(alertUnexpectedMessage)
 		return c.in.setErrorLocked(errors.New("tls: too many ignored records"))
 	}
-	c.input.Reset()
-	if c.rawInput.Len() > recordHeaderLen {
-		return c.readRecordOrCCS(expectChangeCipherSpec)
-	}
-	return io.EOF
+	return c.readRecordOrCCS(expectChangeCipherSpec)
 }
 
 // sendAlert sends a TLS alert message.
@@ -936,18 +923,18 @@ func (c *Conn) write(data []byte) (int, error) {
 		return len(data), nil
 	}
 
-	n, err := c.conn.Write(data)
+	n, err := c.conn.(Socket).WriteTCP(data)
 	c.bytesSent += int64(n)
 	return n, err
 }
 
 func (c *Conn) flush() (int, error) {
-	if c.sendBuf.IsEmpty() {
+	if c.sendBuf.Len() == 0 {
 		return 0, nil
 	}
-	n := c.sendBuf.Buffered()
+	n, err := c.conn.(Socket).WriteTCP(c.sendBuf.Bytes())
 	c.bytesSent += int64(n)
-	err := c.conn.(Socket).Flush()
+	c.sendBuf.Done()
 	c.buffering = false
 	return n, err
 }
@@ -1046,7 +1033,7 @@ func (c *Conn) readHandshake() (interface{}, error) {
 		}
 	}
 
-	data := c.hand.Peek(4)
+	data := c.hand.Bytes()
 	n := int(data[1])<<16 | int(data[2])<<8 | int(data[3])
 	if n > maxHandshake {
 		c.sendAlertLocked(alertInternalError)
@@ -1057,8 +1044,9 @@ func (c *Conn) readHandshake() (interface{}, error) {
 			return nil, err
 		}
 	}
-	data = c.hand.Peek(4 + n)
-	defer c.hand.Discard(4 + n)
+	data = c.hand.Next(4 + n)
+	// Handshake messages are all processed, return the buffer to the pool
+	defer c.hand.Done()
 	var m handshakeMessage
 	switch data[0] {
 	case typeHelloRequest:
@@ -1173,24 +1161,64 @@ func (c *Conn) Write(b []byte) (int, error) {
 	return n + m, c.out.setErrorLocked(err)
 }
 
-// load the data into the TLS rawInput
-func (c *Conn) RawWrite(data []byte) (int, error) {
+// check whether the data is a complete TLS record
+func (c *Conn) IsRecordCompleted(data []byte) bool {
+	if len(data) < recordHeaderLen {
+		return false
+	}
+	if len(data) < recordHeaderLen+int(data[3])<<8|int(data[4]) {
+		return false
+	}
+	return true
+}
 
-	c.rawInput.Write(data)
+// load the data into the TLS rawInput
+// If rawInput is lazy and empty, the data is loaded immediately
+// as a reference (zero-copy)
+func (c *Conn) RawInputSet(data []byte) (int, error) {
+	c.rawInput.Set(data)
 	return len(data), nil
 }
 
-// Decrypt one tls record and save it in the 解析一条tls数据
+// Decrypt one tls record and save it in c.input which is
+// owned by c.rawInput
 func (c *Conn) ReadFrame() error {
-	_, ok := c.in.cipher.(kTLSCipher)
-	if c.rawInput.Len() > recordHeaderLen || ok {
-		return c.readRecordOrCCS(false)
-	}
-	return io.EOF
+	return c.readRecordOrCCS(false)
 }
 
-func (c *Conn) RawData() []byte {
+// return all rawInput data
+func (c *Conn) RawInputData() []byte {
 	return c.rawInput.Bytes()
+}
+
+// Clean up all decrypted data
+// rawInput is cleaned up if all rawInput are processed.
+// otherwise raw data is cached in order to make sure the
+// is not owned by anyone else
+func (c *Conn) DataDone() {
+	if c.rawInput.Len() == 0 {
+		// raw input is drain, thus clean it up
+		c.rawInput.Done()
+	} else {
+		// raw data has a few bytes left but not sufficient, so we cache it
+		// to make sure the data is not owned by anyone else
+		c.rawInput.Write(nil)
+	}
+	c.input.Reset(nil)
+	c.data = nil
+}
+
+// call this function after close. so allocated memory for rawInput and hand
+// are returned to the pool
+func (c *Conn) DataCleanUpAfterClose() {
+	c.data = nil
+	c.input.Reset(nil)
+	c.rawInput.Done()
+}
+
+// Return all decrypted data
+func (c *Conn) Data() []byte {
+	return c.data
 }
 
 // handleRenegotiation processes a HelloRequest handshake message.
