@@ -120,6 +120,12 @@ func (el *eventloop) readTLS(c *conn) error {
 	// TLS records are available
 	for {
 		if err := c.tlsconn.ReadFrame(); err != nil {
+			// If err is io.EOF, it can either the data is drained,
+			// receives a close notify from the client.
+			if err == unix.EAGAIN {
+				c.tlsconn.DataDone()
+				return nil
+			}
 			return el.closeConn(c, os.NewSyscallError("TLS read", err))
 		}
 
