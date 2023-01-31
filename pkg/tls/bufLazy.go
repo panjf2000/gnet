@@ -4,6 +4,8 @@ import (
 	"sync"
 )
 
+const defaultSize = 4096
+
 var bytePool = sync.Pool{
 	New: func() any {
 		buf := make([]byte, defaultSize)
