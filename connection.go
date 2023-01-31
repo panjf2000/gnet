@@ -50,7 +50,6 @@ type conn struct {
 	isDatagram     bool                    // UDP protocol
 	opened         bool                    // connection opened event fired
 	tlsconn        *tls.Conn               // tls connection
-	// tlsEnabled     bool                    // whether TLS is enabled
 }
 
 func newTCPConn(fd int, el *eventloop, sa unix.Sockaddr, localAddr, remoteAddr net.Addr) (c *conn) {
@@ -84,7 +83,6 @@ func (c *conn) releaseTCP() {
 	c.outboundBuffer.Release()
 	netpoll.PutPollAttachment(c.pollAttachment)
 	c.pollAttachment = nil
-	// c.tlsEnabled = false
 }
 
 func newUDPConn(fd int, el *eventloop, localAddr net.Addr, sa unix.Sockaddr, connected bool) (c *conn) {
@@ -132,15 +130,11 @@ func (c *conn) open(buf []byte) error {
 }
 
 func (c *conn) writeTLS(data []byte) (n int, err error) {
-	// temporarily disable the TLS connection.
-	// c.tlsEnabled = false
 	// use tls to encrypt the data before sending it.
-	// tlsconn will implicitly call gnet.Write (but it runs the plaintext version) to sent the data.
-	// unsent data will be buffered
+	// tlsconn will call gnet.WriteTCP() to sent the data directly.
+	// If gnetConn.outboundBufferis not empty, data will be
+	// buffered in gnetConn.outboundBuffer.
 	n, err = c.tlsconn.Write(data)
-	// re-enable the TLS connection if data is sent or is buffered
-	// Otherwise, the connection is closed (c.loop.closeConn() is called).
-	// c.tlsEnabled = true
 	return
 }
 
@@ -177,11 +171,10 @@ func (c *conn) writevTLS(bs [][]byte) (n int, err error) {
 		n += len(b)
 	}
 
-	// temporarily disable the TLS connection.
-	// c.tlsEnabled = false
 	// use tls to encrypt the data before sending it.
-	// tlsconn will implicitly call gnet.Write (but it runs the plaintext version) to sent the data.
-	// unsent data will be buffered
+	// tlsconn will call gnet.WriteTCP() to sent the data directly.
+	// If gnetConn.outboundBufferis not empty, data will be
+	// buffered in gnetConn.outboundBuffer.
 	sent := 0
 	var sentN int
 	for _, b := range bs {
@@ -192,11 +185,6 @@ func (c *conn) writevTLS(bs [][]byte) (n int, err error) {
 		}
 		sent += sentN
 	}
-
-	// re-enable the TLS connection if data is sent or is buffered
-	// Otherwise, the connection is closed (c.loop.closeConn() is called).
-	// c.tlsEnabled = true
-
 	return
 }
 
@@ -537,7 +525,6 @@ func (c *conn) Close() error {
 func (c *conn) UpgradeTLS(config *tls.Config) (err error) {
 	// TODO: create a sync.pool to manage the TLS connection
 	c.tlsconn = tls.Server(c, config.Clone())
-	// c.tlsEnabled = true
 
 	//很有可能握手包在UpgradeTls之前发过来了，这里把inboundBuffer剩余数据当做握手数据处理
 	if c.inboundBuffer.Len() > 0 {

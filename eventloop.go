@@ -120,12 +120,13 @@ func (el *eventloop) readTLS(c *conn) error {
 	// TLS records are available
 	for {
 		if err := c.tlsconn.ReadFrame(); err != nil {
-			// If err is io.EOF, it can either the data is drained,
-			// receives a close notify from the client.
+			// Receive error unix.EAGAIN, wait for the next round
 			if err == unix.EAGAIN {
 				c.tlsconn.DataDone()
 				return nil
 			}
+			// If err is io.EOF, it can either the data is drained,
+			// receives a close notify from the client.
 			return el.closeConn(c, os.NewSyscallError("TLS read", err))
 		}
 
@@ -155,11 +156,11 @@ func (el *eventloop) readTLS(c *conn) error {
 func (el *eventloop) read(c *conn) error {
 	// detected whether kernel TLS RX is enabled
 	// This only happens after TLS handshake is completed.
-	// Therefore, no need to call c.tlsconn.HandshakeComplete()
-	// In addition, all data are copied directly from kernel to the buffer,
-	// el.buffer meaning no need to call unix.read(c.fd, el.buffer)
+	// Therefore, no need to call c.tlsconn.HandshakeComplete().
 	if c.tlsconn != nil && c.tlsconn.IsKTLSRXEnabled() {
-		// attach the gnet eventloop.buffer to tlsconn.rawInput
+		// attach the gnet eventloop.buffer to tlsconn.rawInput.
+		// So, KTLS can decrypt the data directly to the buffer without memory allocation.
+		// Since data is read through KTLS, there is no need to call unix.read(c.fd, el.buffer) 
 		c.tlsconn.RawInputSet(el.buffer)
 		return el.readTLS(c)
 	}
@@ -176,6 +177,7 @@ func (el *eventloop) read(c *conn) error {
 	}
 
 	if c.tlsconn != nil {
+		// attach the gnet eventloop.buffer to tlsconn.rawInput.
 		c.tlsconn.RawInputSet(el.buffer[:n])
 		if !c.tlsconn.HandshakeComplete() {
 			//先判断是否足够一条消息
@@ -186,7 +188,7 @@ func (el *eventloop) read(c *conn) error {
 			}
 			if err = c.tlsconn.Handshake(); err != nil {
 				// closeConn will cleanup the TLS data at the end,
-				// so need to call tlsconn.DataDone()
+				// so no need to call tlsconn.DataDone()
 				return el.closeConn(c, os.NewSyscallError("TLS handshake", err))
 			}
 			if !c.tlsconn.HandshakeComplete() || len(c.tlsconn.RawInputData()) == 0 { //握手没成功，或者握手成功，但是没有数据黏包了
@@ -264,32 +266,9 @@ func (el *eventloop) closeConn(c *conn, err error) (rerr error) {
 	}
 
 	// close the TLS connection by sending the alert
-	//
-	// tlsconn.Close() is called only if err == nil.
-	// Notice tlsconn.Close() eventually calls gnetConn.write().
-	// gnetConn.write() is possible to call c.loop.closeConn() again if unix.Write() returns an error other than unix.EAGAIN,
-	// which creates a cycle. The error message could be "broken pipe" or "connection reset by peer" indicating
-	// the socket is no longer valid.
-	//
-	// This implies that once "err is not nil", it will create a cycle, and run the code in an infinite loop.
-	// Therefore, we use "if err == nil" to detect the cycle and break it.
 	if c.tlsconn != nil {
-		// The default call graph results calling gnet.writeTLS(). See below
-		//
-		// tlsconn.Close() -> tlsconn.sendAlertLocked() -> tlsconn.writeRecordLocked() -> tlsconn.write() ->
-		// gnetConn.Write() (Here tlsEnabled is true, implying to run the TLS version) ->
-		// gnetConn.writeTLS() -> tlsconn.Write() -> tlsconn.writeRecordLocked() -> tlsconn.write() ->
-		// gnetConn.Write() (Here tlsEnabled is false, implying to run the plaintext version) ->
-		// gnetConn.write()
-		//
-		// Therefore, the closing message is encrypted twice which is not correct.
-		// To resolve the issue, we disable the TLS before closing. Then, when tlsconn.Close()
-		// calls gnetConn.Write(), which immediately runs the plaintext version. This means
-		// the encrypted data is written to the socket directly instead of being encrypted one more time.
-		// c.tlsEnabled = false
-		// if err == nil {
+		// close the TLS connection, which will send a close notify to the client
 		c.tlsconn.Close()
-		// }
 		// Make sure all memory requested from the pool is returned.
 		c.tlsconn.DataCleanUpAfterClose()
 		c.tlsconn = nil
