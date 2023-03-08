@@ -1,4 +1,4 @@
-//go:build 386 || arm || mips || mipsle
+//go:build (freebsd || dragonfly || darwin) && (amd64 || arm64 || ppc64 || ppc64le || mips64 || mips64le || riscv64)
 
 /*
  * Copyright (c) 2023 Andy Pan.
@@ -19,4 +19,4 @@
 
 package netpoll
 
-type keventIdent = uint32
+type keventIdent = uint64
