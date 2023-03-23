@@ -136,7 +136,7 @@ func (el *eventloop) read(c *conn) error {
 		return gerrors.ErrEngineShutdown
 	}
 	_, _ = c.inboundBuffer.Write(c.buffer)
-
+	c.buffer = c.buffer[:0]
 	return nil
 }
 
