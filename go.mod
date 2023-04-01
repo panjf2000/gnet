@@ -1,12 +1,13 @@
 module github.com/panjf2000/gnet/v2
 
 require (
+	github.com/0-haha/gnet_go_tls/v120 v120.0.1
 	github.com/panjf2000/ants/v2 v2.7.1
-	github.com/stretchr/testify v1.8.1
+	github.com/stretchr/testify v1.8.2
 	github.com/valyala/bytebufferpool v1.0.0
 	go.uber.org/zap v1.21.0
-	golang.org/x/crypto v0.0.0-20201016220609-9e8e0b390897
-	golang.org/x/sys v0.3.0
+	golang.org/x/crypto v0.5.0
+	golang.org/x/sys v0.4.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 )
 
