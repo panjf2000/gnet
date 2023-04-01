@@ -144,6 +144,7 @@ func (el *eventloop) readTLS(c *conn) error {
 			return gerrors.ErrEngineShutdown
 		}
 		_, _ = c.inboundBuffer.Write(c.buffer)
+		c.buffer = c.buffer[:0]
 
 		// all available TLS records are processed
 		if !c.tlsconn.IsRecordCompleted(c.tlsconn.RawInputData()) {
