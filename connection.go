@@ -526,18 +526,18 @@ func (c *conn) UpgradeTLS(config *tls.Config) (err error) {
 	// TODO: create a sync.pool to manage the TLS connection
 	c.tlsconn = tls.Server(c, config.Clone())
 
-	//很有可能握手包在UpgradeTls之前发过来了，这里把inboundBuffer剩余数据当做握手数据处理
+	// 很有可能握手包在UpgradeTls之前发过来了，这里把inboundBuffer剩余数据当做握手数据处理
 	if c.inboundBuffer.Len() > 0 {
 		head, tail := c.inboundBuffer.Peek(-1)
-		c.tlsconn.RawInputSet(head)
-		c.tlsconn.RawInputSet(tail)
+		c.tlsconn.RawInputSet(head) //nolint:errcheck
+		c.tlsconn.RawInputSet(tail) //nolint:errcheck
 		c.inboundBuffer.Reset()
 		if err := c.tlsconn.Handshake(); err != nil {
 			return err
 		}
 	}
 
-	//握手失败的关了
+	// 握手失败的关了
 	time.AfterFunc(time.Second*5, func() {
 		if c.opened && (c.tlsconn == nil || !c.tlsconn.HandshakeComplete()) {
 			c.Close()

@@ -160,8 +160,8 @@ func (el *eventloop) read(c *conn) error {
 	if c.tlsconn != nil && c.tlsconn.IsKTLSRXEnabled() {
 		// attach the gnet eventloop.buffer to tlsconn.rawInput.
 		// So, KTLS can decrypt the data directly to the buffer without memory allocation.
-		// Since data is read through KTLS, there is no need to call unix.read(c.fd, el.buffer) 
-		c.tlsconn.RawInputSet(el.buffer)
+		// Since data is read through KTLS, there is no need to call unix.read(c.fd, el.buffer)
+		c.tlsconn.RawInputSet(el.buffer) //nolint:errcheck
 		return el.readTLS(c)
 	}
 
@@ -178,9 +178,9 @@ func (el *eventloop) read(c *conn) error {
 
 	if c.tlsconn != nil {
 		// attach the gnet eventloop.buffer to tlsconn.rawInput.
-		c.tlsconn.RawInputSet(el.buffer[:n])
+		c.tlsconn.RawInputSet(el.buffer[:n]) //nolint:errcheck
 		if !c.tlsconn.HandshakeComplete() {
-			//先判断是否足够一条消息
+			// 先判断是否足够一条消息
 			data := c.tlsconn.RawInputData()
 			if !c.tlsconn.IsRecordCompleted(data) {
 				c.tlsconn.DataDone()
@@ -191,7 +191,7 @@ func (el *eventloop) read(c *conn) error {
 				// so no need to call tlsconn.DataDone()
 				return el.closeConn(c, os.NewSyscallError("TLS handshake", err))
 			}
-			if !c.tlsconn.HandshakeComplete() || len(c.tlsconn.RawInputData()) == 0 { //握手没成功，或者握手成功，但是没有数据黏包了
+			if !c.tlsconn.HandshakeComplete() || len(c.tlsconn.RawInputData()) == 0 { // 握手没成功，或者握手成功，但是没有数据黏包了
 				c.tlsconn.DataDone()
 				return nil
 			}

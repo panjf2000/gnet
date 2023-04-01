@@ -9,6 +9,7 @@ import (
 	gtls "github.com/0-haha/gnet_go_tls/v120"
 )
 
+//nolint:revive
 const (
 	// TLS 1.0 - 1.2 cipher suites.
 	TLS_RSA_WITH_RC4_128_SHA                      uint16 = gtls.TLS_RSA_WITH_RC4_128_SHA
