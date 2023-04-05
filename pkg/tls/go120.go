@@ -6,7 +6,7 @@ import (
 	"net"
 	_ "unsafe"
 
-	gtls "github.com/0-haha/gnet_go_tls/v120"
+	gtls "github.com/0-haha/gnet-tls-go1-20"
 )
 
 //nolint:revive
@@ -78,11 +78,11 @@ const (
 	VersionSSL30 = gtls.CurveP256
 )
 
-//go:linkname Server github.com/0-haha/gnet_go_tls/v120.Server
+//go:linkname Server github.com/0-haha/gnet-tls-go1-20.Server
 func Server(conn net.Conn, config *Config) *Conn
 
-//go:linkname LoadX509KeyPair github.com/0-haha/gnet_go_tls/v120.LoadX509KeyPair
+//go:linkname LoadX509KeyPair github.com/0-haha/gnet-tls-go1-20.LoadX509KeyPair
 func LoadX509KeyPair(certFile, keyFile string) (Certificate, error)
 
-//go:linkname X509KeyPair github.com/0-haha/gnet_go_tls/v120.X509KeyPair
+//go:linkname X509KeyPair github.com/0-haha/gnet-tls-go1-20.X509KeyPair
 func X509KeyPair(certPEMBlock, keyPEMBlock []byte) (Certificate, error)
