@@ -1,7 +1,7 @@
 module github.com/panjf2000/gnet/v2
 
 require (
-	github.com/0-haha/gnet-tls-go1-20 v0.2.0-rc.1
+	github.com/0-haha/gnet-tls-go1-20 v1.20.2-rc.1
 	github.com/panjf2000/ants/v2 v2.7.1
 	github.com/stretchr/testify v1.8.2
 	github.com/valyala/bytebufferpool v1.0.0

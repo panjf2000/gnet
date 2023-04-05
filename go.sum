@@ -1,5 +1,5 @@
-github.com/0-haha/gnet-tls-go1-20 v0.2.0-rc.1 h1:7OY74XMmmtQuGCaIkXJy8IEemIzhEX88esFmwKAagkI=
-github.com/0-haha/gnet-tls-go1-20 v0.2.0-rc.1/go.mod h1:ZipvhkWAVMtaMixCaqOh9NgQ+u4u1OCzDOohXR33VfU=
+github.com/0-haha/gnet-tls-go1-20 v1.20.2-rc.1 h1:cYbILYopJYpNQej70cMiYUi2vOE+ZEflt0hypVa3gOw=
+github.com/0-haha/gnet-tls-go1-20 v1.20.2-rc.1/go.mod h1:ZipvhkWAVMtaMixCaqOh9NgQ+u4u1OCzDOohXR33VfU=
 github.com/BurntSushi/toml v0.3.1 h1:WXkYYl6Yr3qBf1K79EBnL4mak0OimBfB0XUf9Vl28OQ=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/benbjohnson/clock v1.1.0 h1:Q92kusRqC1XV2MjkWETPvjJVqKetz1OzxZB7mHJLju8=
