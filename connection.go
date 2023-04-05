@@ -526,7 +526,8 @@ func (c *conn) UpgradeTLS(config *tls.Config) (err error) {
 	// TODO: create a sync.pool to manage the TLS connection
 	c.tlsconn = tls.Server(c, config.Clone())
 
-	// 很有可能握手包在UpgradeTls之前发过来了，这里把inboundBuffer剩余数据当做握手数据处理
+	// It is very likely that the handshake packet was sent before UpgradeTls.
+	// So, the remaining data in the inboundBuffer is treated as handshake data here
 	if c.inboundBuffer.Len() > 0 {
 		head, tail := c.inboundBuffer.Peek(-1)
 		c.tlsconn.RawInputSet(head) //nolint:errcheck
@@ -537,7 +538,7 @@ func (c *conn) UpgradeTLS(config *tls.Config) (err error) {
 		}
 	}
 
-	// 握手失败的关了
+	// handshake is failed
 	time.AfterFunc(time.Second*5, func() {
 		if c.opened && (c.tlsconn == nil || !c.tlsconn.HandshakeComplete()) {
 			c.Close()

@@ -181,7 +181,7 @@ func (el *eventloop) read(c *conn) error {
 		// attach the gnet eventloop.buffer to tlsconn.rawInput.
 		c.tlsconn.RawInputSet(el.buffer[:n]) //nolint:errcheck
 		if !c.tlsconn.HandshakeComplete() {
-			// 先判断是否足够一条消息
+			// check whether the buffer data is sufficient for a complete TLS record
 			data := c.tlsconn.RawInputData()
 			if !c.tlsconn.IsRecordCompleted(data) {
 				c.tlsconn.DataDone()
