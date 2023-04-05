@@ -132,7 +132,7 @@ func (c *conn) open(buf []byte) error {
 func (c *conn) writeTLS(data []byte) (n int, err error) {
 	// use tls to encrypt the data before sending it.
 	// tlsconn will call gnet.WriteTCP() to sent the data directly.
-	// If gnetConn.outboundBufferis not empty, data will be
+	// If gnetConn.outboundBuffer is not empty, data will be
 	// buffered in gnetConn.outboundBuffer.
 	n, err = c.tlsconn.Write(data)
 	return
@@ -173,7 +173,7 @@ func (c *conn) writevTLS(bs [][]byte) (n int, err error) {
 
 	// use tls to encrypt the data before sending it.
 	// tlsconn will call gnet.WriteTCP() to sent the data directly.
-	// If gnetConn.outboundBufferis not empty, data will be
+	// If gnetConn.outboundBuffer is not empty, data will be
 	// buffered in gnetConn.outboundBuffer.
 	sent := 0
 	var sentN int
