@@ -33,7 +33,7 @@ func Writev(fd int, bs [][]byte) (int, error) {
 		return 0, nil
 	}
 	iov := bytes2iovec(bs)
-	n, _, err := unix.RawSyscall(unix.SYS_WRITEV, uintptr(fd), uintptr(unsafe.Pointer(&iov[0])), uintptr(len(iov)))
+	n, _, err := unix.RawSyscall(unix.SYS_WRITEV, uintptr(fd), uintptr(unsafe.Pointer(&iov[0])), uintptr(len(iov))) //nolint:staticcheck
 	if err != 0 {
 		return int(n), err
 	}
@@ -51,7 +51,7 @@ func Readv(fd int, bs [][]byte) (int, error) {
 	}
 	iov := bytes2iovec(bs)
 	// syscall
-	n, _, err := unix.RawSyscall(unix.SYS_READV, uintptr(fd), uintptr(unsafe.Pointer(&iov[0])), uintptr(len(iov)))
+	n, _, err := unix.RawSyscall(unix.SYS_READV, uintptr(fd), uintptr(unsafe.Pointer(&iov[0])), uintptr(len(iov))) //nolint:staticcheck
 	if err != 0 {
 		return int(n), err
 	}
