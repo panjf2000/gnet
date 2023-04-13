@@ -32,16 +32,21 @@ import (
 func (svr *server) accept(fd int, _ netpoll.IOEvent) error {
 	nfd, sa, err := unix.Accept(fd)
 	if err != nil {
-		if err == unix.EAGAIN {
+		switch err {
+		case unix.EINTR, unix.EAGAIN, unix.ECONNABORTED:
+			// ECONNABORTED means that a socket on the listen
+			// queue was closed before we Accept()ed it;
+			// it's a silly error, so try again.
 			return nil
+		default:
+			svr.opts.Logger.Errorf("Accept() fails due to error: %v", err)
+			return errors.ErrAcceptSocket
 		}
-		svr.opts.Logger.Errorf("Accept() fails due to error: %v", err)
-		return errors.ErrAcceptSocket
 	}
+
 	if err = os.NewSyscallError("fcntl nonblock", unix.SetNonblock(nfd, true)); err != nil {
 		return err
 	}
-
 	remoteAddr := socket.SockaddrToTCPOrUnixAddr(sa)
 	if svr.opts.TCPKeepAlive > 0 && svr.ln.network == "tcp" {
 		err = socket.SetKeepAlive(nfd, int(svr.opts.TCPKeepAlive/time.Second))
@@ -56,6 +61,7 @@ func (svr *server) accept(fd int, _ netpoll.IOEvent) error {
 		_ = unix.Close(nfd)
 		c.releaseTCP()
 	}
+
 	return nil
 }
 
@@ -66,16 +72,21 @@ func (el *eventloop) accept(fd int, ev netpoll.IOEvent) error {
 
 	nfd, sa, err := unix.Accept(el.ln.fd)
 	if err != nil {
-		if err == unix.EAGAIN {
+		switch err {
+		case unix.EINTR, unix.EAGAIN, unix.ECONNABORTED:
+			// ECONNABORTED means that a socket on the listen
+			// queue was closed before we Accept()ed it;
+			// it's a silly error, so try again.
 			return nil
+		default:
+			el.getLogger().Errorf("Accept() fails due to error: %v", err)
+			return errors.ErrAcceptSocket
 		}
-		el.getLogger().Errorf("Accept() fails due to error: %v", err)
-		return os.NewSyscallError("accept", err)
 	}
+
 	if err = os.NewSyscallError("fcntl nonblock", unix.SetNonblock(nfd, true)); err != nil {
 		return err
 	}
-
 	remoteAddr := socket.SockaddrToTCPOrUnixAddr(sa)
 	if el.svr.opts.TCPKeepAlive > 0 && el.ln.network == "tcp" {
 		err = socket.SetKeepAlive(nfd, int(el.svr.opts.TCPKeepAlive/time.Second))
@@ -87,5 +98,6 @@ func (el *eventloop) accept(fd int, ev netpoll.IOEvent) error {
 		return err
 	}
 	el.connections[c.fd] = c
+
 	return el.open(c)
 }
