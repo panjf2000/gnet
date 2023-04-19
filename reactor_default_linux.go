@@ -97,7 +97,8 @@ func (el *eventloop) run(lockOSThread bool) {
 	}()
 
 	err := el.poller.Polling(func(fd int, ev uint32) error {
-		if c, ok := el.connections[fd]; ok {
+		if connectI, ack := el.connections.Load(fd); ack {
+			c := connectI.(*conn)
 			// Don't change the ordering of processing EPOLLOUT | EPOLLRDHUP / EPOLLIN unless you're 100%
 			// sure what you're doing!
 			// Re-ordering can easily introduce bugs and bad side-effects, as I found out painfully in the past.
