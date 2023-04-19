@@ -95,8 +95,8 @@ func NewClient(eventHandler EventHandler, opts ...Option) (cli *Client, err erro
 	}
 
 	el.buffer = make([]byte, options.ReadBufferCap)
-	el.udpSockets = make(map[int]*conn)
-	el.connections = make(map[int]*conn)
+	el.udpSockets = sync.Map{}
+	el.connections = sync.Map{}
 	el.eventHandler = eventHandler
 	cli.el = el
 	return
