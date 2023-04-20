@@ -20,12 +20,12 @@ package gnet
 
 import (
 	"context"
+	"github.com/panjf2000/gnet/v2/pkg/gfd"
 	"runtime"
 	"sync"
 	"sync/atomic"
 
 	"github.com/panjf2000/gnet/v2/internal/netpoll"
-	"github.com/panjf2000/gnet/v2/pkg/errors"
 )
 
 type engine struct {
@@ -110,9 +110,9 @@ func (eng *engine) activateEventLoops(numEventLoop int) (err error) {
 			el.engine = eng
 			el.poller = p
 			el.buffer = make([]byte, eng.opts.ReadBufferCap)
-			el.connections = make(map[int]*conn)
+			el.connections = make(map[int]gfd.GFD)
 			el.eventHandler = eng.eventHandler
-			if err = el.poller.AddRead(el.ln.packPollAttachment(el.accept)); err != nil {
+			if err = el.poller.AddRead(el.ln.packPollAttachment(netpoll.PollAttachmentEventLoops)); err != nil {
 				return
 			}
 			eng.lb.register(el)
@@ -142,7 +142,7 @@ func (eng *engine) activateReactors(numEventLoop int) error {
 			el.engine = eng
 			el.poller = p
 			el.buffer = make([]byte, eng.opts.ReadBufferCap)
-			el.connections = make(map[int]*conn)
+			el.connections = make(map[int]gfd.GFD)
 			el.eventHandler = eng.eventHandler
 			eng.lb.register(el)
 		} else {
@@ -160,7 +160,7 @@ func (eng *engine) activateReactors(numEventLoop int) error {
 		el.engine = eng
 		el.poller = p
 		el.eventHandler = eng.eventHandler
-		if err = el.poller.AddRead(eng.ln.packPollAttachment(eng.accept)); err != nil {
+		if err = el.poller.AddRead(eng.ln.packPollAttachment(netpoll.PollAttachmentMainAccept)); err != nil {
 			return err
 		}
 		eng.mainLoop = el
@@ -199,7 +199,7 @@ func (eng *engine) stop(s Engine) {
 
 	// Notify all loops to close by closing all listeners
 	eng.lb.iterate(func(i int, el *eventloop) bool {
-		err := el.poller.UrgentTrigger(func(_ interface{}) error { return errors.ErrEngineShutdown }, nil)
+		err := el.poller.UrgentTrigger(triggerTypeShutdown, gfd.GFD{}, nil)
 		if err != nil {
 			eng.opts.Logger.Errorf("failed to call UrgentTrigger on sub event-loop when stopping engine: %v", err)
 		}
@@ -208,7 +208,7 @@ func (eng *engine) stop(s Engine) {
 
 	if eng.mainLoop != nil {
 		eng.ln.close()
-		err := eng.mainLoop.poller.UrgentTrigger(func(_ interface{}) error { return errors.ErrEngineShutdown }, nil)
+		err := eng.mainLoop.poller.UrgentTrigger(triggerTypeShutdown, gfd.GFD{}, nil)
 		if err != nil {
 			eng.opts.Logger.Errorf("failed to call UrgentTrigger on main event-loop when stopping engine: %v", err)
 		}
@@ -242,6 +242,9 @@ func run(eventHandler EventHandler, listener *listener, options *Options, protoA
 	}
 	if options.NumEventLoop > 0 {
 		numEventLoop = options.NumEventLoop
+	}
+	if numEventLoop > gfd.ElIndexMax {
+		numEventLoop = gfd.ElIndexMax
 	}
 
 	eng := new(engine)

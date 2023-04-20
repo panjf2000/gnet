@@ -17,6 +17,7 @@ package gnet
 
 import (
 	"context"
+	"github.com/panjf2000/gnet/v2/pkg/gfd"
 	"io"
 	"net"
 	"strings"
@@ -104,6 +105,36 @@ func (s Engine) Stop(ctx context.Context) error {
 	}
 }
 
+// ==================================== Concurrency-safe API's ====================================
+
+func (s Engine) AsyncWrite(gFd gfd.GFD, buf []byte, callback AsyncCallback) error {
+	if !gfd.CheckLegal(gFd) {
+		return nil
+	}
+	return s.eng.lb.index(gFd.ElIndex()).poller.Trigger(triggerTypeAsyncWrite, gFd, &asyncWriteHook{callback, buf})
+}
+
+func (s Engine) AsyncWritev(gFd gfd.GFD, bs [][]byte, callback AsyncCallback) error {
+	if !gfd.CheckLegal(gFd) {
+		return nil
+	}
+	return s.eng.lb.index(gFd.ElIndex()).poller.Trigger(triggerTypeAsyncWritev, gFd, &asyncWritevHook{callback, bs})
+}
+
+func (s Engine) Wake(gFd gfd.GFD, callback AsyncCallback) error {
+	if !gfd.CheckLegal(gFd) {
+		return nil
+	}
+	return s.eng.lb.index(gFd.ElIndex()).poller.Trigger(triggerTypeWake, gFd, callback)
+}
+
+func (s Engine) Close(gFd gfd.GFD, callback AsyncCallback) error {
+	if !gfd.CheckLegal(gFd) {
+		return nil
+	}
+	return s.eng.lb.index(gFd.ElIndex()).poller.Trigger(triggerTypeClose, gFd, callback)
+}
+
 // Reader is an interface that consists of a number of methods for reading that Conn must implement.
 type Reader interface {
 	// ================================== Non-concurrency-safe API's ==================================
@@ -178,7 +209,9 @@ type AsyncCallback func(c Conn, err error) error
 
 // Socket is a set of functions which manipulate the underlying file descriptor of a connection.
 type Socket interface {
-	// Fd returns the underlying file descriptor.
+	// Gfd returns the underlying file descriptor.
+	Gfd() gfd.GFD
+
 	Fd() int
 
 	// Dup returns a copy of the underlying file descriptor.

@@ -19,7 +19,7 @@ package gnet
 
 import "github.com/panjf2000/gnet/v2/internal/netpoll"
 
-func (c *conn) handleEvents(_ int, ev uint32) error {
+func (el *eventloop) handleEvents(fd int, ev uint32) error {
 	// Don't change the ordering of processing EPOLLOUT | EPOLLRDHUP / EPOLLIN unless you're 100%
 	// sure what you're doing!
 	// Re-ordering can easily introduce bugs and bad side-effects, as I found out painfully in the past.
@@ -31,13 +31,18 @@ func (c *conn) handleEvents(_ int, ev uint32) error {
 	// In either case write() should take care of it properly:
 	// 1) writing data back,
 	// 2) closing the connection.
+	gfd, ok := el.connections[fd]
+	if !ok {
+		return nil
+	}
+	c := el.connSlice[gfd.ConnIndex1()][gfd.ConnIndex2()]
 	if ev&netpoll.OutEvents != 0 && !c.outboundBuffer.IsEmpty() {
-		if err := c.loop.write(c); err != nil {
+		if err := el.write(c); err != nil {
 			return err
 		}
 	}
 	if ev&netpoll.InEvents != 0 {
-		return c.loop.read(c)
+		return el.read(c)
 	}
 
 	return nil

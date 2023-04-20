@@ -23,6 +23,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/panjf2000/gnet/v2/internal/queue"
+	"github.com/panjf2000/gnet/v2/pkg/gfd"
 	"os"
 	"strings"
 	"sync/atomic"
@@ -36,67 +38,133 @@ import (
 	"github.com/panjf2000/gnet/v2/pkg/logging"
 )
 
+const (
+	triggerTypeAsyncWrite = iota
+	triggerTypeAsyncWritev
+	triggerTypeWake
+	triggerTypeClose
+	triggerTypeShutdown
+	triggerRegister
+)
+
 type eventloop struct {
-	ln           *listener       // listener
-	idx          int             // loop index in the engine loops list
-	cache        bytes.Buffer    // temporary buffer for scattered bytes
-	engine       *engine         // engine in loop
-	poller       *netpoll.Poller // epoll or kqueue
-	buffer       []byte          // read packet buffer whose capacity is set by user, default value is 64KB
-	connCount    int32           // number of active connections in event-loop
-	udpSockets   map[int]*conn   // client-side UDP socket map: fd -> conn
-	connections  map[int]*conn   // TCP connection map: fd -> conn
-	eventHandler EventHandler    // user eventHandler
+	ln           *listener                  // listener
+	idx          int                        // loop index in the engine loops list
+	cache        bytes.Buffer               // temporary buffer for scattered bytes
+	engine       *engine                    // engine in loop
+	poller       *netpoll.Poller            // epoll or kqueue
+	buffer       []byte                     // read packet buffer whose capacity is set by user, default value is 64KB
+	connCounts   [gfd.ConnIndex1Max]int32   // number of active connections in event-loop
+	connNAI1     int                        // connections Next Available Index1
+	connNAI2     int                        // connections Next Available Index2
+	connSlice    [gfd.ConnIndex1Max][]*conn // connection slice *conn
+	connections  map[int]gfd.GFD            // connection map: fd -> GFD
+	eventHandler EventHandler               // user eventHandler
 }
 
 func (el *eventloop) getLogger() logging.Logger {
 	return el.engine.opts.Logger
 }
 
-func (el *eventloop) addConn(delta int32) {
-	atomic.AddInt32(&el.connCount, delta)
+func (el *eventloop) addConn(i1 int, delta int32) {
+	atomic.AddInt32(&el.connCounts[i1], delta)
 }
 
-func (el *eventloop) loadConn() int32 {
-	return atomic.LoadInt32(&el.connCount)
+func (el *eventloop) loadConn() (ct int32) {
+	for i := 0; i < len(el.connCounts); i++ {
+		ct += atomic.LoadInt32(&el.connCounts[i])
+	}
+	return
 }
 
 func (el *eventloop) closeAllSockets() {
 	// Close loops and all outstanding connections
-	for _, c := range el.connections {
-		_ = el.closeConn(c, nil)
-	}
-	for _, c := range el.udpSockets {
-		_ = el.closeConn(c, nil)
+	for k, cl := range el.connSlice {
+		if el.connCounts[k] == 0 {
+			continue
+		}
+		for _, c := range cl {
+			if c != nil {
+				_ = el.closeConn(c, nil)
+			}
+		}
 	}
 }
 
-func (el *eventloop) register(itf interface{}) error {
-	c := itf.(*conn)
-	if c.pollAttachment == nil { // UDP socket
-		c.pollAttachment = netpoll.GetPollAttachment()
-		c.pollAttachment.FD = c.fd
-		c.pollAttachment.Callback = el.readUDP
-		if err := el.poller.AddRead(c.pollAttachment); err != nil {
-			_ = unix.Close(c.fd)
-			c.releaseUDP()
-			return err
-		}
-		el.udpSockets[c.fd] = c
-		return nil
-	}
-	if err := el.poller.AddRead(c.pollAttachment); err != nil {
-		_ = unix.Close(c.fd)
-		c.releaseTCP()
+func (el *eventloop) register(c *conn) error {
+	if err := el.poller.AddRead(&c.pollAttachment); err != nil {
+		_ = unix.Close(c.gfd.Fd())
+		c.release()
 		return err
 	}
-	el.connections[c.fd] = c
+
+	el.storeConn(c)
+	if c.isDatagram {
+		return nil
+	}
 	return el.open(c)
+}
+
+func (el *eventloop) storeConn(c *conn) {
+	if el.connNAI1 >= gfd.ConnIndex1Max {
+		return
+	}
+	if el.connSlice[el.connNAI1] == nil {
+		el.connSlice[el.connNAI1] = make([]*conn, gfd.ConnIndex2Max)
+		el.connSlice[el.connNAI1][el.connNAI2] = c
+	}
+
+	el.connSlice[el.connNAI1][el.connNAI2] = c
+	c.gfd = gfd.NewGFD(c.fd, el.idx, el.connNAI1, el.connNAI2)
+	el.connections[c.fd] = c.gfd
+	el.addConn(el.connNAI1, 1)
+
+	//check if there are remaining free slots in the current space
+	for i2 := el.connNAI2; i2 < gfd.ConnIndex2Max; i2++ {
+		if el.connSlice[el.connNAI1][i2] == nil {
+			el.connNAI2 = i2
+			return
+		}
+	}
+
+	//check if the space have applied for is available
+	for i1 := el.connNAI1; i1 < gfd.ConnIndex1Max; i1++ {
+		if el.connSlice[i1] == nil || el.connCounts[i1] >= gfd.ConnIndex2Max {
+			continue
+		}
+		for i2 := 0; i2 < gfd.ConnIndex2Max; i2++ {
+			if el.connSlice[i1][i2] == nil {
+				el.connNAI1, el.connNAI2 = i1, i2
+				return
+			}
+		}
+	}
+
+	//insufficient space has been applied for, allocate a new space
+	for i1 := 0; i1 < gfd.ConnIndex1Max; i1++ {
+		if el.connSlice[i1] == nil {
+			el.connNAI1, el.connNAI2 = i1, 0
+			return
+		}
+	}
+}
+
+func (el *eventloop) removeConn(c *conn) {
+	delete(el.connections, c.gfd.Fd())
+	el.addConn(c.gfd.ConnIndex1(), -1)
+	if el.connCounts[c.gfd.ConnIndex1()] == 0 {
+		el.connSlice[c.gfd.ConnIndex1()] = nil
+	} else {
+		el.connSlice[c.gfd.ConnIndex1()][c.gfd.ConnIndex2()] = nil
+	}
+
+	if el.connNAI1 > c.gfd.ConnIndex1() || el.connNAI2 > c.gfd.ConnIndex2() {
+		el.connNAI1, el.connNAI2 = c.gfd.ConnIndex1(), c.gfd.ConnIndex2()
+	}
 }
 
 func (el *eventloop) open(c *conn) error {
 	c.opened = true
-	el.addConn(1)
 
 	out, action := el.eventHandler.OnOpen(c)
 	if out != nil {
@@ -106,7 +174,7 @@ func (el *eventloop) open(c *conn) error {
 	}
 
 	if !c.outboundBuffer.IsEmpty() {
-		if err := el.poller.AddWrite(c.pollAttachment); err != nil {
+		if err := el.poller.AddWrite(&c.pollAttachment); err != nil {
 			return err
 		}
 	}
@@ -115,7 +183,7 @@ func (el *eventloop) open(c *conn) error {
 }
 
 func (el *eventloop) read(c *conn) error {
-	n, err := unix.Read(c.fd, el.buffer)
+	n, err := unix.Read(c.gfd.Fd(), el.buffer)
 	if err != nil || n == 0 {
 		if err == unix.EAGAIN {
 			return nil
@@ -152,9 +220,9 @@ func (el *eventloop) write(c *conn) error {
 		if len(iov) > iovMax {
 			iov = iov[:iovMax]
 		}
-		n, err = io.Writev(c.fd, iov)
+		n, err = io.Writev(c.gfd.Fd(), iov)
 	} else {
-		n, err = unix.Write(c.fd, iov[0])
+		n, err = unix.Write(c.gfd.Fd(), iov[0])
 	}
 	_, _ = c.outboundBuffer.Discard(n)
 	switch err {
@@ -168,7 +236,7 @@ func (el *eventloop) write(c *conn) error {
 	// All data have been drained, it's no need to monitor the writable events,
 	// remove the writable event from poller to help the future event-loops.
 	if c.outboundBuffer.IsEmpty() {
-		_ = el.poller.ModRead(c.pollAttachment)
+		_ = el.poller.ModRead(&c.pollAttachment)
 	}
 
 	return nil
@@ -176,15 +244,15 @@ func (el *eventloop) write(c *conn) error {
 
 func (el *eventloop) closeConn(c *conn, err error) (rerr error) {
 	if addr := c.localAddr; addr != nil && strings.HasPrefix(c.localAddr.Network(), "udp") {
-		rerr = el.poller.Delete(c.fd)
-		if c.fd != el.ln.fd {
-			rerr = unix.Close(c.fd)
-			delete(el.udpSockets, c.fd)
+		rerr = el.poller.Delete(c.gfd.Fd())
+		if c.gfd.Fd() != el.ln.fd {
+			rerr = unix.Close(c.gfd.Fd())
+			el.removeConn(c)
 		}
 		if el.eventHandler.OnClose(c, err) == Shutdown {
 			return gerrors.ErrEngineShutdown
 		}
-		c.releaseUDP()
+		c.release()
 		return
 	}
 
@@ -199,7 +267,7 @@ func (el *eventloop) closeConn(c *conn, err error) (rerr error) {
 			if len(iov) > iovMax {
 				iov = iov[:iovMax]
 			}
-			if n, e := io.Writev(c.fd, iov); e != nil {
+			if n, e := io.Writev(c.gfd.Fd(), iov); e != nil {
 				el.getLogger().Warnf("closeConn: error occurs when sending data back to peer, %v", e)
 				break
 			} else {
@@ -208,12 +276,12 @@ func (el *eventloop) closeConn(c *conn, err error) (rerr error) {
 		}
 	}
 
-	err0, err1 := el.poller.Delete(c.fd), unix.Close(c.fd)
+	err0, err1 := el.poller.Delete(c.gfd.Fd()), unix.Close(c.gfd.Fd())
 	if err0 != nil {
-		rerr = fmt.Errorf("failed to delete fd=%d from poller in event-loop(%d): %v", c.fd, el.idx, err0)
+		rerr = fmt.Errorf("failed to delete fd=%d from poller in event-loop(%d): %v", c.gfd.Fd(), el.idx, err0)
 	}
 	if err1 != nil {
-		err1 = fmt.Errorf("failed to close fd=%d in event-loop(%d): %v", c.fd, el.idx, os.NewSyscallError("close", err1))
+		err1 = fmt.Errorf("failed to close fd=%d in event-loop(%d): %v", c.gfd.Fd(), el.idx, os.NewSyscallError("close", err1))
 		if rerr != nil {
 			rerr = errors.New(rerr.Error() + " & " + err1.Error())
 		} else {
@@ -221,21 +289,16 @@ func (el *eventloop) closeConn(c *conn, err error) (rerr error) {
 		}
 	}
 
-	delete(el.connections, c.fd)
-	el.addConn(-1)
+	el.removeConn(c)
 	if el.eventHandler.OnClose(c, err) == Shutdown {
 		rerr = gerrors.ErrEngineShutdown
 	}
-	c.releaseTCP()
+	c.release()
 
 	return
 }
 
 func (el *eventloop) wake(c *conn) error {
-	if co, ok := el.connections[c.fd]; !ok || co != c {
-		return nil // ignore stale wakes.
-	}
-
 	action := el.eventHandler.OnTraffic(c)
 
 	return el.handleAction(c, action)
@@ -260,7 +323,7 @@ func (el *eventloop) ticker(ctx context.Context) {
 		switch action {
 		case None:
 		case Shutdown:
-			err := el.poller.UrgentTrigger(func(_ interface{}) error { return gerrors.ErrEngineShutdown }, nil)
+			err := el.poller.UrgentTrigger(triggerTypeShutdown, gfd.GFD{}, nil)
 			el.getLogger().Debugf("stopping ticker in event-loop(%d) from OnTick(), UrgentTrigger:%v", el.idx, err)
 		}
 		if timer == nil {
@@ -274,6 +337,64 @@ func (el *eventloop) ticker(ctx context.Context) {
 			return
 		case <-timer.C:
 		}
+	}
+}
+
+func (el *eventloop) pollCallback(poolType netpoll.PollCallbackType, fd int, e netpoll.IOEvent) (err error) {
+	switch poolType {
+	case netpoll.PollAttachmentMainAccept:
+		return el.engine.accept(fd, e)
+	case netpoll.PollAttachmentEventLoops:
+		return el.accept(fd, e)
+	case netpoll.PollAttachmentStream:
+		return el.handleEvents(fd, e)
+	case netpoll.PollAttachmentDatagram:
+		return el.readUDP(fd, e)
+	default:
+		return
+	}
+}
+
+func (el *eventloop) taskRun(task *queue.Task) (err error) {
+	//非conn执行任务
+	switch task.TaskType {
+	case triggerTypeShutdown:
+		return gerrors.ErrEngineShutdown
+	case triggerRegister:
+		return el.register(task.Arg.(*conn))
+	}
+
+	//需conn执行任务
+	if el.connSlice[task.GFD.ConnIndex1()] == nil {
+		return
+	}
+	c := el.connSlice[task.GFD.ConnIndex1()][task.GFD.ConnIndex2()]
+	if c == nil || c.gfd != task.GFD {
+		return
+	}
+	switch task.TaskType {
+	case triggerTypeAsyncWrite:
+		return c.asyncWrite(task.Arg.(*asyncWriteHook))
+	case triggerTypeAsyncWritev:
+		return c.asyncWritev(task.Arg.(*asyncWritevHook))
+	case triggerTypeClose:
+		err = el.closeConn(c, nil)
+		if task.Arg != nil {
+			if callback, ok := task.Arg.(AsyncCallback); ok && callback != nil {
+				_ = callback(c, err)
+			}
+		}
+		return
+	case triggerTypeWake:
+		err = el.wake(c)
+		if task.Arg != nil {
+			if callback, ok := task.Arg.(AsyncCallback); ok && callback != nil {
+				_ = callback(c, err)
+			}
+		}
+		return
+	default:
+		return
 	}
 }
 
@@ -303,12 +424,13 @@ func (el *eventloop) readUDP(fd int, _ netpoll.IOEvent) error {
 	if fd == el.ln.fd {
 		c = newUDPConn(fd, el, el.ln.addr, sa, false)
 	} else {
-		c = el.udpSockets[fd]
+		gFd := el.connections[fd]
+		c = el.connSlice[gFd.ConnIndex1()][gFd.ConnIndex2()]
 	}
 	c.buffer = el.buffer[:n]
 	action := el.eventHandler.OnTraffic(c)
 	if c.peer != nil {
-		c.releaseUDP()
+		c.release()
 	}
 	if action == Shutdown {
 		return gerrors.ErrEngineShutdown

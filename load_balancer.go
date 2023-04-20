@@ -41,37 +41,63 @@ type (
 	loadBalancer interface {
 		register(*eventloop)
 		next(net.Addr) *eventloop
+		index(int) *eventloop
 		iterate(func(int, *eventloop) bool)
 		len() int
 	}
 
+	// baseLoadBalancer with base lb.
+	baseLoadBalancer struct {
+		eventLoops []*eventloop
+		size       int
+	}
+
 	// roundRobinLoadBalancer with Round-Robin algorithm.
 	roundRobinLoadBalancer struct {
+		baseLoadBalancer
 		nextLoopIndex int
-		eventLoops    []*eventloop
-		size          int
 	}
 
 	// leastConnectionsLoadBalancer with Least-Connections algorithm.
 	leastConnectionsLoadBalancer struct {
-		eventLoops []*eventloop
-		size       int
+		baseLoadBalancer
 	}
 
 	// sourceAddrHashLoadBalancer with Hash algorithm.
 	sourceAddrHashLoadBalancer struct {
-		eventLoops []*eventloop
-		size       int
+		baseLoadBalancer
 	}
 )
 
-// ==================================== Implementation of Round-Robin load-balancer ====================================
+// ==================================== Implementation of base load-balancer ====================================
 
-func (lb *roundRobinLoadBalancer) register(el *eventloop) {
+func (lb *baseLoadBalancer) register(el *eventloop) {
 	el.idx = lb.size
 	lb.eventLoops = append(lb.eventLoops, el)
 	lb.size++
 }
+
+// next returns the eligible event-loop based on Round-Robin algorithm.
+func (lb *baseLoadBalancer) index(i int) *eventloop {
+	if i >= lb.size {
+		return nil
+	}
+	return lb.eventLoops[i]
+}
+
+func (lb *baseLoadBalancer) iterate(f func(int, *eventloop) bool) {
+	for i, el := range lb.eventLoops {
+		if !f(i, el) {
+			break
+		}
+	}
+}
+
+func (lb *baseLoadBalancer) len() int {
+	return lb.size
+}
+
+// ==================================== Implementation of Round-Robin load-balancer ====================================
 
 // next returns the eligible event-loop based on Round-Robin algorithm.
 func (lb *roundRobinLoadBalancer) next(_ net.Addr) (el *eventloop) {
@@ -82,21 +108,9 @@ func (lb *roundRobinLoadBalancer) next(_ net.Addr) (el *eventloop) {
 	return
 }
 
-func (lb *roundRobinLoadBalancer) iterate(f func(int, *eventloop) bool) {
-	for i, el := range lb.eventLoops {
-		if !f(i, el) {
-			break
-		}
-	}
-}
-
-func (lb *roundRobinLoadBalancer) len() int {
-	return lb.size
-}
-
 // ================================= Implementation of Least-Connections load-balancer =================================
 
-func (lb *leastConnectionsLoadBalancer) min() (el *eventloop) {
+func (lb *leastConnectionsLoadBalancer) next(_ net.Addr) (el *eventloop) {
 	el = lb.eventLoops[0]
 	minN := el.loadConn()
 	for _, v := range lb.eventLoops[1:] {
@@ -108,36 +122,7 @@ func (lb *leastConnectionsLoadBalancer) min() (el *eventloop) {
 	return
 }
 
-func (lb *leastConnectionsLoadBalancer) register(el *eventloop) {
-	el.idx = lb.size
-	lb.eventLoops = append(lb.eventLoops, el)
-	lb.size++
-}
-
-// next returns the eligible event-loop by taking the root node from minimum heap based on Least-Connections algorithm.
-func (lb *leastConnectionsLoadBalancer) next(_ net.Addr) (el *eventloop) {
-	return lb.min()
-}
-
-func (lb *leastConnectionsLoadBalancer) iterate(f func(int, *eventloop) bool) {
-	for i, el := range lb.eventLoops {
-		if !f(i, el) {
-			break
-		}
-	}
-}
-
-func (lb *leastConnectionsLoadBalancer) len() int {
-	return lb.size
-}
-
 // ======================================= Implementation of Hash load-balancer ========================================
-
-func (lb *sourceAddrHashLoadBalancer) register(el *eventloop) {
-	el.idx = lb.size
-	lb.eventLoops = append(lb.eventLoops, el)
-	lb.size++
-}
 
 // hash converts a string to a unique hash code.
 func (*sourceAddrHashLoadBalancer) hash(s string) int {
@@ -152,16 +137,4 @@ func (*sourceAddrHashLoadBalancer) hash(s string) int {
 func (lb *sourceAddrHashLoadBalancer) next(netAddr net.Addr) *eventloop {
 	hashCode := lb.hash(netAddr.String())
 	return lb.eventLoops[hashCode%lb.size]
-}
-
-func (lb *sourceAddrHashLoadBalancer) iterate(f func(int, *eventloop) bool) {
-	for i, el := range lb.eventLoops {
-		if !f(i, el) {
-			break
-		}
-	}
-}
-
-func (lb *sourceAddrHashLoadBalancer) len() int {
-	return lb.size
 }

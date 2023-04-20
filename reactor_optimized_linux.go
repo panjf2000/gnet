@@ -31,7 +31,7 @@ func (el *eventloop) activateMainReactor(lockOSThread bool) {
 
 	defer el.engine.signalShutdown()
 
-	err := el.poller.Polling()
+	err := el.poller.Polling(el.taskRun, el.pollCallback)
 	if err == errors.ErrEngineShutdown {
 		el.engine.opts.Logger.Debugf("main reactor is exiting in terms of the demand from user, %v", err)
 	} else if err != nil {
@@ -50,7 +50,7 @@ func (el *eventloop) activateSubReactor(lockOSThread bool) {
 		el.engine.signalShutdown()
 	}()
 
-	err := el.poller.Polling()
+	err := el.poller.Polling(el.taskRun, el.pollCallback)
 	if err == errors.ErrEngineShutdown {
 		el.engine.opts.Logger.Debugf("event-loop(%d) is exiting in terms of the demand from user, %v", el.idx, err)
 	} else if err != nil {
@@ -70,6 +70,6 @@ func (el *eventloop) run(lockOSThread bool) {
 		el.engine.signalShutdown()
 	}()
 
-	err := el.poller.Polling()
+	err := el.poller.Polling(el.taskRun, el.pollCallback)
 	el.getLogger().Debugf("event-loop(%d) is exiting due to error: %v", el.idx, err)
 }

@@ -35,7 +35,7 @@ func (el *eventloop) activateMainReactor(lockOSThread bool) {
 
 	defer el.engine.signalShutdown()
 
-	err := el.poller.Polling(func(fd int, filter int16) error { return el.engine.accept(fd, filter) })
+	err := el.poller.Polling(el.taskRun, func(fd int, filter int16) error { return el.engine.accept(fd, filter) })
 	if err == errors.ErrEngineShutdown {
 		el.engine.opts.Logger.Debugf("main reactor is exiting in terms of the demand from user, %v", err)
 	} else if err != nil {
@@ -54,8 +54,9 @@ func (el *eventloop) activateSubReactor(lockOSThread bool) {
 		el.engine.signalShutdown()
 	}()
 
-	err := el.poller.Polling(func(fd int, filter int16) (err error) {
-		if c, ack := el.connections[fd]; ack {
+	err := el.poller.Polling(el.taskRun, func(fd int, filter int16) (err error) {
+		if gfd, ack := el.connections[fd]; ack {
+			c := el.connSlice[gfd.ConnIndex1()][gfd.ConnIndex2()]
 			switch filter {
 			case netpoll.EVFilterSock:
 				err = el.closeConn(c, unix.ECONNRESET)
@@ -88,8 +89,9 @@ func (el *eventloop) run(lockOSThread bool) {
 		el.engine.signalShutdown()
 	}()
 
-	err := el.poller.Polling(func(fd int, filter int16) (err error) {
-		if c, ack := el.connections[fd]; ack {
+	err := el.poller.Polling(el.taskRun, func(fd int, filter int16) (err error) {
+		if gfd, ack := el.connections[fd]; ack {
+			c := el.connSlice[gfd.ConnIndex1()][gfd.ConnIndex2()]
 			switch filter {
 			case netpoll.EVFilterSock:
 				err = el.closeConn(c, unix.ECONNRESET)
