@@ -93,7 +93,7 @@ func (el *eventloop) closeAllSockets() {
 
 func (el *eventloop) register(c *conn) error {
 	if err := el.poller.AddRead(&c.pollAttachment); err != nil {
-		_ = unix.Close(c.gfd.Fd())
+		_ = unix.Close(c.fd)
 		c.release()
 		return err
 	}
@@ -147,10 +147,12 @@ func (el *eventloop) storeConn(c *conn) {
 			return
 		}
 	}
+
+	el.connNAI1 = gfd.ConnIndex1Max
 }
 
 func (el *eventloop) removeConn(c *conn) {
-	delete(el.connections, c.gfd.Fd())
+	delete(el.connections, c.fd)
 	el.addConn(c.gfd.ConnIndex1(), -1)
 	if el.connCounts[c.gfd.ConnIndex1()] == 0 {
 		el.connSlice[c.gfd.ConnIndex1()] = nil
@@ -183,7 +185,7 @@ func (el *eventloop) open(c *conn) error {
 }
 
 func (el *eventloop) read(c *conn) error {
-	n, err := unix.Read(c.gfd.Fd(), el.buffer)
+	n, err := unix.Read(c.fd, el.buffer)
 	if err != nil || n == 0 {
 		if err == unix.EAGAIN {
 			return nil
@@ -220,9 +222,9 @@ func (el *eventloop) write(c *conn) error {
 		if len(iov) > iovMax {
 			iov = iov[:iovMax]
 		}
-		n, err = io.Writev(c.gfd.Fd(), iov)
+		n, err = io.Writev(c.fd, iov)
 	} else {
-		n, err = unix.Write(c.gfd.Fd(), iov[0])
+		n, err = unix.Write(c.fd, iov[0])
 	}
 	_, _ = c.outboundBuffer.Discard(n)
 	switch err {
@@ -244,9 +246,9 @@ func (el *eventloop) write(c *conn) error {
 
 func (el *eventloop) closeConn(c *conn, err error) (rerr error) {
 	if addr := c.localAddr; addr != nil && strings.HasPrefix(c.localAddr.Network(), "udp") {
-		rerr = el.poller.Delete(c.gfd.Fd())
-		if c.gfd.Fd() != el.ln.fd {
-			rerr = unix.Close(c.gfd.Fd())
+		rerr = el.poller.Delete(c.fd)
+		if c.fd != el.ln.fd {
+			rerr = unix.Close(c.fd)
 			el.removeConn(c)
 		}
 		if el.eventHandler.OnClose(c, err) == Shutdown {
@@ -267,7 +269,7 @@ func (el *eventloop) closeConn(c *conn, err error) (rerr error) {
 			if len(iov) > iovMax {
 				iov = iov[:iovMax]
 			}
-			if n, e := io.Writev(c.gfd.Fd(), iov); e != nil {
+			if n, e := io.Writev(c.fd, iov); e != nil {
 				el.getLogger().Warnf("closeConn: error occurs when sending data back to peer, %v", e)
 				break
 			} else {
@@ -276,12 +278,12 @@ func (el *eventloop) closeConn(c *conn, err error) (rerr error) {
 		}
 	}
 
-	err0, err1 := el.poller.Delete(c.gfd.Fd()), unix.Close(c.gfd.Fd())
+	err0, err1 := el.poller.Delete(c.fd), unix.Close(c.fd)
 	if err0 != nil {
-		rerr = fmt.Errorf("failed to delete fd=%d from poller in event-loop(%d): %v", c.gfd.Fd(), el.idx, err0)
+		rerr = fmt.Errorf("failed to delete fd=%d from poller in event-loop(%d): %v", c.fd, el.idx, err0)
 	}
 	if err1 != nil {
-		err1 = fmt.Errorf("failed to close fd=%d in event-loop(%d): %v", c.gfd.Fd(), el.idx, os.NewSyscallError("close", err1))
+		err1 = fmt.Errorf("failed to close fd=%d in event-loop(%d): %v", c.fd, el.idx, os.NewSyscallError("close", err1))
 		if rerr != nil {
 			rerr = errors.New(rerr.Error() + " & " + err1.Error())
 		} else {
