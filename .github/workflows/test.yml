@@ -27,6 +27,7 @@ jobs:
         os:
           - ubuntu-latest
           - macos-latest
+          #- windows-latest
     name: Run golangci-lint
     runs-on: ${{ matrix.os }}
     steps:
@@ -42,14 +43,17 @@ jobs:
         uses: golangci/golangci-lint-action@v3
         with:
           version: v1.51.2
-          args: -v -E gofumpt -E gocritic -E misspell -E revive -E godot
+          args: -v -E gofumpt -E gocritic -E misspell -E revive -E godot --timeout 5m
   test:
     needs: lint
     strategy:
       fail-fast: false
       matrix:
-        go: [1.17, 1.18, 1.19]
-        os: [ubuntu-latest, macos-latest]
+        go: ['1.17', '1.18', '1.19', '1.20']
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
     name: Go ${{ matrix.go }} @ ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     steps:
@@ -61,7 +65,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v3
         with:
-          go-version: '^1.17'
+          go-version: ${{ matrix.go }}
 
       - name: Print Go environment
         id: go-env
