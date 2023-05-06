@@ -415,7 +415,15 @@ func (c *conn) Dup() (fd int, err error)       { fd, _, err = netpoll.Dup(c.fd);
 func (c *conn) SetReadBuffer(bytes int) error  { return socket.SetRecvBuffer(c.fd, bytes) }
 func (c *conn) SetWriteBuffer(bytes int) error { return socket.SetSendBuffer(c.fd, bytes) }
 func (c *conn) SetLinger(sec int) error        { return socket.SetLinger(c.fd, sec) }
-func (c *conn) SetNoDelay(noDelay bool) error  { return socket.SetNoDelay(c.fd, bool2int(noDelay)) }
+func (c *conn) SetNoDelay(noDelay bool) error {
+	return socket.SetNoDelay(c.fd, func(b bool) int {
+		if b {
+			return 1
+		}
+		return 0
+	}(noDelay))
+}
+
 func (c *conn) SetKeepAlivePeriod(d time.Duration) error {
 	return socket.SetKeepAlivePeriod(c.fd, int(d.Seconds()))
 }
