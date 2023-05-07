@@ -98,8 +98,11 @@ func (s *testServerGC) OnBoot(eng Engine) (action Action) {
 	s.eng = eng
 	addr := eng.eng.ln.addr
 	go func() {
-		defer eng.Stop(context.Background())
-		for eng.eng.lb.len() == 0 {
+		defer func() {
+			eng.Stop(context.Background())
+			runtime.GC()
+		}()
+		for eng.eng.lb.len() != s.elNum {
 			time.Sleep(time.Second)
 		}
 		for elIdx := 0; elIdx < s.elNum; elIdx++ {
