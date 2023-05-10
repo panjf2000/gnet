@@ -20,6 +20,7 @@ package gnet
 import (
 	"runtime"
 
+	"github.com/panjf2000/gnet/v2/internal/netpoll"
 	"github.com/panjf2000/gnet/v2/pkg/errors"
 )
 
@@ -72,4 +73,33 @@ func (el *eventloop) run(lockOSThread bool) {
 
 	err := el.poller.Polling(el.taskRun, el.pollCallback)
 	el.getLogger().Debugf("event-loop(%d) is exiting due to error: %v", el.idx, err)
+}
+
+func (el *eventloop) handleEvents(fd int, ev uint32) error {
+	// Don't change the ordering of processing EPOLLOUT | EPOLLRDHUP / EPOLLIN unless you're 100%
+	// sure what you're doing!
+	// Re-ordering can easily introduce bugs and bad side-effects, as I found out painfully in the past.
+
+	// We should always check for the EPOLLOUT event first, as we must try to send the leftover data back to
+	// the peer when any error occurs on a connection.
+	//
+	// Either an EPOLLOUT or EPOLLERR event may be fired when a connection is refused.
+	// In either case write() should take care of it properly:
+	// 1) writing data back,
+	// 2) closing the connection.
+	gfd, ok := el.connections[fd]
+	if !ok {
+		return nil
+	}
+	c := el.connSlice[gfd.ConnIndex1()][gfd.ConnIndex2()]
+	if ev&netpoll.OutEvents != 0 && !c.outboundBuffer.IsEmpty() {
+		if err := el.write(c); err != nil {
+			return err
+		}
+	}
+	if ev&netpoll.InEvents != 0 {
+		return el.read(c)
+	}
+
+	return nil
 }

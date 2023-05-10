@@ -19,7 +19,6 @@
 package gnet
 
 import (
-	"github.com/panjf2000/gnet/v2/pkg/gfd"
 	"io"
 	"net"
 	"os"
@@ -33,6 +32,7 @@ import (
 	"github.com/panjf2000/gnet/v2/internal/socket"
 	"github.com/panjf2000/gnet/v2/pkg/buffer/elastic"
 	gerrors "github.com/panjf2000/gnet/v2/pkg/errors"
+	"github.com/panjf2000/gnet/v2/pkg/gfd"
 	bsPool "github.com/panjf2000/gnet/v2/pkg/pool/byteslice"
 )
 
@@ -406,6 +406,7 @@ func (c *conn) SetLinger(sec int) error        { return socket.SetLinger(c.fd, s
 func (c *conn) SetNoDelay(noDelay bool) error {
 	return socket.SetNoDelay(c.fd, bool2int(noDelay))
 }
+
 func (c *conn) SetKeepAlivePeriod(d time.Duration) error {
 	return socket.SetKeepAlivePeriod(c.fd, int(d.Seconds()))
 }

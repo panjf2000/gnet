@@ -17,7 +17,6 @@ package gnet
 
 import (
 	"context"
-	"github.com/panjf2000/gnet/v2/pkg/gfd"
 	"io"
 	"net"
 	"strings"
@@ -27,6 +26,7 @@ import (
 	"github.com/panjf2000/gnet/v2/internal/math"
 	"github.com/panjf2000/gnet/v2/pkg/buffer/ring"
 	"github.com/panjf2000/gnet/v2/pkg/errors"
+	"github.com/panjf2000/gnet/v2/pkg/gfd"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
 )
 

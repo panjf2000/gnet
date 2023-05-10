@@ -15,8 +15,9 @@
 package queue
 
 import (
-	"github.com/panjf2000/gnet/v2/pkg/gfd"
 	"sync"
+
+	"github.com/panjf2000/gnet/v2/pkg/gfd"
 )
 
 // TaskFunc is the callback function executed by poller.

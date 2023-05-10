@@ -20,7 +20,6 @@ package gnet
 import (
 	"context"
 	"errors"
-	"github.com/panjf2000/gnet/v2/pkg/gfd"
 	"net"
 	"strconv"
 	"sync"
@@ -33,6 +32,7 @@ import (
 	"github.com/panjf2000/gnet/v2/internal/socket"
 	"github.com/panjf2000/gnet/v2/pkg/buffer/ring"
 	gerrors "github.com/panjf2000/gnet/v2/pkg/errors"
+	"github.com/panjf2000/gnet/v2/pkg/gfd"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
 )
 

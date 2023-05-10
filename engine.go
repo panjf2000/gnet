@@ -20,12 +20,12 @@ package gnet
 
 import (
 	"context"
-	"github.com/panjf2000/gnet/v2/pkg/gfd"
 	"runtime"
 	"sync"
 	"sync/atomic"
 
 	"github.com/panjf2000/gnet/v2/internal/netpoll"
+	"github.com/panjf2000/gnet/v2/pkg/gfd"
 )
 
 type engine struct {

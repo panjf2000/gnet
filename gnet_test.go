@@ -331,7 +331,7 @@ func (s *testServer) OnTraffic(c Conn) (action Action) {
 	// Only for code coverage of testing.
 	if !s.multicore {
 		assert.NoErrorf(s.tester, c.Flush(), "flush error")
-		_ = c.Gfd()
+		_ = c.Fd()
 		fd, err := c.Dup()
 		assert.NoError(s.tester, err)
 		assert.Greater(s.tester, fd, 0)

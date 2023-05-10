@@ -74,3 +74,21 @@ func (el *eventloop) run(lockOSThread bool) {
 	err := el.poller.Polling(el.taskRun, el.pollCallback)
 	el.getLogger().Debugf("event-loop(%d) is exiting due to error: %v", el.idx, err)
 }
+
+func (el *eventloop) handleEvents(fd int, filter int16) (err error) {
+	if gfd, ok := el.connections[fd]; ok {
+		c := el.connSlice[gfd.ConnIndex1()][gfd.ConnIndex2()]
+		switch filter {
+		case netpoll.EVFilterSock:
+			err = el.closeConn(c, unix.ECONNRESET)
+		case netpoll.EVFilterWrite:
+			if !c.outboundBuffer.IsEmpty() {
+				err = el.write(c)
+			}
+		case netpoll.EVFilterRead:
+			err = el.read(c)
+		}
+	}
+
+	return
+}

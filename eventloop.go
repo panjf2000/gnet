@@ -23,8 +23,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/panjf2000/gnet/v2/internal/queue"
-	"github.com/panjf2000/gnet/v2/pkg/gfd"
 	"os"
 	"strings"
 	"sync/atomic"
@@ -34,7 +32,9 @@ import (
 
 	"github.com/panjf2000/gnet/v2/internal/io"
 	"github.com/panjf2000/gnet/v2/internal/netpoll"
+	"github.com/panjf2000/gnet/v2/internal/queue"
 	gerrors "github.com/panjf2000/gnet/v2/pkg/errors"
+	"github.com/panjf2000/gnet/v2/pkg/gfd"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
 )
 
@@ -105,6 +105,12 @@ func (el *eventloop) register(c *conn) error {
 	return el.open(c)
 }
 
+// storeConn store conn
+// find the next available location
+// 1. current space available location
+// 2. allocated other space is available
+// 3. unallocated space (reapply when using it)
+// 4. if no usable space is found, return directly.
 func (el *eventloop) storeConn(c *conn) {
 	if el.connNAI1 >= gfd.ConnIndex1Max {
 		return
@@ -119,7 +125,6 @@ func (el *eventloop) storeConn(c *conn) {
 	el.connections[c.fd] = c.gfd
 	el.addConn(el.connNAI1, 1)
 
-	//check if there are remaining free slots in the current space
 	for i2 := el.connNAI2; i2 < gfd.ConnIndex2Max; i2++ {
 		if el.connSlice[el.connNAI1][i2] == nil {
 			el.connNAI2 = i2
@@ -127,7 +132,6 @@ func (el *eventloop) storeConn(c *conn) {
 		}
 	}
 
-	//check if the space have applied for is available
 	for i1 := el.connNAI1; i1 < gfd.ConnIndex1Max; i1++ {
 		if el.connSlice[i1] == nil || el.connCounts[i1] >= gfd.ConnIndex2Max {
 			continue
@@ -140,7 +144,6 @@ func (el *eventloop) storeConn(c *conn) {
 		}
 	}
 
-	//insufficient space has been applied for, allocate a new space
 	for i1 := 0; i1 < gfd.ConnIndex1Max; i1++ {
 		if el.connSlice[i1] == nil {
 			el.connNAI1, el.connNAI2 = i1, 0
@@ -342,23 +345,7 @@ func (el *eventloop) ticker(ctx context.Context) {
 	}
 }
 
-func (el *eventloop) pollCallback(poolType netpoll.PollCallbackType, fd int, e netpoll.IOEvent) (err error) {
-	switch poolType {
-	case netpoll.PollAttachmentMainAccept:
-		return el.engine.accept(fd, e)
-	case netpoll.PollAttachmentEventLoops:
-		return el.accept(fd, e)
-	case netpoll.PollAttachmentStream:
-		return el.handleEvents(fd, e)
-	case netpoll.PollAttachmentDatagram:
-		return el.readUDP(fd, e)
-	default:
-		return
-	}
-}
-
 func (el *eventloop) taskRun(task *queue.Task) (err error) {
-	//非conn执行任务
 	switch task.TaskType {
 	case triggerTypeShutdown:
 		return gerrors.ErrEngineShutdown
@@ -366,7 +353,6 @@ func (el *eventloop) taskRun(task *queue.Task) (err error) {
 		return el.register(task.Arg.(*conn))
 	}
 
-	//需conn执行任务
 	if el.connSlice[task.GFD.ConnIndex1()] == nil {
 		return
 	}

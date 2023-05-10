@@ -1,16 +1,29 @@
+// Copyright (c) 2023
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//	http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 package gnet
 
 import (
 	"context"
-	goPool "github.com/panjf2000/gnet/v2/pkg/pool/goroutine"
-	"github.com/stretchr/testify/assert"
 	"runtime"
 	"testing"
 	"time"
+
+	goPool "github.com/panjf2000/gnet/v2/pkg/pool/goroutine"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestServeGC(t *testing.T) {
-	//wg := &sync.WaitGroup{}
 	t.Run("gc-loop", func(t *testing.T) {
 		t.Run("1-loop-10000", func(t *testing.T) {
 			testServeGC(t, "tcp", ":9000", true, true, 1, 10000)
@@ -49,8 +62,6 @@ func TestServeGC(t *testing.T) {
 			testServeGC(t, "tcp", ":9000", true, true, 16, 1000000)
 		})
 	})
-
-	//wg.Wait()
 }
 
 func testServeGC(t *testing.T, network, addr string, multicore, async bool, elNum, initConnCount int) {
@@ -83,12 +94,6 @@ type testServerGC struct {
 	addr          string
 	multicore     bool
 	async         bool
-	writev        bool
-	nclients      int
-	started       int32
-	connected     int32
-	clientActive  int32
-	disconnected  int32
 	workerPool    *goPool.Pool
 	elNum         int
 	initConnCount int
@@ -99,7 +104,7 @@ func (s *testServerGC) OnBoot(eng Engine) (action Action) {
 	addr := eng.eng.ln.addr
 	go func() {
 		defer func() {
-			eng.Stop(context.Background())
+			_ = eng.Stop(context.Background())
 			runtime.GC()
 		}()
 		for eng.eng.lb.len() != s.elNum {
@@ -132,17 +137,15 @@ func (s *testServerGC) OnBoot(eng Engine) (action Action) {
 	return
 }
 
-func (s *testServerGC) OnOpen(c Conn) (out []byte, action Action) {
-
+func (s *testServerGC) OnOpen(_ Conn) (out []byte, action Action) {
 	return
 }
 
-func (s *testServerGC) OnClose(c Conn, err error) (action Action) {
-
+func (s *testServerGC) OnClose(_ Conn, _ error) (action Action) {
 	return
 }
 
-func (s *testServerGC) OnTraffic(c Conn) (action Action) {
+func (s *testServerGC) OnTraffic(_ Conn) (action Action) {
 	return
 }
 
