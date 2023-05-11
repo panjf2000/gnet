@@ -115,12 +115,12 @@ func (el *eventloop) storeConn(c *conn) {
 	if el.connNAI1 >= gfd.ConnIndex1Max {
 		return
 	}
+
 	if el.connSlice[el.connNAI1] == nil {
 		el.connSlice[el.connNAI1] = make([]*conn, gfd.ConnIndex2Max)
-		el.connSlice[el.connNAI1][el.connNAI2] = c
 	}
-
 	el.connSlice[el.connNAI1][el.connNAI2] = c
+
 	c.gfd = gfd.NewGFD(c.fd, el.idx, el.connNAI1, el.connNAI2)
 	el.connections[c.fd] = c.gfd
 	el.addConn(el.connNAI1, 1)
