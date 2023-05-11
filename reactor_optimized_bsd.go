@@ -26,13 +26,11 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func (el *eventloop) activateMainReactor(lockOSThread bool) {
-	if lockOSThread {
+func (el *eventloop) activateMainReactor() error {
+	if el.engine.opts.LockOSThread {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
 	}
-
-	defer el.engine.signalShutdown()
 
 	err := el.poller.Polling(el.taskRun, el.pollCallback)
 	if err == errors.ErrEngineShutdown {
@@ -40,18 +38,17 @@ func (el *eventloop) activateMainReactor(lockOSThread bool) {
 	} else if err != nil {
 		el.engine.opts.Logger.Errorf("main reactor is exiting due to error: %v", err)
 	}
+
+	el.engine.shutdown(err)
+
+	return err
 }
 
-func (el *eventloop) activateSubReactor(lockOSThread bool) {
-	if lockOSThread {
+func (el *eventloop) activateSubReactor() error {
+	if el.engine.opts.LockOSThread {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
 	}
-
-	defer func() {
-		el.closeAllSockets()
-		el.engine.signalShutdown()
-	}()
 
 	err := el.poller.Polling(el.taskRun, el.pollCallback)
 	if err == errors.ErrEngineShutdown {
@@ -59,22 +56,27 @@ func (el *eventloop) activateSubReactor(lockOSThread bool) {
 	} else if err != nil {
 		el.engine.opts.Logger.Errorf("event-loop(%d) is exiting due to error: %v", el.idx, err)
 	}
+
+	el.closeAllSockets()
+	el.engine.shutdown(err)
+
+	return err
 }
 
-func (el *eventloop) run(lockOSThread bool) {
-	if lockOSThread {
+func (el *eventloop) run() error {
+	if el.engine.opts.LockOSThread {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
 	}
 
-	defer func() {
-		el.closeAllSockets()
-		el.ln.close()
-		el.engine.signalShutdown()
-	}()
-
 	err := el.poller.Polling(el.taskRun, el.pollCallback)
 	el.getLogger().Debugf("event-loop(%d) is exiting due to error: %v", el.idx, err)
+
+	el.closeAllSockets()
+	el.ln.close()
+	el.engine.shutdown(err)
+
+	return err
 }
 
 func (el *eventloop) handleEvents(fd int, filter int16) (err error) {

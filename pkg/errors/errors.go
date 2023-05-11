@@ -43,4 +43,6 @@ var (
 	ErrNegativeSize = errors.New("negative size is invalid")
 	// ErrNoIPv4AddressOnInterface occurs when an IPv4 multicast address is set on an interface but IPv4 is not configured.
 	ErrNoIPv4AddressOnInterface = errors.New("no IPv4 address on interface")
+	// ErrInvalidConn occurs when the connection is invalid.
+	ErrInvalidConn = errors.New("invalid connection")
 )

@@ -89,7 +89,7 @@ func (s Engine) Stop(ctx context.Context) error {
 		return errors.ErrEngineInShutdown
 	}
 
-	s.eng.signalShutdown()
+	s.eng.shutdown(nil)
 
 	ticker := time.NewTicker(shutdownPollInterval)
 	defer ticker.Stop()
@@ -473,7 +473,7 @@ func Stop(ctx context.Context, protoAddr string) error {
 	var eng *engine
 	if s, ok := allEngines.Load(protoAddr); ok {
 		eng = s.(*engine)
-		eng.signalShutdown()
+		eng.shutdown(nil)
 		defer allEngines.Delete(protoAddr)
 	} else {
 		return errors.ErrEngineInShutdown
@@ -506,11 +506,4 @@ func parseProtoAddr(addr string) (network, address string) {
 		address = pair[1]
 	}
 	return
-}
-
-func bool2int(b bool) int {
-	if b {
-		return 1
-	}
-	return 0
 }
