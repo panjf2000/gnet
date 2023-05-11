@@ -21,7 +21,9 @@ package gnet
 import (
 	"runtime"
 
+	"github.com/panjf2000/gnet/v2/internal/netpoll"
 	"github.com/panjf2000/gnet/v2/pkg/errors"
+	"golang.org/x/sys/unix"
 )
 
 func (el *eventloop) activateMainReactor(lockOSThread bool) {
