@@ -111,28 +111,28 @@ func (s Engine) AsyncWrite(gFd gfd.GFD, buf []byte, callback AsyncCallback) erro
 	if !gfd.CheckLegal(gFd) {
 		return nil
 	}
-	return s.eng.lb.index(gFd.ElIndex()).poller.Trigger(triggerTypeAsyncWrite, gFd, &asyncWriteHook{callback, buf})
+	return s.eng.trigger(triggerTypeAsyncWrite, gFd, &asyncWriteHook{callback, buf})
 }
 
 func (s Engine) AsyncWritev(gFd gfd.GFD, bs [][]byte, callback AsyncCallback) error {
 	if !gfd.CheckLegal(gFd) {
 		return nil
 	}
-	return s.eng.lb.index(gFd.ElIndex()).poller.Trigger(triggerTypeAsyncWritev, gFd, &asyncWritevHook{callback, bs})
+	return s.eng.trigger(triggerTypeAsyncWritev, gFd, &asyncWritevHook{callback, bs})
 }
 
 func (s Engine) Wake(gFd gfd.GFD, callback AsyncCallback) error {
 	if !gfd.CheckLegal(gFd) {
 		return nil
 	}
-	return s.eng.lb.index(gFd.ElIndex()).poller.Trigger(triggerTypeWake, gFd, callback)
+	return s.eng.trigger(triggerTypeWake, gFd, callback)
 }
 
 func (s Engine) Close(gFd gfd.GFD, callback AsyncCallback) error {
 	if !gfd.CheckLegal(gFd) {
 		return nil
 	}
-	return s.eng.lb.index(gFd.ElIndex()).poller.Trigger(triggerTypeClose, gFd, callback)
+	return s.eng.trigger(triggerTypeClose, gFd, callback)
 }
 
 // Reader is an interface that consists of a number of methods for reading that Conn must implement.
