@@ -30,7 +30,7 @@ const (
 
 // GFD structure introduction.
 // |eventloop index|conn level one index|conn level two index| timestamp |      fd     |
-// |     1bit      |       1bit         |        2bit        |    4bit   |int type size|.
+// |   1 byte      |       1 byte       |      2 byte        |  4 byte   |int type size|.
 type GFD [0x10]byte
 
 func (gfd GFD) Fd() int {
