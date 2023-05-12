@@ -108,30 +108,18 @@ func (s Engine) Stop(ctx context.Context) error {
 // ==================================== Concurrency-safe API's ====================================
 
 func (s Engine) AsyncWrite(gFd gfd.GFD, buf []byte, callback AsyncCallback) error {
-	if !gfd.CheckLegal(gFd) {
-		return nil
-	}
 	return s.eng.trigger(triggerTypeAsyncWrite, gFd, &asyncWriteHook{callback, buf})
 }
 
 func (s Engine) AsyncWritev(gFd gfd.GFD, bs [][]byte, callback AsyncCallback) error {
-	if !gfd.CheckLegal(gFd) {
-		return nil
-	}
 	return s.eng.trigger(triggerTypeAsyncWritev, gFd, &asyncWritevHook{callback, bs})
 }
 
 func (s Engine) Wake(gFd gfd.GFD, callback AsyncCallback) error {
-	if !gfd.CheckLegal(gFd) {
-		return nil
-	}
 	return s.eng.trigger(triggerTypeWake, gFd, callback)
 }
 
 func (s Engine) Close(gFd gfd.GFD, callback AsyncCallback) error {
-	if !gfd.CheckLegal(gFd) {
-		return nil
-	}
 	return s.eng.trigger(triggerTypeClose, gFd, callback)
 }
 

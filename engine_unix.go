@@ -285,6 +285,13 @@ func run(eventHandler EventHandler, listener *listener, options *Options, protoA
 	return nil
 }
 
-func (eng *engine) trigger(taskType int, gfd gfd.GFD, arg interface{}) error {
-	return eng.lb.index(gfd.ElIndex()).poller.Trigger(taskType, gfd, arg)
+func (eng *engine) trigger(taskType int, gFd gfd.GFD, arg interface{}) error {
+	if !gfd.CheckLegal(gFd) {
+		return nil
+	}
+	el := eng.lb.index(gFd.ElIndex())
+	if el == nil {
+		return nil
+	}
+	return el.poller.Trigger(taskType, gFd, arg)
 }
