@@ -190,7 +190,7 @@ func (el *eventloop) closeConn(c *conn, err error) (rerr error) {
 			if n, e := io.Writev(c.fd, iov); e != nil {
 				el.getLogger().Warnf("closeConn: error occurs when sending data back to peer, %v", e)
 				break
-			} else {
+			} else { //nolint:revive
 				_, _ = c.outboundBuffer.Discard(n)
 			}
 		}
