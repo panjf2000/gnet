@@ -71,13 +71,15 @@ type (
 
 // ==================================== Implementation of base load-balancer ====================================
 
-func (lb *baseLoadBalancer) register(el *eventloop) {
+// register adds a new eventloop into load-balancer.
+// TODO(andy): golangci-lint bug of unused?
+func (lb *baseLoadBalancer) register(el *eventloop) { //nolint:unused
 	el.idx = lb.size
 	lb.eventLoops = append(lb.eventLoops, el)
 	lb.size++
 }
 
-// next returns the eligible event-loop based on Round-Robin algorithm.
+// index returns the eligible eventloop by index.
 func (lb *baseLoadBalancer) index(i int) *eventloop {
 	if i >= lb.size {
 		return nil
@@ -85,6 +87,7 @@ func (lb *baseLoadBalancer) index(i int) *eventloop {
 	return lb.eventLoops[i]
 }
 
+// iterate iterates all the eventloops.
 func (lb *baseLoadBalancer) iterate(f func(int, *eventloop) bool) {
 	for i, el := range lb.eventLoops {
 		if !f(i, el) {
@@ -93,6 +96,7 @@ func (lb *baseLoadBalancer) iterate(f func(int, *eventloop) bool) {
 	}
 }
 
+// len returns the length of event-loop list.
 func (lb *baseLoadBalancer) len() int {
 	return lb.size
 }
@@ -112,9 +116,9 @@ func (lb *roundRobinLoadBalancer) next(_ net.Addr) (el *eventloop) {
 
 func (lb *leastConnectionsLoadBalancer) next(_ net.Addr) (el *eventloop) {
 	el = lb.eventLoops[0]
-	minN := el.connections.loadConn()
+	minN := el.connections.loadCount()
 	for _, v := range lb.eventLoops[1:] {
-		if n := v.connections.loadConn(); n < minN {
+		if n := v.connections.loadCount(); n < minN {
 			minN = n
 			el = v
 		}

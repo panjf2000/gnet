@@ -43,24 +43,23 @@ func (cs *connStore) iterate(f func(*conn) bool) {
 	}
 }
 
-func (cs *connStore) addConn(i1 int, delta int32) {
+func (cs *connStore) incCount(i1 int, delta int32) {
 	atomic.AddInt32(&cs.connCounts[i1], delta)
 }
 
-func (cs *connStore) loadConn() (n int32) {
+func (cs *connStore) loadCount() (n int32) {
 	for i := 0; i < len(cs.connCounts); i++ {
 		n += atomic.LoadInt32(&cs.connCounts[i])
 	}
 	return
 }
 
-// storeConn store conn
-// find the next available location
+// addConn stores a new conn into connStore, it finds the next available location:
 // 1. current space available location
 // 2. allocated other space is available
 // 3. unallocated space (reapply when using it)
 // 4. if no usable space is found, return directly.
-func (cs *connStore) storeConn(c *conn, index int) {
+func (cs *connStore) addConn(c *conn, index int) {
 	if cs.connNAI1 >= gfd.ConnIndex1Max {
 		return
 	}
@@ -72,7 +71,7 @@ func (cs *connStore) storeConn(c *conn, index int) {
 
 	c.gfd = gfd.NewGFD(c.fd, index, cs.connNAI1, cs.connNAI2)
 	cs.fd2gfd[c.fd] = c.gfd
-	cs.addConn(cs.connNAI1, 1)
+	cs.incCount(cs.connNAI1, 1)
 
 	for i2 := cs.connNAI2; i2 < gfd.ConnIndex2Max; i2++ {
 		if cs.connMatrix[cs.connNAI1][i2] == nil {
@@ -103,9 +102,9 @@ func (cs *connStore) storeConn(c *conn, index int) {
 	cs.connNAI1 = gfd.ConnIndex1Max
 }
 
-func (cs *connStore) removeConn(c *conn) {
+func (cs *connStore) delConn(c *conn) {
 	delete(cs.fd2gfd, c.fd)
-	cs.addConn(c.gfd.ConnIndex1(), -1)
+	cs.incCount(c.gfd.ConnIndex1(), -1)
 	if cs.connCounts[c.gfd.ConnIndex1()] == 0 {
 		cs.connMatrix[c.gfd.ConnIndex1()] = nil
 	} else {

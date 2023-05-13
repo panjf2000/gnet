@@ -50,7 +50,7 @@ func (lb *sourceAddrHashLoadBalancer) register(el *eventloop) {
 func registerInitConn(el *eventloop) {
 	for i := 0; i < int(atomic.LoadInt32(&nowEventLoopInitConn)); i++ {
 		c := newTCPConn(i, el, &unix.SockaddrInet4{}, &net.TCPAddr{}, &net.TCPAddr{})
-		el.connections.storeConn(c, el.idx)
+		el.connections.addConn(c, el.idx)
 	}
 }
 

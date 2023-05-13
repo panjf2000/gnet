@@ -76,7 +76,7 @@ func (el *eventloop) register(c *conn) error {
 		return err
 	}
 
-	el.connections.storeConn(c, el.idx)
+	el.connections.addConn(c, el.idx)
 	if c.isDatagram {
 		return nil
 	}
@@ -167,7 +167,7 @@ func (el *eventloop) closeConn(c *conn, err error) (rerr error) {
 		rerr = el.poller.Delete(c.fd)
 		if c.fd != el.ln.fd {
 			rerr = unix.Close(c.fd)
-			el.connections.removeConn(c)
+			el.connections.delConn(c)
 		}
 		if el.eventHandler.OnClose(c, err) == Shutdown {
 			return gerrors.ErrEngineShutdown
@@ -209,7 +209,7 @@ func (el *eventloop) closeConn(c *conn, err error) (rerr error) {
 		}
 	}
 
-	el.connections.removeConn(c)
+	el.connections.delConn(c)
 	if el.eventHandler.OnClose(c, err) == Shutdown {
 		rerr = gerrors.ErrEngineShutdown
 	}
