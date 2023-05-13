@@ -16,28 +16,32 @@ package gfd
 
 import (
 	"encoding/binary"
+	"math"
 	"time"
 )
 
 const (
-	ConnIndex2Start = 2
-	TimeStampStart  = 4
-	FdStart         = 8
-	ElIndexMax      = 0xFF
-	ConnIndex1Max   = 0xFF
-	ConnIndex2Max   = 0xFFFF
+	ConnIndex2Offset  = 2
+	TimeStampOffset   = 4
+	FdOffset          = 8
+	EventLoopIndexMax = math.MaxUint8 + 1
+	ConnIndex1Max     = math.MaxUint8 + 1
+	ConnIndex2Max     = math.MaxUint16 + 1
 )
 
-// GFD structure introduction.
+// GFD structure:
+//
 // |eventloop index|conn level one index|conn level two index| timestamp |      fd     |
 // |   1 byte      |       1 byte       |      2 byte        |  4 byte   |int type size|.
+//
+
 type GFD [0x10]byte
 
 func (gfd GFD) Fd() int {
-	return int(binary.BigEndian.Uint64(gfd[FdStart:]))
+	return int(binary.BigEndian.Uint64(gfd[FdOffset:]))
 }
 
-func (gfd GFD) ElIndex() int {
+func (gfd GFD) EventLoopIndex() int {
 	return int(gfd[0])
 }
 
@@ -46,29 +50,27 @@ func (gfd GFD) ConnIndex1() int {
 }
 
 func (gfd GFD) ConnIndex2() int {
-	return int(binary.BigEndian.Uint16(gfd[ConnIndex2Start:TimeStampStart]))
+	return int(binary.BigEndian.Uint16(gfd[ConnIndex2Offset:TimeStampOffset]))
 }
 
 // Timestamp incomplete timestamp, only used to prevent fd duplication.
 func (gfd GFD) Timestamp() uint32 {
-	return binary.BigEndian.Uint32(gfd[TimeStampStart:FdStart])
+	return binary.BigEndian.Uint32(gfd[TimeStampOffset:FdOffset])
 }
 
 func NewGFD(fd, elIndex, connIndex1, connIndex2 int) (gfd GFD) {
 	gfd[0] = byte(elIndex)
 	gfd[1] = byte(connIndex1)
-	binary.BigEndian.PutUint16(gfd[ConnIndex2Start:TimeStampStart], uint16(connIndex2))
-	binary.BigEndian.PutUint32(gfd[TimeStampStart:FdStart], uint32(time.Now().UnixMilli()))
-	binary.BigEndian.PutUint64(gfd[FdStart:], uint64(fd))
+	binary.BigEndian.PutUint16(gfd[ConnIndex2Offset:TimeStampOffset], uint16(connIndex2))
+	binary.BigEndian.PutUint32(gfd[TimeStampOffset:FdOffset], uint32(time.Now().UnixMilli()))
+	binary.BigEndian.PutUint64(gfd[FdOffset:], uint64(fd))
 	return
 }
 
 func CheckLegal(gfd GFD) bool {
-	if gfd.Fd() <= 0 || gfd.ElIndex() < 0 || gfd.ElIndex() >= ElIndexMax ||
-		gfd.ConnIndex1() < 0 || gfd.ConnIndex1() >= ConnIndex1Max ||
-		gfd.ConnIndex2() < 0 || gfd.ConnIndex2() >= ConnIndex2Max ||
-		gfd.Timestamp() == 0 {
-		return false
-	}
-	return true
+	return gfd.Fd() > 2 && gfd.Fd() <= math.MaxInt &&
+		gfd.EventLoopIndex() >= 0 && gfd.EventLoopIndex() <= EventLoopIndexMax &&
+		gfd.ConnIndex1() >= 0 && gfd.ConnIndex1() <= ConnIndex1Max &&
+		gfd.ConnIndex2() >= 0 && gfd.ConnIndex2() <= ConnIndex2Max &&
+		gfd.Timestamp() != 0
 }

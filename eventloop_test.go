@@ -15,12 +15,13 @@ package gnet
 
 import (
 	"context"
-	"golang.org/x/sys/unix"
 	"net"
 	"runtime"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"golang.org/x/sys/unix"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -53,7 +54,7 @@ func registerInitConn(el *eventloop) {
 	}
 }
 
-var nowEventLoopInitConn int32 = 0
+var nowEventLoopInitConn int32
 
 // TestServeGC generate fake data asynchronously, if you need to test, manually open the comment.
 func TestServeGC(t *testing.T) {
@@ -61,39 +62,39 @@ func TestServeGC(t *testing.T) {
 		t.Run("1-loop-10000", func(t *testing.T) {
 			testServeGC(t, "tcp", ":9000", true, true, 1, 10000)
 		})
-		//t.Run("1-loop-100000", func(t *testing.T) {
-		//	testServeGC(t, "tcp", ":9000", true, true, 1, 100000)
-		//})
-		//t.Run("1-loop-1000000", func(t *testing.T) {
-		//	testServeGC(t, "tcp", ":9000", true, true, 1, 1000000)
-		//})
+		// t.Run("1-loop-100000", func(t *testing.T) {
+		// 	testServeGC(t, "tcp", ":9000", true, true, 1, 100000)
+		// })
+		// t.Run("1-loop-1000000", func(t *testing.T) {
+		// 	testServeGC(t, "tcp", ":9000", true, true, 1, 1000000)
+		// })
 		t.Run("2-loop-10000", func(t *testing.T) {
 			testServeGC(t, "tcp", ":9000", true, true, 2, 10000)
 		})
-		//t.Run("2-loop-100000", func(t *testing.T) {
-		//	testServeGC(t, "tcp", ":9000", true, true, 2, 100000)
-		//})
-		//t.Run("2-loop-1000000", func(t *testing.T) {
-		//	testServeGC(t, "tcp", ":9000", true, true, 2, 1000000)
-		//})
+		// t.Run("2-loop-100000", func(t *testing.T) {
+		// 	testServeGC(t, "tcp", ":9000", true, true, 2, 100000)
+		// })
+		// t.Run("2-loop-1000000", func(t *testing.T) {
+		// 	testServeGC(t, "tcp", ":9000", true, true, 2, 1000000)
+		// })
 		t.Run("4-loop-10000", func(t *testing.T) {
 			testServeGC(t, "tcp", ":9000", true, true, 4, 10000)
 		})
-		//t.Run("4-loop-100000", func(t *testing.T) {
-		//	testServeGC(t, "tcp", ":9000", true, true, 4, 100000)
-		//})
-		//t.Run("4-loop-1000000", func(t *testing.T) {
-		//	testServeGC(t, "tcp", ":9000", true, true, 4, 1000000)
-		//})
+		// t.Run("4-loop-100000", func(t *testing.T) {
+		// 	testServeGC(t, "tcp", ":9000", true, true, 4, 100000)
+		// })
+		// t.Run("4-loop-1000000", func(t *testing.T) {
+		// 	testServeGC(t, "tcp", ":9000", true, true, 4, 1000000)
+		// })
 		t.Run("16-loop-10000", func(t *testing.T) {
 			testServeGC(t, "tcp", ":9000", true, true, 16, 10000)
 		})
-		//t.Run("16-loop-100000", func(t *testing.T) {
-		//	testServeGC(t, "tcp", ":9000", true, true, 16, 100000)
-		//})
-		//t.Run("16-loop-1000000", func(t *testing.T) {
-		//	testServeGC(t, "tcp", ":9000", true, true, 16, 1000000)
-		//})
+		// t.Run("16-loop-100000", func(t *testing.T) {
+		// 	testServeGC(t, "tcp", ":9000", true, true, 16, 100000)
+		// })
+		// t.Run("16-loop-1000000", func(t *testing.T) {
+		// 	testServeGC(t, "tcp", ":9000", true, true, 16, 1000000)
+		// })
 	})
 }
 
@@ -155,6 +156,4 @@ func (s *testServerGC) GC() {
 			break
 		}
 	}
-
-	return
 }

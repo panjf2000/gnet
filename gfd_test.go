@@ -2,8 +2,6 @@ package gnet
 
 import (
 	"context"
-	"github.com/panjf2000/gnet/v2/pkg/gfd"
-	"github.com/stretchr/testify/assert"
 	"math"
 	"math/rand"
 	"net"
@@ -11,6 +9,10 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+
+	"github.com/panjf2000/gnet/v2/pkg/gfd"
 )
 
 func TestServeGFD(t *testing.T) {
@@ -57,14 +59,11 @@ type testServerGFD struct {
 	*BuiltinEventEngine
 	tester    *testing.T
 	eng       Engine
-	ctx       context.Context
-	cancel    context.CancelFunc
 	network   string
 	addr      string
 	multicore bool
 	async     bool
 	elNum     int
-	gc        bool
 	started   int32
 	client    []net.Conn
 	real      sync.Map
@@ -89,7 +88,7 @@ func (s *testServerGFD) OnClose(c Conn, _ error) (action Action) {
 
 func (s *testServerGFD) OnTick() (delay time.Duration, action Action) {
 	if atomic.CompareAndSwapInt32(&s.started, 0, 1) {
-		//建立客户端连接
+		// 建立客户端连接
 		for i := 0; i < 100; i++ {
 			c, err := net.Dial(s.network, s.addr)
 			assert.NoError(s.tester, err)
@@ -97,21 +96,21 @@ func (s *testServerGFD) OnTick() (delay time.Duration, action Action) {
 		}
 		return time.Millisecond * 10, None
 	}
-	//检测正常数据
+	// 检测正常数据
 	s.tester.Run("gfd-normal", func(t *testing.T) {
 		s.real.Range(func(key, value interface{}) bool {
 			s.Async(t, value.(gfd.GFD))
 			return true
 		})
 	})
-	//检测失效数据-连接已释放，但还拥有gfd
+	// 检测失效数据-连接已释放，但还拥有gfd
 	s.tester.Run("gfd-invalid", func(t *testing.T) {
 		s.fail.Range(func(key, value interface{}) bool {
 			s.Async(t, value.(gfd.GFD))
 			return true
 		})
 	})
-	//检测假数据-业务端自行生成gfd假数据
+	// 检测假数据-业务端自行生成gfd假数据
 	s.tester.Run("gfd-fake", func(t *testing.T) {
 		err := s.eng.AsyncWrite(gfd.NewGFD(math.MaxInt, math.MaxInt, math.MaxInt, math.MaxInt), []byte{}, nil)
 		assert.NoError(s.tester, err)

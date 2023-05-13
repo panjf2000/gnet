@@ -238,8 +238,8 @@ func run(eventHandler EventHandler, listener *listener, options *Options, protoA
 	if options.NumEventLoop > 0 {
 		numEventLoop = options.NumEventLoop
 	}
-	if numEventLoop > gfd.ElIndexMax {
-		numEventLoop = gfd.ElIndexMax
+	if numEventLoop > gfd.EventLoopIndexMax {
+		numEventLoop = gfd.EventLoopIndexMax
 	}
 
 	shutdownCtx, shutdown := context.WithCancel(context.Background())
@@ -289,7 +289,7 @@ func (eng *engine) trigger(taskType int, gFd gfd.GFD, arg interface{}) error {
 	if !gfd.CheckLegal(gFd) {
 		return nil
 	}
-	el := eng.lb.index(gFd.ElIndex())
+	el := eng.lb.index(gFd.EventLoopIndex())
 	if el == nil {
 		return nil
 	}
