@@ -102,7 +102,7 @@ func (eng *engine) activateEventLoops(numEventLoop int) (err error) {
 			el.engine = eng
 			el.poller = p
 			el.buffer = make([]byte, eng.opts.ReadBufferCap)
-			el.connections = make(map[int]gfd.GFD)
+			el.connections.fd2gfd = make(map[int]gfd.GFD)
 			el.eventHandler = eng.eventHandler
 			if err = el.poller.AddRead(el.ln.packPollAttachment(netpoll.PollAttachmentEventLoops)); err != nil {
 				return
@@ -137,7 +137,7 @@ func (eng *engine) activateReactors(numEventLoop int) error {
 			el.engine = eng
 			el.poller = p
 			el.buffer = make([]byte, eng.opts.ReadBufferCap)
-			el.connections = make(map[int]gfd.GFD)
+			el.connections.fd2gfd = make(map[int]gfd.GFD)
 			el.eventHandler = eng.eventHandler
 			eng.lb.register(el)
 		} else {

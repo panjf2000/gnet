@@ -89,11 +89,10 @@ func (el *eventloop) handleEvents(fd int, ev uint32) error {
 	// In either case write() should take care of it properly:
 	// 1) writing data back,
 	// 2) closing the connection.
-	gfd, ok := el.connections[fd]
-	if !ok {
+	c := el.connections.getConn(fd)
+	if c == nil {
 		return nil
 	}
-	c := el.connSlice[gfd.ConnIndex1()][gfd.ConnIndex2()]
 	if ev&netpoll.OutEvents != 0 && !c.outboundBuffer.IsEmpty() {
 		if err := el.write(c); err != nil {
 			return err

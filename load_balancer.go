@@ -112,9 +112,9 @@ func (lb *roundRobinLoadBalancer) next(_ net.Addr) (el *eventloop) {
 
 func (lb *leastConnectionsLoadBalancer) next(_ net.Addr) (el *eventloop) {
 	el = lb.eventLoops[0]
-	minN := el.loadConn()
+	minN := el.connections.loadConn()
 	for _, v := range lb.eventLoops[1:] {
-		if n := v.loadConn(); n < minN {
+		if n := v.connections.loadConn(); n < minN {
 			minN = n
 			el = v
 		}

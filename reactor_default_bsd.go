@@ -53,8 +53,7 @@ func (el *eventloop) activateSubReactor() error {
 	}
 
 	err := el.poller.Polling(el.taskRun, func(fd int, filter int16) (err error) {
-		if gfd, ack := el.connections[fd]; ack {
-			c := el.connSlice[gfd.ConnIndex1()][gfd.ConnIndex2()]
+		if c := el.connections.getConn(fd); c != nil {
 			switch filter {
 			case netpoll.EVFilterSock:
 				err = el.closeConn(c, unix.ECONNRESET)
@@ -88,8 +87,7 @@ func (el *eventloop) run() error {
 	}
 
 	err := el.poller.Polling(el.taskRun, func(fd int, filter int16) (err error) {
-		if gfd, ack := el.connections[fd]; ack {
-			c := el.connSlice[gfd.ConnIndex1()][gfd.ConnIndex2()]
+		if c := el.connections.getConn(fd); c != nil {
 			switch filter {
 			case netpoll.EVFilterSock:
 				err = el.closeConn(c, unix.ECONNRESET)

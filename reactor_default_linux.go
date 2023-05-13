@@ -50,8 +50,7 @@ func (el *eventloop) activateSubReactor() error {
 	}
 
 	err := el.poller.Polling(el.taskRun, func(fd int, ev uint32) error {
-		if gfd, ack := el.connections[fd]; ack {
-			c := el.connSlice[gfd.ConnIndex1()][gfd.ConnIndex2()]
+		if c := el.connections.getConn(fd); c != nil {
 			// Don't change the ordering of processing EPOLLOUT | EPOLLRDHUP / EPOLLIN unless you're 100%
 			// sure what you're doing!
 			// Re-ordering can easily introduce bugs and bad side-effects, as I found out painfully in the past.
@@ -96,8 +95,7 @@ func (el *eventloop) run() error {
 	}
 
 	err := el.poller.Polling(el.taskRun, func(fd int, ev uint32) error {
-		if gfd, ack := el.connections[fd]; ack {
-			c := el.connSlice[gfd.ConnIndex1()][gfd.ConnIndex2()]
+		if c := el.connections.getConn(fd); c != nil {
 			// Don't change the ordering of processing EPOLLOUT | EPOLLRDHUP / EPOLLIN unless you're 100%
 			// sure what you're doing!
 			// Re-ordering can easily introduce bugs and bad side-effects, as I found out painfully in the past.

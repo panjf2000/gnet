@@ -21,9 +21,10 @@ package gnet
 import (
 	"runtime"
 
+	"golang.org/x/sys/unix"
+
 	"github.com/panjf2000/gnet/v2/internal/netpoll"
 	"github.com/panjf2000/gnet/v2/pkg/errors"
-	"golang.org/x/sys/unix"
 )
 
 func (el *eventloop) activateMainReactor() error {
@@ -80,8 +81,7 @@ func (el *eventloop) run() error {
 }
 
 func (el *eventloop) handleEvents(fd int, filter int16) (err error) {
-	if gfd, ok := el.connections[fd]; ok {
-		c := el.connSlice[gfd.ConnIndex1()][gfd.ConnIndex2()]
+	if c := el.connections.getConn(fd); c != nil {
 		switch filter {
 		case netpoll.EVFilterSock:
 			err = el.closeConn(c, unix.ECONNRESET)

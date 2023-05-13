@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"golang.org/x/sys/unix"
@@ -48,47 +47,26 @@ const (
 )
 
 type eventloop struct {
-	ln           *listener                  // listener
-	idx          int                        // loop index in the engine loops list
-	cache        bytes.Buffer               // temporary buffer for scattered bytes
-	engine       *engine                    // engine in loop
-	poller       *netpoll.Poller            // epoll or kqueue
-	buffer       []byte                     // read packet buffer whose capacity is set by user, default value is 64KB
-	connCounts   [gfd.ConnIndex1Max]int32   // number of active connections in event-loop
-	connNAI1     int                        // connections Next Available Index1
-	connNAI2     int                        // connections Next Available Index2
-	connSlice    [gfd.ConnIndex1Max][]*conn // connection slice *conn
-	connections  map[int]gfd.GFD            // connection map: fd -> GFD
-	eventHandler EventHandler               // user eventHandler
+	ln           *listener       // listener
+	idx          int             // loop index in the engine loops list
+	cache        bytes.Buffer    // temporary buffer for scattered bytes
+	engine       *engine         // engine in loop
+	poller       *netpoll.Poller // epoll or kqueue
+	buffer       []byte          // read packet buffer whose capacity is set by user, default value is 64KB
+	connections  connStore       // loop connections storage
+	eventHandler EventHandler    // user eventHandler
 }
 
 func (el *eventloop) getLogger() logging.Logger {
 	return el.engine.opts.Logger
 }
 
-func (el *eventloop) addConn(i1 int, delta int32) {
-	atomic.AddInt32(&el.connCounts[i1], delta)
-}
-
-func (el *eventloop) loadConn() (ct int32) {
-	for i := 0; i < len(el.connCounts); i++ {
-		ct += atomic.LoadInt32(&el.connCounts[i])
-	}
-	return
-}
-
 func (el *eventloop) closeAllSockets() {
 	// Close loops and all outstanding connections
-	for k, cl := range el.connSlice {
-		if el.connCounts[k] == 0 {
-			continue
-		}
-		for _, c := range cl {
-			if c != nil {
-				_ = el.closeConn(c, nil)
-			}
-		}
-	}
+	el.connections.iterate(func(c *conn) bool {
+		_ = el.closeConn(c, nil)
+		return true
+	})
 }
 
 func (el *eventloop) register(c *conn) error {
@@ -98,74 +76,11 @@ func (el *eventloop) register(c *conn) error {
 		return err
 	}
 
-	el.storeConn(c)
+	el.connections.storeConn(c, el.idx)
 	if c.isDatagram {
 		return nil
 	}
 	return el.open(c)
-}
-
-// storeConn store conn
-// find the next available location
-// 1. current space available location
-// 2. allocated other space is available
-// 3. unallocated space (reapply when using it)
-// 4. if no usable space is found, return directly.
-func (el *eventloop) storeConn(c *conn) {
-	if el.connNAI1 >= gfd.ConnIndex1Max {
-		return
-	}
-
-	if el.connSlice[el.connNAI1] == nil {
-		el.connSlice[el.connNAI1] = make([]*conn, gfd.ConnIndex2Max)
-	}
-	el.connSlice[el.connNAI1][el.connNAI2] = c
-
-	c.gfd = gfd.NewGFD(c.fd, el.idx, el.connNAI1, el.connNAI2)
-	el.connections[c.fd] = c.gfd
-	el.addConn(el.connNAI1, 1)
-
-	for i2 := el.connNAI2; i2 < gfd.ConnIndex2Max; i2++ {
-		if el.connSlice[el.connNAI1][i2] == nil {
-			el.connNAI2 = i2
-			return
-		}
-	}
-
-	for i1 := el.connNAI1; i1 < gfd.ConnIndex1Max; i1++ {
-		if el.connSlice[i1] == nil || el.connCounts[i1] >= gfd.ConnIndex2Max {
-			continue
-		}
-		for i2 := 0; i2 < gfd.ConnIndex2Max; i2++ {
-			if el.connSlice[i1][i2] == nil {
-				el.connNAI1, el.connNAI2 = i1, i2
-				return
-			}
-		}
-	}
-
-	for i1 := 0; i1 < gfd.ConnIndex1Max; i1++ {
-		if el.connSlice[i1] == nil {
-			el.connNAI1, el.connNAI2 = i1, 0
-			return
-		}
-	}
-
-	el.connNAI1 = gfd.ConnIndex1Max
-}
-
-func (el *eventloop) removeConn(c *conn) {
-	delete(el.connections, c.fd)
-	el.addConn(c.gfd.ConnIndex1(), -1)
-	if el.connCounts[c.gfd.ConnIndex1()] == 0 {
-		el.connSlice[c.gfd.ConnIndex1()] = nil
-	} else {
-		el.connSlice[c.gfd.ConnIndex1()][c.gfd.ConnIndex2()] = nil
-	}
-
-	if el.connNAI1 > c.gfd.ConnIndex1() || el.connNAI2 > c.gfd.ConnIndex2() {
-		el.connNAI1, el.connNAI2 = c.gfd.ConnIndex1(), c.gfd.ConnIndex2()
-	}
 }
 
 func (el *eventloop) open(c *conn) error {
@@ -252,7 +167,7 @@ func (el *eventloop) closeConn(c *conn, err error) (rerr error) {
 		rerr = el.poller.Delete(c.fd)
 		if c.fd != el.ln.fd {
 			rerr = unix.Close(c.fd)
-			el.removeConn(c)
+			el.connections.removeConn(c)
 		}
 		if el.eventHandler.OnClose(c, err) == Shutdown {
 			return gerrors.ErrEngineShutdown
@@ -294,7 +209,7 @@ func (el *eventloop) closeConn(c *conn, err error) (rerr error) {
 		}
 	}
 
-	el.removeConn(c)
+	el.connections.removeConn(c)
 	if el.eventHandler.OnClose(c, err) == Shutdown {
 		rerr = gerrors.ErrEngineShutdown
 	}
@@ -353,11 +268,13 @@ func (el *eventloop) taskRun(task *queue.Task) (err error) {
 		return el.register(task.Arg.(*conn))
 	}
 
-	if el.connSlice[task.GFD.ConnIndex1()] == nil {
-		return
-	}
-	c := el.connSlice[task.GFD.ConnIndex1()][task.GFD.ConnIndex2()]
+	c := el.connections.getConnByIndex(task.GFD.ConnIndex1(), task.GFD.ConnIndex2())
 	if c == nil || c.gfd != task.GFD {
+		if c == nil {
+			el.getLogger().Errorf("failed to find conn for task: %+v", task)
+		} else {
+			el.getLogger().Errorf("invalid connection for task: %+v, expected gfd: %+v, got: %+v", task, task.GFD, c.gfd)
+		}
 		return
 	}
 	switch task.TaskType {
@@ -412,8 +329,7 @@ func (el *eventloop) readUDP(fd int, _ netpoll.IOEvent) error {
 	if fd == el.ln.fd {
 		c = newUDPConn(fd, el, el.ln.addr, sa, false)
 	} else {
-		gFd := el.connections[fd]
-		c = el.connSlice[gFd.ConnIndex1()][gFd.ConnIndex2()]
+		c = el.connections.getConn(fd)
 	}
 	c.buffer = el.buffer[:n]
 	action := el.eventHandler.OnTraffic(c)

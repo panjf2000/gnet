@@ -104,7 +104,7 @@ func NewClient(eh EventHandler, opts ...Option) (cli *Client, err error) {
 	}
 
 	el.buffer = make([]byte, options.ReadBufferCap)
-	el.connections = make(map[int]gfd.GFD)
+	el.connections.fd2gfd = make(map[int]gfd.GFD)
 	el.eventHandler = eh
 	cli.el = &el
 	return

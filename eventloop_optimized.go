@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build (freebsd || dragonfly || darwin) && poll_opt
-// +build freebsd dragonfly darwin
+//go:build (freebsd || dragonfly || darwin || linux) && poll_opt
+// +build freebsd dragonfly darwin linux
 // +build poll_opt
 
 package gnet
