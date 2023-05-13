@@ -161,8 +161,8 @@ func (s *testMcastServer) OnTick() (delay time.Duration, action Action) {
 		for i := 0; i < s.nclients; i++ {
 			atomic.AddInt32(&s.active, 1)
 			go func() {
+				defer atomic.AddInt32(&s.active, -1)
 				s.startMcastClient()
-				atomic.AddInt32(&s.active, -1)
 			}()
 		}
 	}

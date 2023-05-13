@@ -11,6 +11,10 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
+//go:build linux || freebsd || dragonfly || darwin
+// +build linux freebsd dragonfly darwin
+
 package gnet
 
 import (
@@ -54,6 +58,7 @@ func registerInitConn(el *eventloop) {
 	}
 }
 
+// nowEventLoopInitConn initializes the number of conn fake data, must be set to 0 after use.
 var nowEventLoopInitConn int32
 
 // TestServeGC generate fake data asynchronously, if you need to test, manually open the comment.
@@ -118,6 +123,7 @@ func testServeGC(t *testing.T, network, addr string, multicore, async bool, elNu
 		WithTCPKeepAlive(time.Minute*1),
 		WithTCPNoDelay(TCPDelay))
 	assert.NoError(t, err)
+	nowEventLoopInitConn = 0
 }
 
 type testServerGC struct {

@@ -75,7 +75,7 @@ func initListener(network, addr string, options *Options) (l *listener, err erro
 				if network != "unix" && (options.ReuseAddr || options.ReusePort) {
 					_ = windows.SetsockoptInt(windows.Handle(fd), windows.SOL_SOCKET, windows.SO_REUSEADDR, 1)
 				}
-				if options.TCPNoDelay == options.TCPNoDelay {
+				if options.TCPNoDelay == TCPNoDelay {
 					_ = windows.SetsockoptInt(windows.Handle(fd), windows.IPPROTO_TCP, windows.TCP_NODELAY, 1)
 				}
 				if options.SocketRecvBuffer > 0 {

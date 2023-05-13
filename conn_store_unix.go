@@ -1,3 +1,6 @@
+//go:build linux || freebsd || dragonfly || darwin
+// +build linux freebsd dragonfly darwin
+
 /*
  * Copyright (c) 2023 Andy Pan, Jinxing C.
  *
@@ -117,7 +120,10 @@ func (cs *connStore) delConn(c *conn) {
 }
 
 func (cs *connStore) getConn(fd int) *conn {
-	gFD := cs.fd2gfd[fd]
+	gFD, ok := cs.fd2gfd[fd]
+	if !ok {
+		return nil
+	}
 	if cs.connMatrix[gFD.ConnIndex1()] == nil {
 		return nil
 	}

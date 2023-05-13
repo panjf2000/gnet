@@ -1,3 +1,6 @@
+//go:build linux || freebsd || dragonfly || darwin
+// +build linux freebsd dragonfly darwin
+
 package gnet
 
 import (
@@ -53,6 +56,7 @@ func testServeGFD(t *testing.T, network, addr string, multicore, async bool, elN
 		WithTCPKeepAlive(time.Minute*1),
 		WithTCPNoDelay(TCPDelay))
 	assert.NoError(t, err)
+	nowEventLoopInitConn = 0
 }
 
 type testServerGFD struct {
