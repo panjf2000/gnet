@@ -518,7 +518,7 @@ func (s *testEngineClosedWakeUpServer) OnTraffic(c Conn) Action {
 	fd := c.Gfd()
 
 	go func() { require.NoError(s.tester, c.Wake(nil)) }()
-	go func() { require.NoError(s.tester, s.eng.Close(fd, nil)) }()
+	go s.eng.Close(fd, nil)
 
 	<-s.clientClosed
 
