@@ -173,8 +173,8 @@ func (el *eventloop) closeConn(c *conn, err error) (rerr error) {
 		return
 	}
 
-	if !c.opened {
-		return
+	if !c.opened || el.connections.getConn(c.fd) == nil {
+		return // ignore stale connections
 	}
 
 	// Send residual data in buffer back to the peer before actually closing the connection.
@@ -216,6 +216,10 @@ func (el *eventloop) closeConn(c *conn, err error) (rerr error) {
 }
 
 func (el *eventloop) wake(c *conn) error {
+	if !c.opened || el.connections.getConn(c.fd) == nil {
+		return nil // ignore stale connections
+	}
+
 	action := el.eventHandler.OnTraffic(c)
 
 	return el.handleAction(c, action)

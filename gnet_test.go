@@ -1091,6 +1091,8 @@ func (s *testClosedWakeUpServer) OnBoot(_ Engine) (action Action) {
 }
 
 func (s *testClosedWakeUpServer) OnTraffic(c Conn) Action {
+	assert.NotNil(s.tester, c.RemoteAddr())
+
 	select {
 	case <-s.wakeup:
 	default:
