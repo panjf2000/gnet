@@ -75,7 +75,7 @@ func newUDPConn(fd int, el *eventloop, localAddr net.Addr, sa unix.Sockaddr, con
 		localAddr:      localAddr,
 		remoteAddr:     socket.SockaddrToUDPAddr(sa),
 		isDatagram:     true,
-		pollAttachment: netpoll.PollAttachment{FD: fd},
+		pollAttachment: netpoll.PollAttachment{FD: fd, Callback: el.readUDP},
 	}
 	if connected {
 		c.peer = nil

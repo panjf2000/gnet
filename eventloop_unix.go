@@ -64,9 +64,6 @@ func (el *eventloop) closeConns() {
 
 func (el *eventloop) register(itf interface{}) error {
 	c := itf.(*conn)
-	if c.isDatagram {
-		c.pollAttachment.Callback = el.readUDP
-	}
 	if err := el.poller.AddRead(&c.pollAttachment); err != nil {
 		_ = unix.Close(c.fd)
 		c.release()
@@ -74,6 +71,7 @@ func (el *eventloop) register(itf interface{}) error {
 	}
 
 	el.connections.addConn(c, el.idx)
+
 	if c.isDatagram {
 		return nil
 	}
@@ -306,11 +304,13 @@ func (el *eventloop) execCmd(itf interface{}) (err error) {
 	if c == nil || c.gfd != cmd.fd {
 		return gerrors.ErrInvalidConn
 	}
+
 	defer func() {
 		if cmd.cb != nil {
 			_ = cmd.cb(c, err)
 		}
 	}()
+
 	switch cmd.typ {
 	case asyncCmdClose:
 		return el.closeConn(c, nil)

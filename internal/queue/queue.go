@@ -14,9 +14,7 @@
 
 package queue
 
-import (
-	"sync"
-)
+import "sync"
 
 // TaskFunc is the callback function executed by poller.
 type TaskFunc func(interface{}) error

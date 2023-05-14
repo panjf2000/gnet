@@ -31,23 +31,17 @@ import (
 )
 
 func (lb *roundRobinLoadBalancer) register(el *eventloop) {
-	el.idx = lb.size
-	lb.eventLoops = append(lb.eventLoops, el)
-	lb.size++
+	lb.baseLoadBalancer.register(el)
 	registerInitConn(el)
 }
 
 func (lb *leastConnectionsLoadBalancer) register(el *eventloop) {
-	el.idx = lb.size
-	lb.eventLoops = append(lb.eventLoops, el)
-	lb.size++
+	lb.baseLoadBalancer.register(el)
 	registerInitConn(el)
 }
 
 func (lb *sourceAddrHashLoadBalancer) register(el *eventloop) {
-	el.idx = lb.size
-	lb.eventLoops = append(lb.eventLoops, el)
-	lb.size++
+	lb.baseLoadBalancer.register(el)
 	registerInitConn(el)
 }
 

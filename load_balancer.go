@@ -55,7 +55,7 @@ type (
 	// roundRobinLoadBalancer with Round-Robin algorithm.
 	roundRobinLoadBalancer struct {
 		baseLoadBalancer
-		nextLoopIndex int
+		nextIndex uint64
 	}
 
 	// leastConnectionsLoadBalancer with Least-Connections algorithm.
@@ -72,8 +72,7 @@ type (
 // ==================================== Implementation of base load-balancer ====================================
 
 // register adds a new eventloop into load-balancer.
-// TODO(andy): golangci-lint bug of unused?
-func (lb *baseLoadBalancer) register(el *eventloop) { //nolint:unused
+func (lb *baseLoadBalancer) register(el *eventloop) {
 	el.idx = lb.size
 	lb.eventLoops = append(lb.eventLoops, el)
 	lb.size++
@@ -105,10 +104,8 @@ func (lb *baseLoadBalancer) len() int {
 
 // next returns the eligible event-loop based on Round-Robin algorithm.
 func (lb *roundRobinLoadBalancer) next(_ net.Addr) (el *eventloop) {
-	el = lb.eventLoops[lb.nextLoopIndex]
-	if lb.nextLoopIndex++; lb.nextLoopIndex >= lb.size {
-		lb.nextLoopIndex = 0
-	}
+	el = lb.eventLoops[lb.nextIndex%uint64(lb.size)]
+	lb.nextIndex++
 	return
 }
 
