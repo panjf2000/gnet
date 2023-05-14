@@ -33,6 +33,7 @@ func (el *eventloop) activateMainReactor() error {
 	err := el.poller.Polling()
 	if err == errors.ErrEngineShutdown {
 		el.engine.opts.Logger.Debugf("main reactor is exiting in terms of the demand from user, %v", err)
+		err = nil
 	} else if err != nil {
 		el.engine.opts.Logger.Errorf("main reactor is exiting due to error: %v", err)
 	}
@@ -51,6 +52,7 @@ func (el *eventloop) activateSubReactor() error {
 	err := el.poller.Polling()
 	if err == errors.ErrEngineShutdown {
 		el.engine.opts.Logger.Debugf("event-loop(%d) is exiting in terms of the demand from user, %v", el.idx, err)
+		err = nil
 	} else if err != nil {
 		el.engine.opts.Logger.Errorf("event-loop(%d) is exiting due to error: %v", el.idx, err)
 	}
@@ -68,7 +70,12 @@ func (el *eventloop) run() error {
 	}
 
 	err := el.poller.Polling()
-	el.getLogger().Debugf("event-loop(%d) is exiting due to error: %v", el.idx, err)
+	if err == errors.ErrEngineShutdown {
+		el.engine.opts.Logger.Debugf("event-loop(%d) is exiting in terms of the demand from user, %v", el.idx, err)
+		err = nil
+	} else if err != nil {
+		el.engine.opts.Logger.Errorf("event-loop(%d) is exiting due to error: %v", el.idx, err)
+	}
 
 	el.closeAllSockets()
 	el.ln.close()
