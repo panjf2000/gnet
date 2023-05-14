@@ -68,7 +68,7 @@ func (e Engine) CountConnections() (count int) {
 	}
 
 	e.eng.lb.iterate(func(i int, el *eventloop) bool {
-		count += int(el.loadConn())
+		count += int(el.countConn())
 		return true
 	})
 	return

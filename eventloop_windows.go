@@ -43,11 +43,11 @@ func (el *eventloop) getLogger() logging.Logger {
 	return el.eng.opts.Logger
 }
 
-func (el *eventloop) addConn(delta int32) {
+func (el *eventloop) incConn(delta int32) {
 	atomic.AddInt32(&el.connCount, delta)
 }
 
-func (el *eventloop) loadConn() int32 {
+func (el *eventloop) countConn() int32 {
 	return atomic.LoadInt32(&el.connCount)
 }
 
@@ -95,7 +95,7 @@ func (el *eventloop) run() (err error) {
 
 func (el *eventloop) open(c *conn) error {
 	el.connections[c] = struct{}{}
-	el.addConn(1)
+	el.incConn(1)
 
 	out, action := el.eventHandler.OnOpen(c)
 	if out != nil {
@@ -203,7 +203,7 @@ func (el *eventloop) close(c *conn, err error) error {
 		el.getLogger().Errorf("failed to close connection(%s), error:%v", c.remoteAddr.String(), err)
 	}
 	delete(el.connections, c)
-	el.addConn(-1)
+	el.incConn(-1)
 	c.releaseTCP()
 
 	return el.handleAction(c, action)

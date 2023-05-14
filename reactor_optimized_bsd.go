@@ -57,7 +57,7 @@ func (el *eventloop) activateSubReactor() error {
 		el.engine.opts.Logger.Errorf("event-loop(%d) is exiting due to error: %v", el.idx, err)
 	}
 
-	el.closeAllSockets()
+	el.closeConns()
 	el.engine.shutdown(err)
 
 	return err
@@ -77,7 +77,7 @@ func (el *eventloop) run() error {
 		el.engine.opts.Logger.Errorf("event-loop(%d) is exiting due to error: %v", el.idx, err)
 	}
 
-	el.closeAllSockets()
+	el.closeConns()
 	el.ln.close()
 	el.engine.shutdown(err)
 

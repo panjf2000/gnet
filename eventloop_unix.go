@@ -50,11 +50,11 @@ func (el *eventloop) getLogger() logging.Logger {
 	return el.engine.opts.Logger
 }
 
-func (el *eventloop) loadConn() int32 {
+func (el *eventloop) countConn() int32 {
 	return el.connections.loadCount()
 }
 
-func (el *eventloop) closeAllSockets() {
+func (el *eventloop) closeConns() {
 	// Close loops and all outstanding connections
 	el.connections.iterate(func(c *conn) bool {
 		_ = el.closeConn(c, nil)
