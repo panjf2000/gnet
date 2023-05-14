@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build linux || freebsd || dragonfly || darwin
+//go:build gc_opt && (linux || freebsd || dragonfly || darwin)
+// +build gc_opt
 // +build linux freebsd dragonfly darwin
 
 package gnet
@@ -29,6 +30,10 @@ type connStore struct {
 	connNAI2   int                        // connections Next Available Index2
 	connMatrix [gfd.ConnIndex1Max][]*conn // connection matrix of *conn, multiple slices
 	fd2gfd     map[int]gfd.GFD            // connection map: fd -> GFD
+}
+
+func (cs *connStore) init() {
+	cs.fd2gfd = make(map[int]gfd.GFD)
 }
 
 func (cs *connStore) iterate(f func(*conn) bool) {
@@ -127,9 +132,9 @@ func (cs *connStore) getConn(fd int) *conn {
 	return cs.connMatrix[gFD.ConnIndex1()][gFD.ConnIndex2()]
 }
 
-func (cs *connStore) getConnByIndex(idx1, idx2 int) *conn {
-	if cs.connMatrix[idx1] == nil {
+func (cs *connStore) getConnByGFD(fd gfd.GFD) *conn {
+	if cs.connMatrix[fd.ConnIndex1()] == nil {
 		return nil
 	}
-	return cs.connMatrix[idx1][idx2]
+	return cs.connMatrix[fd.ConnIndex1()][fd.ConnIndex2()]
 }

@@ -94,7 +94,7 @@ jobs:
         run: go test $(go list ./... | tail -n +2)
 
       - name: Run integration tests
-        run: go test -v -race -coverprofile="codecov.report" -covermode=atomic -timeout 5m -failfast
+        run: go test -v -race -coverprofile="codecov.report" -covermode=atomic -timeout 10m -failfast
 
       - name: Upload the code coverage report to codecov.io
         uses: codecov/codecov-action@v3

@@ -32,7 +32,6 @@ import (
 	"github.com/panjf2000/gnet/v2/internal/socket"
 	"github.com/panjf2000/gnet/v2/pkg/buffer/ring"
 	gerrors "github.com/panjf2000/gnet/v2/pkg/errors"
-	"github.com/panjf2000/gnet/v2/pkg/gfd"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
 )
 
@@ -104,7 +103,7 @@ func NewClient(eh EventHandler, opts ...Option) (cli *Client, err error) {
 	}
 
 	el.buffer = make([]byte, options.ReadBufferCap)
-	el.connections.fd2gfd = make(map[int]gfd.GFD)
+	el.connections.init()
 	el.eventHandler = eh
 	cli.el = &el
 	return
