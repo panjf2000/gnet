@@ -317,12 +317,11 @@ func (el *eventloop) execCmd(itf interface{}) (err error) {
 	case asyncCmdWake:
 		return el.wake(c)
 	case asyncCmdWrite:
-		_, err = c.write(cmd.arg.([]byte))
-		return
+		_, err = c.Write(cmd.arg.([]byte))
 	case asyncCmdWritev:
-		_, err = c.writev(cmd.arg.([][]byte))
-		return
+		_, err = c.Writev(cmd.arg.([][]byte))
 	default:
 		return gerrors.ErrUnsupportedOp
 	}
+	return
 }
