@@ -21,9 +21,6 @@ package gnet
 import (
 	"runtime"
 
-	"golang.org/x/sys/unix"
-
-	"github.com/panjf2000/gnet/v2/internal/netpoll"
 	"github.com/panjf2000/gnet/v2/pkg/errors"
 )
 
@@ -33,7 +30,7 @@ func (el *eventloop) activateMainReactor() error {
 		defer runtime.UnlockOSThread()
 	}
 
-	err := el.poller.Polling(el.taskRun, el.pollCallback)
+	err := el.poller.Polling()
 	if err == errors.ErrEngineShutdown {
 		el.engine.opts.Logger.Debugf("main reactor is exiting in terms of the demand from user, %v", err)
 	} else if err != nil {
@@ -51,7 +48,7 @@ func (el *eventloop) activateSubReactor() error {
 		defer runtime.UnlockOSThread()
 	}
 
-	err := el.poller.Polling(el.taskRun, el.pollCallback)
+	err := el.poller.Polling()
 	if err == errors.ErrEngineShutdown {
 		el.engine.opts.Logger.Debugf("event-loop(%d) is exiting in terms of the demand from user, %v", el.idx, err)
 	} else if err != nil {
@@ -70,7 +67,7 @@ func (el *eventloop) run() error {
 		defer runtime.UnlockOSThread()
 	}
 
-	err := el.poller.Polling(el.taskRun, el.pollCallback)
+	err := el.poller.Polling()
 	el.getLogger().Debugf("event-loop(%d) is exiting due to error: %v", el.idx, err)
 
 	el.closeAllSockets()
@@ -78,21 +75,4 @@ func (el *eventloop) run() error {
 	el.engine.shutdown(err)
 
 	return err
-}
-
-func (el *eventloop) handleEvents(fd int, filter int16) (err error) {
-	if c := el.connections.getConn(fd); c != nil {
-		switch filter {
-		case netpoll.EVFilterSock:
-			err = el.closeConn(c, unix.ECONNRESET)
-		case netpoll.EVFilterWrite:
-			if !c.outboundBuffer.IsEmpty() {
-				err = el.write(c)
-			}
-		case netpoll.EVFilterRead:
-			err = el.read(c)
-		}
-	}
-
-	return
 }

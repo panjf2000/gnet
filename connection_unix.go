@@ -59,8 +59,9 @@ func newTCPConn(fd int, el *eventloop, sa unix.Sockaddr, localAddr, remoteAddr n
 		loop:           el,
 		localAddr:      localAddr,
 		remoteAddr:     remoteAddr,
-		pollAttachment: netpoll.PollAttachment{FD: fd, Type: netpoll.PollAttachmentStream},
+		pollAttachment: netpoll.PollAttachment{FD: fd},
 	}
+	c.pollAttachment.Callback = c.handleEvents
 	c.outboundBuffer.Reset(el.engine.opts.WriteBufferCap)
 	return
 }
@@ -74,7 +75,7 @@ func newUDPConn(fd int, el *eventloop, localAddr net.Addr, sa unix.Sockaddr, con
 		localAddr:      localAddr,
 		remoteAddr:     socket.SockaddrToUDPAddr(sa),
 		isDatagram:     true,
-		pollAttachment: netpoll.PollAttachment{FD: fd, Type: netpoll.PollAttachmentDatagram},
+		pollAttachment: netpoll.PollAttachment{FD: fd},
 	}
 	if connected {
 		c.peer = nil
@@ -93,7 +94,7 @@ func (c *conn) release() {
 	if addr, ok := c.remoteAddr.(*net.TCPAddr); ok && len(addr.Zone) > 0 {
 		bsPool.Put(bs.StringToBytes(addr.Zone))
 	}
-	c.pollAttachment.FD, c.pollAttachment.Type = 0, 0
+	c.pollAttachment.FD, c.pollAttachment.Callback = 0, nil
 	if !c.isDatagram {
 		c.opened = false
 		c.peer = nil
@@ -188,11 +189,12 @@ type asyncWriteHook struct {
 	data     []byte
 }
 
-func (c *conn) asyncWrite(hook *asyncWriteHook) (err error) {
+func (c *conn) asyncWrite(itf interface{}) (err error) {
 	if !c.opened {
 		return nil
 	}
 
+	hook := itf.(*asyncWriteHook)
 	_, err = c.write(hook.data)
 	if hook.callback != nil {
 		_ = hook.callback(c, err)
@@ -205,11 +207,12 @@ type asyncWritevHook struct {
 	data     [][]byte
 }
 
-func (c *conn) asyncWritev(hook *asyncWritevHook) (err error) {
+func (c *conn) asyncWritev(itf interface{}) (err error) {
 	if !c.opened {
 		return nil
 	}
 
+	hook := itf.(*asyncWritevHook)
 	_, err = c.writev(hook.data)
 	if hook.callback != nil {
 		_ = hook.callback(c, err)
@@ -427,24 +430,39 @@ func (c *conn) AsyncWrite(buf []byte, callback AsyncCallback) error {
 		}()
 		return c.sendTo(buf)
 	}
-	return c.loop.poller.Trigger(triggerTypeAsyncWrite, c.gfd, &asyncWriteHook{callback, buf})
+	return c.loop.poller.Trigger(c.asyncWrite, &asyncWriteHook{callback, buf})
 }
 
 func (c *conn) AsyncWritev(bs [][]byte, callback AsyncCallback) error {
 	if c.isDatagram {
 		return gerrors.ErrUnsupportedOp
 	}
-	return c.loop.poller.Trigger(triggerTypeAsyncWritev, c.gfd, &asyncWritevHook{callback, bs})
+	return c.loop.poller.Trigger(c.asyncWritev, &asyncWritevHook{callback, bs})
 }
 
 func (c *conn) Wake(callback AsyncCallback) error {
-	return c.loop.poller.UrgentTrigger(triggerTypeWake, c.gfd, callback)
+	return c.loop.poller.UrgentTrigger(func(_ interface{}) (err error) {
+		err = c.loop.wake(c)
+		if callback != nil {
+			_ = callback(c, err)
+		}
+		return
+	}, nil)
 }
 
 func (c *conn) CloseWithCallback(callback AsyncCallback) error {
-	return c.loop.poller.Trigger(triggerTypeClose, c.gfd, callback)
+	return c.loop.poller.Trigger(func(_ interface{}) (err error) {
+		err = c.loop.closeConn(c, nil)
+		if callback != nil {
+			_ = callback(c, err)
+		}
+		return
+	}, nil)
 }
 
 func (c *conn) Close() error {
-	return c.loop.poller.Trigger(triggerTypeClose, c.gfd, nil)
+	return c.loop.poller.Trigger(func(_ interface{}) (err error) {
+		err = c.loop.closeConn(c, nil)
+		return
+	}, nil)
 }

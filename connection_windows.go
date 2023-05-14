@@ -56,16 +56,6 @@ type conn struct {
 	inboundBuffer elastic.RingBuffer // buffer for data from the peer
 }
 
-type asyncWriteHook struct {
-	callback AsyncCallback
-	data     []byte
-}
-
-type asyncWritevHook struct {
-	callback AsyncCallback
-	data     [][]byte
-}
-
 func packTCPConn(c *conn, buf []byte) *tcpConn {
 	tc := &tcpConn{c: c, buf: bbPool.Get()}
 	_, _ = tc.buf.Write(buf)

@@ -31,19 +31,8 @@ import (
 
 	"github.com/panjf2000/gnet/v2/internal/io"
 	"github.com/panjf2000/gnet/v2/internal/netpoll"
-	"github.com/panjf2000/gnet/v2/internal/queue"
 	gerrors "github.com/panjf2000/gnet/v2/pkg/errors"
-	"github.com/panjf2000/gnet/v2/pkg/gfd"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
-)
-
-const (
-	triggerTypeAsyncWrite = iota
-	triggerTypeAsyncWritev
-	triggerTypeWake
-	triggerTypeClose
-	triggerTypeShutdown
-	triggerRegister
 )
 
 type eventloop struct {
@@ -73,7 +62,11 @@ func (el *eventloop) closeAllSockets() {
 	})
 }
 
-func (el *eventloop) register(c *conn) error {
+func (el *eventloop) register(itf interface{}) error {
+	c := itf.(*conn)
+	if c.isDatagram {
+		c.pollAttachment.Callback = el.readUDP
+	}
 	if err := el.poller.AddRead(&c.pollAttachment); err != nil {
 		_ = unix.Close(c.fd)
 		c.release()
@@ -247,7 +240,7 @@ func (el *eventloop) ticker(ctx context.Context) {
 		switch action {
 		case None:
 		case Shutdown:
-			err := el.poller.UrgentTrigger(triggerTypeShutdown, gfd.GFD{}, nil)
+			err := el.poller.UrgentTrigger(func(_ interface{}) error { return gerrors.ErrEngineShutdown }, nil)
 			el.getLogger().Debugf("stopping ticker in event-loop(%d) from OnTick(), UrgentTrigger:%v", el.idx, err)
 		}
 		if timer == nil {
@@ -261,49 +254,6 @@ func (el *eventloop) ticker(ctx context.Context) {
 			return
 		case <-timer.C:
 		}
-	}
-}
-
-func (el *eventloop) taskRun(task *queue.Task) (err error) {
-	switch task.TaskType {
-	case triggerTypeShutdown:
-		return gerrors.ErrEngineShutdown
-	case triggerRegister:
-		return el.register(task.Arg.(*conn))
-	}
-
-	c := el.connections.getConnByIndex(task.GFD.ConnIndex1(), task.GFD.ConnIndex2())
-	if c == nil || c.gfd != task.GFD {
-		if c == nil {
-			el.getLogger().Errorf("failed to find conn for task: %+v", task)
-		} else {
-			el.getLogger().Errorf("invalid connection for task: %+v, expected gfd: %+v, got: %+v", task, task.GFD, c.gfd)
-		}
-		return
-	}
-	switch task.TaskType {
-	case triggerTypeAsyncWrite:
-		return c.asyncWrite(task.Arg.(*asyncWriteHook))
-	case triggerTypeAsyncWritev:
-		return c.asyncWritev(task.Arg.(*asyncWritevHook))
-	case triggerTypeClose:
-		err = el.closeConn(c, nil)
-		if task.Arg != nil {
-			if callback, ok := task.Arg.(AsyncCallback); ok && callback != nil {
-				_ = callback(c, err)
-			}
-		}
-		return
-	case triggerTypeWake:
-		err = el.wake(c)
-		if task.Arg != nil {
-			if callback, ok := task.Arg.(AsyncCallback); ok && callback != nil {
-				_ = callback(c, err)
-			}
-		}
-		return
-	default:
-		return
 	}
 }
 

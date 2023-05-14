@@ -28,7 +28,6 @@ import (
 
 	"github.com/panjf2000/gnet/v2/internal/queue"
 	"github.com/panjf2000/gnet/v2/pkg/errors"
-	"github.com/panjf2000/gnet/v2/pkg/gfd"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
 )
 
@@ -79,9 +78,9 @@ var note = []unix.Kevent_t{{
 //
 // Note that urgentAsyncTaskQueue is a queue with high-priority and its size is expected to be small,
 // so only those urgent tasks should be put into this queue.
-func (p *Poller) UrgentTrigger(taskType int, gfd gfd.GFD, arg interface{}) (err error) {
+func (p *Poller) UrgentTrigger(fn queue.TaskFunc, arg interface{}) (err error) {
 	task := queue.GetTask()
-	task.TaskType, task.GFD, task.Arg = taskType, gfd, arg
+	task.Run, task.Arg = fn, arg
 	p.urgentAsyncTaskQueue.Enqueue(task)
 	if atomic.CompareAndSwapInt32(&p.wakeupCall, 0, 1) {
 		if _, err = unix.Kevent(p.fd, note, nil, nil); err == unix.EAGAIN {
@@ -95,9 +94,9 @@ func (p *Poller) UrgentTrigger(taskType int, gfd gfd.GFD, arg interface{}) (err 
 // call this method when the task is not so urgent, for instance writing data back to the peer.
 //
 // Note that asyncTaskQueue is a queue with low-priority whose size may grow large and tasks in it may backlog.
-func (p *Poller) Trigger(taskType int, gfd gfd.GFD, arg interface{}) (err error) {
+func (p *Poller) Trigger(fn queue.TaskFunc, arg interface{}) (err error) {
 	task := queue.GetTask()
-	task.TaskType, task.GFD, task.Arg = taskType, gfd, arg
+	task.Run, task.Arg = fn, arg
 	p.asyncTaskQueue.Enqueue(task)
 	if atomic.CompareAndSwapInt32(&p.wakeupCall, 0, 1) {
 		if _, err = unix.Kevent(p.fd, note, nil, nil); err == unix.EAGAIN {
@@ -108,7 +107,7 @@ func (p *Poller) Trigger(taskType int, gfd gfd.GFD, arg interface{}) (err error)
 }
 
 // Polling blocks the current goroutine, waiting for network-events.
-func (p *Poller) Polling(taskRun func(task *queue.Task) error, pollCallback func(pct PollCallbackType, fd int, e IOEvent) error) error {
+func (p *Poller) Polling() error {
 	el := newEventList(InitPollEventsCap)
 
 	var (
@@ -137,7 +136,7 @@ func (p *Poller) Polling(taskRun func(task *queue.Task) error, pollCallback func
 					evFilter = EVFilterSock
 				}
 				pollAttachment := (*PollAttachment)(unsafe.Pointer(ev.Udata))
-				switch err = pollCallback(pollAttachment.Type, int(ev.Ident), evFilter); err {
+				switch err = pollAttachment.Callback(int(ev.Ident), evFilter); err {
 				case nil:
 				case errors.ErrAcceptSocket, errors.ErrEngineShutdown:
 					return err
@@ -153,7 +152,7 @@ func (p *Poller) Polling(taskRun func(task *queue.Task) error, pollCallback func
 			doChores = false
 			task := p.urgentAsyncTaskQueue.Dequeue()
 			for ; task != nil; task = p.urgentAsyncTaskQueue.Dequeue() {
-				switch err = taskRun(task); err {
+				switch err = task.Run(task.Arg); err {
 				case nil:
 				case errors.ErrEngineShutdown:
 					return err
@@ -166,7 +165,7 @@ func (p *Poller) Polling(taskRun func(task *queue.Task) error, pollCallback func
 				if task = p.asyncTaskQueue.Dequeue(); task == nil {
 					break
 				}
-				switch err = taskRun(task); err {
+				switch err = task.Run(task.Arg); err {
 				case nil:
 				case errors.ErrEngineShutdown:
 					return err

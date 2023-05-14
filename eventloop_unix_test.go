@@ -151,14 +151,14 @@ func (s *testServerGC) GC() {
 	}()
 	var gcAllTime, gcAllCount time.Duration
 	gcStart := time.Now()
-	for range time.Tick(time.Second * 2) {
+	for range time.Tick(time.Second) {
 		gcAllCount++
 		now := time.Now()
 		runtime.GC()
 		gcTime := time.Since(now)
 		gcAllTime += gcTime
 		s.tester.Log(s.tester.Name(), s.network, " server gc:", gcTime, ", average gc time: ", gcAllTime/gcAllCount)
-		if time.Since(gcStart) >= time.Second*10 {
+		if time.Since(gcStart) >= time.Second*5 {
 			break
 		}
 	}

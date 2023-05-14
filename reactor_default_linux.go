@@ -30,7 +30,7 @@ func (el *eventloop) activateMainReactor() error {
 		defer runtime.UnlockOSThread()
 	}
 
-	err := el.poller.Polling(el.taskRun, func(fd int, ev uint32) error { return el.engine.accept(fd, ev) })
+	err := el.poller.Polling(func(fd int, ev uint32) error { return el.engine.accept(fd, ev) })
 	if err == errors.ErrEngineShutdown {
 		el.engine.opts.Logger.Debugf("main reactor is exiting in terms of the demand from user, %v", err)
 		err = nil
@@ -49,7 +49,7 @@ func (el *eventloop) activateSubReactor() error {
 		defer runtime.UnlockOSThread()
 	}
 
-	err := el.poller.Polling(el.taskRun, func(fd int, ev uint32) error {
+	err := el.poller.Polling(func(fd int, ev uint32) error {
 		if c := el.connections.getConn(fd); c != nil {
 			// Don't change the ordering of processing EPOLLOUT | EPOLLRDHUP / EPOLLIN unless you're 100%
 			// sure what you're doing!
@@ -94,7 +94,7 @@ func (el *eventloop) run() error {
 		defer runtime.UnlockOSThread()
 	}
 
-	err := el.poller.Polling(el.taskRun, func(fd int, ev uint32) error {
+	err := el.poller.Polling(func(fd int, ev uint32) error {
 		if c := el.connections.getConn(fd); c != nil {
 			// Don't change the ordering of processing EPOLLOUT | EPOLLRDHUP / EPOLLIN unless you're 100%
 			// sure what you're doing!

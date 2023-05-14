@@ -40,8 +40,8 @@ type listener struct {
 	pollAttachment   *netpoll.PollAttachment // listener attachment for poller
 }
 
-func (ln *listener) packPollAttachment(pct netpoll.PollCallbackType) *netpoll.PollAttachment {
-	ln.pollAttachment = &netpoll.PollAttachment{FD: ln.fd, Type: pct}
+func (ln *listener) packPollAttachment(handler netpoll.PollEventHandler) *netpoll.PollAttachment {
+	ln.pollAttachment = &netpoll.PollAttachment{FD: ln.fd, Callback: handler}
 	return ln.pollAttachment
 }
 

@@ -105,24 +105,6 @@ func (s Engine) Stop(ctx context.Context) error {
 	}
 }
 
-// ==================================== Concurrency-safe API's ====================================
-
-func (s Engine) AsyncWrite(gFd gfd.GFD, buf []byte, callback AsyncCallback) error {
-	return s.eng.trigger(triggerTypeAsyncWrite, gFd, &asyncWriteHook{callback, buf})
-}
-
-func (s Engine) AsyncWritev(gFd gfd.GFD, bs [][]byte, callback AsyncCallback) error {
-	return s.eng.trigger(triggerTypeAsyncWritev, gFd, &asyncWritevHook{callback, bs})
-}
-
-func (s Engine) Wake(gFd gfd.GFD, callback AsyncCallback) error {
-	return s.eng.trigger(triggerTypeWake, gFd, callback)
-}
-
-func (s Engine) Close(gFd gfd.GFD, callback AsyncCallback) error {
-	return s.eng.trigger(triggerTypeClose, gFd, callback)
-}
-
 // Reader is an interface that consists of a number of methods for reading that Conn must implement.
 type Reader interface {
 	// ================================== Non-concurrency-safe API's ==================================

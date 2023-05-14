@@ -104,7 +104,7 @@ func (eng *engine) activateEventLoops(numEventLoop int) (err error) {
 			el.buffer = make([]byte, eng.opts.ReadBufferCap)
 			el.connections.fd2gfd = make(map[int]gfd.GFD)
 			el.eventHandler = eng.eventHandler
-			if err = el.poller.AddRead(el.ln.packPollAttachment(netpoll.PollAttachmentEventLoops)); err != nil {
+			if err = el.poller.AddRead(el.ln.packPollAttachment(el.accept)); err != nil {
 				return
 			}
 			eng.lb.register(el)
@@ -155,7 +155,7 @@ func (eng *engine) activateReactors(numEventLoop int) error {
 		el.engine = eng
 		el.poller = p
 		el.eventHandler = eng.eventHandler
-		if err = el.poller.AddRead(eng.ln.packPollAttachment(netpoll.PollAttachmentMainAccept)); err != nil {
+		if err = el.poller.AddRead(eng.ln.packPollAttachment(eng.accept)); err != nil {
 			return err
 		}
 		eng.mainLoop = el
@@ -193,7 +193,7 @@ func (eng *engine) stop(s Engine) {
 
 	// Notify all loops to close by closing all listeners
 	eng.lb.iterate(func(i int, el *eventloop) bool {
-		err := el.poller.UrgentTrigger(triggerTypeShutdown, gfd.GFD{}, nil)
+		err := el.poller.UrgentTrigger(func(_ interface{}) error { return errors.ErrEngineShutdown }, nil)
 		if err != nil {
 			eng.opts.Logger.Errorf("failed to call UrgentTrigger on sub event-loop when stopping engine: %v", err)
 		}
@@ -202,7 +202,7 @@ func (eng *engine) stop(s Engine) {
 
 	if eng.mainLoop != nil {
 		eng.ln.close()
-		err := eng.mainLoop.poller.UrgentTrigger(triggerTypeShutdown, gfd.GFD{}, nil)
+		err := eng.mainLoop.poller.UrgentTrigger(func(_ interface{}) error { return errors.ErrEngineShutdown }, nil)
 		if err != nil {
 			eng.opts.Logger.Errorf("failed to call UrgentTrigger on main event-loop when stopping engine: %v", err)
 		}
@@ -283,15 +283,4 @@ func run(eventHandler EventHandler, listener *listener, options *Options, protoA
 	allEngines.Store(protoAddr, &eng)
 
 	return nil
-}
-
-func (eng *engine) trigger(taskType int, gFd gfd.GFD, arg interface{}) error {
-	if !gfd.CheckLegal(gFd) {
-		return nil
-	}
-	el := eng.lb.index(gFd.EventLoopIndex())
-	if el == nil {
-		return nil
-	}
-	return el.poller.Trigger(taskType, gFd, arg)
 }

@@ -123,7 +123,7 @@ func (cli *Client) Start() error {
 
 // Stop stops the client event-loop.
 func (cli *Client) Stop() (err error) {
-	logging.Error(cli.el.poller.UrgentTrigger(triggerTypeShutdown, gfd.GFD{}, nil))
+	logging.Error(cli.el.poller.UrgentTrigger(func(_ interface{}) error { return gerrors.ErrEngineShutdown }, nil))
 	// Stop the ticker.
 	if cli.opts.Ticker {
 		cli.el.engine.ticker.cancel()
@@ -217,7 +217,7 @@ func (cli *Client) Enroll(c net.Conn) (Conn, error) {
 	default:
 		return nil, gerrors.ErrUnsupportedProtocol
 	}
-	err = cli.el.poller.UrgentTrigger(triggerRegister, gc.Gfd(), gc)
+	err = cli.el.poller.UrgentTrigger(cli.el.register, gc)
 	if err != nil {
 		gc.Close()
 		return nil, err

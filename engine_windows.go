@@ -25,7 +25,6 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
-	"github.com/panjf2000/gnet/v2/pkg/gfd"
 )
 
 type engine struct {
@@ -159,8 +158,4 @@ func run(eventHandler EventHandler, listener *listener, options *Options, protoA
 	allEngines.Store(protoAddr, &eng)
 
 	return nil
-}
-
-func (eng *engine) trigger(_ int, _ gfd.GFD, _ interface{}) error {
-	return errorx.ErrUnsupportedOp
 }

@@ -20,7 +20,6 @@ package gnet
 import (
 	"runtime"
 
-	"github.com/panjf2000/gnet/v2/internal/netpoll"
 	"github.com/panjf2000/gnet/v2/pkg/errors"
 )
 
@@ -30,7 +29,7 @@ func (el *eventloop) activateMainReactor() error {
 		defer runtime.UnlockOSThread()
 	}
 
-	err := el.poller.Polling(el.taskRun, el.pollCallback)
+	err := el.poller.Polling()
 	if err == errors.ErrEngineShutdown {
 		el.engine.opts.Logger.Debugf("main reactor is exiting in terms of the demand from user, %v", err)
 	} else if err != nil {
@@ -48,7 +47,7 @@ func (el *eventloop) activateSubReactor() error {
 		defer runtime.UnlockOSThread()
 	}
 
-	err := el.poller.Polling(el.taskRun, el.pollCallback)
+	err := el.poller.Polling()
 	if err == errors.ErrEngineShutdown {
 		el.engine.opts.Logger.Debugf("event-loop(%d) is exiting in terms of the demand from user, %v", el.idx, err)
 	} else if err != nil {
@@ -67,7 +66,7 @@ func (el *eventloop) run() error {
 		defer runtime.UnlockOSThread()
 	}
 
-	err := el.poller.Polling(el.taskRun, el.pollCallback)
+	err := el.poller.Polling()
 	el.getLogger().Debugf("event-loop(%d) is exiting due to error: %v", el.idx, err)
 
 	el.closeAllSockets()
@@ -75,32 +74,4 @@ func (el *eventloop) run() error {
 	el.engine.shutdown(err)
 
 	return err
-}
-
-func (el *eventloop) handleEvents(fd int, ev uint32) error {
-	// Don't change the ordering of processing EPOLLOUT | EPOLLRDHUP / EPOLLIN unless you're 100%
-	// sure what you're doing!
-	// Re-ordering can easily introduce bugs and bad side-effects, as I found out painfully in the past.
-
-	// We should always check for the EPOLLOUT event first, as we must try to send the leftover data back to
-	// the peer when any error occurs on a connection.
-	//
-	// Either an EPOLLOUT or EPOLLERR event may be fired when a connection is refused.
-	// In either case write() should take care of it properly:
-	// 1) writing data back,
-	// 2) closing the connection.
-	c := el.connections.getConn(fd)
-	if c == nil {
-		return nil
-	}
-	if ev&netpoll.OutEvents != 0 && !c.outboundBuffer.IsEmpty() {
-		if err := el.write(c); err != nil {
-			return err
-		}
-	}
-	if ev&netpoll.InEvents != 0 {
-		return el.read(c)
-	}
-
-	return nil
 }

@@ -29,15 +29,6 @@ import (
 	"github.com/panjf2000/gnet/v2/pkg/logging"
 )
 
-const (
-	triggerTypeAsyncWrite = iota
-	triggerTypeAsyncWritev
-	triggerTypeWake
-	triggerTypeClose
-	triggerTypeShutdown
-	triggerRegister
-)
-
 type eventloop struct {
 	ch           chan interface{}   // channel for event-loop
 	idx          int                // index of event-loop in event-loops

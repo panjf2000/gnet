@@ -16,8 +16,6 @@ package queue
 
 import (
 	"sync"
-
-	"github.com/panjf2000/gnet/v2/pkg/gfd"
 )
 
 // TaskFunc is the callback function executed by poller.
@@ -25,9 +23,8 @@ type TaskFunc func(interface{}) error
 
 // Task is a wrapper that contains function and its argument.
 type Task struct {
-	GFD      gfd.GFD
-	TaskType int
-	Arg      interface{}
+	Run TaskFunc
+	Arg interface{}
 }
 
 var taskPool = sync.Pool{New: func() interface{} { return new(Task) }}
@@ -39,10 +36,7 @@ func GetTask() *Task {
 
 // PutTask puts the trashy Task back in pool.
 func PutTask(task *Task) {
-	for k := range task.GFD {
-		task.GFD[k] = 0
-	}
-	task.TaskType, task.Arg = 0, nil
+	task.Run, task.Arg = nil, nil
 	taskPool.Put(task)
 }
 
