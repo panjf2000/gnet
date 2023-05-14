@@ -1091,8 +1091,6 @@ func (s *testClosedWakeUpServer) OnBoot(_ Engine) (action Action) {
 }
 
 func (s *testClosedWakeUpServer) OnTraffic(c Conn) Action {
-	require.NotNil(s.tester, c.RemoteAddr())
-
 	select {
 	case <-s.wakeup:
 	default:

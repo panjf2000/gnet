@@ -18,11 +18,14 @@
 package gnet
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"math/rand"
 	"net"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -30,7 +33,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 	"golang.org/x/sys/unix"
+
+	"github.com/panjf2000/gnet/v2/pkg/gfd"
+	"github.com/panjf2000/gnet/v2/pkg/logging"
+	bbPool "github.com/panjf2000/gnet/v2/pkg/pool/bytebuffer"
+	goPool "github.com/panjf2000/gnet/v2/pkg/pool/goroutine"
 )
 
 var (
@@ -201,4 +210,327 @@ func TestMulticastBindIPv6(t *testing.T) {
 		WithMulticastInterfaceIndex(iface.Index),
 		WithTicker(true))
 	assert.NoError(t, err)
+}
+
+func TestEngineAsyncWrite(t *testing.T) {
+	t.Run("tcp", func(t *testing.T) {
+		t.Run("1-loop", func(t *testing.T) {
+			testEngineAsyncWrite(t, "tcp", ":18888", false, false, 10, LeastConnections)
+		})
+		t.Run("N-loop", func(t *testing.T) {
+			testEngineAsyncWrite(t, "tcp", ":28888", true, true, 10, RoundRobin)
+		})
+	})
+	t.Run("unix", func(t *testing.T) {
+		t.Run("1-loop", func(t *testing.T) {
+			testEngineAsyncWrite(t, "unix", ":18888", false, false, 10, LeastConnections)
+		})
+		t.Run("N-loop", func(t *testing.T) {
+			testEngineAsyncWrite(t, "unix", ":28888", true, true, 10, RoundRobin)
+		})
+	})
+}
+
+type testEngineAsyncWriteServer struct {
+	*BuiltinEventEngine
+	tester       *testing.T
+	eng          Engine
+	network      string
+	addr         string
+	multicore    bool
+	writev       bool
+	nclients     int
+	started      int32
+	connected    int32
+	clientActive int32
+	disconnected int32
+	workerPool   *goPool.Pool
+}
+
+func (s *testEngineAsyncWriteServer) OnBoot(eng Engine) (action Action) {
+	s.eng = eng
+	return
+}
+
+func (s *testEngineAsyncWriteServer) OnOpen(c Conn) (out []byte, action Action) {
+	c.SetContext(c)
+	atomic.AddInt32(&s.connected, 1)
+	out = []byte("sweetness\r\n")
+	require.NotNil(s.tester, c.LocalAddr(), "nil local addr")
+	require.NotNil(s.tester, c.RemoteAddr(), "nil remote addr")
+	return
+}
+
+func (s *testEngineAsyncWriteServer) OnClose(c Conn, err error) (action Action) {
+	if err != nil {
+		logging.Debugf("error occurred on closed, %v\n", err)
+	}
+	if s.network != "udp" {
+		require.Equal(s.tester, c.Context(), c, "invalid context")
+	}
+
+	atomic.AddInt32(&s.disconnected, 1)
+	if atomic.LoadInt32(&s.connected) == atomic.LoadInt32(&s.disconnected) &&
+		atomic.LoadInt32(&s.disconnected) == int32(s.nclients) {
+		action = Shutdown
+		s.workerPool.Release()
+	}
+
+	return
+}
+
+func (s *testEngineAsyncWriteServer) OnTraffic(c Conn) (action Action) {
+	gFD := c.Gfd()
+
+	buf := bbPool.Get()
+	_, _ = c.WriteTo(buf)
+
+	// just for test
+	_ = c.InboundBuffered()
+	_ = c.OutboundBuffered()
+	_, _ = c.Discard(1)
+
+	_ = s.workerPool.Submit(
+		func() {
+			if s.writev {
+				mid := buf.Len() / 2
+				bs := make([][]byte, 2)
+				bs[0] = buf.B[:mid]
+				bs[1] = buf.B[mid:]
+				_ = s.eng.AsyncWritev(gFD, bs, func(c Conn, err error) error {
+					if c.RemoteAddr() != nil {
+						logging.Debugf("conn=%s done writev: %v", c.RemoteAddr().String(), err)
+					}
+					bbPool.Put(buf)
+					return nil
+				})
+			} else {
+				_ = s.eng.AsyncWrite(gFD, buf.Bytes(), func(c Conn, err error) error {
+					if c.RemoteAddr() != nil {
+						logging.Debugf("conn=%s done write: %v", c.RemoteAddr().String(), err)
+					}
+					bbPool.Put(buf)
+					return nil
+				})
+			}
+		})
+	return
+}
+
+func (s *testEngineAsyncWriteServer) OnTick() (delay time.Duration, action Action) {
+	delay = time.Second / 5
+	if atomic.CompareAndSwapInt32(&s.started, 0, 1) {
+		for i := 0; i < s.nclients; i++ {
+			atomic.AddInt32(&s.clientActive, 1)
+			go func() {
+				initClient(s.tester, s.network, s.addr, s.multicore)
+				atomic.AddInt32(&s.clientActive, -1)
+			}()
+		}
+	}
+	if s.network == "udp" && atomic.LoadInt32(&s.clientActive) == 0 {
+		action = Shutdown
+		return
+	}
+	return
+}
+
+func testEngineAsyncWrite(t *testing.T, network, addr string, multicore, writev bool, nclients int, lb LoadBalancing) {
+	ts := &testEngineAsyncWriteServer{
+		tester:     t,
+		network:    network,
+		addr:       addr,
+		multicore:  multicore,
+		writev:     writev,
+		nclients:   nclients,
+		workerPool: goPool.Default(),
+	}
+	err := Run(ts,
+		network+"://"+addr,
+		WithMulticore(multicore),
+		WithTicker(true),
+		WithLoadBalancing(lb))
+	assert.NoError(t, err)
+}
+
+func initClient(t *testing.T, network, addr string, multicore bool) {
+	rand.Seed(time.Now().UnixNano())
+	c, err := net.Dial(network, addr)
+	require.NoError(t, err)
+	defer c.Close()
+	rd := bufio.NewReader(c)
+	msg, err := rd.ReadBytes('\n')
+	require.NoError(t, err)
+	require.Equal(t, string(msg), "sweetness\r\n", "bad header")
+	duration := time.Duration((rand.Float64()*2+1)*float64(time.Second)) / 2
+	t.Logf("test duration: %dms", duration/time.Millisecond)
+	start := time.Now()
+	for time.Since(start) < duration {
+		reqData := make([]byte, streamLen)
+		_, err = rand.Read(reqData)
+		require.NoError(t, err)
+		_, err = c.Write(reqData)
+		require.NoError(t, err)
+		respData := make([]byte, len(reqData))
+		_, err = io.ReadFull(rd, respData)
+		require.NoError(t, err)
+		require.Equalf(
+			t,
+			len(reqData),
+			len(respData),
+			"response mismatch with protocol:%s, multi-core:%t, length of bytes: %d vs %d",
+			network,
+			multicore,
+			len(reqData),
+			len(respData),
+		)
+	}
+}
+
+func TestEngineWakeConn(t *testing.T) {
+	testEngineWakeConn(t, "tcp", ":9990")
+}
+
+type testEngineWakeConnServer struct {
+	*BuiltinEventEngine
+	tester  *testing.T
+	eng     Engine
+	network string
+	addr    string
+	gFD     chan gfd.GFD
+	wake    bool
+}
+
+func (t *testEngineWakeConnServer) OnBoot(eng Engine) (action Action) {
+	t.eng = eng
+	return
+}
+
+func (t *testEngineWakeConnServer) OnOpen(c Conn) (out []byte, action Action) {
+	t.gFD <- c.Gfd()
+	return
+}
+
+func (t *testEngineWakeConnServer) OnClose(Conn, error) (action Action) {
+	action = Shutdown
+	return
+}
+
+func (t *testEngineWakeConnServer) OnTraffic(c Conn) (action Action) {
+	_, _ = c.Write([]byte("Waking up."))
+	action = -1
+	return
+}
+
+func (t *testEngineWakeConnServer) OnTick() (delay time.Duration, action Action) {
+	if !t.wake {
+		t.wake = true
+		delay = time.Millisecond * 100
+		go func() {
+			conn, err := net.Dial(t.network, t.addr)
+			require.NoError(t.tester, err)
+			defer conn.Close()
+			r := make([]byte, 10)
+			_, err = conn.Read(r)
+			require.NoError(t.tester, err)
+		}()
+		return
+	}
+	gFD := <-t.gFD
+	_ = t.eng.Wake(gFD, func(c Conn, err error) error {
+		logging.Debugf("conn=%s done wake: %v", c.RemoteAddr().String(), err)
+		return nil
+	})
+	delay = time.Millisecond * 100
+	return
+}
+
+func testEngineWakeConn(t *testing.T, network, addr string) {
+	svr := &testEngineWakeConnServer{tester: t, network: network, addr: addr, gFD: make(chan gfd.GFD, 1)}
+	logger := zap.NewExample()
+	err := Run(svr, network+"://"+addr,
+		WithTicker(true),
+		WithNumEventLoop(2*runtime.NumCPU()),
+		WithLogger(logger.Sugar()),
+		WithSocketRecvBuffer(4*1024),
+		WithSocketSendBuffer(4*1024),
+		WithReadBufferCap(2000),
+		WithWriteBufferCap(2000))
+	assert.NoError(t, err)
+	_ = logger.Sync()
+}
+
+// Test should not panic when we wake-up server_closed conn.
+func TestEngineClosedWakeUp(t *testing.T) {
+	events := &testEngineClosedWakeUpServer{
+		tester:             t,
+		BuiltinEventEngine: &BuiltinEventEngine{}, network: "tcp", addr: ":9999", protoAddr: "tcp://:9999",
+		clientClosed: make(chan struct{}),
+		serverClosed: make(chan struct{}),
+		wakeup:       make(chan struct{}),
+	}
+
+	err := Run(events, events.protoAddr)
+	assert.NoError(t, err)
+}
+
+type testEngineClosedWakeUpServer struct {
+	*BuiltinEventEngine
+	tester                   *testing.T
+	network, addr, protoAddr string
+
+	eng Engine
+
+	wakeup       chan struct{}
+	serverClosed chan struct{}
+	clientClosed chan struct{}
+}
+
+func (s *testEngineClosedWakeUpServer) OnBoot(eng Engine) (action Action) {
+	s.eng = eng
+	go func() {
+		c, err := net.Dial(s.network, s.addr)
+		require.NoError(s.tester, err)
+
+		_, err = c.Write([]byte("hello"))
+		require.NoError(s.tester, err)
+
+		<-s.wakeup
+		_, err = c.Write([]byte("hello again"))
+		require.NoError(s.tester, err)
+
+		close(s.clientClosed)
+		<-s.serverClosed
+
+		logging.Debugf("stop engine...", Stop(context.TODO(), s.protoAddr))
+	}()
+
+	return None
+}
+
+func (s *testEngineClosedWakeUpServer) OnTraffic(c Conn) Action {
+	select {
+	case <-s.wakeup:
+	default:
+		close(s.wakeup)
+	}
+
+	fd := c.Gfd()
+
+	go func() { require.NoError(s.tester, c.Wake(nil)) }()
+	go func() { require.NoError(s.tester, s.eng.Close(fd, nil)) }()
+
+	<-s.clientClosed
+
+	_, _ = c.Write([]byte("answer"))
+	return None
+}
+
+func (s *testEngineClosedWakeUpServer) OnClose(Conn, error) (action Action) {
+	select {
+	case <-s.serverClosed:
+	default:
+		close(s.serverClosed)
+	}
+	return
 }

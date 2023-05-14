@@ -50,13 +50,23 @@ type Engine struct {
 	eng *engine
 }
 
+func (e Engine) Validate() error {
+	if e.eng == nil {
+		return errors.ErrEmptyEngine
+	}
+	if e.eng.isInShutdown() {
+		return errors.ErrEngineInShutdown
+	}
+	return nil
+}
+
 // CountConnections counts the number of currently active connections and returns it.
-func (s Engine) CountConnections() (count int) {
-	if s.eng == nil {
+func (e Engine) CountConnections() (count int) {
+	if e.Validate() != nil {
 		return -1
 	}
 
-	s.eng.lb.iterate(func(i int, el *eventloop) bool {
+	e.eng.lb.iterate(func(i int, el *eventloop) bool {
 		count += int(el.loadConn())
 		return true
 	})
@@ -66,13 +76,13 @@ func (s Engine) CountConnections() (count int) {
 // Dup returns a copy of the underlying file descriptor of listener.
 // It is the caller's responsibility to close dupFD when finished.
 // Closing listener does not affect dupFD, and closing dupFD does not affect listener.
-func (s Engine) Dup() (dupFD int, err error) {
-	if s.eng == nil {
-		return -1, errors.ErrEmptyEngine
+func (e Engine) Dup() (dupFD int, err error) {
+	if err = e.Validate(); err != nil {
+		return -1, err
 	}
 
 	var sc string
-	dupFD, sc, err = s.eng.ln.dup()
+	dupFD, sc, err = e.eng.ln.dup()
 	if err != nil {
 		logging.Warnf("%s failed when duplicating new fd\n", sc)
 	}
@@ -81,20 +91,17 @@ func (s Engine) Dup() (dupFD int, err error) {
 
 // Stop gracefully shuts down this Engine without interrupting any active event-loops,
 // it waits indefinitely for connections and event-loops to be closed and then shuts down.
-func (s Engine) Stop(ctx context.Context) error {
-	if s.eng == nil {
-		return errors.ErrEmptyEngine
-	}
-	if s.eng.isInShutdown() {
-		return errors.ErrEngineInShutdown
+func (e Engine) Stop(ctx context.Context) error {
+	if err := e.Validate(); err != nil {
+		return err
 	}
 
-	s.eng.shutdown(nil)
+	e.eng.shutdown(nil)
 
 	ticker := time.NewTicker(shutdownPollInterval)
 	defer ticker.Stop()
 	for {
-		if s.eng.isInShutdown() {
+		if e.eng.isInShutdown() {
 			return nil
 		}
 		select {
@@ -103,6 +110,54 @@ func (s Engine) Stop(ctx context.Context) error {
 		case <-ticker.C:
 		}
 	}
+}
+
+type asyncCmdType uint8
+
+const (
+	asyncCmdClose = iota + 1
+	asyncCmdWake
+	asyncCmdWrite
+	asyncCmdWritev
+)
+
+type asyncCmd struct {
+	fd  gfd.GFD
+	typ asyncCmdType
+	cb  AsyncCallback
+	arg interface{}
+}
+
+func (e Engine) AsyncWrite(fd gfd.GFD, p []byte, cb AsyncCallback) error {
+	if err := e.Validate(); err != nil {
+		return err
+	}
+
+	return e.eng.sendCmd(&asyncCmd{fd: fd, typ: asyncCmdWrite, cb: cb, arg: p}, false)
+}
+
+func (e Engine) AsyncWritev(fd gfd.GFD, batch [][]byte, cb AsyncCallback) error {
+	if err := e.Validate(); err != nil {
+		return err
+	}
+
+	return e.eng.sendCmd(&asyncCmd{fd: fd, typ: asyncCmdWritev, cb: cb, arg: batch}, false)
+}
+
+func (e Engine) Close(fd gfd.GFD, cb AsyncCallback) error {
+	if err := e.Validate(); err != nil {
+		return err
+	}
+
+	return e.eng.sendCmd(&asyncCmd{fd: fd, typ: asyncCmdClose, cb: cb}, false)
+}
+
+func (e Engine) Wake(fd gfd.GFD, cb AsyncCallback) error {
+	if err := e.Validate(); err != nil {
+		return err
+	}
+
+	return e.eng.sendCmd(&asyncCmd{fd: fd, typ: asyncCmdWake, cb: cb}, true)
 }
 
 // Reader is an interface that consists of a number of methods for reading that Conn must implement.

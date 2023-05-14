@@ -284,3 +284,17 @@ func run(eventHandler EventHandler, listener *listener, options *Options, protoA
 
 	return nil
 }
+
+func (eng *engine) sendCmd(cmd *asyncCmd, urgent bool) error {
+	if !gfd.Validate(cmd.fd) {
+		return errors.ErrInvalidConn
+	}
+	el := eng.lb.index(cmd.fd.EventLoopIndex())
+	if el == nil {
+		return errors.ErrInvalidConn
+	}
+	if urgent {
+		return el.poller.UrgentTrigger(el.execCmd, cmd)
+	}
+	return el.poller.Trigger(el.execCmd, cmd)
+}

@@ -129,3 +129,10 @@ func (cs *connStore) getConn(fd int) *conn {
 	}
 	return cs.connMatrix[gFD.ConnIndex1()][gFD.ConnIndex2()]
 }
+
+func (cs *connStore) getConnByIndex(idx1, idx2 int) *conn {
+	if cs.connMatrix[idx1] == nil {
+		return nil
+	}
+	return cs.connMatrix[idx1][idx2]
+}

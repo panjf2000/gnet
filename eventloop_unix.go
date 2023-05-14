@@ -295,3 +295,30 @@ func (el *eventloop) readUDP(fd int, _ netpoll.IOEvent) error {
 	}
 	return nil
 }
+
+func (el *eventloop) execCmd(itf interface{}) (err error) {
+	cmd := itf.(*asyncCmd)
+	c := el.connections.getConnByIndex(cmd.fd.ConnIndex1(), cmd.fd.ConnIndex2())
+	if c == nil || c.gfd != cmd.fd {
+		return gerrors.ErrInvalidConn
+	}
+	defer func() {
+		if cmd.cb != nil {
+			_ = cmd.cb(c, err)
+		}
+	}()
+	switch cmd.typ {
+	case asyncCmdClose:
+		return el.closeConn(c, nil)
+	case asyncCmdWake:
+		return el.wake(c)
+	case asyncCmdWrite:
+		_, err = c.write(cmd.arg.([]byte))
+		return
+	case asyncCmdWritev:
+		_, err = c.writev(cmd.arg.([][]byte))
+		return
+	default:
+		return gerrors.ErrUnsupportedOp
+	}
+}

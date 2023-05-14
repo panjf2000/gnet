@@ -67,10 +67,10 @@ func NewGFD(fd, elIndex, connIndex1, connIndex2 int) (gfd GFD) {
 	return
 }
 
-func CheckLegal(gfd GFD) bool {
+func Validate(gfd GFD) bool {
 	return gfd.Fd() > 2 && gfd.Fd() <= math.MaxInt &&
-		gfd.EventLoopIndex() >= 0 && gfd.EventLoopIndex() <= EventLoopIndexMax &&
-		gfd.ConnIndex1() >= 0 && gfd.ConnIndex1() <= ConnIndex1Max &&
-		gfd.ConnIndex2() >= 0 && gfd.ConnIndex2() <= ConnIndex2Max &&
+		gfd.EventLoopIndex() >= 0 && gfd.EventLoopIndex() < EventLoopIndexMax &&
+		gfd.ConnIndex1() >= 0 && gfd.ConnIndex1() < ConnIndex1Max &&
+		gfd.ConnIndex2() >= 0 && gfd.ConnIndex2() < ConnIndex2Max &&
 		gfd.Timestamp() != 0
 }
