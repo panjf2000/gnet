@@ -12,6 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/*
+Package gfd provides a structure GFD to store the fd, eventloop index, connStore indexes
+and some other information.
+
+GFD structure:
+|eventloop index|conn level one index|conn level two index| timestamp |      fd     |
+|   1 byte      |       1 byte       |      2 byte        |  4 byte   |int type size|.
+*/
 package gfd
 
 import (
@@ -20,6 +28,7 @@ import (
 	"time"
 )
 
+// Constants for GFD.
 const (
 	ConnIndex2Offset  = 2
 	TimeStampOffset   = 4
@@ -29,35 +38,35 @@ const (
 	ConnIndex2Max     = math.MaxUint16 + 1
 )
 
-// GFD structure:
-//
-// |eventloop index|conn level one index|conn level two index| timestamp |      fd     |
-// |   1 byte      |       1 byte       |      2 byte        |  4 byte   |int type size|.
-//
-
+// GFD is a structure to store the fd, eventloop index, connStore indexes.
 type GFD [0x10]byte
 
+// Fd returns the underlying fd.
 func (gfd GFD) Fd() int {
 	return int(binary.BigEndian.Uint64(gfd[FdOffset:]))
 }
 
+// EventLoopIndex returns the eventloop index.
 func (gfd GFD) EventLoopIndex() int {
 	return int(gfd[0])
 }
 
+// ConnIndex1 returns the connStore index of the first level.
 func (gfd GFD) ConnIndex1() int {
 	return int(gfd[1])
 }
 
+// ConnIndex2 returns the connStore index of the second level.
 func (gfd GFD) ConnIndex2() int {
 	return int(binary.BigEndian.Uint16(gfd[ConnIndex2Offset:TimeStampOffset]))
 }
 
-// Timestamp incomplete timestamp, only used to prevent fd duplication.
+// Timestamp returns the incomplete timestamp, only used to prevent fd duplication.
 func (gfd GFD) Timestamp() uint32 {
 	return binary.BigEndian.Uint32(gfd[TimeStampOffset:FdOffset])
 }
 
+// NewGFD creates a new GFD.
 func NewGFD(fd, elIndex, connIndex1, connIndex2 int) (gfd GFD) {
 	gfd[0] = byte(elIndex)
 	gfd[1] = byte(connIndex1)
@@ -67,6 +76,7 @@ func NewGFD(fd, elIndex, connIndex1, connIndex2 int) (gfd GFD) {
 	return
 }
 
+// Validate checks if the GFD is valid.
 func Validate(gfd GFD) bool {
 	return gfd.Fd() > 2 && gfd.Fd() <= math.MaxInt &&
 		gfd.EventLoopIndex() >= 0 && gfd.EventLoopIndex() < EventLoopIndexMax &&

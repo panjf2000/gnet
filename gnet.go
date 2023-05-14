@@ -50,6 +50,7 @@ type Engine struct {
 	eng *engine
 }
 
+// Validate checks whether the engine is available.
 func (e Engine) Validate() error {
 	if e.eng == nil {
 		return errors.ErrEmptyEngine
@@ -128,6 +129,7 @@ type asyncCmd struct {
 	arg interface{}
 }
 
+// AsyncWrite writes data to the given connection asynchronously.
 func (e Engine) AsyncWrite(fd gfd.GFD, p []byte, cb AsyncCallback) error {
 	if err := e.Validate(); err != nil {
 		return err
@@ -136,6 +138,7 @@ func (e Engine) AsyncWrite(fd gfd.GFD, p []byte, cb AsyncCallback) error {
 	return e.eng.sendCmd(&asyncCmd{fd: fd, typ: asyncCmdWrite, cb: cb, arg: p}, false)
 }
 
+// AsyncWritev is like AsyncWrite, but it accepts a slice of byte slices.
 func (e Engine) AsyncWritev(fd gfd.GFD, batch [][]byte, cb AsyncCallback) error {
 	if err := e.Validate(); err != nil {
 		return err
@@ -144,6 +147,7 @@ func (e Engine) AsyncWritev(fd gfd.GFD, batch [][]byte, cb AsyncCallback) error 
 	return e.eng.sendCmd(&asyncCmd{fd: fd, typ: asyncCmdWritev, cb: cb, arg: batch}, false)
 }
 
+// Close closes the given connection.
 func (e Engine) Close(fd gfd.GFD, cb AsyncCallback) error {
 	if err := e.Validate(); err != nil {
 		return err
@@ -152,6 +156,7 @@ func (e Engine) Close(fd gfd.GFD, cb AsyncCallback) error {
 	return e.eng.sendCmd(&asyncCmd{fd: fd, typ: asyncCmdClose, cb: cb}, false)
 }
 
+// Wake wakes up the given connection.
 func (e Engine) Wake(fd gfd.GFD, cb AsyncCallback) error {
 	if err := e.Validate(); err != nil {
 		return err
@@ -234,9 +239,10 @@ type AsyncCallback func(c Conn, err error) error
 
 // Socket is a set of functions which manipulate the underlying file descriptor of a connection.
 type Socket interface {
-	// Gfd returns the underlying file descriptor.
+	// Gfd returns the gfd of socket.
 	Gfd() gfd.GFD
 
+	// Fd returns the underlying file descriptor.
 	Fd() int
 
 	// Dup returns a copy of the underlying file descriptor.
