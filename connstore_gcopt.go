@@ -29,7 +29,6 @@ type connStore struct {
 	connNAI1   int                        // connections Next Available Index1
 	connNAI2   int                        // connections Next Available Index2
 	connMatrix [gfd.ConnIndex1Max][]*conn // connection matrix of *conn, multiple slices
-	connAlloc  int32                      // number of allocated *conn
 	fd2gfd     map[int]gfd.GFD            // fd -> gfd.GFD
 }
 
@@ -39,7 +38,13 @@ func (cs *connStore) init() {
 
 func (cs *connStore) iterate(f func(*conn) bool) {
 	for _, conns := range cs.connMatrix {
-		for _, c := range conns {
+		if len(conns) == 0 {
+			continue
+		}
+		// Allocate new slice to keep the data safe while ranging over slice with modification in f.
+		connsCopy := make([]*conn, len(conns))
+		copy(connsCopy, conns)
+		for _, c := range connsCopy {
 			if c != nil {
 				if !f(c) {
 					return
@@ -49,20 +54,13 @@ func (cs *connStore) iterate(f func(*conn) bool) {
 	}
 }
 
-func (cs *connStore) incCount(i1 int, delta int32) {
-	atomic.AddInt32(&cs.connCounts[i1], delta)
+func (cs *connStore) incCount(row int, delta int32) {
+	atomic.AddInt32(&cs.connCounts[row], delta)
 }
 
 func (cs *connStore) loadCount() (n int32) {
 	for i := 0; i < len(cs.connCounts); i++ {
 		n += atomic.LoadInt32(&cs.connCounts[i])
-	}
-	return
-}
-
-func (cs *connStore) unsafeLoadCount() (n int32) {
-	for i := 0; i < len(cs.connCounts); i++ {
-		n += cs.connCounts[i]
 	}
 	return
 }
@@ -79,7 +77,6 @@ func (cs *connStore) addConn(c *conn, index int) {
 
 	if cs.connMatrix[cs.connNAI1] == nil {
 		cs.connMatrix[cs.connNAI1] = make([]*conn, gfd.ConnIndex2Max)
-		cs.connAlloc += gfd.ConnIndex2Max
 	}
 	cs.connMatrix[cs.connNAI1][cs.connNAI2] = c
 
@@ -87,33 +84,10 @@ func (cs *connStore) addConn(c *conn, index int) {
 	cs.fd2gfd[c.fd] = c.gfd
 	cs.incCount(cs.connNAI1, 1)
 
-	for idx2 := cs.connNAI2; idx2 < gfd.ConnIndex2Max; idx2++ {
-		if cs.connMatrix[cs.connNAI1][idx2] == nil {
-			cs.connNAI2 = idx2
-			return
-		}
+	if cs.connNAI2++; cs.connNAI2 == gfd.ConnIndex2Max {
+		cs.connNAI1++
+		cs.connNAI2 = 0
 	}
-
-	for idx1 := cs.connNAI1; idx1 < gfd.ConnIndex1Max; idx1++ {
-		if cs.connMatrix[idx1] == nil || cs.connCounts[idx1] >= gfd.ConnIndex2Max {
-			continue
-		}
-		for idx2 := 0; idx2 < gfd.ConnIndex2Max; idx2++ {
-			if cs.connMatrix[idx1][idx2] == nil {
-				cs.connNAI1, cs.connNAI2 = idx1, idx2
-				return
-			}
-		}
-	}
-
-	for idx1 := 0; idx1 < gfd.ConnIndex1Max; idx1++ {
-		if cs.connMatrix[idx1] == nil {
-			cs.connNAI1, cs.connNAI2 = idx1, 0
-			return
-		}
-	}
-
-	cs.connNAI1 = gfd.ConnIndex1Max
 }
 
 func (cs *connStore) delConn(c *conn) {
@@ -124,78 +98,47 @@ func (cs *connStore) delConn(c *conn) {
 	} else {
 		cs.connMatrix[c.gfd.ConnIndex1()][c.gfd.ConnIndex2()] = nil
 	}
-
 	if cs.connNAI1 > c.gfd.ConnIndex1() || cs.connNAI2 > c.gfd.ConnIndex2() {
 		cs.connNAI1, cs.connNAI2 = c.gfd.ConnIndex1(), c.gfd.ConnIndex2()
 	}
 
-	/*
-		if cs.connMatrix[c.gfd.ConnIndex1()] == nil {
-			return
-		}
+	// Locate the last *conn in connMatrix and move it to the deleted location.
 
-		for i1 := gfd.ConnIndex1Max - 1; i1 >= c.gfd.ConnIndex1(); i1-- {
-			if cs.connCounts[i1] == 0 {
+	if cs.connMatrix[c.gfd.ConnIndex1()] == nil { // the deleted *conn is the last one, do nothing here.
+		return
+	}
+
+	for row := gfd.ConnIndex1Max - 1; row >= c.gfd.ConnIndex1(); row-- {
+		if cs.connCounts[row] == 0 {
+			continue
+		}
+		columnMin := -1
+		if row == c.gfd.ConnIndex1() {
+			columnMin = c.gfd.ConnIndex2()
+		}
+		for column := gfd.ConnIndex2Max - 1; column > columnMin; column-- {
+			if cs.connMatrix[row][column] == nil {
 				continue
 			}
-			i2End := -1
-			if i1 == c.gfd.ConnIndex1() {
-				i2End = c.gfd.ConnIndex2()
-			}
-			for i2 := gfd.ConnIndex2Max - 1; i2 > i2End; i2-- {
-				if cs.connMatrix[i1][i2] == nil {
-					continue
-				}
-				gFd := cs.connMatrix[i1][i2].gfd
-				gFd.UpdateIndexes(c.gfd.ConnIndex1(), c.gfd.ConnIndex2())
 
-				cs.connMatrix[c.gfd.ConnIndex1()][c.gfd.ConnIndex2()] = cs.connMatrix[i1][i2]
-				cs.connMatrix[c.gfd.ConnIndex1()][c.gfd.ConnIndex2()].gfd = gFd
-				cs.fd2gfd[gFd.Fd()] = gFd
+			gFd := cs.connMatrix[row][column].gfd
+			gFd.UpdateIndexes(c.gfd.ConnIndex1(), c.gfd.ConnIndex2())
+			cs.connMatrix[row][column].gfd = gFd
+			cs.fd2gfd[gFd.Fd()] = gFd
+			cs.connMatrix[c.gfd.ConnIndex1()][c.gfd.ConnIndex2()] = cs.connMatrix[row][column]
+			cs.incCount(row, -1)
+			cs.incCount(c.gfd.ConnIndex1(), 1)
 
-				cs.incCount(c.gfd.ConnIndex1(), 1)
-				cs.incCount(i1, -1)
-
-				if cs.connCounts[i1] == 0 {
-					cs.connMatrix[i1] = nil
-				} else {
-					cs.connMatrix[i1][i2] = nil
-				}
-				return
-			}
-		}
-	*/
-
-	// Compact the connMatrix when it becomes sparse.
-	const sparseFactor float32 = 0.5
-	connCount := cs.unsafeLoadCount()
-	if cs.connNAI1 > 0 && float32(connCount/cs.connAlloc) < sparseFactor {
-		var newConnMatrix [gfd.ConnIndex1Max][]*conn
-		row := connCount / gfd.ConnIndex2Max
-		if connCount%gfd.ConnIndex2Max > 0 {
-			row += 1
-		}
-		for i := int32(0); i < row; i++ {
-			newConnMatrix[i] = make([]*conn, gfd.ConnIndex2Max)
-			if connCount -= gfd.ConnIndex2Max; connCount >= 0 {
-				atomic.StoreInt32(&cs.connCounts[i], gfd.ConnIndex2Max)
+			if cs.connCounts[row] == 0 {
+				cs.connMatrix[row] = nil
 			} else {
-				atomic.StoreInt32(&cs.connCounts[i], gfd.ConnIndex2Max+connCount)
+				cs.connMatrix[row][column] = nil
 			}
+
+			cs.connNAI1, cs.connNAI2 = row, column
+
+			return
 		}
-
-		var i, j int
-		cs.iterate(func(c *conn) bool {
-			c.gfd.UpdateIndexes(i, j)
-			cs.fd2gfd[c.fd] = c.gfd
-			newConnMatrix[i][j] = c
-			if j++; j == gfd.ConnIndex2Max {
-				i, j = i+1, 0
-			}
-			return true
-		})
-
-		cs.connMatrix, cs.connNAI1, cs.connNAI2 = newConnMatrix, i, j
 	}
 }
 

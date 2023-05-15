@@ -63,73 +63,73 @@ func TestServeGC(t *testing.T) {
 	t.Run("gc-loop", func(t *testing.T) {
 		t.Run("1-loop-10000", func(t *testing.T) {
 			if testBigGC {
-				t.SkipNow()
+				t.Skipf("Skip when testBigGC=%t", testBigGC)
 			}
 			testServeGC(t, "tcp", ":9000", true, true, 1, 10000)
 		})
 		t.Run("1-loop-100000", func(t *testing.T) {
 			if testBigGC {
-				t.SkipNow()
+				t.Skipf("Skip when testBigGC=%t", testBigGC)
 			}
 			testServeGC(t, "tcp", ":9000", true, true, 1, 100000)
 		})
 		t.Run("1-loop-1000000", func(t *testing.T) {
 			if !testBigGC {
-				t.SkipNow()
+				t.Skipf("Skip when testBigGC=%t", testBigGC)
 			}
 			testServeGC(t, "tcp", ":9000", true, true, 1, 1000000)
 		})
 		t.Run("2-loop-10000", func(t *testing.T) {
 			if testBigGC {
-				t.SkipNow()
+				t.Skipf("Skip when testBigGC=%t", testBigGC)
 			}
 			testServeGC(t, "tcp", ":9000", true, true, 2, 10000)
 		})
 		t.Run("2-loop-100000", func(t *testing.T) {
 			if testBigGC {
-				t.SkipNow()
+				t.Skipf("Skip when testBigGC=%t", testBigGC)
 			}
 			testServeGC(t, "tcp", ":9000", true, true, 2, 100000)
 		})
 		t.Run("2-loop-1000000", func(t *testing.T) {
 			if !testBigGC {
-				t.SkipNow()
+				t.Skipf("Skip when testBigGC=%t", testBigGC)
 			}
 			testServeGC(t, "tcp", ":9000", true, true, 2, 1000000)
 		})
 		t.Run("4-loop-10000", func(t *testing.T) {
 			if testBigGC {
-				t.SkipNow()
+				t.Skipf("Skip when testBigGC=%t", testBigGC)
 			}
 			testServeGC(t, "tcp", ":9000", true, true, 4, 10000)
 		})
 		t.Run("4-loop-100000", func(t *testing.T) {
 			if testBigGC {
-				t.SkipNow()
+				t.Skipf("Skip when testBigGC=%t", testBigGC)
 			}
 			testServeGC(t, "tcp", ":9000", true, true, 4, 100000)
 		})
 		t.Run("4-loop-1000000", func(t *testing.T) {
 			if !testBigGC {
-				t.SkipNow()
+				t.Skipf("Skip when testBigGC=%t", testBigGC)
 			}
 			testServeGC(t, "tcp", ":9000", true, true, 4, 1000000)
 		})
 		t.Run("16-loop-10000", func(t *testing.T) {
 			if testBigGC {
-				t.SkipNow()
+				t.Skipf("Skip when testBigGC=%t", testBigGC)
 			}
 			testServeGC(t, "tcp", ":9000", true, true, 16, 10000)
 		})
 		t.Run("16-loop-100000", func(t *testing.T) {
 			if testBigGC {
-				t.SkipNow()
+				t.Skipf("Skip when testBigGC=%t", testBigGC)
 			}
 			testServeGC(t, "tcp", ":9000", true, true, 16, 100000)
 		})
 		t.Run("16-loop-1000000", func(t *testing.T) {
 			if !testBigGC {
-				t.SkipNow()
+				t.Skipf("Skip when testBigGC=%t", testBigGC)
 			}
 			testServeGC(t, "tcp", ":9000", true, true, 16, 1000000)
 		})
