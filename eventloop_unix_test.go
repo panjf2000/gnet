@@ -53,47 +53,86 @@ func registerInitConn(el *eventloop) {
 }
 
 // nowEventLoopInitConn initializes the number of conn fake data, must be set to 0 after use.
-var nowEventLoopInitConn int32
+var (
+	nowEventLoopInitConn int32
+	testBigGC            = false
+)
 
 // TestServeGC generate fake data asynchronously, if you need to test, manually open the comment.
 func TestServeGC(t *testing.T) {
 	t.Run("gc-loop", func(t *testing.T) {
 		t.Run("1-loop-10000", func(t *testing.T) {
+			if testBigGC {
+				t.SkipNow()
+			}
 			testServeGC(t, "tcp", ":9000", true, true, 1, 10000)
 		})
-		// t.Run("1-loop-100000", func(t *testing.T) {
-		// 	testServeGC(t, "tcp", ":9000", true, true, 1, 100000)
-		// })
-		// t.Run("1-loop-1000000", func(t *testing.T) {
-		// 	testServeGC(t, "tcp", ":9000", true, true, 1, 1000000)
-		// })
+		t.Run("1-loop-100000", func(t *testing.T) {
+			if testBigGC {
+				t.SkipNow()
+			}
+			testServeGC(t, "tcp", ":9000", true, true, 1, 100000)
+		})
+		t.Run("1-loop-1000000", func(t *testing.T) {
+			if !testBigGC {
+				t.SkipNow()
+			}
+			testServeGC(t, "tcp", ":9000", true, true, 1, 1000000)
+		})
 		t.Run("2-loop-10000", func(t *testing.T) {
+			if testBigGC {
+				t.SkipNow()
+			}
 			testServeGC(t, "tcp", ":9000", true, true, 2, 10000)
 		})
-		// t.Run("2-loop-100000", func(t *testing.T) {
-		// 	testServeGC(t, "tcp", ":9000", true, true, 2, 100000)
-		// })
-		// t.Run("2-loop-1000000", func(t *testing.T) {
-		// 	testServeGC(t, "tcp", ":9000", true, true, 2, 1000000)
-		// })
+		t.Run("2-loop-100000", func(t *testing.T) {
+			if testBigGC {
+				t.SkipNow()
+			}
+			testServeGC(t, "tcp", ":9000", true, true, 2, 100000)
+		})
+		t.Run("2-loop-1000000", func(t *testing.T) {
+			if !testBigGC {
+				t.SkipNow()
+			}
+			testServeGC(t, "tcp", ":9000", true, true, 2, 1000000)
+		})
 		t.Run("4-loop-10000", func(t *testing.T) {
+			if testBigGC {
+				t.SkipNow()
+			}
 			testServeGC(t, "tcp", ":9000", true, true, 4, 10000)
 		})
-		// t.Run("4-loop-100000", func(t *testing.T) {
-		// 	testServeGC(t, "tcp", ":9000", true, true, 4, 100000)
-		// })
-		// t.Run("4-loop-1000000", func(t *testing.T) {
-		// 	testServeGC(t, "tcp", ":9000", true, true, 4, 1000000)
-		// })
+		t.Run("4-loop-100000", func(t *testing.T) {
+			if testBigGC {
+				t.SkipNow()
+			}
+			testServeGC(t, "tcp", ":9000", true, true, 4, 100000)
+		})
+		t.Run("4-loop-1000000", func(t *testing.T) {
+			if !testBigGC {
+				t.SkipNow()
+			}
+			testServeGC(t, "tcp", ":9000", true, true, 4, 1000000)
+		})
 		t.Run("16-loop-10000", func(t *testing.T) {
+			if testBigGC {
+				t.SkipNow()
+			}
 			testServeGC(t, "tcp", ":9000", true, true, 16, 10000)
 		})
-		// t.Run("16-loop-100000", func(t *testing.T) {
-		// 	testServeGC(t, "tcp", ":9000", true, true, 16, 100000)
-		// })
-		// t.Run("16-loop-1000000", func(t *testing.T) {
-		// 	testServeGC(t, "tcp", ":9000", true, true, 16, 1000000)
-		// })
+		t.Run("16-loop-100000", func(t *testing.T) {
+			if testBigGC {
+				t.SkipNow()
+			}
+			testServeGC(t, "tcp", ":9000", true, true, 16, 100000)
+		})
+		t.Run("16-loop-1000000", func(t *testing.T) {
+			if !testBigGC {
+				t.SkipNow()
+			}
+			testServeGC(t, "tcp", ":9000", true, true, 16, 1000000)
+		})
 	})
 }
 
@@ -133,12 +172,16 @@ type testServerGC struct {
 
 func (s *testServerGC) OnBoot(eng Engine) (action Action) {
 	s.eng = eng
-	go s.GC()
+	gcSecs := 5
+	if testBigGC {
+		gcSecs = 10
+	}
+	go s.GC(gcSecs)
 
 	return
 }
 
-func (s *testServerGC) GC() {
+func (s *testServerGC) GC(secs int) {
 	defer func() {
 		_ = s.eng.Stop(context.Background())
 		runtime.GC()
@@ -151,8 +194,8 @@ func (s *testServerGC) GC() {
 		runtime.GC()
 		gcTime := time.Since(now)
 		gcAllTime += gcTime
-		s.tester.Log(s.tester.Name(), s.network, " server gc:", gcTime, ", average gc time: ", gcAllTime/gcAllCount)
-		if time.Since(gcStart) >= time.Second*5 {
+		s.tester.Log(s.tester.Name(), s.network, " server gc:", gcTime, ", average gc time:", gcAllTime/gcAllCount)
+		if time.Since(gcStart) >= time.Second*time.Duration(secs) {
 			break
 		}
 	}
