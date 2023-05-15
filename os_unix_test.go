@@ -18,14 +18,11 @@
 package gnet
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"math/rand"
 	"net"
-	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -33,13 +30,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap"
 	"golang.org/x/sys/unix"
-
-	"github.com/panjf2000/gnet/v2/pkg/gfd"
-	"github.com/panjf2000/gnet/v2/pkg/logging"
-	bbPool "github.com/panjf2000/gnet/v2/pkg/pool/bytebuffer"
-	goPool "github.com/panjf2000/gnet/v2/pkg/pool/goroutine"
 )
 
 var (
@@ -212,6 +203,7 @@ func TestMulticastBindIPv6(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+/*
 func TestEngineAsyncWrite(t *testing.T) {
 	t.Run("tcp", func(t *testing.T) {
 		t.Run("1-loop", func(t *testing.T) {
@@ -536,3 +528,4 @@ func (s *testEngineClosedWakeUpServer) OnClose(Conn, error) (action Action) {
 	}
 	return
 }
+*/

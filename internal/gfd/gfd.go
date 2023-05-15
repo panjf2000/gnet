@@ -25,18 +25,26 @@ package gfd
 import (
 	"encoding/binary"
 	"math"
-	"time"
+	"sync/atomic"
 )
 
 // Constants for GFD.
 const (
 	ConnIndex2Offset  = 2
-	TimeStampOffset   = 4
+	SequenceOffset    = 4
 	FdOffset          = 8
 	EventLoopIndexMax = math.MaxUint8 + 1
 	ConnIndex1Max     = math.MaxUint8 + 1
 	ConnIndex2Max     = math.MaxUint16 + 1
 )
+
+type monotoneSeq uint32
+
+func (seq *monotoneSeq) Inc() uint32 {
+	return atomic.AddUint32((*uint32)(seq), 1)
+}
+
+var monoSeq = new(monotoneSeq)
 
 // GFD is a structure to store the fd, eventloop index, connStore indexes.
 type GFD [0x10]byte
@@ -58,20 +66,26 @@ func (gfd GFD) ConnIndex1() int {
 
 // ConnIndex2 returns the connStore index of the second level.
 func (gfd GFD) ConnIndex2() int {
-	return int(binary.BigEndian.Uint16(gfd[ConnIndex2Offset:TimeStampOffset]))
+	return int(binary.BigEndian.Uint16(gfd[ConnIndex2Offset:SequenceOffset]))
 }
 
-// Timestamp returns the incomplete timestamp, only used to prevent fd duplication.
-func (gfd GFD) Timestamp() uint32 {
-	return binary.BigEndian.Uint32(gfd[TimeStampOffset:FdOffset])
+// Sequence returns the monotonic sequence, only used to prevent fd duplication.
+func (gfd GFD) Sequence() uint32 {
+	return binary.BigEndian.Uint32(gfd[SequenceOffset:FdOffset])
+}
+
+// UpdateIndexes updates the connStore indexes.
+func (gfd GFD) UpdateIndexes(idx1, idx2 int) {
+	gfd[1] = byte(idx1)
+	binary.BigEndian.PutUint16(gfd[ConnIndex2Offset:SequenceOffset], uint16(idx2))
 }
 
 // NewGFD creates a new GFD.
 func NewGFD(fd, elIndex, connIndex1, connIndex2 int) (gfd GFD) {
 	gfd[0] = byte(elIndex)
 	gfd[1] = byte(connIndex1)
-	binary.BigEndian.PutUint16(gfd[ConnIndex2Offset:TimeStampOffset], uint16(connIndex2))
-	binary.BigEndian.PutUint32(gfd[TimeStampOffset:FdOffset], uint32(time.Now().UnixMilli()))
+	binary.BigEndian.PutUint16(gfd[ConnIndex2Offset:SequenceOffset], uint16(connIndex2))
+	binary.BigEndian.PutUint32(gfd[SequenceOffset:FdOffset], monoSeq.Inc())
 	binary.BigEndian.PutUint64(gfd[FdOffset:], uint64(fd))
 	return
 }
@@ -82,5 +96,5 @@ func Validate(gfd GFD) bool {
 		gfd.EventLoopIndex() >= 0 && gfd.EventLoopIndex() < EventLoopIndexMax &&
 		gfd.ConnIndex1() >= 0 && gfd.ConnIndex1() < ConnIndex1Max &&
 		gfd.ConnIndex2() >= 0 && gfd.ConnIndex2() < ConnIndex2Max &&
-		gfd.Timestamp() != 0
+		gfd.Sequence() > 0
 }

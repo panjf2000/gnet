@@ -27,12 +27,12 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/panjf2000/gnet/v2/internal/bs"
+	"github.com/panjf2000/gnet/v2/internal/gfd"
 	gio "github.com/panjf2000/gnet/v2/internal/io"
 	"github.com/panjf2000/gnet/v2/internal/netpoll"
 	"github.com/panjf2000/gnet/v2/internal/socket"
 	"github.com/panjf2000/gnet/v2/pkg/buffer/elastic"
 	gerrors "github.com/panjf2000/gnet/v2/pkg/errors"
-	"github.com/panjf2000/gnet/v2/pkg/gfd"
 	bsPool "github.com/panjf2000/gnet/v2/pkg/pool/byteslice"
 )
 
@@ -400,8 +400,9 @@ func (c *conn) RemoteAddr() net.Addr       { return c.remoteAddr }
 
 // Implementation of Socket interface
 
+// func (c *conn) Gfd() gfd.GFD             { return c.gfd }
+
 func (c *conn) Fd() int                        { return c.fd }
-func (c *conn) Gfd() gfd.GFD                   { return c.gfd }
 func (c *conn) Dup() (fd int, err error)       { fd, _, err = netpoll.Dup(c.fd); return }
 func (c *conn) SetReadBuffer(bytes int) error  { return socket.SetRecvBuffer(c.fd, bytes) }
 func (c *conn) SetWriteBuffer(bytes int) error { return socket.SetSendBuffer(c.fd, bytes) }

@@ -26,7 +26,6 @@ import (
 	"github.com/panjf2000/gnet/v2/internal/math"
 	"github.com/panjf2000/gnet/v2/pkg/buffer/ring"
 	"github.com/panjf2000/gnet/v2/pkg/errors"
-	"github.com/panjf2000/gnet/v2/pkg/gfd"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
 )
 
@@ -113,6 +112,7 @@ func (e Engine) Stop(ctx context.Context) error {
 	}
 }
 
+/*
 type asyncCmdType uint8
 
 const (
@@ -164,6 +164,7 @@ func (e Engine) Wake(fd gfd.GFD, cb AsyncCallback) error {
 
 	return e.eng.sendCmd(&asyncCmd{fd: fd, typ: asyncCmdWake, cb: cb}, true)
 }
+*/
 
 // Reader is an interface that consists of a number of methods for reading that Conn must implement.
 type Reader interface {
@@ -240,7 +241,7 @@ type AsyncCallback func(c Conn, err error) error
 // Socket is a set of functions which manipulate the underlying file descriptor of a connection.
 type Socket interface {
 	// Gfd returns the gfd of socket.
-	Gfd() gfd.GFD
+	// Gfd() gfd.GFD
 
 	// Fd returns the underlying file descriptor.
 	Fd() int

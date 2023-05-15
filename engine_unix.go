@@ -25,9 +25,9 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
+	"github.com/panjf2000/gnet/v2/internal/gfd"
 	"github.com/panjf2000/gnet/v2/internal/netpoll"
 	"github.com/panjf2000/gnet/v2/pkg/errors"
-	"github.com/panjf2000/gnet/v2/pkg/gfd"
 )
 
 type engine struct {
@@ -285,6 +285,7 @@ func run(eventHandler EventHandler, listener *listener, options *Options, protoA
 	return nil
 }
 
+/*
 func (eng *engine) sendCmd(cmd *asyncCmd, urgent bool) error {
 	if !gfd.Validate(cmd.fd) {
 		return errors.ErrInvalidConn
@@ -298,3 +299,4 @@ func (eng *engine) sendCmd(cmd *asyncCmd, urgent bool) error {
 	}
 	return el.poller.Trigger(el.execCmd, cmd)
 }
+*/

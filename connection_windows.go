@@ -28,7 +28,6 @@ import (
 
 	"github.com/panjf2000/gnet/v2/pkg/buffer/elastic"
 	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
-	"github.com/panjf2000/gnet/v2/pkg/gfd"
 	bbPool "github.com/panjf2000/gnet/v2/pkg/pool/bytebuffer"
 )
 
@@ -414,9 +413,7 @@ func (c *conn) SetKeepAlivePeriod(d time.Duration) error {
 
 // Gfd return an uninitialized GFD which is not valid,
 // this method is only implemented for compatibility, don't use it on Windows.
-func (c *conn) Gfd() gfd.GFD {
-	return gfd.GFD{}
-}
+// func (c *conn) Gfd() gfd.GFD { return gfd.GFD{} }
 
 // ==================================== Concurrency-safe API's ====================================
 

@@ -21,7 +21,7 @@ package gnet
 import (
 	"sync/atomic"
 
-	"github.com/panjf2000/gnet/v2/pkg/gfd"
+	"github.com/panjf2000/gnet/v2/internal/gfd"
 )
 
 type connStore struct {
@@ -65,6 +65,8 @@ func (cs *connStore) getConn(fd int) *conn {
 	return cs.connMap[fd]
 }
 
+/*
 func (cs *connStore) getConnByGFD(fd gfd.GFD) *conn {
 	return cs.connMap[fd.Fd()]
 }
+*/

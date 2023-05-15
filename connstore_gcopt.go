@@ -12,16 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build gc_opt && (linux || freebsd || dragonfly || darwin)
-// +build gc_opt
+//go:build (linux || freebsd || dragonfly || darwin) && gc_opt
 // +build linux freebsd dragonfly darwin
+// +build gc_opt
 
 package gnet
 
 import (
 	"sync/atomic"
 
-	"github.com/panjf2000/gnet/v2/pkg/gfd"
+	"github.com/panjf2000/gnet/v2/internal/gfd"
 )
 
 type connStore struct {
@@ -29,7 +29,8 @@ type connStore struct {
 	connNAI1   int                        // connections Next Available Index1
 	connNAI2   int                        // connections Next Available Index2
 	connMatrix [gfd.ConnIndex1Max][]*conn // connection matrix of *conn, multiple slices
-	fd2gfd     map[int]gfd.GFD            // connection map: fd -> GFD
+	connAlloc  int32                      // number of allocated *conn
+	fd2gfd     map[int]gfd.GFD            // fd -> gfd.GFD
 }
 
 func (cs *connStore) init() {
@@ -59,6 +60,13 @@ func (cs *connStore) loadCount() (n int32) {
 	return
 }
 
+func (cs *connStore) unsafeLoadCount() (n int32) {
+	for i := 0; i < len(cs.connCounts); i++ {
+		n += cs.connCounts[i]
+	}
+	return
+}
+
 // addConn stores a new conn into connStore, it finds the next available location:
 // 1. current space available location
 // 2. allocated other space is available
@@ -71,6 +79,7 @@ func (cs *connStore) addConn(c *conn, index int) {
 
 	if cs.connMatrix[cs.connNAI1] == nil {
 		cs.connMatrix[cs.connNAI1] = make([]*conn, gfd.ConnIndex2Max)
+		cs.connAlloc += gfd.ConnIndex2Max
 	}
 	cs.connMatrix[cs.connNAI1][cs.connNAI2] = c
 
@@ -78,28 +87,28 @@ func (cs *connStore) addConn(c *conn, index int) {
 	cs.fd2gfd[c.fd] = c.gfd
 	cs.incCount(cs.connNAI1, 1)
 
-	for i2 := cs.connNAI2; i2 < gfd.ConnIndex2Max; i2++ {
-		if cs.connMatrix[cs.connNAI1][i2] == nil {
-			cs.connNAI2 = i2
+	for idx2 := cs.connNAI2; idx2 < gfd.ConnIndex2Max; idx2++ {
+		if cs.connMatrix[cs.connNAI1][idx2] == nil {
+			cs.connNAI2 = idx2
 			return
 		}
 	}
 
-	for i1 := cs.connNAI1; i1 < gfd.ConnIndex1Max; i1++ {
-		if cs.connMatrix[i1] == nil || cs.connCounts[i1] >= gfd.ConnIndex2Max {
+	for idx1 := cs.connNAI1; idx1 < gfd.ConnIndex1Max; idx1++ {
+		if cs.connMatrix[idx1] == nil || cs.connCounts[idx1] >= gfd.ConnIndex2Max {
 			continue
 		}
-		for i2 := 0; i2 < gfd.ConnIndex2Max; i2++ {
-			if cs.connMatrix[i1][i2] == nil {
-				cs.connNAI1, cs.connNAI2 = i1, i2
+		for idx2 := 0; idx2 < gfd.ConnIndex2Max; idx2++ {
+			if cs.connMatrix[idx1][idx2] == nil {
+				cs.connNAI1, cs.connNAI2 = idx1, idx2
 				return
 			}
 		}
 	}
 
-	for i1 := 0; i1 < gfd.ConnIndex1Max; i1++ {
-		if cs.connMatrix[i1] == nil {
-			cs.connNAI1, cs.connNAI2 = i1, 0
+	for idx1 := 0; idx1 < gfd.ConnIndex1Max; idx1++ {
+		if cs.connMatrix[idx1] == nil {
+			cs.connNAI1, cs.connNAI2 = idx1, 0
 			return
 		}
 	}
@@ -119,6 +128,37 @@ func (cs *connStore) delConn(c *conn) {
 	if cs.connNAI1 > c.gfd.ConnIndex1() || cs.connNAI2 > c.gfd.ConnIndex2() {
 		cs.connNAI1, cs.connNAI2 = c.gfd.ConnIndex1(), c.gfd.ConnIndex2()
 	}
+
+	// Compact the connMatrix when it becomes sparse.
+	const sparseFactor float32 = 0.5
+	connCount := cs.unsafeLoadCount()
+	if cs.connNAI1 > 0 && float32(connCount/cs.connAlloc) < sparseFactor {
+		var newConnMatrix [gfd.ConnIndex1Max][]*conn
+		row := connCount / gfd.ConnIndex2Max
+		if connCount%gfd.ConnIndex2Max > 0 {
+			row += 1
+		}
+		for i := int32(0); i < row; i++ {
+			newConnMatrix[i] = make([]*conn, gfd.ConnIndex2Max)
+			if connCount -= gfd.ConnIndex2Max; connCount >= 0 {
+				atomic.StoreInt32(&cs.connCounts[i], gfd.ConnIndex2Max)
+			} else {
+				atomic.StoreInt32(&cs.connCounts[i], -connCount)
+			}
+		}
+
+		var i, j int
+		cs.iterate(func(c *conn) bool {
+			newConnMatrix[i][j] = c
+			c.gfd.UpdateIndexes(i, j)
+			if j++; j == gfd.ConnIndex2Max {
+				i, j = i+1, 0
+			}
+			return true
+		})
+
+		cs.connMatrix, cs.connNAI1, cs.connNAI2 = newConnMatrix, i, j
+	}
 }
 
 func (cs *connStore) getConn(fd int) *conn {
@@ -132,9 +172,11 @@ func (cs *connStore) getConn(fd int) *conn {
 	return cs.connMatrix[gFD.ConnIndex1()][gFD.ConnIndex2()]
 }
 
+/*
 func (cs *connStore) getConnByGFD(fd gfd.GFD) *conn {
 	if cs.connMatrix[fd.ConnIndex1()] == nil {
 		return nil
 	}
 	return cs.connMatrix[fd.ConnIndex1()][fd.ConnIndex2()]
 }
+*/

@@ -298,6 +298,7 @@ func (el *eventloop) readUDP(fd int, _ netpoll.IOEvent) error {
 	return nil
 }
 
+/*
 func (el *eventloop) execCmd(itf interface{}) (err error) {
 	cmd := itf.(*asyncCmd)
 	c := el.connections.getConnByGFD(cmd.fd)
@@ -325,3 +326,4 @@ func (el *eventloop) execCmd(itf interface{}) (err error) {
 	}
 	return
 }
+*/
