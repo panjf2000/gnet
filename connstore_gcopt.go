@@ -129,6 +129,41 @@ func (cs *connStore) delConn(c *conn) {
 		cs.connNAI1, cs.connNAI2 = c.gfd.ConnIndex1(), c.gfd.ConnIndex2()
 	}
 
+	// if cs.connMatrix[c.gfd.ConnIndex1()] == nil {
+	//	return
+	//}
+	//
+	//for i1 := gfd.ConnIndex1Max - 1; i1 >= c.gfd.ConnIndex1(); i1-- {
+	//	if cs.connCounts[i1] == 0 {
+	//		continue
+	//	}
+	//	i2End := -1
+	//	if i1 == c.gfd.ConnIndex1() {
+	//		i2End = c.gfd.ConnIndex2()
+	//	}
+	//	for i2 := gfd.ConnIndex2Max - 1; i2 > i2End; i2-- {
+	//		if cs.connMatrix[i1][i2] == nil {
+	//			continue
+	//		}
+	//		gFd := cs.connMatrix[i1][i2].gfd
+	//		gFd.UpdateIndexes(c.gfd.ConnIndex1(), c.gfd.ConnIndex2())
+	//
+	//		cs.connMatrix[c.gfd.ConnIndex1()][c.gfd.ConnIndex2()] = cs.connMatrix[i1][i2]
+	//		cs.connMatrix[c.gfd.ConnIndex1()][c.gfd.ConnIndex2()].gfd = gFd
+	//		cs.fd2gfd[gFd.Fd()] = gFd
+	//
+	//		cs.incCount(c.gfd.ConnIndex1(), 1)
+	//		cs.incCount(i1, -1)
+	//
+	//		if cs.connCounts[i1] == 0 {
+	//			cs.connMatrix[i1] = nil
+	//		} else {
+	//			cs.connMatrix[i1][i2] = nil
+	//		}
+	//		return
+	//	}
+	//}
+
 	// Compact the connMatrix when it becomes sparse.
 	const sparseFactor float32 = 0.5
 	connCount := cs.unsafeLoadCount()
