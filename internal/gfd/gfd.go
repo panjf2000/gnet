@@ -76,8 +76,8 @@ func (gfd GFD) Sequence() uint32 {
 
 // UpdateIndexes updates the connStore indexes.
 func (gfd *GFD) UpdateIndexes(idx1, idx2 int) {
-	gfd[1] = byte(idx1)
-	binary.BigEndian.PutUint16(gfd[ConnIndex2Offset:SequenceOffset], uint16(idx2))
+	(*gfd)[1] = byte(idx1)
+	binary.BigEndian.PutUint16((*gfd)[ConnIndex2Offset:SequenceOffset], uint16(idx2))
 }
 
 // NewGFD creates a new GFD.
