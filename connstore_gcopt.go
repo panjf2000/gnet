@@ -143,7 +143,7 @@ func (cs *connStore) delConn(c *conn) {
 			if connCount -= gfd.ConnIndex2Max; connCount >= 0 {
 				atomic.StoreInt32(&cs.connCounts[i], gfd.ConnIndex2Max)
 			} else {
-				atomic.StoreInt32(&cs.connCounts[i], -connCount)
+				atomic.StoreInt32(&cs.connCounts[i], gfd.ConnIndex2Max+connCount)
 			}
 		}
 
