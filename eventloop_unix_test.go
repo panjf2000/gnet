@@ -21,6 +21,7 @@ import (
 	"context"
 	"net"
 	"runtime"
+	"runtime/debug"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -57,6 +58,100 @@ var (
 	nowEventLoopInitConn int32
 	testBigGC            = false
 )
+
+func BenchmarkGC4El100k(b *testing.B) {
+	oldGc := debug.SetGCPercent(-1)
+
+	ts1 := benchServeGC(b, "tcp", ":9001", true, 4, 100000)
+	b.Run("Run-4-eventloop-100000", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			runtime.GC()
+		}
+	})
+	_ = ts1.eng.Stop(context.Background())
+
+	debug.SetGCPercent(oldGc)
+}
+
+func BenchmarkGC4El200k(b *testing.B) {
+	oldGc := debug.SetGCPercent(-1)
+
+	ts1 := benchServeGC(b, "tcp", ":9001", true, 4, 200000)
+	b.Run("Run-4-eventloop-200000", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			runtime.GC()
+		}
+	})
+	_ = ts1.eng.Stop(context.Background())
+
+	debug.SetGCPercent(oldGc)
+}
+
+func BenchmarkGC4El500k(b *testing.B) {
+	oldGc := debug.SetGCPercent(-1)
+
+	ts1 := benchServeGC(b, "tcp", ":9001", true, 4, 500000)
+	b.Run("Run-4-eventloop-500000", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			runtime.GC()
+		}
+	})
+	_ = ts1.eng.Stop(context.Background())
+
+	debug.SetGCPercent(oldGc)
+}
+
+func benchServeGC(b *testing.B, network, addr string, async bool, elNum int, initConnCount int32) *benchmarkServerGC {
+	ts := &benchmarkServerGC{
+		tester:        b,
+		network:       network,
+		addr:          addr,
+		async:         async,
+		elNum:         elNum,
+		initOk:        make(chan struct{}),
+		initConnCount: initConnCount,
+	}
+
+	nowEventLoopInitConn = initConnCount
+	go func() {
+		err := Run(ts,
+			network+"://"+addr,
+			WithLockOSThread(async),
+			WithNumEventLoop(elNum),
+			WithTCPKeepAlive(time.Minute*1),
+			WithTCPNoDelay(TCPDelay))
+		assert.NoError(b, err)
+		nowEventLoopInitConn = 0
+	}()
+	<-ts.initOk
+	return ts
+}
+
+type benchmarkServerGC struct {
+	*BuiltinEventEngine
+	tester        *testing.B
+	eng           Engine
+	network       string
+	addr          string
+	async         bool
+	elNum         int
+	initConnCount int32
+	initOk        chan struct{}
+}
+
+func (s *benchmarkServerGC) OnBoot(eng Engine) (action Action) {
+	s.eng = eng
+	go func() {
+		for {
+			if s.eng.eng.lb.len() == s.elNum && s.eng.CountConnections() == s.elNum*int(s.initConnCount) {
+				break
+			}
+			time.Sleep(time.Millisecond)
+		}
+		close(s.initOk)
+	}()
+	return
+}
 
 // TestServeGC generate fake data asynchronously, if you need to test, manually open the comment.
 func TestServeGC(t *testing.T) {

@@ -54,6 +54,7 @@ func (cm *connMatrix) loadCount() (n int32) {
 func (cm *connMatrix) addConn(c *conn, index int) {
 	c.gfd = gfd.NewGFD(c.fd, index, 0, 0)
 	cm.connMap[c.fd] = c
+	cm.incCount(0, 1)
 }
 
 func (cm *connMatrix) delConn(c *conn) {
