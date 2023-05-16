@@ -27,6 +27,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/panjf2000/gnet/v2/internal/bs"
+	"github.com/panjf2000/gnet/v2/internal/gfd"
 	gio "github.com/panjf2000/gnet/v2/internal/io"
 	"github.com/panjf2000/gnet/v2/internal/netpoll"
 	"github.com/panjf2000/gnet/v2/internal/socket"
@@ -36,61 +37,45 @@ import (
 )
 
 type conn struct {
-	ctx            interface{}             // user-defined context
-	peer           unix.Sockaddr           // remote socket address
-	localAddr      net.Addr                // local addr
-	remoteAddr     net.Addr                // remote addr
-	loop           *eventloop              // connected event-loop
-	outboundBuffer *elastic.Buffer         // buffer for data that is eligible to be sent to the peer
-	pollAttachment *netpoll.PollAttachment // connection attachment for poller
-	inboundBuffer  elastic.RingBuffer      // buffer for leftover data from the peer
-	buffer         []byte                  // buffer for the latest bytes
-	fd             int                     // file descriptor
-	isDatagram     bool                    // UDP protocol
-	opened         bool                    // connection opened event fired
+	fd             int                    // file descriptor
+	gfd            gfd.GFD                // gnet file descriptor
+	ctx            interface{}            // user-defined context
+	peer           unix.Sockaddr          // remote socket address
+	localAddr      net.Addr               // local addr
+	remoteAddr     net.Addr               // remote addr
+	loop           *eventloop             // connected event-loop
+	outboundBuffer elastic.Buffer         // buffer for data that is eligible to be sent to the peer
+	pollAttachment netpoll.PollAttachment // connection attachment for poller
+	inboundBuffer  elastic.RingBuffer     // buffer for leftover data from the peer
+	buffer         []byte                 // buffer for the latest bytes
+	isDatagram     bool                   // UDP protocol
+	opened         bool                   // connection opened event fired
 }
 
 func newTCPConn(fd int, el *eventloop, sa unix.Sockaddr, localAddr, remoteAddr net.Addr) (c *conn) {
 	c = &conn{
-		fd:         fd,
-		peer:       sa,
-		loop:       el,
-		localAddr:  localAddr,
-		remoteAddr: remoteAddr,
+		fd:             fd,
+		peer:           sa,
+		loop:           el,
+		localAddr:      localAddr,
+		remoteAddr:     remoteAddr,
+		pollAttachment: netpoll.PollAttachment{FD: fd},
 	}
-	c.outboundBuffer, _ = elastic.New(el.engine.opts.WriteBufferCap)
-	c.pollAttachment = netpoll.GetPollAttachment()
-	c.pollAttachment.FD, c.pollAttachment.Callback = fd, c.handleEvents
+	c.pollAttachment.Callback = c.handleEvents
+	c.outboundBuffer.Reset(el.engine.opts.WriteBufferCap)
 	return
-}
-
-func (c *conn) releaseTCP() {
-	c.opened = false
-	c.peer = nil
-	c.ctx = nil
-	c.buffer = nil
-	if addr, ok := c.localAddr.(*net.TCPAddr); ok && c.localAddr != c.loop.ln.addr && len(addr.Zone) > 0 {
-		bsPool.Put(bs.StringToBytes(addr.Zone))
-	}
-	if addr, ok := c.remoteAddr.(*net.TCPAddr); ok && len(addr.Zone) > 0 {
-		bsPool.Put(bs.StringToBytes(addr.Zone))
-	}
-	c.localAddr = nil
-	c.remoteAddr = nil
-	c.inboundBuffer.Done()
-	c.outboundBuffer.Release()
-	netpoll.PutPollAttachment(c.pollAttachment)
-	c.pollAttachment = nil
 }
 
 func newUDPConn(fd int, el *eventloop, localAddr net.Addr, sa unix.Sockaddr, connected bool) (c *conn) {
 	c = &conn{
-		fd:         fd,
-		peer:       sa,
-		loop:       el,
-		localAddr:  localAddr,
-		remoteAddr: socket.SockaddrToUDPAddr(sa),
-		isDatagram: true,
+		fd:             fd,
+		gfd:            gfd.NewGFD(fd, el.idx, 0, 0),
+		peer:           sa,
+		loop:           el,
+		localAddr:      localAddr,
+		remoteAddr:     socket.SockaddrToUDPAddr(sa),
+		isDatagram:     true,
+		pollAttachment: netpoll.PollAttachment{FD: fd, Callback: el.readUDP},
 	}
 	if connected {
 		c.peer = nil
@@ -98,19 +83,24 @@ func newUDPConn(fd int, el *eventloop, localAddr net.Addr, sa unix.Sockaddr, con
 	return
 }
 
-func (c *conn) releaseUDP() {
+func (c *conn) release() {
 	c.ctx = nil
-	if addr, ok := c.localAddr.(*net.UDPAddr); ok && c.localAddr != c.loop.ln.addr && len(addr.Zone) > 0 {
-		bsPool.Put(bs.StringToBytes(addr.Zone))
-	}
-	if addr, ok := c.remoteAddr.(*net.UDPAddr); ok && len(addr.Zone) > 0 {
-		bsPool.Put(bs.StringToBytes(addr.Zone))
-	}
 	c.localAddr = nil
 	c.remoteAddr = nil
 	c.buffer = nil
-	netpoll.PutPollAttachment(c.pollAttachment)
-	c.pollAttachment = nil
+	if addr, ok := c.localAddr.(*net.TCPAddr); ok && c.localAddr != c.loop.ln.addr && len(addr.Zone) > 0 {
+		bsPool.Put(bs.StringToBytes(addr.Zone))
+	}
+	if addr, ok := c.remoteAddr.(*net.TCPAddr); ok && len(addr.Zone) > 0 {
+		bsPool.Put(bs.StringToBytes(addr.Zone))
+	}
+	c.pollAttachment.FD, c.pollAttachment.Callback = 0, nil
+	if !c.isDatagram {
+		c.opened = false
+		c.peer = nil
+		c.inboundBuffer.Done()
+		c.outboundBuffer.Release()
+	}
 }
 
 func (c *conn) open(buf []byte) error {
@@ -141,7 +131,7 @@ func (c *conn) write(data []byte) (n int, err error) {
 		// A temporary error occurs, append the data to outbound buffer, writing it back to the peer in the next round.
 		if err == unix.EAGAIN {
 			_, _ = c.outboundBuffer.Write(data)
-			err = c.loop.poller.ModReadWrite(c.pollAttachment)
+			err = c.loop.poller.ModReadWrite(&c.pollAttachment)
 			return
 		}
 		return -1, c.loop.closeConn(c, os.NewSyscallError("write", err))
@@ -149,7 +139,7 @@ func (c *conn) write(data []byte) (n int, err error) {
 	// Failed to send all data back to the peer, buffer the leftover data for the next round.
 	if sent < n {
 		_, _ = c.outboundBuffer.Write(data[sent:])
-		err = c.loop.poller.ModReadWrite(c.pollAttachment)
+		err = c.loop.poller.ModReadWrite(&c.pollAttachment)
 	}
 	return
 }
@@ -171,7 +161,7 @@ func (c *conn) writev(bs [][]byte) (n int, err error) {
 		// A temporary error occurs, append the data to outbound buffer, writing it back to the peer in the next round.
 		if err == unix.EAGAIN {
 			_, _ = c.outboundBuffer.Writev(bs)
-			err = c.loop.poller.ModReadWrite(c.pollAttachment)
+			err = c.loop.poller.ModReadWrite(&c.pollAttachment)
 			return
 		}
 		return -1, c.loop.closeConn(c, os.NewSyscallError("write", err))
@@ -189,7 +179,7 @@ func (c *conn) writev(bs [][]byte) (n int, err error) {
 			sent -= bn
 		}
 		_, _ = c.outboundBuffer.Writev(bs[pos:])
-		err = c.loop.poller.ModReadWrite(c.pollAttachment)
+		err = c.loop.poller.ModReadWrite(&c.pollAttachment)
 	}
 	return
 }
@@ -376,7 +366,7 @@ func (c *conn) WriteTo(w io.Writer) (n int64, err error) {
 }
 
 func (c *conn) Flush() error {
-	if c.outboundBuffer == nil || c.outboundBuffer.IsEmpty() {
+	if c.outboundBuffer.IsEmpty() {
 		return nil
 	}
 
@@ -409,6 +399,8 @@ func (c *conn) LocalAddr() net.Addr        { return c.localAddr }
 func (c *conn) RemoteAddr() net.Addr       { return c.remoteAddr }
 
 // Implementation of Socket interface
+
+// func (c *conn) Gfd() gfd.GFD             { return c.gfd }
 
 func (c *conn) Fd() int                        { return c.fd }
 func (c *conn) Dup() (fd int, err error)       { fd, _, err = netpoll.Dup(c.fd); return }

@@ -50,7 +50,7 @@ func (el *eventloop) activateSubReactor() error {
 	}
 
 	err := el.poller.Polling(func(fd int, ev uint32) error {
-		if c, ack := el.connections[fd]; ack {
+		if c := el.connections.getConn(fd); c != nil {
 			// Don't change the ordering of processing EPOLLOUT | EPOLLRDHUP / EPOLLIN unless you're 100%
 			// sure what you're doing!
 			// Re-ordering can easily introduce bugs and bad side-effects, as I found out painfully in the past.
@@ -70,6 +70,7 @@ func (el *eventloop) activateSubReactor() error {
 			if ev&netpoll.InEvents != 0 {
 				return el.read(c)
 			}
+			return nil
 		}
 		return nil
 	})
@@ -81,7 +82,7 @@ func (el *eventloop) activateSubReactor() error {
 		el.engine.opts.Logger.Errorf("event-loop(%d) is exiting due to error: %v", el.idx, err)
 	}
 
-	el.closeAllSockets()
+	el.closeConns()
 	el.engine.shutdown(err)
 
 	return err
@@ -94,7 +95,7 @@ func (el *eventloop) run() error {
 	}
 
 	err := el.poller.Polling(func(fd int, ev uint32) error {
-		if c, ok := el.connections[fd]; ok {
+		if c := el.connections.getConn(fd); c != nil {
 			// Don't change the ordering of processing EPOLLOUT | EPOLLRDHUP / EPOLLIN unless you're 100%
 			// sure what you're doing!
 			// Re-ordering can easily introduce bugs and bad side-effects, as I found out painfully in the past.
@@ -126,7 +127,7 @@ func (el *eventloop) run() error {
 		el.engine.opts.Logger.Errorf("event-loop(%d) is exiting due to error: %v", el.idx, err)
 	}
 
-	el.closeAllSockets()
+	el.closeConns()
 	el.ln.close()
 	el.engine.shutdown(err)
 

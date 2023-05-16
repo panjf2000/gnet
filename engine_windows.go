@@ -159,3 +159,9 @@ func run(eventHandler EventHandler, listener *listener, options *Options, protoA
 
 	return nil
 }
+
+/*
+func (eng *engine) sendCmd(_ *asyncCmd, _ bool) error {
+	return errorx.ErrUnsupportedOp
+}
+*/

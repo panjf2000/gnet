@@ -47,7 +47,7 @@ func (ev *clientEvents) OnOpen(c Conn) ([]byte, Action) {
 	return nil, None
 }
 
-func (ev *clientEvents) OnClose(c Conn, err error) Action {
+func (ev *clientEvents) OnClose(Conn, error) Action {
 	if ev.svr != nil {
 		if atomic.AddInt32(&ev.svr.clientActive, -1) == 0 {
 			return Shutdown

@@ -435,7 +435,7 @@ func startClient(t *testing.T, network, addr string, multicore, async bool) {
 	}
 }
 
-func TestDefaultGnetServer(t *testing.T) {
+func TestDefaultGnetServer(*testing.T) {
 	svr := BuiltinEventEngine{}
 	svr.OnBoot(Engine{})
 	svr.OnOpen(nil)
@@ -512,7 +512,7 @@ func (t *testWakeConnServer) OnOpen(c Conn) (out []byte, action Action) {
 	return
 }
 
-func (t *testWakeConnServer) OnClose(c Conn, err error) (action Action) {
+func (t *testWakeConnServer) OnClose(Conn, error) (action Action) {
 	action = Shutdown
 	return
 }
@@ -575,12 +575,12 @@ type testShutdownServer struct {
 	N       int
 }
 
-func (t *testShutdownServer) OnOpen(c Conn) (out []byte, action Action) {
+func (t *testShutdownServer) OnOpen(Conn) (out []byte, action Action) {
 	atomic.AddInt64(&t.clients, 1)
 	return
 }
 
-func (t *testShutdownServer) OnClose(c Conn, err error) (action Action) {
+func (t *testShutdownServer) OnClose(Conn, error) (action Action) {
 	atomic.AddInt64(&t.clients, -1)
 	return
 }
@@ -623,7 +623,7 @@ type testCloseActionErrorServer struct {
 	action        bool
 }
 
-func (t *testCloseActionErrorServer) OnClose(c Conn, err error) (action Action) {
+func (t *testCloseActionErrorServer) OnClose(Conn, error) (action Action) {
 	action = Shutdown
 	return
 }
@@ -721,12 +721,12 @@ type testCloseActionOnOpenServer struct {
 	action        bool
 }
 
-func (t *testCloseActionOnOpenServer) OnOpen(c Conn) (out []byte, action Action) {
+func (t *testCloseActionOnOpenServer) OnOpen(Conn) (out []byte, action Action) {
 	action = Close
 	return
 }
 
-func (t *testCloseActionOnOpenServer) OnClose(c Conn, err error) (action Action) {
+func (t *testCloseActionOnOpenServer) OnClose(Conn, error) (action Action) {
 	action = Shutdown
 	return
 }
@@ -763,7 +763,7 @@ type testShutdownActionOnOpenServer struct {
 	action        bool
 }
 
-func (t *testShutdownActionOnOpenServer) OnOpen(c Conn) (out []byte, action Action) {
+func (t *testShutdownActionOnOpenServer) OnOpen(Conn) (out []byte, action Action) {
 	action = Shutdown
 	return
 }
@@ -851,7 +851,7 @@ type testCloseConnectionServer struct {
 	action        bool
 }
 
-func (t *testCloseConnectionServer) OnClose(c Conn, err error) (action Action) {
+func (t *testCloseConnectionServer) OnClose(Conn, error) (action Action) {
 	action = Shutdown
 	return
 }
@@ -913,7 +913,7 @@ type testStopServer struct {
 	action                   bool
 }
 
-func (t *testStopServer) OnClose(c Conn, err error) (action Action) {
+func (t *testStopServer) OnClose(Conn, error) (action Action) {
 	logging.Debugf("closing connection...")
 	return
 }
@@ -978,7 +978,7 @@ func (t *testStopEngine) OnBoot(eng Engine) (action Action) {
 	return
 }
 
-func (t *testStopEngine) OnClose(c Conn, err error) (action Action) {
+func (t *testStopEngine) OnClose(Conn, error) (action Action) {
 	logging.Debugf("closing connection...")
 	return
 }
@@ -1091,7 +1091,7 @@ func (s *testClosedWakeUpServer) OnBoot(_ Engine) (action Action) {
 }
 
 func (s *testClosedWakeUpServer) OnTraffic(c Conn) Action {
-	require.NotNil(s.tester, c.RemoteAddr())
+	assert.NotNil(s.tester, c.RemoteAddr())
 
 	select {
 	case <-s.wakeup:
@@ -1108,7 +1108,7 @@ func (s *testClosedWakeUpServer) OnTraffic(c Conn) Action {
 	return None
 }
 
-func (s *testClosedWakeUpServer) OnClose(c Conn, err error) (action Action) {
+func (s *testClosedWakeUpServer) OnClose(Conn, error) (action Action) {
 	select {
 	case <-s.serverClosed:
 	default:
@@ -1148,7 +1148,7 @@ func (s *simServer) OnOpen(c Conn) (out []byte, action Action) {
 	return
 }
 
-func (s *simServer) OnClose(c Conn, err error) (action Action) {
+func (s *simServer) OnClose(_ Conn, err error) (action Action) {
 	if err != nil {
 		logging.Debugf("error occurred on closed, %v\n", err)
 	}

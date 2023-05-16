@@ -1,4 +1,4 @@
-name: Run tests with -tags=poll_opt
+name: Run tests with -tags=poll_opt,gc_opt
 
 on:
   push:
@@ -90,7 +90,7 @@ jobs:
         run: go test $(go list ./... | tail -n +2)
 
       - name: Run integration tests with -tags=poll_opt
-        run: go test -v -tags=poll_opt -coverprofile="codecov.report" -covermode=atomic -timeout 10m -failfast
+        run: go test -v -tags=poll_opt,gc_opt -coverprofile="codecov.report" -covermode=atomic -timeout 10m -failfast
 
       - name: Upload the code coverage report to codecov.io
         uses: codecov/codecov-action@v3

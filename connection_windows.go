@@ -411,6 +411,10 @@ func (c *conn) SetKeepAlivePeriod(d time.Duration) error {
 	return nil
 }
 
+// Gfd return an uninitialized GFD which is not valid,
+// this method is only implemented for compatibility, don't use it on Windows.
+// func (c *conn) Gfd() gfd.GFD { return gfd.GFD{} }
+
 // ==================================== Concurrency-safe API's ====================================
 
 func (c *conn) AsyncWrite(buf []byte, cb AsyncCallback) error {

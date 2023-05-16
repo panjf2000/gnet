@@ -42,7 +42,7 @@ jobs:
       - name: Setup and run golangci-lint
         uses: golangci/golangci-lint-action@v3
         with:
-          version: v1.51.2
+          version: v1.52.2
           args: -v -E gofumpt -E gocritic -E misspell -E revive -E godot --timeout 5m
   test:
     needs: lint
@@ -94,7 +94,7 @@ jobs:
         run: go test $(go list ./... | tail -n +2)
 
       - name: Run integration tests
-        run: go test -v -race -coverprofile="codecov.report" -covermode=atomic -timeout 5m
+        run: go test -v -race -coverprofile="codecov.report" -covermode=atomic -timeout 10m -failfast
 
       - name: Upload the code coverage report to codecov.io
         uses: codecov/codecov-action@v3

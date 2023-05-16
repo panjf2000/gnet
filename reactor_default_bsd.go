@@ -53,7 +53,7 @@ func (el *eventloop) activateSubReactor() error {
 	}
 
 	err := el.poller.Polling(func(fd int, filter int16) (err error) {
-		if c, ack := el.connections[fd]; ack {
+		if c := el.connections.getConn(fd); c != nil {
 			switch filter {
 			case netpoll.EVFilterSock:
 				err = el.closeConn(c, unix.ECONNRESET)
@@ -74,7 +74,7 @@ func (el *eventloop) activateSubReactor() error {
 		el.engine.opts.Logger.Errorf("event-loop(%d) is exiting due to error: %v", el.idx, err)
 	}
 
-	el.closeAllSockets()
+	el.closeConns()
 	el.engine.shutdown(err)
 
 	return err
@@ -87,7 +87,7 @@ func (el *eventloop) run() error {
 	}
 
 	err := el.poller.Polling(func(fd int, filter int16) (err error) {
-		if c, ack := el.connections[fd]; ack {
+		if c := el.connections.getConn(fd); c != nil {
 			switch filter {
 			case netpoll.EVFilterSock:
 				err = el.closeConn(c, unix.ECONNRESET)
@@ -109,7 +109,7 @@ func (el *eventloop) run() error {
 		el.engine.opts.Logger.Errorf("event-loop(%d) is exiting due to error: %v", el.idx, err)
 	}
 
-	el.closeAllSockets()
+	el.closeConns()
 	el.ln.close()
 	el.engine.shutdown(err)
 

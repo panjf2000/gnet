@@ -25,6 +25,7 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
+	"github.com/panjf2000/gnet/v2/internal/gfd"
 	"github.com/panjf2000/gnet/v2/internal/netpoll"
 	"github.com/panjf2000/gnet/v2/pkg/errors"
 )
@@ -101,7 +102,7 @@ func (eng *engine) activateEventLoops(numEventLoop int) (err error) {
 			el.engine = eng
 			el.poller = p
 			el.buffer = make([]byte, eng.opts.ReadBufferCap)
-			el.connections = make(map[int]*conn)
+			el.connections.init()
 			el.eventHandler = eng.eventHandler
 			if err = el.poller.AddRead(el.ln.packPollAttachment(el.accept)); err != nil {
 				return
@@ -136,7 +137,7 @@ func (eng *engine) activateReactors(numEventLoop int) error {
 			el.engine = eng
 			el.poller = p
 			el.buffer = make([]byte, eng.opts.ReadBufferCap)
-			el.connections = make(map[int]*conn)
+			el.connections.init()
 			el.eventHandler = eng.eventHandler
 			eng.lb.register(el)
 		} else {
@@ -237,6 +238,9 @@ func run(eventHandler EventHandler, listener *listener, options *Options, protoA
 	if options.NumEventLoop > 0 {
 		numEventLoop = options.NumEventLoop
 	}
+	if numEventLoop > gfd.EventLoopIndexMax {
+		numEventLoop = gfd.EventLoopIndexMax
+	}
 
 	shutdownCtx, shutdown := context.WithCancel(context.Background())
 	eng := engine{
@@ -280,3 +284,19 @@ func run(eventHandler EventHandler, listener *listener, options *Options, protoA
 
 	return nil
 }
+
+/*
+func (eng *engine) sendCmd(cmd *asyncCmd, urgent bool) error {
+	if !gfd.Validate(cmd.fd) {
+		return errors.ErrInvalidConn
+	}
+	el := eng.lb.index(cmd.fd.EventLoopIndex())
+	if el == nil {
+		return errors.ErrInvalidConn
+	}
+	if urgent {
+		return el.poller.UrgentTrigger(el.execCmd, cmd)
+	}
+	return el.poller.Trigger(el.execCmd, cmd)
+}
+*/
