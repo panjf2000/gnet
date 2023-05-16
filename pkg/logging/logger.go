@@ -52,6 +52,7 @@ import (
 	"strconv"
 
 	"go.uber.org/zap"
+	"go.uber.org/zap/buffer"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/natefinch/lumberjack.v2"
 )
@@ -68,22 +69,22 @@ type Level = zapcore.Level
 const (
 	// DebugLevel logs are typically voluminous, and are usually disabled in
 	// production.
-	DebugLevel Level = iota - 1
+	DebugLevel = zapcore.DebugLevel
 	// InfoLevel is the default logging priority.
-	InfoLevel
+	InfoLevel = zapcore.InfoLevel
 	// WarnLevel logs are more important than Info, but don't need individual
 	// human review.
-	WarnLevel
+	WarnLevel = zapcore.WarnLevel
 	// ErrorLevel logs are high-priority. If an application is running smoothly,
 	// it shouldn't generate any error-level logs.
-	ErrorLevel
+	ErrorLevel = zapcore.ErrorLevel
 	// DPanicLevel logs are particularly important errors. In development the
 	// logger panics after writing the message.
-	DPanicLevel
+	DPanicLevel = zapcore.DPanicLevel
 	// PanicLevel logs a message, then panics.
-	PanicLevel
+	PanicLevel = zapcore.PanicLevel
 	// FatalLevel logs a message, then calls os.Exit(1).
-	FatalLevel
+	FatalLevel = zapcore.FatalLevel
 )
 
 func init() {
@@ -105,19 +106,62 @@ func init() {
 			panic("invalid GNET_LOGGING_FILE, " + err.Error())
 		}
 	} else {
-		cfg := zap.NewDevelopmentConfig()
-		cfg.Level = zap.NewAtomicLevelAt(defaultLoggingLevel)
-		cfg.EncoderConfig.EncodeTime = zapcore.RFC3339NanoTimeEncoder
-		zapLogger, _ := cfg.Build()
+		core := zapcore.NewCore(getDevEncoder(), zapcore.Lock(os.Stdout), defaultLoggingLevel)
+		zapLogger := zap.New(core,
+			zap.Development(),
+			zap.AddCaller(),
+			zap.AddStacktrace(ErrorLevel),
+			zap.ErrorOutput(zapcore.Lock(os.Stderr)))
 		defaultLogger = zapLogger.Sugar()
 	}
 }
 
-func getEncoder() zapcore.Encoder {
+type prefixEncoder struct {
+	zapcore.Encoder
+
+	prefix  string
+	bufPool buffer.Pool
+}
+
+func (e *prefixEncoder) EncodeEntry(entry zapcore.Entry, fields []zapcore.Field) (*buffer.Buffer, error) {
+	buf := e.bufPool.Get()
+
+	buf.AppendString(e.prefix)
+	buf.AppendString(" ")
+
+	logEntry, err := e.Encoder.EncodeEntry(entry, fields)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = buf.Write(logEntry.Bytes())
+	if err != nil {
+		return nil, err
+	}
+
+	return buf, nil
+}
+
+func getDevEncoder() zapcore.Encoder {
+	encoderConfig := zap.NewDevelopmentEncoderConfig()
+	encoderConfig.EncodeTime = zapcore.RFC3339NanoTimeEncoder
+	encoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
+	return &prefixEncoder{
+		Encoder: zapcore.NewConsoleEncoder(encoderConfig),
+		prefix:  "[gnet]",
+		bufPool: buffer.NewPool(),
+	}
+}
+
+func getProdEncoder() zapcore.Encoder {
 	encoderConfig := zap.NewProductionEncoderConfig()
 	encoderConfig.EncodeTime = zapcore.RFC3339NanoTimeEncoder
 	encoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
-	return zapcore.NewConsoleEncoder(encoderConfig)
+	return &prefixEncoder{
+		Encoder: zapcore.NewConsoleEncoder(encoderConfig),
+		prefix:  "[gnet]",
+		bufPool: buffer.NewPool(),
+	}
 }
 
 // GetDefaultLogger returns the default logger.
@@ -144,7 +188,7 @@ func CreateLoggerAsLocalFile(localFilePath string, logLevel Level) (logger Logge
 		MaxAge:     15, // days
 	}
 
-	encoder := getEncoder()
+	encoder := getProdEncoder()
 	ws := zapcore.AddSync(lumberJackLogger)
 	zapcore.Lock(ws)
 
@@ -152,7 +196,7 @@ func CreateLoggerAsLocalFile(localFilePath string, logLevel Level) (logger Logge
 		return level >= logLevel
 	})
 	core := zapcore.NewCore(encoder, ws, levelEnabler)
-	zapLogger := zap.New(core, zap.AddCaller())
+	zapLogger := zap.New(core, zap.AddCaller(), zap.AddStacktrace(ErrorLevel))
 	logger = zapLogger.Sugar()
 	flush = zapLogger.Sync
 	return

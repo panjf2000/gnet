@@ -887,7 +887,7 @@ func TestServerOptionsCheck(t *testing.T) {
 	assert.EqualError(t, err, gerr.ErrTooManyEventLoopThreads.Error(), "error returned with LockOSThread option")
 }
 
-func TestStop(t *testing.T) {
+func TestStopServer(t *testing.T) {
 	testStop(t, "tcp", ":9997")
 }
 
