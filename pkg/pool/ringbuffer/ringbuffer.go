@@ -1,4 +1,4 @@
-// Copyright (c) 2019 Andy Pan
+// Copyright (c) 2019 The Gnet Authors. All rights reserved.
 // Copyright (c) 2016 Aliaksandr Valialkin, VertaMedia
 //
 // Licensed under the Apache License, Version 2.0 (the "License");

@@ -12,13 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build linux || freebsd || dragonfly || darwin
-// +build linux freebsd dragonfly darwin
+//go:build !poll_opt
+// +build !poll_opt
 
 package netpoll
 
-// PollAttachment is the user data which is about to be stored in "void *ptr" of epoll_data or "void *udata" of kevent.
-type PollAttachment struct {
-	FD       int
-	Callback PollEventHandler
-}
+import "golang.org/x/sys/unix"
+
+type epollevent = unix.EpollEvent

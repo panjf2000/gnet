@@ -1,5 +1,5 @@
+// Copyright (c) 2022 The Gnet Authors. All rights reserved.
 // Copyright 2009 The Go Authors. All rights reserved.
-// Copyright (c) 2022 Andy Pan.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
