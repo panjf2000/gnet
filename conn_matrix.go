@@ -24,17 +24,17 @@ import (
 	"github.com/panjf2000/gnet/v2/internal/gfd"
 )
 
-type connStore struct {
+type connMatrix struct {
 	connCount int32
 	connMap   map[int]*conn
 }
 
-func (cs *connStore) init() {
-	cs.connMap = make(map[int]*conn)
+func (cm *connMatrix) init() {
+	cm.connMap = make(map[int]*conn)
 }
 
-func (cs *connStore) iterate(f func(*conn) bool) {
-	for _, c := range cs.connMap {
+func (cm *connMatrix) iterate(f func(*conn) bool) {
+	for _, c := range cm.connMap {
 		if c != nil {
 			if !f(c) {
 				return
@@ -43,30 +43,30 @@ func (cs *connStore) iterate(f func(*conn) bool) {
 	}
 }
 
-func (cs *connStore) incCount(_ int, delta int32) {
-	atomic.AddInt32(&cs.connCount, delta)
+func (cm *connMatrix) incCount(_ int, delta int32) {
+	atomic.AddInt32(&cm.connCount, delta)
 }
 
-func (cs *connStore) loadCount() (n int32) {
-	return atomic.LoadInt32(&cs.connCount)
+func (cm *connMatrix) loadCount() (n int32) {
+	return atomic.LoadInt32(&cm.connCount)
 }
 
-func (cs *connStore) addConn(c *conn, index int) {
+func (cm *connMatrix) addConn(c *conn, index int) {
 	c.gfd = gfd.NewGFD(c.fd, index, 0, 0)
-	cs.connMap[c.fd] = c
+	cm.connMap[c.fd] = c
 }
 
-func (cs *connStore) delConn(c *conn) {
-	delete(cs.connMap, c.fd)
-	cs.incCount(0, -1)
+func (cm *connMatrix) delConn(c *conn) {
+	delete(cm.connMap, c.fd)
+	cm.incCount(0, -1)
 }
 
-func (cs *connStore) getConn(fd int) *conn {
-	return cs.connMap[fd]
+func (cm *connMatrix) getConn(fd int) *conn {
+	return cm.connMap[fd]
 }
 
 /*
-func (cs *connStore) getConnByGFD(fd gfd.GFD) *conn {
-	return cs.connMap[fd.Fd()]
+func (cm *connMatrix) getConnByGFD(fd gfd.GFD) *conn {
+	return cm.connMap[fd.Fd()]
 }
 */

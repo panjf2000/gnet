@@ -17,8 +17,8 @@ Package gfd provides a structure GFD to store the fd, eventloop index, connStore
 and some other information.
 
 GFD structure:
-|eventloop index|conn level one index|conn level two index| timestamp |      fd     |
-|   1 byte      |       1 byte       |      2 byte        |  4 byte   |int type size|.
+|eventloop index|conn matrix row index|conn matrix column index|monotone sequence|  socket fd  |
+|   1 byte      |       1 byte        |        2 byte          |     4 byte      |    8 byte   |.
 */
 package gfd
 
@@ -30,12 +30,12 @@ import (
 
 // Constants for GFD.
 const (
-	ConnIndex2Offset  = 2
-	SequenceOffset    = 4
-	FdOffset          = 8
-	EventLoopIndexMax = math.MaxUint8 + 1
-	ConnIndex1Max     = math.MaxUint8 + 1
-	ConnIndex2Max     = math.MaxUint16 + 1
+	ConnMatrixColumnOffset = 2
+	SequenceOffset         = 4
+	FdOffset               = 8
+	EventLoopIndexMax      = math.MaxUint8 + 1
+	ConnMatrixRowMax       = math.MaxUint8 + 1
+	ConnMatrixColumnMax    = math.MaxUint16 + 1
 )
 
 type monotoneSeq uint32
@@ -59,14 +59,14 @@ func (gfd GFD) EventLoopIndex() int {
 	return int(gfd[0])
 }
 
-// ConnIndex1 returns the connStore index of the first level.
-func (gfd GFD) ConnIndex1() int {
+// ConnMatrixRow returns the connMatrix row index.
+func (gfd GFD) ConnMatrixRow() int {
 	return int(gfd[1])
 }
 
-// ConnIndex2 returns the connStore index of the second level.
-func (gfd GFD) ConnIndex2() int {
-	return int(binary.BigEndian.Uint16(gfd[ConnIndex2Offset:SequenceOffset]))
+// ConnMatrixColumn returns the connMatrix column index.
+func (gfd GFD) ConnMatrixColumn() int {
+	return int(binary.BigEndian.Uint16(gfd[ConnMatrixColumnOffset:SequenceOffset]))
 }
 
 // Sequence returns the monotonic sequence, only used to prevent fd duplication.
@@ -75,26 +75,26 @@ func (gfd GFD) Sequence() uint32 {
 }
 
 // UpdateIndexes updates the connStore indexes.
-func (gfd *GFD) UpdateIndexes(idx1, idx2 int) {
-	(*gfd)[1] = byte(idx1)
-	binary.BigEndian.PutUint16((*gfd)[ConnIndex2Offset:SequenceOffset], uint16(idx2))
-}
-
-// NewGFD creates a new GFD.
-func NewGFD(fd, elIndex, connIndex1, connIndex2 int) (gfd GFD) {
-	gfd[0] = byte(elIndex)
-	gfd[1] = byte(connIndex1)
-	binary.BigEndian.PutUint16(gfd[ConnIndex2Offset:SequenceOffset], uint16(connIndex2))
-	binary.BigEndian.PutUint32(gfd[SequenceOffset:FdOffset], monoSeq.Inc())
-	binary.BigEndian.PutUint64(gfd[FdOffset:], uint64(fd))
-	return
+func (gfd *GFD) UpdateIndexes(row, column int) {
+	(*gfd)[1] = byte(row)
+	binary.BigEndian.PutUint16((*gfd)[ConnMatrixColumnOffset:SequenceOffset], uint16(column))
 }
 
 // Validate checks if the GFD is valid.
-func Validate(gfd GFD) bool {
+func (gfd GFD) Validate() bool {
 	return gfd.Fd() > 2 && gfd.Fd() <= math.MaxInt &&
 		gfd.EventLoopIndex() >= 0 && gfd.EventLoopIndex() < EventLoopIndexMax &&
-		gfd.ConnIndex1() >= 0 && gfd.ConnIndex1() < ConnIndex1Max &&
-		gfd.ConnIndex2() >= 0 && gfd.ConnIndex2() < ConnIndex2Max &&
+		gfd.ConnMatrixRow() >= 0 && gfd.ConnMatrixRow() < ConnMatrixRowMax &&
+		gfd.ConnMatrixColumn() >= 0 && gfd.ConnMatrixColumn() < ConnMatrixColumnMax &&
 		gfd.Sequence() > 0
+}
+
+// NewGFD creates a new GFD.
+func NewGFD(fd, elIndex, row, column int) (gfd GFD) {
+	gfd[0] = byte(elIndex)
+	gfd[1] = byte(row)
+	binary.BigEndian.PutUint16(gfd[ConnMatrixColumnOffset:SequenceOffset], uint16(column))
+	binary.BigEndian.PutUint32(gfd[SequenceOffset:FdOffset], monoSeq.Inc())
+	binary.BigEndian.PutUint64(gfd[FdOffset:], uint64(fd))
+	return
 }
