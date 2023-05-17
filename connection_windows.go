@@ -215,7 +215,7 @@ func (c *conn) Discard(n int) (int, error) {
 
 func (c *conn) Write(p []byte) (int, error) {
 	if c.rawConn == nil && c.loop.eng.ln.pc == nil {
-		return 0, errorx.ErrInvalidConn
+		return 0, net.ErrClosed
 	}
 	if c.rawConn != nil {
 		return c.rawConn.Write(p)
@@ -232,14 +232,14 @@ func (c *conn) Writev(bs [][]byte) (int, error) {
 		}
 		return c.rawConn.Write(bb.Bytes())
 	}
-	return 0, errorx.ErrInvalidConn
+	return 0, net.ErrClosed
 }
 
 func (c *conn) ReadFrom(r io.Reader) (int64, error) {
 	if c.rawConn != nil {
 		return io.Copy(c.rawConn, r)
 	}
-	return 0, errorx.ErrInvalidConn
+	return 0, net.ErrClosed
 }
 
 func (c *conn) WriteTo(w io.Writer) (n int64, err error) {
@@ -299,7 +299,7 @@ func (c *conn) Fd() (fd int) {
 
 func (c *conn) Dup() (fd int, err error) {
 	if c.rawConn == nil && c.loop.eng.ln.pc == nil {
-		return -1, errorx.ErrInvalidConn
+		return -1, net.ErrClosed
 	}
 
 	var (
@@ -345,7 +345,7 @@ func (c *conn) Dup() (fd int, err error) {
 
 func (c *conn) SetReadBuffer(bytes int) error {
 	if c.rawConn == nil && c.loop.eng.ln.pc == nil {
-		return errorx.ErrInvalidConn
+		return net.ErrClosed
 	}
 
 	if c.rawConn != nil {
@@ -356,7 +356,7 @@ func (c *conn) SetReadBuffer(bytes int) error {
 
 func (c *conn) SetWriteBuffer(bytes int) error {
 	if c.rawConn == nil && c.loop.eng.ln.pc == nil {
-		return errorx.ErrInvalidConn
+		return net.ErrClosed
 	}
 	if c.rawConn != nil {
 		return c.rawConn.(interface{ SetWriteBuffer(int) error }).SetWriteBuffer(bytes)
@@ -366,7 +366,7 @@ func (c *conn) SetWriteBuffer(bytes int) error {
 
 func (c *conn) SetLinger(sec int) error {
 	if c.rawConn == nil {
-		return errorx.ErrInvalidConn
+		return net.ErrClosed
 	}
 
 	tc, ok := c.rawConn.(*net.TCPConn)
@@ -378,7 +378,7 @@ func (c *conn) SetLinger(sec int) error {
 
 func (c *conn) SetNoDelay(noDelay bool) error {
 	if c.rawConn == nil {
-		return errorx.ErrInvalidConn
+		return net.ErrClosed
 	}
 
 	tc, ok := c.rawConn.(*net.TCPConn)
@@ -390,7 +390,7 @@ func (c *conn) SetNoDelay(noDelay bool) error {
 
 func (c *conn) SetKeepAlivePeriod(d time.Duration) error {
 	if c.rawConn == nil {
-		return errorx.ErrInvalidConn
+		return net.ErrClosed
 	}
 
 	tc, ok := c.rawConn.(*net.TCPConn)
