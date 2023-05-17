@@ -23,6 +23,9 @@ func TestConnMatrix(t *testing.T) {
 		testConnMatrix(t, 10000)
 	})
 	t.Run("100k-connections", func(t *testing.T) {
+		if !testVastConns {
+			t.Skip("skipped because testVastConns is set to false")
+		}
 		testConnMatrix(t, 100000)
 	})
 	t.Run("1m-connections", func(t *testing.T) {
