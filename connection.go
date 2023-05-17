@@ -32,6 +32,7 @@ import (
 	"github.com/panjf2000/gnet/v2/internal/socket"
 	"github.com/panjf2000/gnet/v2/pkg/buffer/elastic"
 	gerrors "github.com/panjf2000/gnet/v2/pkg/errors"
+	"github.com/panjf2000/gnet/v2/pkg/logging"
 	bsPool "github.com/panjf2000/gnet/v2/pkg/pool/byteslice"
 )
 
@@ -144,7 +145,11 @@ func (c *conn) write(data []byte) (n int, err error) {
 			err = c.loop.poller.ModReadWrite(c.pollAttachment)
 			return
 		}
-		return -1, c.loop.closeConn(c, os.NewSyscallError("write", err))
+		if err := c.loop.closeConn(c, os.NewSyscallError("write", err)); err != nil {
+			logging.Errorf("failed to close connection(fd=%d,peer=%+v) on conn.write: %v",
+				c.fd, c.remoteAddr, err)
+		}
+		return -1, os.NewSyscallError("write", err)
 	}
 	// Failed to send all data back to the peer, buffer the leftover data for the next round.
 	if sent < n {
@@ -174,7 +179,11 @@ func (c *conn) writev(bs [][]byte) (n int, err error) {
 			err = c.loop.poller.ModReadWrite(c.pollAttachment)
 			return
 		}
-		return -1, c.loop.closeConn(c, os.NewSyscallError("write", err))
+		if err := c.loop.closeConn(c, os.NewSyscallError("writev", err)); err != nil {
+			logging.Errorf("failed to close connection(fd=%d,peer=%+v) on conn.writev: %v",
+				c.fd, c.remoteAddr, err)
+		}
+		return -1, os.NewSyscallError("writev", err)
 	}
 	// Failed to send all data back to the peer, buffer the leftover data for the next round.
 	if sent < n {
@@ -200,15 +209,18 @@ type asyncWriteHook struct {
 }
 
 func (c *conn) asyncWrite(itf interface{}) (err error) {
+	hook := itf.(*asyncWriteHook)
+	defer func() {
+		if hook.callback != nil {
+			_ = hook.callback(c, err)
+		}
+	}()
+
 	if !c.opened {
-		return nil
+		return net.ErrClosed
 	}
 
-	hook := itf.(*asyncWriteHook)
 	_, err = c.write(hook.data)
-	if hook.callback != nil {
-		_ = hook.callback(c, err)
-	}
 	return
 }
 
@@ -218,15 +230,18 @@ type asyncWritevHook struct {
 }
 
 func (c *conn) asyncWritev(itf interface{}) (err error) {
+	hook := itf.(*asyncWritevHook)
+	defer func() {
+		if hook.callback != nil {
+			_ = hook.callback(c, err)
+		}
+	}()
+
 	if !c.opened {
-		return nil
+		return net.ErrClosed
 	}
 
-	hook := itf.(*asyncWritevHook)
 	_, err = c.writev(hook.data)
-	if hook.callback != nil {
-		_ = hook.callback(c, err)
-	}
 	return
 }
 
