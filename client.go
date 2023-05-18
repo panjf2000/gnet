@@ -37,9 +37,8 @@ import (
 
 // Client of gnet.
 type Client struct {
-	opts     *Options
-	el       *eventloop
-	logFlush func() error
+	opts *Options
+	el   *eventloop
 }
 
 // NewClient creates an instance of Client.
@@ -47,17 +46,19 @@ func NewClient(eventHandler EventHandler, opts ...Option) (cli *Client, err erro
 	options := loadOptions(opts...)
 	cli = new(Client)
 	cli.opts = options
-	var logger logging.Logger
-	if options.LogPath != "" {
-		if logger, cli.logFlush, err = logging.CreateLoggerAsLocalFile(options.LogPath, options.LogLevel); err != nil {
-			return
-		}
-	} else {
-		logger = logging.GetDefaultLogger()
-	}
+
+	logger, logFlusher := logging.GetDefaultLogger(), logging.GetDefaultFlusher()
 	if options.Logger == nil {
+		if options.LogPath != "" {
+			logger, logFlusher, _ = logging.CreateLoggerAsLocalFile(options.LogPath, options.LogLevel)
+		}
 		options.Logger = logger
+	} else {
+		logger = options.Logger
+		logFlusher = nil
 	}
+	logging.SetDefaultLoggerAndFlusher(logger, logFlusher)
+
 	var p *netpoll.Poller
 	if p, err = netpoll.OpenPoller(); err != nil {
 		return
@@ -126,9 +127,6 @@ func (cli *Client) Stop() (err error) {
 	// Stop the ticker.
 	if cli.opts.Ticker {
 		cli.el.engine.cancelTicker()
-	}
-	if cli.logFlush != nil {
-		err = cli.logFlush()
 	}
 	logging.Cleanup()
 	return

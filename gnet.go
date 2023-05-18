@@ -365,28 +365,21 @@ var MaxStreamBufferCap = 64 * 1024 // 64KB
 func Run(eventHandler EventHandler, protoAddr string, opts ...Option) (err error) {
 	options := loadOptions(opts...)
 
-	logging.Debugf("default logging level is %s", logging.LogLevel())
-
-	var (
-		logger logging.Logger
-		flush  func() error
-	)
-	if options.LogPath != "" {
-		if logger, flush, err = logging.CreateLoggerAsLocalFile(options.LogPath, options.LogLevel); err != nil {
-			return
-		}
-	} else {
-		logger = logging.GetDefaultLogger()
-	}
+	logger, logFlusher := logging.GetDefaultLogger(), logging.GetDefaultFlusher()
 	if options.Logger == nil {
-		options.Logger = logger
-	}
-	defer func() {
-		if flush != nil {
-			_ = flush()
+		if options.LogPath != "" {
+			logger, logFlusher, _ = logging.CreateLoggerAsLocalFile(options.LogPath, options.LogLevel)
 		}
-		logging.Cleanup()
-	}()
+		options.Logger = logger
+	} else {
+		logger = options.Logger
+		logFlusher = nil
+	}
+	logging.SetDefaultLoggerAndFlusher(logger, logFlusher)
+
+	defer logging.Cleanup()
+
+	logging.Debugf("default logging level is %s", logging.LogLevel())
 
 	// The maximum number of operating system threads that the Go program can use is initially set to 10000,
 	// which should also be the maximum amount of I/O event-loops locked to OS threads that users can start up.

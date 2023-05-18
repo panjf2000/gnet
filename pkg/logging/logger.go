@@ -50,16 +50,19 @@ import (
 	"errors"
 	"os"
 	"strconv"
+	"sync"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
+type Flusher func() error
+
 var (
-	flushLogs           func() error
 	defaultLogger       Logger
 	defaultLoggingLevel Level
+	defaultFlusher      Flusher
 )
 
 // Level is the alias of zapcore.Level.
@@ -100,7 +103,7 @@ func init() {
 	fileName := os.Getenv("GNET_LOGGING_FILE")
 	if len(fileName) > 0 {
 		var err error
-		defaultLogger, flushLogs, err = CreateLoggerAsLocalFile(fileName, defaultLoggingLevel)
+		defaultLogger, defaultFlusher, err = CreateLoggerAsLocalFile(fileName, defaultLoggingLevel)
 		if err != nil {
 			panic("invalid GNET_LOGGING_FILE, " + err.Error())
 		}
@@ -125,13 +128,31 @@ func GetDefaultLogger() Logger {
 	return defaultLogger
 }
 
+// GetDefaultFlusher returns the default flusher.
+func GetDefaultFlusher() Flusher {
+	return defaultFlusher
+}
+
+var setupOnce sync.Once
+
+// SetDefaultLoggerAndFlusher sets the default logger and its flusher.
+//
+// Note that this function should only be called once at the
+// start of the program and not thereafter for the entire runtime,
+// otherwise it will only keep the first setup.
+func SetDefaultLoggerAndFlusher(logger Logger, flusher Flusher) {
+	setupOnce.Do(func() {
+		defaultLogger, defaultFlusher = logger, flusher
+	})
+}
+
 // LogLevel tells what the default logging level is.
 func LogLevel() string {
 	return defaultLoggingLevel.String()
 }
 
 // CreateLoggerAsLocalFile setups the logger by local file path.
-func CreateLoggerAsLocalFile(localFilePath string, logLevel Level) (logger Logger, flush func() error, err error) {
+func CreateLoggerAsLocalFile(localFilePath string, logLevel Level) (logger Logger, flusher Flusher, err error) {
 	if len(localFilePath) == 0 {
 		return nil, nil, errors.New("invalid local logger path")
 	}
@@ -154,14 +175,14 @@ func CreateLoggerAsLocalFile(localFilePath string, logLevel Level) (logger Logge
 	core := zapcore.NewCore(encoder, ws, levelEnabler)
 	zapLogger := zap.New(core, zap.AddCaller())
 	logger = zapLogger.Sugar()
-	flush = zapLogger.Sync
+	flusher = zapLogger.Sync
 	return
 }
 
 // Cleanup does something windup for logger, like closing, flushing, etc.
 func Cleanup() {
-	if flushLogs != nil {
-		_ = flushLogs()
+	if defaultFlusher != nil {
+		_ = defaultFlusher()
 	}
 }
 
