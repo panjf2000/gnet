@@ -118,6 +118,7 @@ func (cli *Client) Start() error {
 	if cli.opts.Ticker {
 		go cli.el.ticker(cli.el.engine.ticker.ctx)
 	}
+	logging.Debugf("default logging level is %s", logging.LogLevel())
 	return nil
 }
 
