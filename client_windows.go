@@ -28,25 +28,25 @@ import (
 )
 
 type Client struct {
-	opts     *Options
-	el       *eventloop
-	logFlush func() error
+	opts *Options
+	el   *eventloop
 }
 
 func NewClient(eh EventHandler, opts ...Option) (cli *Client, err error) {
 	options := loadOptions(opts...)
 	cli = &Client{opts: options}
-	var logger logging.Logger
-	if options.LogPath != "" {
-		if logger, cli.logFlush, err = logging.CreateLoggerAsLocalFile(options.LogPath, options.LogLevel); err != nil {
-			return
-		}
-	} else {
-		logger = logging.GetDefaultLogger()
-	}
+
+	logger, logFlusher := logging.GetDefaultLogger(), logging.GetDefaultFlusher()
 	if options.Logger == nil {
+		if options.LogPath != "" {
+			logger, logFlusher, _ = logging.CreateLoggerAsLocalFile(options.LogPath, options.LogLevel)
+		}
 		options.Logger = logger
+	} else {
+		logger = options.Logger
+		logFlusher = nil
 	}
+	logging.SetDefaultLoggerAndFlusher(logger, logFlusher)
 
 	shutdownCtx, shutdown := context.WithCancel(context.Background())
 	eng := &engine{
@@ -78,6 +78,7 @@ func (cli *Client) Start() error {
 			return nil
 		})
 	}
+	logging.Debugf("default logging level is %s", logging.LogLevel())
 	return nil
 }
 
@@ -88,9 +89,6 @@ func (cli *Client) Stop() (err error) {
 	}
 	_ = cli.el.eng.workerPool.Wait()
 	cli.el.eventHandler.OnShutdown(Engine{})
-	if cli.logFlush != nil {
-		err = cli.logFlush()
-	}
 	logging.Cleanup()
 	return
 }
