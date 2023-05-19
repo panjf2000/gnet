@@ -7,7 +7,8 @@ import Link from '@docusaurus/Link';
 import classnames from 'classnames';
 import GithubSlugger from 'github-slugger';
 import pluralize from 'pluralize';
-import titleize from 'titleize';
+import { titleCase } from "title-case";
+
 
 const AnchoredH2 = Heading('h2');
 const AnchoredH3 = Heading('h3');
@@ -43,14 +44,14 @@ function Header({groupBy, group}) {
     case 'release':
       return (
         <li className="header sticky">
-          <h3><Link to={`/releases/${group}/`}>{titleize(group)}</Link></h3>
+          <h3><Link to={`/releases/${group}/`}>{titleCase(group)}</Link></h3>
         </li>
       );
       break;
 
     case 'type':
       let icon = null;
-      let label = pluralize(titleize(group));
+      let label = pluralize(titleCase(group));
       let textColor = null;
 
       switch(group) {

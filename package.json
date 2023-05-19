@@ -37,7 +37,7 @@
     "strftime": "^0.10.0",
     "svg.js": "^2.6.2",
     "timeago-react": "^3.0.0",
-    "titleize": "^2.1.0"
+    "title-case": "^3.0.3"
   },
   "browserslist": {
     "production": [
