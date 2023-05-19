@@ -1,16 +1,16 @@
 module.exports = {
   "latest_highlight": {
     "author_github": "https://github.com/panjf2000",
-    "date": "2022-02-27",
-    "description": "Release of v2.0.0",
+    "date": "2023-05-19",
+    "description": "The first release candidate for gnet v2.3.0",
     "hide_on_release_notes": false,
-    "id": "2022-02-27-release-of-gnet-v2",
-    "path": "website/highlights/2022-02-27-release-of-gnet-v2.md",
-    "permalink": "/highlights/2022-02-27-release-of-gnet-v2/",
+    "id": "2023-05-19-release-candidate-for-gnet-v2-3-0",
+    "path": "website/highlights/2023-05-19-release-candidate-for-gnet-v2-3-0.md",
+    "permalink": "/highlights/2023-05-19-release-candidate-for-gnet-v2-3-0/",
     "tags": [
       "release",
     ],
-    "title": "Release of v2.0.0"
+    "title": "Release candidate for gnet v2.3.0"
   },
   "latest_post": {
     "author_github": "https://github.com/panjf2000",
