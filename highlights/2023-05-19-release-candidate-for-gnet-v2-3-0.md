@@ -14,7 +14,7 @@ tags: ["type: tag", "domain: v2.3.0-rc.1"]
 
 The two major updates in this release candidate are [#460](https://github.com/panjf2000/gnet/pull/460) and [#461](https://github.com/panjf2000/gnet/pull/461).
 
-We introduced a new data structure `matrix` in #460 to displace the default `map` for managing connections internally, with the help of this new data structure, we can significantly reduce GC (Garbage Collection) latency:
+We introduced a new data structure `matrix` in [#460](https://github.com/panjf2000/gnet/pull/460) to displace the default `map` for managing connections internally, with the help of this new data structure, we can significantly reduce GC (Garbage Collection) latency:
 
 ```bash
 goos: darwin
