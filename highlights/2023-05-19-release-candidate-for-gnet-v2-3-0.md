@@ -5,7 +5,7 @@ title: "Release candidate for gnet v2.3.0"
 description: "The first release candidate for gnet v2.3.0"
 author_github: "https://github.com/panjf2000"
 pr_numbers: [b493107]
-release: "2.3.0-RC1"
+release: "2.3.0-rc.1"
 hide_on_release_notes: false
 tags: ["type: tag", "domain: v2.3.0-rc.1"]
 ---
@@ -49,6 +49,3 @@ geomean                                          ²               +0.00%        
 While we have performed sufficient testing on `matrix`, we are still using `map` as the default connection storage in this RC version for the sake of caution, but you can enable the new data structure by specifying build tags: -tags=gc_opt. This can be considered as a precautionary measure so that in case `matrix` has any unexpected bugs, you can quickly fall back to the default `map`. We will consider promoting `matrix` to be the default storage for connections in a subsequent official release.
 
 Another significant leap is [#461](https://github.com/panjf2000/gnet/pull/461), you can now run `gnet` on Windows, it should be noted that the Windows version of `gnet` is intended for development purposes and is not recommended for use in production.
-
-
-Please visit [Gnet v2.3.0 RC1](https://github.com/panjf2000/gnet/releases/tag/v2.3.0-rc.1) for more details.
