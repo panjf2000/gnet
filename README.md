@@ -38,7 +38,7 @@ English | [中文](README_ZH.md)
 - [x] Supporting two event-driven mechanisms: `epoll` on **Linux** and `kqueue` on **FreeBSD/DragonFly/Darwin**
 - [x] Flexible ticker event
 - [x] Implementation of `gnet` Client
-- [x] **Windows** platform support (Not for production use, only for debugging and testing)
+- [x] **Windows** platform support (For compatibility in development only, do not use it in production)
 - [ ] **TLS** support
 - [ ] [io_uring](https://kernel.dk/io_uring.pdf) support
 

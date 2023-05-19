@@ -38,7 +38,7 @@
 - [x] 支持两种事件驱动机制：**Linux** 里的 `epoll` 以及 **FreeBSD/DragonFly/Darwin** 里的 `kqueue`
 - [x] 灵活的事件定时器
 - [x] 实现 `gnet` 客户端
-- [x] 支持 **Windows** 平台 (非生产环境使用，只用来调试和测试)
+- [x] 支持 **Windows** 平台 (仅用于开发环境的兼容性，不要在生产环境中使用)
 - [ ] 支持 **TLS**
 - [ ] 支持 [io_uring](https://kernel.dk/io_uring.pdf)
 
