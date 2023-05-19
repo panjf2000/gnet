@@ -130,8 +130,7 @@ function Footer() {
             <small>
               <a href="https://github.com/panjf2000/gnet/security/policy">Security Policy</a>&nbsp;&bull;&nbsp;
               <a href="https://github.com/panjf2000/gnet/blob/master/PRIVACY.md">Privacy Policy</a>
-            </small><br />
-            <small>Acknowledgement for Timber, Inc.</small>
+            </small>
           </div>
         )}
       </div>
