@@ -26,8 +26,14 @@ It's recommended to use Conn.Context() to store necessary resource for each conn
 
 ### Enable poll_opt mode to boost performance
 
-By default, `gnet` utilizes the standard package `golang.org/x/sys/unix` to implement pollers with `epoll` or `kqueue`, where a HASH map of `fd->conn` is introduced to help retrieve connections by file descriptors returned from pollers, but now the user can run `go build` with build tags `poll_opt`, like this: `go build -tags=poll_opt`, and `gnet` then switch to the optimized implementations of pollers that invoke the system calls of `epoll` or `kqueue` directly and add file descriptors to the interest list along with storing the corresponding connection pointers into `epoll_data` or `kevent`, in which case `gnet` can get rid of the HASH MAP of `fd->conn` and regain each connection pointer by the conversion of `void*` pointer in the I/O event-looping. In theory, it ought to achieve a higher performance with this optimization. 
+By default, `gnet` utilizes the standard package `golang.org/x/sys/unix` to implement pollers with `epoll` or `kqueue`, where a HASH map of `fd->conn` is introduced to help retrieve connections by file descriptors returned from pollers, but now you can run `go build` with build tags `poll_opt`, like this: `go build -tags=poll_opt`, and `gnet` will switch to the optimized implementations of pollers that invoke the system calls of `epoll` or `kqueue` directly and add file descriptors to the interest list along with storing the corresponding connection pointers into `epoll_data` or `kevent`, in which case `gnet` can get rid of the HASH MAP of `fd->conn` and regain each connection pointer by the conversion of `void*` pointer in the I/O event-looping. In theory, it ought to achieve a higher performance with this optimization. 
 
-See [#230](https://github.com/panjf2000/gnet/pull/230) for code details.
+Visit [#230](https://github.com/panjf2000/gnet/pull/230) for code details.
+
+### Enable gc_opt mode to reduce GC latency
+
+By default, `gnet` uses `map` as the internal storage of connections, but now you can run `go build` with build tags `gc_opt`, like this: `go build -tags=gc_opt`, and `gnet` will switch to the optimized implementation of connections storage that uses a new data structure `matrix` for managing connections, in which case `gnet` eliminates the pointers in `map` to reduce the GC latency significantly.
+
+Visit [Release candidate for gnet v2.3.0](https://gnet.host/highlights/2023-05-19-release-candidate-for-gnet-v2-3-0) for more details.
 
 ### To be continued
