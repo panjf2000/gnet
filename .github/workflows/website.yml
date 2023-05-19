@@ -11,10 +11,10 @@ jobs:
     if: github.event_name != 'push'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v1
-      - uses: actions/setup-node@v1
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
         with:
-          node-version: '14.x'
+          node-version: 18
       - name: Test Build
         run: |
           if [ -e yarn.lock ]; then
@@ -29,10 +29,10 @@ jobs:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v1
-      - uses: actions/setup-node@v1
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
         with:
-          node-version: '14.x'
+          node-version: 18
       - name: Add key to allow access to repository
         env:
           SSH_AUTH_SOCK: /tmp/ssh_agent.sock
