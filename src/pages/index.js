@@ -204,11 +204,11 @@ function InstallationSection() {
 
 const hardware = `
 # Hardware Environment
-CPU: 28 HT Cores Intel(R) Xeon(R) Gold 5120 CPU @ 2.20GHz
-Mem: 32GB RAM
-OS : Ubuntu 18.04.3 4.15.0-88-generic #88-Ubuntu
-Net: Switched 10-gigabit ethernet
-Go : go1.14.x linux/amd64
+* 28 HT Cores Intel(R) Xeon(R) Gold 5120 CPU @ 2.20GHz
+* 32GB RAM
+* Ubuntu 18.04.3 4.15.0-88-generic #88-Ubuntu
+* Dedicated Cisco 10-gigabit Ethernet switch
+* Go1.19.x linux/amd64
 `
 
 function Performance() {
