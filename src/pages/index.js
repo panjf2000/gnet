@@ -185,17 +185,17 @@ function InstallationSection() {
         <div className="sub-title">
             <p className="hero--subsubtitle">`gnet` is available as a Go module 
             and we highly recommend that you use `gnet` via <a href="https://go.dev/blog/using-go-modules" target="_blank">Go Modules</a>, 
-            with Go 1.11 Modules enabled (Go 1.11+), you can just simply add `import "github.com/panjf2000/gnet"` 
+            with Go 1.11 Modules enabled (Go 1.11+), you can just simply add `import "github.com/panjf2000/gnet/v2"`
             to the codebase and run `go mod download/go mod tidy` or `go [build|run|test]` to download the necessary dependencies automatically.
             </p>
         </div>
         
         <p className="hero--subtitle">Run <strong><em>go get</em></strong> to download gnet:</p>
 
-        <h4 className={styles.installSubTitle}>For v2</h4>
+        <h4 className={styles.installSubTitle}>With v2</h4>
         <CodeBlock className="language-bash">go get -u github.com/panjf2000/gnet/v2</CodeBlock>
 
-        <h4 className={styles.installSubTitle}>For v1</h4>
+        <h4 className={styles.installSubTitle}>With v1</h4>
         <CodeBlock className="language-bash">go get -u github.com/panjf2000/gnet</CodeBlock>
       </div>
     </section>
