@@ -245,8 +245,9 @@ func (s *testServer) OnOpen(c Conn) (out []byte, action Action) {
 	c.SetContext(c)
 	nclients := atomic.AddInt32(&s.connected, 1)
 	if int(nclients) == s.nclients {
-		require.EqualValuesf(s.tester, s.nclients, s.eng.CountConnections(), "expected connected clients: %d, but got: %d",
-			nclients, s.nclients)
+		connCount := s.eng.CountConnections()
+		require.EqualValuesf(s.tester, s.nclients, connCount, "expected connected clients: %d, but got: %d",
+			s.nclients, connCount)
 	}
 	out = []byte("sweetness\r\n")
 	require.NotNil(s.tester, c.LocalAddr(), "nil local addr")
