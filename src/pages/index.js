@@ -219,14 +219,14 @@ function Performance() {
         <div className="sub-title">Benchmarks on TechEmpower</div>
         <CodeBlock className="language-bash">{hardware}</CodeBlock>
         <br />
-        <img src="/img/techempower-all.jpg" alt="All languages" />
+        <img src="/img/techempower-plaintext-top50-dark.jpg" alt="All languages" />
         <br />
-        <p className="hero--subtitle">This is the <strong><em>top 50</em></strong> on the framework ranking of all programming languages consists of a total of <strong><em>422 frameworks</em></strong> from all over the world where <code>gnet</code> is the <strong><em>runner-up</em></strong>.</p>
-        <img src="/img/techempower-go.png" alt="Go" />
+        <p className="hero--subtitle">This is a leaderboard of the top <strong><em>50</em></strong> out of <strong><em>499</em></strong> frameworks that encompass various programming languages worldwide, in which <code>gnet</code> is ranked <strong><em>first</em></strong>.</p>
+        <img src="/img/techempower-plaintext-topN-go-dark.png" alt="Go" />
         <br />
         <p className="hero--subtitle">This is the full framework ranking of Go and <code>gnet</code> tops all the other frameworks, which makes <code>gnet</code> the <strong><em>fastest</em></strong> networking framework in Go.</p>
         <br />
-        <p className="hero--subtitle">To check the full ranking list, visit <Link to="https://www.techempower.com/benchmarks/#section=test&runid=53c6220a-e110-466c-a333-2e879fea21ad&hw=ph&test=plaintext">TechEmpower Plaintext Benchmark</Link>.</p>
+        <p className="hero--subtitle">To check the full ranking list, visit <Link to="https://www.techempower.com/benchmarks/#section=test&runid=a07a7117-f861-49b2-a710-94970c5767d0&test=plaintext">TechEmpower Plaintext Benchmark</Link>.</p>
       </div>
     </section>
   );
