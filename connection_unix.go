@@ -134,7 +134,7 @@ func (c *conn) write(data []byte) (n int, err error) {
 			err = c.loop.poller.ModReadWrite(&c.pollAttachment)
 			return
 		}
-		if err := c.loop.closeConn(c, os.NewSyscallError("write", err)); err != nil {
+		if err := c.loop.close(c, os.NewSyscallError("write", err)); err != nil {
 			logging.Errorf("failed to close connection(fd=%d,peer=%+v) on conn.write: %v",
 				c.fd, c.remoteAddr, err)
 		}
@@ -168,7 +168,7 @@ func (c *conn) writev(bs [][]byte) (n int, err error) {
 			err = c.loop.poller.ModReadWrite(&c.pollAttachment)
 			return
 		}
-		if err := c.loop.closeConn(c, os.NewSyscallError("writev", err)); err != nil {
+		if err := c.loop.close(c, os.NewSyscallError("writev", err)); err != nil {
 			logging.Errorf("failed to close connection(fd=%d,peer=%+v) on conn.writev: %v",
 				c.fd, c.remoteAddr, err)
 		}
@@ -467,7 +467,7 @@ func (c *conn) Wake(callback AsyncCallback) error {
 
 func (c *conn) CloseWithCallback(callback AsyncCallback) error {
 	return c.loop.poller.Trigger(func(_ interface{}) (err error) {
-		err = c.loop.closeConn(c, nil)
+		err = c.loop.close(c, nil)
 		if callback != nil {
 			_ = callback(c, err)
 		}
@@ -477,7 +477,7 @@ func (c *conn) CloseWithCallback(callback AsyncCallback) error {
 
 func (c *conn) Close() error {
 	return c.loop.poller.Trigger(func(_ interface{}) (err error) {
-		err = c.loop.closeConn(c, nil)
+		err = c.loop.close(c, nil)
 		return
 	}, nil)
 }

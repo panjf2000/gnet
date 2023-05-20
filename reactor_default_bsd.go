@@ -56,7 +56,7 @@ func (el *eventloop) activateSubReactor() error {
 		if c := el.connections.getConn(fd); c != nil {
 			switch filter {
 			case netpoll.EVFilterSock:
-				err = el.closeConn(c, unix.ECONNRESET)
+				err = el.close(c, unix.ECONNRESET)
 			case netpoll.EVFilterWrite:
 				if !c.outboundBuffer.IsEmpty() {
 					err = el.write(c)
@@ -90,7 +90,7 @@ func (el *eventloop) run() error {
 		if c := el.connections.getConn(fd); c != nil {
 			switch filter {
 			case netpoll.EVFilterSock:
-				err = el.closeConn(c, unix.ECONNRESET)
+				err = el.close(c, unix.ECONNRESET)
 			case netpoll.EVFilterWrite:
 				if !c.outboundBuffer.IsEmpty() {
 					err = el.write(c)

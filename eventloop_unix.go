@@ -56,7 +56,7 @@ func (el *eventloop) countConn() int32 {
 func (el *eventloop) closeConns() {
 	// Close loops and all outstanding connections
 	el.connections.iterate(func(c *conn) bool {
-		_ = el.closeConn(c, nil)
+		_ = el.close(c, nil)
 		return true
 	})
 }
@@ -105,7 +105,7 @@ func (el *eventloop) read(c *conn) error {
 		if n == 0 {
 			err = unix.ECONNRESET
 		}
-		return el.closeConn(c, os.NewSyscallError("read", err))
+		return el.close(c, os.NewSyscallError("read", err))
 	}
 
 	c.buffer = el.buffer[:n]
@@ -113,7 +113,7 @@ func (el *eventloop) read(c *conn) error {
 	switch action {
 	case None:
 	case Close:
-		return el.closeConn(c, nil)
+		return el.close(c, nil)
 	case Shutdown:
 		return gerrors.ErrEngineShutdown
 	}
@@ -144,7 +144,7 @@ func (el *eventloop) write(c *conn) error {
 	case unix.EAGAIN:
 		return nil
 	default:
-		return el.closeConn(c, os.NewSyscallError("write", err))
+		return el.close(c, os.NewSyscallError("write", err))
 	}
 
 	// All data have been drained, it's no need to monitor the writable events,
@@ -156,7 +156,7 @@ func (el *eventloop) write(c *conn) error {
 	return nil
 }
 
-func (el *eventloop) closeConn(c *conn, err error) (rerr error) {
+func (el *eventloop) close(c *conn, err error) (rerr error) {
 	if addr := c.localAddr; addr != nil && strings.HasPrefix(c.localAddr.Network(), "udp") {
 		rerr = el.poller.Delete(c.fd)
 		if c.fd != el.ln.fd {
@@ -182,7 +182,7 @@ func (el *eventloop) closeConn(c *conn, err error) (rerr error) {
 				iov = iov[:iovMax]
 			}
 			if n, e := io.Writev(c.fd, iov); e != nil {
-				el.getLogger().Warnf("closeConn: error occurs when sending data back to peer, %v", e)
+				el.getLogger().Warnf("close: error occurs when sending data back to peer, %v", e)
 				break
 			} else { //nolint:revive
 				_, _ = c.outboundBuffer.Discard(n)
@@ -263,7 +263,7 @@ func (el *eventloop) handleAction(c *conn, action Action) error {
 	case None:
 		return nil
 	case Close:
-		return el.closeConn(c, nil)
+		return el.close(c, nil)
 	case Shutdown:
 		return gerrors.ErrEngineShutdown
 	default:
@@ -313,7 +313,7 @@ func (el *eventloop) execCmd(itf interface{}) (err error) {
 
 	switch cmd.typ {
 	case asyncCmdClose:
-		return el.closeConn(c, nil)
+		return el.close(c, nil)
 	case asyncCmdWake:
 		return el.wake(c)
 	case asyncCmdWrite:
