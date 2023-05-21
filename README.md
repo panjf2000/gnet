@@ -151,7 +151,9 @@ The source code of `gnet` should be distributed under the Apache-2.0 license.
 
 Please read the [Contributing Guidelines](CONTRIBUTING.md) before opening a PR and thank you to all the developers who already made contributions to `gnet`!
 
-[![](https://opencollective.com/gnet/contributors.svg?width=890&button=false)](https://github.com/panjf2000/gnet/graphs/contributors)
+<a href="https://github.com/panjf2000/gnet/graphs/contributors">
+	<img src="https://contrib.rocks/image?repo=panjf2000/gnet" />
+</a>
 
 # ⚓ Relevant Articles
 

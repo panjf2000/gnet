@@ -151,7 +151,9 @@ Test duration   : 15s
 
 请在提 PR 之前仔细阅读 [Contributing Guidelines](CONTRIBUTING.md)，感谢那些为 `gnet` 贡献过代码的开发者！
 
-[![](https://opencollective.com/gnet/contributors.svg?width=890&button=false)](https://github.com/panjf2000/gnet/graphs/contributors)
+<a href="https://github.com/panjf2000/gnet/graphs/contributors">
+	<img src="https://contrib.rocks/image?repo=panjf2000/gnet" />
+</a>
 
 # ⚓ 相关文章
 
