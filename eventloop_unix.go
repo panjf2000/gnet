@@ -1,5 +1,4 @@
-// Copyright (c) 2019 Andy Pan
-// Copyright (c) 2018 Joshua J Baker
+// Copyright (c) 2019 The Gnet Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,7 +24,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"golang.org/x/sys/unix"
@@ -43,9 +41,7 @@ type eventloop struct {
 	engine       *engine         // engine in loop
 	poller       *netpoll.Poller // epoll or kqueue
 	buffer       []byte          // read packet buffer whose capacity is set by user, default value is 64KB
-	connCount    int32           // number of active connections in event-loop
-	udpSockets   map[int]*conn   // client-side UDP socket map: fd -> conn
-	connections  map[int]*conn   // TCP connection map: fd -> conn
+	connections  connMatrix      // loop connections storage
 	eventHandler EventHandler    // user eventHandler
 }
 
@@ -53,50 +49,36 @@ func (el *eventloop) getLogger() logging.Logger {
 	return el.engine.opts.Logger
 }
 
-func (el *eventloop) addConn(delta int32) {
-	atomic.AddInt32(&el.connCount, delta)
+func (el *eventloop) countConn() int32 {
+	return el.connections.loadCount()
 }
 
-func (el *eventloop) loadConn() int32 {
-	return atomic.LoadInt32(&el.connCount)
-}
-
-func (el *eventloop) closeAllSockets() {
+func (el *eventloop) closeConns() {
 	// Close loops and all outstanding connections
-	for _, c := range el.connections {
-		_ = el.closeConn(c, nil)
-	}
-	for _, c := range el.udpSockets {
-		_ = el.closeConn(c, nil)
-	}
+	el.connections.iterate(func(c *conn) bool {
+		_ = el.close(c, nil)
+		return true
+	})
 }
 
 func (el *eventloop) register(itf interface{}) error {
 	c := itf.(*conn)
-	if c.pollAttachment == nil { // UDP socket
-		c.pollAttachment = netpoll.GetPollAttachment()
-		c.pollAttachment.FD = c.fd
-		c.pollAttachment.Callback = el.readUDP
-		if err := el.poller.AddRead(c.pollAttachment); err != nil {
-			_ = unix.Close(c.fd)
-			c.releaseUDP()
-			return err
-		}
-		el.udpSockets[c.fd] = c
-		return nil
-	}
-	if err := el.poller.AddRead(c.pollAttachment); err != nil {
+	if err := el.poller.AddRead(&c.pollAttachment); err != nil {
 		_ = unix.Close(c.fd)
-		c.releaseTCP()
+		c.release()
 		return err
 	}
-	el.connections[c.fd] = c
+
+	el.connections.addConn(c, el.idx)
+
+	if c.isDatagram {
+		return nil
+	}
 	return el.open(c)
 }
 
 func (el *eventloop) open(c *conn) error {
 	c.opened = true
-	el.addConn(1)
 
 	out, action := el.eventHandler.OnOpen(c)
 	if out != nil {
@@ -106,7 +88,7 @@ func (el *eventloop) open(c *conn) error {
 	}
 
 	if !c.outboundBuffer.IsEmpty() {
-		if err := el.poller.AddWrite(c.pollAttachment); err != nil {
+		if err := el.poller.AddWrite(&c.pollAttachment); err != nil {
 			return err
 		}
 	}
@@ -174,7 +156,7 @@ func (el *eventloop) read(c *conn) error {
 		if n == 0 {
 			err = unix.ECONNRESET
 		}
-		return el.closeConn(c, os.NewSyscallError("read", err))
+		return el.close(c, os.NewSyscallError("read", err))
 	}
 
 	if c.tlsconn != nil {
@@ -205,7 +187,7 @@ func (el *eventloop) read(c *conn) error {
 	switch action {
 	case None:
 	case Close:
-		return el.closeConn(c, nil)
+		return el.close(c, nil)
 	case Shutdown:
 		return gerrors.ErrEngineShutdown
 	}
@@ -236,34 +218,34 @@ func (el *eventloop) write(c *conn) error {
 	case unix.EAGAIN:
 		return nil
 	default:
-		return el.closeConn(c, os.NewSyscallError("write", err))
+		return el.close(c, os.NewSyscallError("write", err))
 	}
 
 	// All data have been drained, it's no need to monitor the writable events,
 	// remove the writable event from poller to help the future event-loops.
 	if c.outboundBuffer.IsEmpty() {
-		_ = el.poller.ModRead(c.pollAttachment)
+		_ = el.poller.ModRead(&c.pollAttachment)
 	}
 
 	return nil
 }
 
-func (el *eventloop) closeConn(c *conn, err error) (rerr error) {
+func (el *eventloop) close(c *conn, err error) (rerr error) {
 	if addr := c.localAddr; addr != nil && strings.HasPrefix(c.localAddr.Network(), "udp") {
 		rerr = el.poller.Delete(c.fd)
 		if c.fd != el.ln.fd {
 			rerr = unix.Close(c.fd)
-			delete(el.udpSockets, c.fd)
+			el.connections.delConn(c)
 		}
 		if el.eventHandler.OnClose(c, err) == Shutdown {
 			return gerrors.ErrEngineShutdown
 		}
-		c.releaseUDP()
+		c.release()
 		return
 	}
 
-	if !c.opened {
-		return
+	if !c.opened || el.connections.getConn(c.fd) == nil {
+		return // ignore stale connections
 	}
 
 	// close the TLS connection by sending the alert
@@ -284,9 +266,9 @@ func (el *eventloop) closeConn(c *conn, err error) (rerr error) {
 				iov = iov[:iovMax]
 			}
 			if n, e := io.Writev(c.fd, iov); e != nil {
-				el.getLogger().Warnf("closeConn: error occurs when sending data back to peer, %v", e)
+				el.getLogger().Warnf("close: error occurs when sending data back to peer, %v", e)
 				break
-			} else {
+			} else { //nolint:revive
 				_, _ = c.outboundBuffer.Discard(n)
 			}
 		}
@@ -305,19 +287,18 @@ func (el *eventloop) closeConn(c *conn, err error) (rerr error) {
 		}
 	}
 
-	delete(el.connections, c.fd)
-	el.addConn(-1)
+	el.connections.delConn(c)
 	if el.eventHandler.OnClose(c, err) == Shutdown {
 		rerr = gerrors.ErrEngineShutdown
 	}
-	c.releaseTCP()
+	c.release()
 
 	return
 }
 
 func (el *eventloop) wake(c *conn) error {
-	if co, ok := el.connections[c.fd]; !ok || co != c {
-		return nil // ignore stale wakes.
+	if !c.opened || el.connections.getConn(c.fd) == nil {
+		return nil // ignore stale connections
 	}
 
 	action := el.eventHandler.OnTraffic(c)
@@ -366,7 +347,7 @@ func (el *eventloop) handleAction(c *conn, action Action) error {
 	case None:
 		return nil
 	case Close:
-		return el.closeConn(c, nil)
+		return el.close(c, nil)
 	case Shutdown:
 		return gerrors.ErrEngineShutdown
 	default:
@@ -387,15 +368,45 @@ func (el *eventloop) readUDP(fd int, _ netpoll.IOEvent) error {
 	if fd == el.ln.fd {
 		c = newUDPConn(fd, el, el.ln.addr, sa, false)
 	} else {
-		c = el.udpSockets[fd]
+		c = el.connections.getConn(fd)
 	}
 	c.buffer = el.buffer[:n]
 	action := el.eventHandler.OnTraffic(c)
 	if c.peer != nil {
-		c.releaseUDP()
+		c.release()
 	}
 	if action == Shutdown {
 		return gerrors.ErrEngineShutdown
 	}
 	return nil
 }
+
+/*
+func (el *eventloop) execCmd(itf interface{}) (err error) {
+	cmd := itf.(*asyncCmd)
+	c := el.connections.getConnByGFD(cmd.fd)
+	if c == nil || c.gfd != cmd.fd {
+		return gerrors.ErrInvalidConn
+	}
+
+	defer func() {
+		if cmd.cb != nil {
+			_ = cmd.cb(c, err)
+		}
+	}()
+
+	switch cmd.typ {
+	case asyncCmdClose:
+		return el.close(c, nil)
+	case asyncCmdWake:
+		return el.wake(c)
+	case asyncCmdWrite:
+		_, err = c.Write(cmd.arg.([]byte))
+	case asyncCmdWritev:
+		_, err = c.Writev(cmd.arg.([][]byte))
+	default:
+		return gerrors.ErrUnsupportedOp
+	}
+	return
+}
+*/

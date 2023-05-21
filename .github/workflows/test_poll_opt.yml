@@ -5,12 +5,14 @@ on:
     branches:
       - master
       - dev
+      - 1.x
     paths-ignore:
       - '**.md'
   pull_request:
     branches:
       - master
       - dev
+      - 1.x
     paths-ignore:
       - '**.md'
 
@@ -39,14 +41,14 @@ jobs:
       - name: Setup and run golangci-lint
         uses: golangci/golangci-lint-action@v3
         with:
-          version: v1.51.2
+          version: v1.52.2
           args: -v -E gofumpt -E gocritic -E misspell -E revive -E godot
   test:
     needs: lint
     strategy:
       fail-fast: false
       matrix:
-        go: [1.17, 1.18, 1.19]
+        go: ['1.17', '1.18', '1.19', '1.20']
         os: [ubuntu-latest, macos-latest]
     name: Go ${{ matrix.go }} @ ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -88,7 +90,7 @@ jobs:
         run: go test $(go list ./... | tail -n +2)
 
       - name: Run integration tests with -tags=poll_opt
-        run: go test -v -tags=poll_opt -coverprofile="codecov.report" -covermode=atomic -timeout 5m
+        run: go test -v -tags=poll_opt -coverprofile="codecov.report" -covermode=atomic -timeout 10m -failfast
 
       - name: Upload the code coverage report to codecov.io
         uses: codecov/codecov-action@v3

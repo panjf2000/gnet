@@ -3,8 +3,8 @@
 <br />
 <a title="Build Status" target="_blank" href="https://github.com/panjf2000/gnet/actions?query=workflow%3ATests"><img src="https://img.shields.io/github/actions/workflow/status/panjf2000/gnet/test.yml?branch=dev&style=flat-square&logo=github-actions" /></a>
 <a title="Codecov" target="_blank" href="https://codecov.io/gh/panjf2000/gnet"><img src="https://img.shields.io/codecov/c/github/panjf2000/gnet?style=flat-square&logo=codecov" /></a>
-<a title="Supported Platforms" target="_blank" href="https://github.com/panjf2000/gnet"><img src="https://img.shields.io/badge/platform-Linux%20%7C%20FreeBSD%20%7C%20DragonFly%20%7C%20Darwin-549688?style=flat-square&logo=launchpad" /></a>
-<a title="Require Go Version" target="_blank" href="https://github.com/panjf2000/gnet"><img src="https://img.shields.io/badge/go-%3E%3D1.9-30dff3?style=flat-square&logo=go" /></a>
+<a title="Supported Platforms" target="_blank" href="https://github.com/panjf2000/gnet"><img src="https://img.shields.io/badge/platform-Linux%20%7C%20FreeBSD%20%7C%20DragonFly%20%7C%20Darwin%20%7C%20Windows-549688?style=flat-square&logo=launchpad" /></a>
+<a title="Require Go Version" target="_blank" href="https://github.com/panjf2000/gnet"><img src="https://img.shields.io/badge/go-%3E%3D1.17-30dff3?style=flat-square&logo=go" /></a>
 <br />
 <a title="Chat Room" target="_blank" href="https://gitter.im/gnet-io/gnet?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=body_badge"><img src="https://badges.gitter.im/gnet-io/gnet.svg" /></a>
 <a title="Go Report Card" target="_blank" href="https://goreportcard.com/report/github.com/panjf2000/gnet"><img src="https://goreportcard.com/badge/github.com/panjf2000/gnet?style=flat-square" /></a>
@@ -38,23 +38,23 @@
 - [x] 支持两种事件驱动机制：**Linux** 里的 `epoll` 以及 **FreeBSD/DragonFly/Darwin** 里的 `kqueue`
 - [x] 灵活的事件定时器
 - [x] 实现 `gnet` 客户端
-- [ ] 支持 **Windows** 平台 ([gnet v1](https://github.com/panjf2000/gnet/tree/1.x) 支持 Windows，v2 暂时不支持)
+- [x] 支持 **Windows** 平台 (仅用于开发环境的兼容性，不要在生产环境中使用)
 - [ ] 支持 **TLS**
 - [ ] 支持 [io_uring](https://kernel.dk/io_uring.pdf)
 
 # 🎬 开始
 
-`gnet` 是一个 Go module，而且我们也强烈推荐通过 [Go Modules](https://go.dev/blog/using-go-modules) 来使用 `gnet`，在开启 Go Modules 支持（Go 1.11+）之后可以通过简单地在代码中写 `import "github.com/panjf2000/gnet"` 来引入 `gnet`，然后执行 `go mod download/go mod tidy` 或者 `go [build|run|test]` 这些命令来自动下载所依赖的包。
+`gnet` 是一个 Go module，而且我们也强烈推荐通过 [Go Modules](https://go.dev/blog/using-go-modules) 来使用 `gnet`，在开启 Go Modules 支持（Go 1.11+）之后可以通过简单地在代码中写 `import "github.com/panjf2000/gnet/v2"` 来引入 `gnet`，然后执行 `go mod download/go mod tidy` 或者 `go [build|run|test]` 这些命令来自动下载所依赖的包。
 
 ## 使用 v2 
 
-```powershell
+```bash
 go get -u github.com/panjf2000/gnet/v2
 ```
 
 ## 使用 v1
 
-```powershell
+```bash
 go get -u github.com/panjf2000/gnet
 ```
 
@@ -70,25 +70,24 @@ go get -u github.com/panjf2000/gnet
 
 ## TechEmpower 性能测试
 
-```powershell
+```bash
 # 硬件环境
-CPU: 28 HT Cores Intel(R) Xeon(R) Gold 5120 CPU @ 2.20GHz
-Mem: 32GB RAM
-OS : Ubuntu 18.04.3 4.15.0-88-generic #88-Ubuntu
-Net: Switched 10-gigabit ethernet
-Go : go1.14.x linux/amd64
+* 28 HT Cores Intel(R) Xeon(R) Gold 5120 CPU @ 2.20GHz
+* 32GB RAM
+* Ubuntu 18.04.3 4.15.0-88-generic #88-Ubuntu
+* Dedicated Cisco 10-gigabit Ethernet switch
+* Go1.19.x linux/amd64
 ```
 
-![All language](https://raw.githubusercontent.com/panjf2000/illustrations/master/benchmark/techempower-all.jpg)
+![](https://raw.githubusercontent.com/panjf2000/illustrations/master/benchmark/techempower-plaintext-top50-light.jpg)
 
-这是包含全部编程语言框架的性能排名***前 50*** 的结果，总榜单包含了全世界共计 ***422 个框架***，其中 `gnet` 排名***第二***。
+这是包含全部编程语言框架的性能排名***前 50*** 的结果，总榜单包含了全世界共计 ***499*** 个框架，其中 `gnet` 排名***第一***。
 
-
-![Golang](https://raw.githubusercontent.com/panjf2000/illustrations/master/benchmark/techempower-go.png)
+![](https://raw.githubusercontent.com/panjf2000/illustrations/master/benchmark/techempower-plaintext-topN-go-light.png)
 
 这是 Go 语言分类下的全部排名，`gnet` 超越了其他所有框架，位列第一，是***最快***的 Go 网络框架。
 
-完整的排行可以通过 [TechEmpower Plaintext Benchmark](https://www.techempower.com/benchmarks/#section=test&runid=53c6220a-e110-466c-a333-2e879fea21ad&hw=ph&test=plaintext) 查看。
+完整的排行可以通过 [TechEmpower Plaintext Benchmark](https://www.techempower.com/benchmarks/#section=test&runid=a07a7117-f861-49b2-a710-94970c5767d0&test=plaintext) 查看。
 
 ## 同类型的网络库性能对比
 
@@ -96,7 +95,7 @@ Go : go1.14.x linux/amd64
 
 ### Test Environment
 
-```powershell
+```bash
 # Machine information
         OS : Ubuntu 20.04/x86_64
        CPU : 8 CPU cores, AMD EPYC 7K62 48-Core Processor
@@ -122,7 +121,7 @@ Test duration   : 15s
 
 ### Test Environment
 
-```powershell
+```bash
 # Machine information
         OS : MacOS Big Sur/x86_64
        CPU : 6 CPU cores, Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz
@@ -152,7 +151,9 @@ Test duration   : 15s
 
 请在提 PR 之前仔细阅读 [Contributing Guidelines](CONTRIBUTING.md)，感谢那些为 `gnet` 贡献过代码的开发者！
 
-[![](https://opencollective.com/gnet/contributors.svg?width=890&button=false)](https://github.com/panjf2000/gnet/graphs/contributors)
+<a href="https://github.com/panjf2000/gnet/graphs/contributors">
+	<img src="https://contrib.rocks/image?repo=panjf2000/gnet" />
+</a>
 
 # ⚓ 相关文章
 
@@ -176,7 +177,7 @@ Test duration   : 15s
 
 # ☕️ 打赏
 
-> 当您通过以下方式进行捐赠时，请务必留下姓名、Github账号或其他社交媒体账号，以便我将其添加到捐赠者名单中，以表谢意。
+> 当您通过以下方式进行捐赠时，请务必留下姓名、GitHub 账号或其他社交媒体账号，以便我将其添加到捐赠者名单中，以表谢意。
 
 <img src="https://raw.githubusercontent.com/panjf2000/illustrations/master/payments/WeChatPay.JPG" width="250" align="middle"/>&nbsp;&nbsp;
 <img src="https://raw.githubusercontent.com/panjf2000/illustrations/master/payments/AliPay.JPG" width="250" align="middle"/>&nbsp;&nbsp;

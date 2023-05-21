@@ -1,19 +1,5 @@
-// Copyright (c) 2021 Andy Pan
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
-//go:build linux || freebsd || dragonfly || darwin
-// +build linux freebsd dragonfly darwin
+//go:build linux || freebsd || dragonfly || darwin || windows
+// +build linux freebsd dragonfly darwin windows
 
 package gnet
 
@@ -47,7 +33,7 @@ func (ev *clientEvents) OnOpen(c Conn) ([]byte, Action) {
 	return nil, None
 }
 
-func (ev *clientEvents) OnClose(c Conn, err error) Action {
+func (ev *clientEvents) OnClose(Conn, error) Action {
 	if ev.svr != nil {
 		if atomic.AddInt32(&ev.svr.clientActive, -1) == 0 {
 			return Shutdown
@@ -264,6 +250,7 @@ func (s *testClientServer) OnTraffic(c Conn) (action Action) {
 }
 
 func (s *testClientServer) OnTick() (delay time.Duration, action Action) {
+	delay = time.Second / 5
 	if atomic.CompareAndSwapInt32(&s.started, 0, 1) {
 		for i := 0; i < s.nclients; i++ {
 			atomic.AddInt32(&s.clientActive, 1)
@@ -278,7 +265,6 @@ func (s *testClientServer) OnTick() (delay time.Duration, action Action) {
 		action = Shutdown
 		return
 	}
-	delay = time.Second / 5
 	return
 }
 
@@ -327,7 +313,7 @@ func startGnetClient(t *testing.T, cli *Client, ev *clientEvents, network, addr 
 	)
 	if netDial {
 		var netConn net.Conn
-		netConn, err = net.Dial(network, addr)
+		netConn, err = NetDial(network, addr)
 		require.NoError(t, err)
 		c, err = cli.Enroll(netConn)
 	} else {

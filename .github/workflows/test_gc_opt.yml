@@ -1,0 +1,106 @@
+name: Run tests with -tags=gc_opt
+
+on:
+  push:
+    branches:
+      - master
+      - dev
+      - 1.x
+    paths-ignore:
+      - '**.md'
+  pull_request:
+    branches:
+      - master
+      - dev
+      - 1.x
+    paths-ignore:
+      - '**.md'
+
+env:
+  GO111MODULE: on
+  GOPROXY: "https://proxy.golang.org"
+
+jobs:
+  lint:
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          #- windows-latest
+    name: Run golangci-lint
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: '^1.17'
+
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup and run golangci-lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: v1.52.2
+          args: -v -E gofumpt -E gocritic -E misspell -E revive -E godot --timeout 5m
+  test:
+    needs: lint
+    strategy:
+      fail-fast: false
+      matrix:
+        go: ['1.17', '1.18', '1.19', '1.20']
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+    name: Go ${{ matrix.go }} @ ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ matrix.go }}
+
+      - name: Print Go environment
+        id: go-env
+        run: |
+          printf "Using go at: $(which go)\n"
+          printf "Go version: $(go version)\n"
+          printf "\n\nGo environment:\n\n"
+          go env
+          printf "\n\nSystem environment:\n\n"
+          env
+          # Calculate the short SHA1 hash of the git commit
+          echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "GO_CACHE=$(go env GOCACHE)" >> $GITHUB_OUTPUT
+
+      - name: Cache go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ${{ steps.go-env.outputs.GO_CACHE }}
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-${{ matrix.go }}-go-ci-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.go }}-go-ci
+
+      - name: Run unit tests for packages
+        run: go test $(go list ./... | tail -n +2)
+
+      - name: Run integration tests
+        run: go test -v -race -tags=gc_opt -coverprofile="codecov.report" -covermode=atomic -timeout 15m -failfast
+
+      - name: Upload the code coverage report to codecov.io
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./codecov.report
+          flags: unittests
+          name: codecov-gnet
+          fail_ci_if_error: true
+          verbose: true

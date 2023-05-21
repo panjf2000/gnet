@@ -1,4 +1,4 @@
-// Copyright (c) 2021 Andy Pan
+// Copyright (c) 2021 The Gnet Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,24 +16,6 @@
 // +build linux freebsd dragonfly darwin
 
 package netpoll
-
-import "sync"
-
-var pollAttachmentPool = sync.Pool{New: func() interface{} { return new(PollAttachment) }}
-
-// GetPollAttachment attempts to get a cached PollAttachment from pool.
-func GetPollAttachment() *PollAttachment {
-	return pollAttachmentPool.Get().(*PollAttachment)
-}
-
-// PutPollAttachment put an unused PollAttachment back to pool.
-func PutPollAttachment(pa *PollAttachment) {
-	if pa == nil {
-		return
-	}
-	pa.FD, pa.Callback = 0, nil
-	pollAttachmentPool.Put(pa)
-}
 
 // PollAttachment is the user data which is about to be stored in "void *ptr" of epoll_data or "void *udata" of kevent.
 type PollAttachment struct {

@@ -1,4 +1,4 @@
-// Copyright (c) 2019 Andy Pan
+// Copyright (c) 2019 The Gnet Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -27,38 +27,36 @@ import (
 	"github.com/panjf2000/gnet/v2/pkg/errors"
 )
 
-func (el *eventloop) activateMainReactor(lockOSThread bool) {
-	if lockOSThread {
+func (el *eventloop) activateMainReactor() error {
+	if el.engine.opts.LockOSThread {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
 	}
-
-	defer el.engine.signalShutdown()
 
 	err := el.poller.Polling(func(fd int, filter int16) error { return el.engine.accept(fd, filter) })
 	if err == errors.ErrEngineShutdown {
 		el.engine.opts.Logger.Debugf("main reactor is exiting in terms of the demand from user, %v", err)
+		err = nil
 	} else if err != nil {
 		el.engine.opts.Logger.Errorf("main reactor is exiting due to error: %v", err)
 	}
+
+	el.engine.shutdown(err)
+
+	return err
 }
 
-func (el *eventloop) activateSubReactor(lockOSThread bool) {
-	if lockOSThread {
+func (el *eventloop) activateSubReactor() error {
+	if el.engine.opts.LockOSThread {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
 	}
 
-	defer func() {
-		el.closeAllSockets()
-		el.engine.signalShutdown()
-	}()
-
 	err := el.poller.Polling(func(fd int, filter int16) (err error) {
-		if c, ack := el.connections[fd]; ack {
+		if c := el.connections.getConn(fd); c != nil {
 			switch filter {
 			case netpoll.EVFilterSock:
-				err = el.closeConn(c, unix.ECONNRESET)
+				err = el.close(c, unix.ECONNRESET)
 			case netpoll.EVFilterWrite:
 				if !c.outboundBuffer.IsEmpty() {
 					err = el.write(c)
@@ -71,28 +69,28 @@ func (el *eventloop) activateSubReactor(lockOSThread bool) {
 	})
 	if err == errors.ErrEngineShutdown {
 		el.engine.opts.Logger.Debugf("event-loop(%d) is exiting in terms of the demand from user, %v", el.idx, err)
+		err = nil
 	} else if err != nil {
 		el.engine.opts.Logger.Errorf("event-loop(%d) is exiting due to error: %v", el.idx, err)
 	}
+
+	el.closeConns()
+	el.engine.shutdown(err)
+
+	return err
 }
 
-func (el *eventloop) run(lockOSThread bool) {
-	if lockOSThread {
+func (el *eventloop) run() error {
+	if el.engine.opts.LockOSThread {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
 	}
 
-	defer func() {
-		el.closeAllSockets()
-		el.ln.close()
-		el.engine.signalShutdown()
-	}()
-
 	err := el.poller.Polling(func(fd int, filter int16) (err error) {
-		if c, ack := el.connections[fd]; ack {
+		if c := el.connections.getConn(fd); c != nil {
 			switch filter {
 			case netpoll.EVFilterSock:
-				err = el.closeConn(c, unix.ECONNRESET)
+				err = el.close(c, unix.ECONNRESET)
 			case netpoll.EVFilterWrite:
 				if !c.outboundBuffer.IsEmpty() {
 					err = el.write(c)
@@ -104,5 +102,16 @@ func (el *eventloop) run(lockOSThread bool) {
 		}
 		return el.accept(fd, filter)
 	})
-	el.getLogger().Debugf("event-loop(%d) is exiting due to error: %v", el.idx, err)
+	if err == errors.ErrEngineShutdown {
+		el.engine.opts.Logger.Debugf("event-loop(%d) is exiting in terms of the demand from user, %v", el.idx, err)
+		err = nil
+	} else if err != nil {
+		el.engine.opts.Logger.Errorf("event-loop(%d) is exiting due to error: %v", el.idx, err)
+	}
+
+	el.closeConns()
+	el.ln.close()
+	el.engine.shutdown(err)
+
+	return err
 }

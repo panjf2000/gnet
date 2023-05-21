@@ -1,3 +1,4 @@
+// Copyright (c) 2020 The Gnet Authors. All rights reserved.
 // Copyright (c) 2017 Ma Weiwei, Max Riveiro
 //
 // Licensed under the Apache License, Version 2.0 (the "License");

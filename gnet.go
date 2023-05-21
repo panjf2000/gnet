@@ -1,5 +1,4 @@
-// Copyright (c) 2019 Andy Pan
-// Copyright (c) 2018 Joshua J Baker
+// Copyright (c) 2019 The Gnet Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -49,14 +48,25 @@ type Engine struct {
 	eng *engine
 }
 
+// Validate checks whether the engine is available.
+func (e Engine) Validate() error {
+	if e.eng == nil {
+		return errors.ErrEmptyEngine
+	}
+	if e.eng.isInShutdown() {
+		return errors.ErrEngineInShutdown
+	}
+	return nil
+}
+
 // CountConnections counts the number of currently active connections and returns it.
-func (s Engine) CountConnections() (count int) {
-	if s.eng == nil {
+func (e Engine) CountConnections() (count int) {
+	if e.Validate() != nil {
 		return -1
 	}
 
-	s.eng.lb.iterate(func(i int, el *eventloop) bool {
-		count += int(el.loadConn())
+	e.eng.lb.iterate(func(i int, el *eventloop) bool {
+		count += int(el.countConn())
 		return true
 	})
 	return
@@ -65,13 +75,13 @@ func (s Engine) CountConnections() (count int) {
 // Dup returns a copy of the underlying file descriptor of listener.
 // It is the caller's responsibility to close dupFD when finished.
 // Closing listener does not affect dupFD, and closing dupFD does not affect listener.
-func (s Engine) Dup() (dupFD int, err error) {
-	if s.eng == nil {
-		return -1, errors.ErrEmptyEngine
+func (e Engine) Dup() (fd int, err error) {
+	if err = e.Validate(); err != nil {
+		return -1, err
 	}
 
 	var sc string
-	dupFD, sc, err = s.eng.ln.dup()
+	fd, sc, err = e.eng.ln.dup()
 	if err != nil {
 		logging.Warnf("%s failed when duplicating new fd\n", sc)
 	}
@@ -80,20 +90,17 @@ func (s Engine) Dup() (dupFD int, err error) {
 
 // Stop gracefully shuts down this Engine without interrupting any active event-loops,
 // it waits indefinitely for connections and event-loops to be closed and then shuts down.
-func (s Engine) Stop(ctx context.Context) error {
-	if s.eng == nil {
-		return errors.ErrEmptyEngine
-	}
-	if s.eng.isInShutdown() {
-		return errors.ErrEngineInShutdown
+func (e Engine) Stop(ctx context.Context) error {
+	if err := e.Validate(); err != nil {
+		return err
 	}
 
-	s.eng.signalShutdown()
+	e.eng.shutdown(nil)
 
 	ticker := time.NewTicker(shutdownPollInterval)
 	defer ticker.Stop()
 	for {
-		if s.eng.isInShutdown() {
+		if e.eng.isInShutdown() {
 			return nil
 		}
 		select {
@@ -103,6 +110,60 @@ func (s Engine) Stop(ctx context.Context) error {
 		}
 	}
 }
+
+/*
+type asyncCmdType uint8
+
+const (
+	asyncCmdClose = iota + 1
+	asyncCmdWake
+	asyncCmdWrite
+	asyncCmdWritev
+)
+
+type asyncCmd struct {
+	fd  gfd.GFD
+	typ asyncCmdType
+	cb  AsyncCallback
+	arg interface{}
+}
+
+// AsyncWrite writes data to the given connection asynchronously.
+func (e Engine) AsyncWrite(fd gfd.GFD, p []byte, cb AsyncCallback) error {
+	if err := e.Validate(); err != nil {
+		return err
+	}
+
+	return e.eng.sendCmd(&asyncCmd{fd: fd, typ: asyncCmdWrite, cb: cb, arg: p}, false)
+}
+
+// AsyncWritev is like AsyncWrite, but it accepts a slice of byte slices.
+func (e Engine) AsyncWritev(fd gfd.GFD, batch [][]byte, cb AsyncCallback) error {
+	if err := e.Validate(); err != nil {
+		return err
+	}
+
+	return e.eng.sendCmd(&asyncCmd{fd: fd, typ: asyncCmdWritev, cb: cb, arg: batch}, false)
+}
+
+// Close closes the given connection.
+func (e Engine) Close(fd gfd.GFD, cb AsyncCallback) error {
+	if err := e.Validate(); err != nil {
+		return err
+	}
+
+	return e.eng.sendCmd(&asyncCmd{fd: fd, typ: asyncCmdClose, cb: cb}, false)
+}
+
+// Wake wakes up the given connection.
+func (e Engine) Wake(fd gfd.GFD, cb AsyncCallback) error {
+	if err := e.Validate(); err != nil {
+		return err
+	}
+
+	return e.eng.sendCmd(&asyncCmd{fd: fd, typ: asyncCmdWake, cb: cb}, true)
+}
+*/
 
 // Reader is an interface that consists of a number of methods for reading that Conn must implement.
 type Reader interface {
@@ -178,6 +239,9 @@ type AsyncCallback func(c Conn, err error) error
 
 // Socket is a set of functions which manipulate the underlying file descriptor of a connection.
 type Socket interface {
+	// Gfd returns the gfd of socket.
+	// Gfd() gfd.GFD
+
 	// Fd returns the underlying file descriptor.
 	Fd() int
 
@@ -365,28 +429,21 @@ var MaxStreamBufferCap = 64 * 1024 // 64KB
 func Run(eventHandler EventHandler, protoAddr string, opts ...Option) (err error) {
 	options := loadOptions(opts...)
 
-	logging.Debugf("default logging level is %s", logging.LogLevel())
-
-	var (
-		logger logging.Logger
-		flush  func() error
-	)
-	if options.LogPath != "" {
-		if logger, flush, err = logging.CreateLoggerAsLocalFile(options.LogPath, options.LogLevel); err != nil {
-			return
-		}
-	} else {
-		logger = logging.GetDefaultLogger()
-	}
+	logger, logFlusher := logging.GetDefaultLogger(), logging.GetDefaultFlusher()
 	if options.Logger == nil {
-		options.Logger = logger
-	}
-	defer func() {
-		if flush != nil {
-			_ = flush()
+		if options.LogPath != "" {
+			logger, logFlusher, _ = logging.CreateLoggerAsLocalFile(options.LogPath, options.LogLevel)
 		}
-		logging.Cleanup()
-	}()
+		options.Logger = logger
+	} else {
+		logger = options.Logger
+		logFlusher = nil
+	}
+	logging.SetDefaultLoggerAndFlusher(logger, logFlusher)
+
+	defer logging.Cleanup()
+
+	logging.Debugf("default logging level is %s", logging.LogLevel())
 
 	// The maximum number of operating system threads that the Go program can use is initially set to 10000,
 	// which should also be the maximum amount of I/O event-loops locked to OS threads that users can start up.
@@ -440,7 +497,7 @@ func Stop(ctx context.Context, protoAddr string) error {
 	var eng *engine
 	if s, ok := allEngines.Load(protoAddr); ok {
 		eng = s.(*engine)
-		eng.signalShutdown()
+		eng.shutdown(nil)
 		defer allEngines.Delete(protoAddr)
 	} else {
 		return errors.ErrEngineInShutdown
@@ -473,11 +530,4 @@ func parseProtoAddr(addr string) (network, address string) {
 		address = pair[1]
 	}
 	return
-}
-
-func bool2int(b bool) int {
-	if b {
-		return 1
-	}
-	return 0
 }

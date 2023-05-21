@@ -21,9 +21,9 @@ body:
       options:
         - label: I've thoroughly read the documentations on this issue but still have no clue.
           required: true
-        - label: I've searched the current list of Github issues but didn't find any duplicate issues that have been solved.
+        - label: I've searched the Github Issues but didn't find any duplicate issues that have been resolved.
           required: true
-        - label: I've searched the internet with this issue, but haven't found anything helpful.
+        - label: I've searched the internet for this issue but didn't find anything helpful.
           required: true
     validations:
       required: true

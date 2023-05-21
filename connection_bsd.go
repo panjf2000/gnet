@@ -1,4 +1,4 @@
-// Copyright (c) 2021 Andy Pan
+// Copyright (c) 2021 The Gnet Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ import (
 func (c *conn) handleEvents(_ int, filter int16) (err error) {
 	switch filter {
 	case netpoll.EVFilterSock:
-		err = c.loop.closeConn(c, unix.ECONNRESET)
+		err = c.loop.close(c, unix.ECONNRESET)
 	case netpoll.EVFilterWrite:
 		if !c.outboundBuffer.IsEmpty() {
 			err = c.loop.write(c)

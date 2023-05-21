@@ -1,4 +1,4 @@
-// Copyright (c) 2019 Andy Pan
+// Copyright (c) 2019 The Gnet Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,6 +18,8 @@ import (
 	"time"
 
 	"github.com/panjf2000/ants/v2"
+
+	"github.com/panjf2000/gnet/v2/pkg/logging"
 )
 
 const (
@@ -40,9 +42,25 @@ func init() {
 // Pool is the alias of ants.Pool.
 type Pool = ants.Pool
 
+type antsLogger struct {
+	logging.Logger
+}
+
+// Printf implements the ants.Logger interface.
+func (l antsLogger) Printf(format string, args ...interface{}) {
+	l.Infof(format, args...)
+}
+
 // Default instantiates a non-blocking *WorkerPool with the capacity of DefaultAntsPoolSize.
 func Default() *Pool {
-	options := ants.Options{ExpiryDuration: ExpiryDuration, Nonblocking: Nonblocking}
+	options := ants.Options{
+		ExpiryDuration: ExpiryDuration,
+		Nonblocking:    Nonblocking,
+		Logger:         &antsLogger{logging.GetDefaultLogger()},
+		PanicHandler: func(i interface{}) {
+			logging.Errorf("goroutine pool panic: %v", i)
+		},
+	}
 	defaultAntsPool, _ := ants.NewPool(DefaultAntsPoolSize, ants.WithOptions(options))
 	return defaultAntsPool
 }

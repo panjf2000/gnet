@@ -1,4 +1,4 @@
-// Copyright (c) 2021 Andy Pan
+// Copyright (c) 2021 The Gnet Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -32,16 +32,21 @@ import (
 func (eng *engine) accept(fd int, _ netpoll.IOEvent) error {
 	nfd, sa, err := unix.Accept(fd)
 	if err != nil {
-		if err == unix.EAGAIN {
+		switch err {
+		case unix.EINTR, unix.EAGAIN, unix.ECONNABORTED:
+			// ECONNABORTED means that a socket on the listen
+			// queue was closed before we Accept()ed it;
+			// it's a silly error, so try again.
 			return nil
+		default:
+			eng.opts.Logger.Errorf("Accept() failed due to error: %v", err)
+			return errors.ErrAcceptSocket
 		}
-		eng.opts.Logger.Errorf("Accept() failed due to error: %v", err)
-		return errors.ErrAcceptSocket
 	}
+
 	if err = os.NewSyscallError("fcntl nonblock", unix.SetNonblock(nfd, true)); err != nil {
 		return err
 	}
-
 	remoteAddr := socket.SockaddrToTCPOrUnixAddr(sa)
 	if eng.opts.TCPKeepAlive > 0 && eng.ln.network == "tcp" {
 		err = socket.SetKeepAlivePeriod(nfd, int(eng.opts.TCPKeepAlive.Seconds()))
@@ -50,6 +55,7 @@ func (eng *engine) accept(fd int, _ netpoll.IOEvent) error {
 
 	el := eng.lb.next(remoteAddr)
 	c := newTCPConn(nfd, el, sa, el.ln.addr, remoteAddr)
+
 	if el.engine.opts.TLSconfig != nil {
 		if err = c.UpgradeTLS(el.engine.opts.TLSconfig); err != nil {
 			return err
@@ -60,7 +66,7 @@ func (eng *engine) accept(fd int, _ netpoll.IOEvent) error {
 	if err != nil {
 		eng.opts.Logger.Errorf("UrgentTrigger() failed due to error: %v", err)
 		_ = unix.Close(nfd)
-		c.releaseTCP()
+		c.release()
 	}
 	return nil
 }
@@ -72,16 +78,21 @@ func (el *eventloop) accept(fd int, ev netpoll.IOEvent) error {
 
 	nfd, sa, err := unix.Accept(el.ln.fd)
 	if err != nil {
-		if err == unix.EAGAIN {
+		switch err {
+		case unix.EINTR, unix.EAGAIN, unix.ECONNABORTED:
+			// ECONNABORTED means that a socket on the listen
+			// queue was closed before we Accept()ed it;
+			// it's a silly error, so try again.
 			return nil
+		default:
+			el.getLogger().Errorf("Accept() failed due to error: %v", err)
+			return errors.ErrAcceptSocket
 		}
-		el.getLogger().Errorf("Accept() failed due to error: %v", err)
-		return os.NewSyscallError("accept", err)
 	}
+
 	if err = os.NewSyscallError("fcntl nonblock", unix.SetNonblock(nfd, true)); err != nil {
 		return err
 	}
-
 	remoteAddr := socket.SockaddrToTCPOrUnixAddr(sa)
 	if el.engine.opts.TCPKeepAlive > 0 && el.ln.network == "tcp" {
 		err = socket.SetKeepAlivePeriod(nfd, int(el.engine.opts.TCPKeepAlive/time.Second))
@@ -89,14 +100,18 @@ func (el *eventloop) accept(fd int, ev netpoll.IOEvent) error {
 	}
 
 	c := newTCPConn(nfd, el, sa, el.ln.addr, remoteAddr)
+<<<<<<< HEAD:acceptor.go
 	if el.engine.opts.TLSconfig != nil {
 		if err = c.UpgradeTLS(el.engine.opts.TLSconfig); err != nil {
 			return err
 		}
 	}
 	if err = el.poller.AddRead(c.pollAttachment); err != nil {
+=======
+	if err = el.poller.AddRead(&c.pollAttachment); err != nil {
+>>>>>>> f80734af8ec21935798edbfc73362cd9dae73f2b:acceptor_unix.go
 		return err
 	}
-	el.connections[c.fd] = c
+	el.connections.addConn(c, el.idx)
 	return el.open(c)
 }

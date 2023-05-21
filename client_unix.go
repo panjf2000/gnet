@@ -1,4 +1,4 @@
-// Copyright (c) 2021 Andy Pan
+// Copyright (c) 2021 The Gnet Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,9 +22,9 @@ import (
 	"errors"
 	"net"
 	"strconv"
-	"sync"
 	"syscall"
 
+	"golang.org/x/sync/errgroup"
 	"golang.org/x/sys/unix"
 
 	"github.com/panjf2000/gnet/v2/internal/math"
@@ -37,43 +37,52 @@ import (
 
 // Client of gnet.
 type Client struct {
-	opts     *Options
-	el       *eventloop
-	logFlush func() error
+	opts *Options
+	el   *eventloop
 }
 
 // NewClient creates an instance of Client.
-func NewClient(eventHandler EventHandler, opts ...Option) (cli *Client, err error) {
+func NewClient(eh EventHandler, opts ...Option) (cli *Client, err error) {
 	options := loadOptions(opts...)
 	cli = new(Client)
 	cli.opts = options
-	var logger logging.Logger
-	if options.LogPath != "" {
-		if logger, cli.logFlush, err = logging.CreateLoggerAsLocalFile(options.LogPath, options.LogLevel); err != nil {
-			return
-		}
-	} else {
-		logger = logging.GetDefaultLogger()
-	}
+
+	logger, logFlusher := logging.GetDefaultLogger(), logging.GetDefaultFlusher()
 	if options.Logger == nil {
+		if options.LogPath != "" {
+			logger, logFlusher, _ = logging.CreateLoggerAsLocalFile(options.LogPath, options.LogLevel)
+		}
 		options.Logger = logger
+	} else {
+		logger = options.Logger
+		logFlusher = nil
 	}
+	logging.SetDefaultLoggerAndFlusher(logger, logFlusher)
+
 	var p *netpoll.Poller
 	if p, err = netpoll.OpenPoller(); err != nil {
 		return
 	}
-	eng := new(engine)
-	eng.opts = options
-	eng.eventHandler = eventHandler
-	eng.ln = &listener{network: "udp"}
-	eng.cond = sync.NewCond(&sync.Mutex{})
-	if options.Ticker {
-		eng.tickerCtx, eng.cancelTicker = context.WithCancel(context.Background())
+
+	shutdownCtx, shutdown := context.WithCancel(context.Background())
+	eng := engine{
+		ln:           &listener{network: "udp"},
+		opts:         options,
+		eventHandler: eh,
+		workerPool: struct {
+			*errgroup.Group
+			shutdownCtx context.Context
+			shutdown    context.CancelFunc
+		}{&errgroup.Group{}, shutdownCtx, shutdown},
 	}
-	el := new(eventloop)
-	el.ln = eng.ln
-	el.engine = eng
-	el.poller = p
+	if options.Ticker {
+		eng.ticker.ctx, eng.ticker.cancel = context.WithCancel(context.Background())
+	}
+	el := eventloop{
+		ln:     eng.ln,
+		engine: &eng,
+		poller: p,
+	}
 
 	rbc := options.ReadBufferCap
 	switch {
@@ -95,41 +104,34 @@ func NewClient(eventHandler EventHandler, opts ...Option) (cli *Client, err erro
 	}
 
 	el.buffer = make([]byte, options.ReadBufferCap)
-	el.udpSockets = make(map[int]*conn)
-	el.connections = make(map[int]*conn)
-	el.eventHandler = eventHandler
-	cli.el = el
+	el.connections.init()
+	el.eventHandler = eh
+	cli.el = &el
 	return
 }
 
 // Start starts the client event-loop, handing IO events.
 func (cli *Client) Start() error {
 	cli.el.eventHandler.OnBoot(Engine{})
-	cli.el.engine.wg.Add(1)
-	go func() {
-		cli.el.run(cli.opts.LockOSThread)
-		cli.el.engine.wg.Done()
-	}()
+	cli.el.engine.workerPool.Go(cli.el.run)
 	// Start the ticker.
 	if cli.opts.Ticker {
-		go cli.el.ticker(cli.el.engine.tickerCtx)
+		go cli.el.ticker(cli.el.engine.ticker.ctx)
 	}
+	logging.Debugf("default logging level is %s", logging.LogLevel())
 	return nil
 }
 
 // Stop stops the client event-loop.
 func (cli *Client) Stop() (err error) {
 	logging.Error(cli.el.poller.UrgentTrigger(func(_ interface{}) error { return gerrors.ErrEngineShutdown }, nil))
-	cli.el.engine.wg.Wait()
-	logging.Error(cli.el.poller.Close())
-	cli.el.eventHandler.OnShutdown(Engine{})
 	// Stop the ticker.
 	if cli.opts.Ticker {
-		cli.el.engine.cancelTicker()
+		cli.el.engine.ticker.cancel()
 	}
-	if cli.logFlush != nil {
-		err = cli.logFlush()
-	}
+	_ = cli.el.engine.workerPool.Wait()
+	logging.Error(cli.el.poller.Close())
+	cli.el.eventHandler.OnShutdown(Engine{})
 	logging.Cleanup()
 	return
 }
