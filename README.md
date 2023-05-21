@@ -22,7 +22,7 @@ English | [中文](README_ZH.md)
 
 `gnet` is not designed to displace the standard Go [net](https://golang.org/pkg/net/) package, but to create a networking client/server framework for Go that performs on par with [Redis](http://redis.io) and [Haproxy](http://www.haproxy.org) for networking packets handling (although it does not limit itself to these areas), therefore, `gnet` is not as comprehensive as Go [net](https://golang.org/pkg/net/), it only provides the core functionalities (by a concise API set) of a networking application and it is not planned on being a full-featured networking framework, as I think [net](https://golang.org/pkg/net/) has done a good enough job in this area.
 
-`gnet` sells itself as a high-performance, lightweight, non-blocking, event-driven networking framework written in pure Go which works on transport layer with TCP/UDP protocols and Unix Domain Socket , so it allows developers to implement their own protocols(HTTP, RPC, WebSocket, Redis, etc.) of application layer upon `gnet` for building  diversified network applications, for instance, you get an HTTP Server or Web Framework if you implement HTTP protocol upon `gnet` while you have a Redis Server done with the implementation of Redis protocol upon `gnet` and so on.
+`gnet` sells itself as a high-performance, lightweight, non-blocking, event-driven networking framework written in pure Go which works on the transport layer with TCP/UDP protocols and Unix Domain Socket, so it allows developers to implement their own protocols(HTTP, RPC, WebSocket, Redis, etc.) of application layer upon `gnet` for building diversified network applications, for instance, you get an HTTP Server or Web Framework if you implement HTTP protocol upon `gnet` while you have a Redis Server done with the implementation of Redis protocol upon `gnet` and so on.
 
 **`gnet` derives from the project: `evio` while having a much higher performance and more features.**
 
@@ -32,9 +32,9 @@ English | [中文](README_ZH.md)
 - [x] Built-in goroutine pool powered by the library [ants](https://github.com/panjf2000/ants)
 - [x] Lock-free during the entire runtime
 - [x] Concise and easy-to-use APIs
-- [x] Efficient, reusable and elastic memory buffer: (Elastic-)Ring-Buffer, Linked-List-Buffer and Elastic-Mixed-Buffer
-- [x] Supporting multiple protocols/IPC mechanism: `TCP`, `UDP` and `Unix Domain Socket`
-- [x] Supporting multiple load-balancing algorithms: `Round-Robin`, `Source-Addr-Hash` and `Least-Connections`
+- [x] Efficient, reusable, and elastic memory buffer: (Elastic-)Ring-Buffer, Linked-List-Buffer and Elastic-Mixed-Buffer
+- [x] Supporting multiple protocols/IPC mechanisms: `TCP`, `UDP`, and `Unix Domain Socket`
+- [x] Supporting multiple load-balancing algorithms: `Round-Robin`, `Source-Addr-Hash`, and `Least-Connections`
 - [x] Supporting two event-driven mechanisms: `epoll` on **Linux** and `kqueue` on **FreeBSD/DragonFly/Darwin**
 - [x] Flexible ticker event
 - [x] Implementation of `gnet` Client
@@ -48,13 +48,13 @@ English | [中文](README_ZH.md)
 
 ## With v2 
 
-```powershell
+```bash
 go get -u github.com/panjf2000/gnet/v2
 ```
 
 ## With v1
 
-```powershell
+```bash
 go get -u github.com/panjf2000/gnet
 ```
 
@@ -79,11 +79,11 @@ If you have `gnet` integrated into projects, feel free to open a pull request re
 * Go1.19.x linux/amd64
 ```
 
-![All language](https://raw.githubusercontent.com/panjf2000/illustrations/master/benchmark/techempower-plaintext-top50-light.jpg)
+![](https://raw.githubusercontent.com/panjf2000/illustrations/master/benchmark/techempower-plaintext-top50-light.jpg)
 
 This is a leaderboard of the top ***50*** out of ***499*** frameworks that encompass various programming languages worldwide, in which `gnet` is ranked ***first***.
 
-![Golang](https://raw.githubusercontent.com/panjf2000/illustrations/master/benchmark/techempower-plaintext-topN-go-light.png)
+![](https://raw.githubusercontent.com/panjf2000/illustrations/master/benchmark/techempower-plaintext-topN-go-light.png)
 
 This is the full framework ranking of Go and `gnet` tops all the other frameworks, which makes `gnet` the ***fastest*** networking framework in Go.
 
@@ -95,7 +95,7 @@ To see the full ranking list, visit [TechEmpower Plaintext Benchmark](https://ww
 
 ### Test Environment
 
-```powershell
+```bash
 # Machine information
         OS : Ubuntu 20.04/x86_64
        CPU : 8 CPU cores, AMD EPYC 7K62 48-Core Processor
@@ -121,7 +121,7 @@ Test duration   : 15s
 
 ### Test Environment
 
-```powershell
+```bash
 # Machine information
         OS : MacOS Big Sur/x86_64
        CPU : 6 CPU cores, Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz
@@ -145,7 +145,7 @@ Test duration   : 15s
 
 # ⚠️ License
 
-Source code of `gnet` should be distributed under the Apache-2.0 license.
+The source code of `gnet` should be distributed under the Apache-2.0 license.
 
 # 👏 Contributors
 
@@ -169,13 +169,13 @@ Support us with a monthly donation and help us continue our activities.
 
 # 💎 Sponsors
 
-Become a bronze sponsor with a monthly donation of $10 and get your logo on our README on Github.
+Become a bronze sponsor with a monthly donation of $10 and get your logo on our README on GitHub.
 
 <a href="https://opencollective.com/gnet#sponsors" target="_blank"><img src="https://opencollective.com/gnet/sponsors.svg"></a>
 
 # ☕️ Buy me a coffee
 
-> Please be sure to leave your name, Github account or other social media accounts when you donate by the following means so that I can add it to the list of donors as a token of my appreciation.
+> Please be sure to leave your name, GitHub account, or other social media accounts when you donate by the following means so that I can add it to the list of donors as a token of my appreciation.
 
 <img src="https://raw.githubusercontent.com/panjf2000/illustrations/master/payments/WeChatPay.JPG" width="250" align="middle"/>&nbsp;&nbsp;
 <img src="https://raw.githubusercontent.com/panjf2000/illustrations/master/payments/AliPay.JPG" width="250" align="middle"/>&nbsp;&nbsp;

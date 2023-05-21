@@ -48,13 +48,13 @@
 
 ## 使用 v2 
 
-```powershell
+```bash
 go get -u github.com/panjf2000/gnet/v2
 ```
 
 ## 使用 v1
 
-```powershell
+```bash
 go get -u github.com/panjf2000/gnet
 ```
 
@@ -79,11 +79,11 @@ go get -u github.com/panjf2000/gnet
 * Go1.19.x linux/amd64
 ```
 
-![All language](https://raw.githubusercontent.com/panjf2000/illustrations/master/benchmark/techempower-plaintext-top50-light.jpg)
+![](https://raw.githubusercontent.com/panjf2000/illustrations/master/benchmark/techempower-plaintext-top50-light.jpg)
 
 这是包含全部编程语言框架的性能排名***前 50*** 的结果，总榜单包含了全世界共计 ***499*** 个框架，其中 `gnet` 排名***第一***。
 
-![Golang](https://raw.githubusercontent.com/panjf2000/illustrations/master/benchmark/techempower-plaintext-topN-go-light.png)
+![](https://raw.githubusercontent.com/panjf2000/illustrations/master/benchmark/techempower-plaintext-topN-go-light.png)
 
 这是 Go 语言分类下的全部排名，`gnet` 超越了其他所有框架，位列第一，是***最快***的 Go 网络框架。
 
@@ -95,7 +95,7 @@ go get -u github.com/panjf2000/gnet
 
 ### Test Environment
 
-```powershell
+```bash
 # Machine information
         OS : Ubuntu 20.04/x86_64
        CPU : 8 CPU cores, AMD EPYC 7K62 48-Core Processor
@@ -121,7 +121,7 @@ Test duration   : 15s
 
 ### Test Environment
 
-```powershell
+```bash
 # Machine information
         OS : MacOS Big Sur/x86_64
        CPU : 6 CPU cores, Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz
@@ -175,7 +175,7 @@ Test duration   : 15s
 
 # ☕️ 打赏
 
-> 当您通过以下方式进行捐赠时，请务必留下姓名、Github账号或其他社交媒体账号，以便我将其添加到捐赠者名单中，以表谢意。
+> 当您通过以下方式进行捐赠时，请务必留下姓名、GitHub 账号或其他社交媒体账号，以便我将其添加到捐赠者名单中，以表谢意。
 
 <img src="https://raw.githubusercontent.com/panjf2000/illustrations/master/payments/WeChatPay.JPG" width="250" align="middle"/>&nbsp;&nbsp;
 <img src="https://raw.githubusercontent.com/panjf2000/illustrations/master/payments/AliPay.JPG" width="250" align="middle"/>&nbsp;&nbsp;
