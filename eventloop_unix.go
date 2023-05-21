@@ -109,7 +109,7 @@ func (el *eventloop) readTLS(c *conn) error {
 			}
 			// If err is io.EOF, it can either the data is drained,
 			// receives a close notify from the client.
-			return el.closeConn(c, os.NewSyscallError("TLS read", err))
+			return el.close(c, os.NewSyscallError("TLS read", err))
 		}
 
 		// load all decrypted data and make it ready for gnet to use
@@ -120,7 +120,7 @@ func (el *eventloop) readTLS(c *conn) error {
 		case None:
 		case Close:
 			// tls data will be cleaned up in el.closeConn()
-			return el.closeConn(c, nil)
+			return el.close(c, nil)
 		case Shutdown:
 			c.tlsconn.DataDone()
 			return gerrors.ErrEngineShutdown
@@ -170,9 +170,9 @@ func (el *eventloop) read(c *conn) error {
 				return nil
 			}
 			if err = c.tlsconn.Handshake(); err != nil {
-				// closeConn will cleanup the TLS data at the end,
+				// close will cleanup the TLS data at the end,
 				// so no need to call tlsconn.DataDone()
-				return el.closeConn(c, os.NewSyscallError("TLS handshake", err))
+				return el.close(c, os.NewSyscallError("TLS handshake", err))
 			}
 			if !c.tlsconn.HandshakeComplete() || len(c.tlsconn.RawInputData()) == 0 { // 握手没成功，或者握手成功，但是没有数据黏包了
 				c.tlsconn.DataDone()

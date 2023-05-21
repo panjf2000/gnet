@@ -100,16 +100,14 @@ func (el *eventloop) accept(fd int, ev netpoll.IOEvent) error {
 	}
 
 	c := newTCPConn(nfd, el, sa, el.ln.addr, remoteAddr)
-<<<<<<< HEAD:acceptor.go
+
 	if el.engine.opts.TLSconfig != nil {
 		if err = c.UpgradeTLS(el.engine.opts.TLSconfig); err != nil {
 			return err
 		}
 	}
-	if err = el.poller.AddRead(c.pollAttachment); err != nil {
-=======
+
 	if err = el.poller.AddRead(&c.pollAttachment); err != nil {
->>>>>>> f80734af8ec21935798edbfc73362cd9dae73f2b:acceptor_unix.go
 		return err
 	}
 	el.connections.addConn(c, el.idx)
