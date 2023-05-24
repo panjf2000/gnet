@@ -194,7 +194,7 @@ func (eng *engine) stop(s Engine) {
 
 	eng.eventHandler.OnShutdown(s)
 
-	// Notify all loops to exit.
+	// Notify all event-loops to exit.
 	eng.lb.iterate(func(i int, el *eventloop) bool {
 		err := el.poller.UrgentTrigger(func(_ interface{}) error { return errors.ErrEngineShutdown }, nil)
 		if err != nil {
@@ -202,9 +202,7 @@ func (eng *engine) stop(s Engine) {
 		}
 		return true
 	})
-
 	if eng.mainLoop != nil {
-		eng.ln.close()
 		err := eng.mainLoop.poller.UrgentTrigger(func(_ interface{}) error { return errors.ErrEngineShutdown }, nil)
 		if err != nil {
 			eng.opts.Logger.Errorf("failed to call UrgentTrigger on main event-loop when stopping engine: %v", err)
@@ -220,15 +218,17 @@ func (eng *engine) stop(s Engine) {
 		eng.opts.Logger.Errorf("engine shutdown error: %v", err)
 	}
 
+	// Close all listeners and pollers of event-loops.
 	eng.closeEventLoops()
-
 	if eng.mainLoop != nil {
+		eng.ln.close()
 		err := eng.mainLoop.poller.Close()
 		if err != nil {
 			eng.opts.Logger.Errorf("failed to close poller when stopping engine: %v", err)
 		}
 	}
 
+	// Put the engine into the shutdown state.
 	atomic.StoreInt32(&eng.inShutdown, 1)
 }
 
