@@ -16,6 +16,7 @@ package gnet
 
 import (
 	"context"
+	"errors"
 	"net"
 	"os"
 	"sync"
@@ -37,21 +38,49 @@ type listener struct {
 }
 
 func (l *listener) dup() (int, string, error) {
-	var (
-		file *os.File
-		err  error
-	)
-	if l.pc != nil {
-		file, err = l.pc.(*net.UDPConn).File()
-	} else if l.ln != nil {
-		file, err = l.ln.(interface{ File() (*os.File, error) }).File()
-	} else {
-		return -1, "", errorx.ErrUnsupportedOp
+	if l.ln == nil && l.pc == nil {
+		return -1, "dup", errorx.ErrUnsupportedOp
 	}
+
+	var (
+		sc syscall.Conn
+		ok bool
+	)
+	if l.ln != nil {
+		sc, ok = l.ln.(syscall.Conn)
+	} else {
+		sc, ok = l.pc.(syscall.Conn)
+	}
+
+	if !ok {
+		return -1, "dup", errors.New("failed to convert net.Conn to syscall.Conn")
+	}
+	rc, err := sc.SyscallConn()
+	if err != nil {
+		return -1, "dup", errors.New("failed to get syscall.RawConn from net.Conn")
+	}
+
+	var dupHandle windows.Handle
+	e := rc.Control(func(fd uintptr) {
+		process := windows.CurrentProcess()
+		err = windows.DuplicateHandle(
+			process,
+			windows.Handle(fd),
+			process,
+			&dupHandle,
+			0,
+			true,
+			windows.DUPLICATE_SAME_ACCESS,
+		)
+	})
 	if err != nil {
 		return -1, "dup", err
 	}
-	return int(file.Fd()), "", nil
+	if e != nil {
+		return -1, "dup", e
+	}
+
+	return int(dupHandle), "dup", nil
 }
 
 func (l *listener) close() {

@@ -28,6 +28,14 @@ type clientEvents struct {
 	rspChMap  sync.Map
 }
 
+func (ev *clientEvents) OnBoot(e Engine) Action {
+	fd, err := e.Dup()
+	require.ErrorIsf(ev.tester, err, gerr.ErrEmptyEngine, "expected error: %v, but got: %v",
+		gerr.ErrUnsupportedOp, err)
+	assert.EqualValuesf(ev.tester, fd, -1, "expected -1, but got: %d", fd)
+	return None
+}
+
 func (ev *clientEvents) OnOpen(c Conn) ([]byte, Action) {
 	c.SetContext([]byte{})
 	rspCh := make(chan []byte, 1)
