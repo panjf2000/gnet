@@ -72,7 +72,7 @@ func (ev *clientEvents) OnTick() (delay time.Duration, action Action) {
 
 func (ev *clientEvents) OnShutdown(e Engine) {
 	fd, err := e.Dup()
-	require.ErrorIsf(ev.tester, err, gerr.ErrUnsupportedOp, "expected error: %v, but got: %v",
+	require.ErrorIsf(ev.tester, err, gerr.ErrEmptyEngine, "expected error: %v, but got: %v",
 		gerr.ErrUnsupportedOp, err)
 	assert.EqualValuesf(ev.tester, fd, -1, "expected -1, but got: %d", fd)
 }
