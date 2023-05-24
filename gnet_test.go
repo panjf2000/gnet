@@ -238,6 +238,10 @@ type testServer struct {
 
 func (s *testServer) OnBoot(eng Engine) (action Action) {
 	s.eng = eng
+	fd, err := s.eng.Dup()
+	require.NoErrorf(s.tester, err, "dup error")
+	assert.Greaterf(s.tester, fd, 2, "expected fd: > 2, but got: %d", fd)
+	assert.NoErrorf(s.tester, SysClose(fd), "close fd error")
 	return
 }
 
@@ -253,6 +257,13 @@ func (s *testServer) OnOpen(c Conn) (out []byte, action Action) {
 	require.NotNil(s.tester, c.LocalAddr(), "nil local addr")
 	require.NotNil(s.tester, c.RemoteAddr(), "nil remote addr")
 	return
+}
+
+func (s *testServer) OnShutdown(_ Engine) {
+	fd, err := s.eng.Dup()
+	require.NoErrorf(s.tester, err, "dup error")
+	assert.Greaterf(s.tester, fd, 2, "expected fd: > 2, but got: %d", fd)
+	assert.NoErrorf(s.tester, SysClose(fd), "close fd error")
 }
 
 func (s *testServer) OnClose(c Conn, err error) (action Action) {
@@ -318,6 +329,7 @@ func (s *testServer) OnTraffic(c Conn) (action Action) {
 		}
 		return
 	}
+
 	buf, _ := c.Next(-1)
 	_, _ = c.Write(buf)
 
@@ -326,8 +338,8 @@ func (s *testServer) OnTraffic(c Conn) (action Action) {
 		assert.NoErrorf(s.tester, c.Flush(), "flush error")
 		_ = c.Fd()
 		fd, err := c.Dup()
-		assert.NoError(s.tester, err)
-		assert.Greater(s.tester, fd, 0)
+		require.NoErrorf(s.tester, err, "dup error")
+		assert.Greaterf(s.tester, fd, 2, "expected fd: > 2, but got: %d", fd)
 		assert.NoErrorf(s.tester, SysClose(fd), "close error")
 		// TODO(panjf2000): somehow these two system calls will fail with Unix Domain Socket,
 		//  returning "invalid argument" error on macOS in Github actions intermittently,
@@ -759,6 +771,7 @@ type testShutdownActionOnOpenServer struct {
 	tester        *testing.T
 	network, addr string
 	action        bool
+	eng           Engine
 }
 
 func (t *testShutdownActionOnOpenServer) OnOpen(Conn) (out []byte, action Action) {
@@ -766,9 +779,13 @@ func (t *testShutdownActionOnOpenServer) OnOpen(Conn) (out []byte, action Action
 	return
 }
 
-func (t *testShutdownActionOnOpenServer) OnShutdown(s Engine) {
-	dupFD, err := s.Dup()
-	logging.Debugf("dup fd: %d with error: %v\n", dupFD, err)
+func (t *testShutdownActionOnOpenServer) OnShutdown(e Engine) {
+	t.eng = e
+	fd, err := t.eng.Dup()
+	assert.Greaterf(t.tester, fd, 2, "expected fd: > 2, but got: %d", fd)
+	require.NoErrorf(t.tester, err, "dup error")
+	assert.NoErrorf(t.tester, SysClose(fd), "close error")
+	logging.Debugf("dup fd: %d with error: %v\n", fd, err)
 }
 
 func (t *testShutdownActionOnOpenServer) OnTick() (delay time.Duration, action Action) {
@@ -790,6 +807,9 @@ func testShutdownActionOnOpen(t *testing.T, network, addr string) {
 	events := &testShutdownActionOnOpenServer{tester: t, network: network, addr: addr}
 	err := Run(events, network+"://"+addr, WithTicker(true))
 	assert.NoError(t, err)
+	_, err = events.eng.Dup()
+	assert.ErrorIsf(t, err, gerr.ErrEngineInShutdown, "expected error: %v, but got: %v",
+		gerr.ErrEngineInShutdown, err)
 }
 
 func TestUDPShutdown(t *testing.T) {

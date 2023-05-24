@@ -20,6 +20,7 @@ package gnet
 import (
 	"context"
 	"runtime"
+	"sync"
 	"sync/atomic"
 
 	"golang.org/x/sync/errgroup"
@@ -44,6 +45,7 @@ type engine struct {
 
 		shutdownCtx context.Context
 		shutdown    context.CancelFunc
+		once        sync.Once
 	}
 	eventHandler EventHandler // user eventHandler
 }
@@ -58,7 +60,9 @@ func (eng *engine) shutdown(err error) {
 		eng.opts.Logger.Errorf("engine is being shutdown with error: %v", err)
 	}
 
-	eng.workerPool.shutdown()
+	eng.workerPool.once.Do(func() {
+		eng.workerPool.shutdown()
+	})
 }
 
 func (eng *engine) startEventLoops() {
@@ -70,6 +74,7 @@ func (eng *engine) startEventLoops() {
 
 func (eng *engine) closeEventLoops() {
 	eng.lb.iterate(func(i int, el *eventloop) bool {
+		el.ln.close()
 		_ = el.poller.Close()
 		return true
 	})
@@ -85,7 +90,6 @@ func (eng *engine) startSubReactors() {
 func (eng *engine) activateEventLoops(numEventLoop int) (err error) {
 	network, address := eng.ln.network, eng.ln.address
 	ln := eng.ln
-	eng.ln = nil
 	var striker *eventloop
 	// Create loops locally and bind the listeners.
 	for i := 0; i < numEventLoop; i++ {
@@ -190,7 +194,7 @@ func (eng *engine) stop(s Engine) {
 
 	eng.eventHandler.OnShutdown(s)
 
-	// Notify all loops to close by closing all listeners
+	// Notify all loops to exit.
 	eng.lb.iterate(func(i int, el *eventloop) bool {
 		err := el.poller.UrgentTrigger(func(_ interface{}) error { return errors.ErrEngineShutdown }, nil)
 		if err != nil {
@@ -249,7 +253,8 @@ func run(eventHandler EventHandler, listener *listener, options *Options, protoA
 			*errgroup.Group
 			shutdownCtx context.Context
 			shutdown    context.CancelFunc
-		}{&errgroup.Group{}, shutdownCtx, shutdown},
+			once        sync.Once
+		}{&errgroup.Group{}, shutdownCtx, shutdown, sync.Once{}},
 		eventHandler: eventHandler,
 	}
 	switch options.LB {

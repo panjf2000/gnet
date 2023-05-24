@@ -56,7 +56,8 @@ func NewClient(eh EventHandler, opts ...Option) (cli *Client, err error) {
 			*errgroup.Group
 			shutdownCtx context.Context
 			shutdown    context.CancelFunc
-		}{&errgroup.Group{}, shutdownCtx, shutdown},
+			once        sync.Once
+		}{&errgroup.Group{}, shutdownCtx, shutdown, sync.Once{}},
 		eventHandler: eh,
 	}
 	cli.el = &eventloop{

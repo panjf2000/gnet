@@ -43,11 +43,13 @@ func (l *listener) dup() (int, string, error) {
 	)
 	if l.pc != nil {
 		file, err = l.pc.(*net.UDPConn).File()
-	} else {
+	} else if l.ln != nil {
 		file, err = l.ln.(interface{ File() (*os.File, error) }).File()
+	} else {
+		return -1, "", errorx.ErrUnsupportedOp
 	}
 	if err != nil {
-		return 0, "dup", err
+		return -1, "dup", err
 	}
 	return int(file.Fd()), "", nil
 }

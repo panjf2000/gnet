@@ -110,7 +110,6 @@ func (el *eventloop) run() error {
 	}
 
 	el.closeConns()
-	el.ln.close()
 	el.engine.shutdown(err)
 
 	return err
