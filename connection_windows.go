@@ -60,12 +60,12 @@ func packTCPConn(c *conn, buf []byte) *tcpConn {
 
 func unpackTCPConn(tc *tcpConn) {
 	tc.c.buffer = tc.buf
+	tc.buf = nil
 }
 
 func resetTCPConn(tc *tcpConn) {
 	bbPool.Put(tc.c.buffer)
 	tc.c.buffer = nil
-	tc.buf = nil
 }
 
 func packUDPConn(c *conn, buf []byte) *udpConn {
