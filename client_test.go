@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	gerr "github.com/panjf2000/gnet/v2/pkg/errors"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
 	bbPool "github.com/panjf2000/gnet/v2/pkg/pool/bytebuffer"
 	goPool "github.com/panjf2000/gnet/v2/pkg/pool/goroutine"
@@ -21,9 +22,18 @@ import (
 
 type clientEvents struct {
 	*BuiltinEventEngine
+	tester    *testing.T
 	svr       *testClientServer
 	packetLen int
 	rspChMap  sync.Map
+}
+
+func (ev *clientEvents) OnBoot(e Engine) Action {
+	fd, err := e.Dup()
+	require.ErrorIsf(ev.tester, err, gerr.ErrEmptyEngine, "expected error: %v, but got: %v",
+		gerr.ErrUnsupportedOp, err)
+	assert.EqualValuesf(ev.tester, fd, -1, "expected -1, but got: %d", fd)
+	return None
 }
 
 func (ev *clientEvents) OnOpen(c Conn) ([]byte, Action) {
@@ -66,6 +76,13 @@ func (ev *clientEvents) OnTraffic(c Conn) (action Action) {
 func (ev *clientEvents) OnTick() (delay time.Duration, action Action) {
 	delay = 200 * time.Millisecond
 	return
+}
+
+func (ev *clientEvents) OnShutdown(e Engine) {
+	fd, err := e.Dup()
+	require.ErrorIsf(ev.tester, err, gerr.ErrEmptyEngine, "expected error: %v, but got: %v",
+		gerr.ErrUnsupportedOp, err)
+	assert.EqualValuesf(ev.tester, fd, -1, "expected -1, but got: %d", fd)
 }
 
 func TestServeWithGnetClient(t *testing.T) {
@@ -279,7 +296,7 @@ func testServeWithGnetClient(t *testing.T, network, addr string, reuseport, reus
 		workerPool: goPool.Default(),
 	}
 	var err error
-	ts.clientEV = &clientEvents{packetLen: streamLen, svr: ts}
+	ts.clientEV = &clientEvents{tester: t, packetLen: streamLen, svr: ts}
 	ts.client, err = NewClient(
 		ts.clientEV,
 		WithLogLevel(logging.DebugLevel),

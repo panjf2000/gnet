@@ -114,8 +114,6 @@ func (c *conn) resetBuffer() {
 	c.inboundBuffer.Reset()
 }
 
-// ================================== Non-concurrency-safe API's ==================================
-
 func (c *conn) Read(p []byte) (n int, err error) {
 	if c.inboundBuffer.IsEmpty() {
 		n = copy(p, c.buffer.B)
@@ -264,17 +262,6 @@ func (c *conn) OutboundBuffered() int {
 	return 0
 }
 
-func (*conn) SetDeadline(_ time.Time) error {
-	return errorx.ErrUnsupportedOp
-}
-
-func (*conn) SetReadDeadline(_ time.Time) error {
-	return errorx.ErrUnsupportedOp
-}
-
-func (*conn) SetWriteDeadline(_ time.Time) error {
-	return errorx.ErrUnsupportedOp
-}
 func (c *conn) Context() interface{}       { return c.ctx }
 func (c *conn) SetContext(ctx interface{}) { c.ctx = ctx }
 func (c *conn) LocalAddr() net.Addr        { return c.localAddr }
@@ -412,8 +399,6 @@ func (c *conn) SetKeepAlivePeriod(d time.Duration) error {
 // this method is only implemented for compatibility, don't use it on Windows.
 // func (c *conn) Gfd() gfd.GFD { return gfd.GFD{} }
 
-// ==================================== Concurrency-safe API's ====================================
-
 func (c *conn) AsyncWrite(buf []byte, cb AsyncCallback) error {
 	if cb == nil {
 		cb = func(c Conn, err error) error { return nil }
@@ -481,4 +466,16 @@ func (c *conn) CloseWithCallback(cb AsyncCallback) error {
 		return c.loop.close(c, nil)
 	}
 	return nil
+}
+
+func (*conn) SetDeadline(_ time.Time) error {
+	return errorx.ErrUnsupportedOp
+}
+
+func (*conn) SetReadDeadline(_ time.Time) error {
+	return errorx.ErrUnsupportedOp
+}
+
+func (*conn) SetWriteDeadline(_ time.Time) error {
+	return errorx.ErrUnsupportedOp
 }

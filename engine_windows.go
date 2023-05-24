@@ -17,6 +17,7 @@ package gnet
 import (
 	"context"
 	"runtime"
+	"sync"
 	"sync/atomic"
 
 	"golang.org/x/sync/errgroup"
@@ -38,6 +39,7 @@ type engine struct {
 
 		shutdownCtx context.Context
 		shutdown    context.CancelFunc
+		once        sync.Once
 	}
 	eventHandler EventHandler // user eventHandler
 }
@@ -123,7 +125,8 @@ func run(eventHandler EventHandler, listener *listener, options *Options, protoA
 			*errgroup.Group
 			shutdownCtx context.Context
 			shutdown    context.CancelFunc
-		}{&errgroup.Group{}, shutdownCtx, shutdown},
+			once        sync.Once
+		}{&errgroup.Group{}, shutdownCtx, shutdown, sync.Once{}},
 	}
 
 	switch options.LB {

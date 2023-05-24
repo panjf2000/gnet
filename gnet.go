@@ -166,11 +166,12 @@ func (e Engine) Wake(fd gfd.GFD, cb AsyncCallback) error {
 */
 
 // Reader is an interface that consists of a number of methods for reading that Conn must implement.
+//
+// Note that the methods in this interface are not goroutine-safe for concurrent use,
+// you must invoke them within any method in EventHandler.
 type Reader interface {
-	// ================================== Non-concurrency-safe API's ==================================
-
 	io.Reader
-	io.WriterTo // must be non-blocking, otherwise it may block the event-loop.
+	io.WriterTo
 
 	// Next returns a slice containing the next n bytes from the buffer,
 	// advancing the buffer as if the bytes had been returned by Read.
@@ -207,28 +208,29 @@ type Reader interface {
 
 // Writer is an interface that consists of a number of methods for writing that Conn must implement.
 type Writer interface {
-	// ================================== Non-concurrency-safe API's ==================================
+	io.Writer     // not goroutine-safe
+	io.ReaderFrom // not goroutine-safe
 
-	io.Writer
-	io.ReaderFrom // must be non-blocking, otherwise it may block the event-loop.
-
-	// Writev writes multiple byte slices to peer synchronously, you must call it in the current goroutine.
+	// Writev writes multiple byte slices to peer synchronously, it's not goroutine-safe,
+	// you must invoke it within any method in EventHandler.
 	Writev(bs [][]byte) (n int, err error)
 
-	// Flush writes any buffered data to the underlying connection, you must call it in the current goroutine.
+	// Flush writes any buffered data to the underlying connection, it's not goroutine-safe,
+	// you must invoke it within any method in EventHandler.
 	Flush() (err error)
 
 	// OutboundBuffered returns the number of bytes that can be read from the current buffer.
+	// it's not goroutine-safe, you must invoke it within any method in EventHandler.
 	OutboundBuffered() (n int)
 
-	// ==================================== Concurrency-safe API's ====================================
-
-	// AsyncWrite writes one byte slice to peer asynchronously, usually you would call it in individual goroutines
-	// instead of the event-loop goroutines.
+	// AsyncWrite writes bytes to peer asynchronously, it's goroutine-safe,
+	// you don't have to invoke it within any method in EventHandler,
+	// usually you would call it in an individual goroutine.
 	AsyncWrite(buf []byte, callback AsyncCallback) (err error)
 
-	// AsyncWritev writes multiple byte slices to peer asynchronously, usually you would call it in individual goroutines
-	// instead of the event-loop goroutines.
+	// AsyncWritev writes multiple byte slices to peer asynchronously,
+	// you don't have to invoke it within any method in EventHandler,
+	// usually you would call it in an individual goroutine.
 	AsyncWritev(bs [][]byte, callback AsyncCallback) (err error)
 }
 
@@ -238,6 +240,9 @@ type Writer interface {
 type AsyncCallback func(c Conn, err error) error
 
 // Socket is a set of functions which manipulate the underlying file descriptor of a connection.
+//
+// Note that the methods in this interface are goroutine-safe for concurrent use,
+// you don't have to invoke them within any method in EventHandler.
 type Socket interface {
 	// Gfd returns the gfd of socket.
 	// Gfd() gfd.GFD
@@ -291,23 +296,36 @@ type Socket interface {
 
 // Conn is an interface of underlying connection.
 type Conn interface {
-	Reader
-	Writer
-	Socket
+	Reader // all methods in Reader are not goroutine-safe.
+	Writer // some methods in Writer are goroutine-safe, some are not.
+	Socket // all methods in Socket are goroutine-safe.
 
-	// ================================== Non-concurrency-safe API's ==================================
-
-	// Context returns a user-defined context.
+	// Context returns a user-defined context, it's not goroutine-safe,
+	// you must invoke it within any method in EventHandler.
 	Context() (ctx interface{})
 
-	// SetContext sets a user-defined context.
+	// SetContext sets a user-defined context, it's not goroutine-safe,
+	// you must invoke it within any method in EventHandler.
 	SetContext(ctx interface{})
 
-	// LocalAddr is the connection's local socket address.
+	// LocalAddr is the connection's local socket address, it's not goroutine-safe,
+	// you must invoke it within any method in EventHandler.
 	LocalAddr() (addr net.Addr)
 
-	// RemoteAddr is the connection's remote peer address.
+	// RemoteAddr is the connection's remote peer address, it's not goroutine-safe,
+	// you must invoke it within any method in EventHandler.
 	RemoteAddr() (addr net.Addr)
+
+	// Wake triggers a OnTraffic event for the current connection, it's goroutine-safe.
+	Wake(callback AsyncCallback) (err error)
+
+	// CloseWithCallback closes the current connection, it's goroutine-safe.
+	// Usually you should provide a non-nil callback for this method,
+	// otherwise your better choice is Close().
+	CloseWithCallback(callback AsyncCallback) (err error)
+
+	// Close closes the current connection, implements net.Conn, it's goroutine-safe.
+	Close() (err error)
 
 	// SetDeadline implements net.Conn.
 	SetDeadline(t time.Time) (err error)
@@ -317,18 +335,6 @@ type Conn interface {
 
 	// SetWriteDeadline implements net.Conn.
 	SetWriteDeadline(t time.Time) (err error)
-
-	// ==================================== Concurrency-safe API's ====================================
-
-	// Wake triggers a OnTraffic event for the connection.
-	Wake(callback AsyncCallback) (err error)
-
-	// CloseWithCallback closes the current connection, usually you don't need to pass a non-nil callback
-	// because you should use OnClose() instead, the callback here is only for compatibility.
-	CloseWithCallback(callback AsyncCallback) (err error)
-
-	// Close closes the current connection, implements net.Conn.
-	Close() (err error)
 }
 
 type (
