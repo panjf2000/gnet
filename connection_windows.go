@@ -60,10 +60,11 @@ func packTCPConn(c *conn, buf []byte) *tcpConn {
 
 func unpackTCPConn(tc *tcpConn) {
 	tc.c.buffer = tc.buf
+	tc.buf = nil
 }
 
 func resetTCPConn(tc *tcpConn) {
-	bbPool.Put(tc.buf)
+	bbPool.Put(tc.c.buffer)
 	tc.c.buffer = nil
 }
 
@@ -83,7 +84,7 @@ func newTCPConn(nc net.Conn, el *eventloop) (c *conn) {
 	return
 }
 
-func (c *conn) releaseTCP() {
+func (c *conn) release() {
 	c.ctx = nil
 	c.localAddr = nil
 	c.remoteAddr = nil
@@ -100,13 +101,6 @@ func newUDPConn(el *eventloop, localAddr, remoteAddr net.Addr) *conn {
 		localAddr:  localAddr,
 		remoteAddr: remoteAddr,
 	}
-}
-
-func (c *conn) releaseUDP() {
-	c.ctx = nil
-	c.localAddr = nil
-	bbPool.Put(c.buffer)
-	c.buffer = nil
 }
 
 func (c *conn) resetBuffer() {
