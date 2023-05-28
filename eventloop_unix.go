@@ -122,6 +122,7 @@ func (el *eventloop) read(c *conn) error {
 	return nil
 }
 
+// The default value of UIO_MAXIOV/IOV_MAX is 1024 on Linux and most BSD-like OSs.
 const iovMax = 1024
 
 func (el *eventloop) write(c *conn) error {

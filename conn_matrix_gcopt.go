@@ -83,30 +83,33 @@ func (cm *connMatrix) addConn(c *conn, index int) {
 }
 
 func (cm *connMatrix) delConn(c *conn) {
-	delete(cm.fd2gfd, c.fd)
-	cm.incCount(c.gfd.ConnMatrixRow(), -1)
-	if cm.connCounts[c.gfd.ConnMatrixRow()] == 0 {
-		cm.table[c.gfd.ConnMatrixRow()] = nil
+	cfd, cgfd := c.fd, c.gfd
+
+	delete(cm.fd2gfd, cfd)
+	cm.incCount(cgfd.ConnMatrixRow(), -1)
+	if cm.connCounts[cgfd.ConnMatrixRow()] == 0 {
+		cm.table[cgfd.ConnMatrixRow()] = nil
 	} else {
-		cm.table[c.gfd.ConnMatrixRow()][c.gfd.ConnMatrixColumn()] = nil
+		cm.table[cgfd.ConnMatrixRow()][cgfd.ConnMatrixColumn()] = nil
 	}
-	if cm.row > c.gfd.ConnMatrixRow() || cm.column > c.gfd.ConnMatrixColumn() {
-		cm.row, cm.column = c.gfd.ConnMatrixRow(), c.gfd.ConnMatrixColumn()
+	if cm.row > cgfd.ConnMatrixRow() || cm.column > cgfd.ConnMatrixColumn() {
+		cm.row, cm.column = cgfd.ConnMatrixRow(), cgfd.ConnMatrixColumn()
 	}
 
 	// Locate the last *conn in table and move it to the deleted location.
 
-	if cm.disableCompact || cm.table[c.gfd.ConnMatrixRow()] == nil { // the deleted *conn is the last one, do nothing here.
+	if cm.disableCompact || cm.table[cgfd.ConnMatrixRow()] == nil { // the deleted *conn is the last one, do nothing here.
 		return
 	}
 
-	for row := gfd.ConnMatrixRowMax - 1; row >= c.gfd.ConnMatrixRow(); row-- {
+	// Traverse backward to find the first non-empty point in the matrix until we reach the deleted position.
+	for row := gfd.ConnMatrixRowMax - 1; row >= cgfd.ConnMatrixRow(); row-- {
 		if cm.connCounts[row] == 0 {
 			continue
 		}
 		columnMin := -1
-		if row == c.gfd.ConnMatrixRow() {
-			columnMin = c.gfd.ConnMatrixColumn()
+		if row == cgfd.ConnMatrixRow() {
+			columnMin = cgfd.ConnMatrixColumn()
 		}
 		for column := gfd.ConnMatrixColumnMax - 1; column > columnMin; column-- {
 			if cm.table[row][column] == nil {
@@ -114,12 +117,12 @@ func (cm *connMatrix) delConn(c *conn) {
 			}
 
 			gFd := cm.table[row][column].gfd
-			gFd.UpdateIndexes(c.gfd.ConnMatrixRow(), c.gfd.ConnMatrixColumn())
+			gFd.UpdateIndexes(cgfd.ConnMatrixRow(), cgfd.ConnMatrixColumn())
 			cm.table[row][column].gfd = gFd
 			cm.fd2gfd[gFd.Fd()] = gFd
-			cm.table[c.gfd.ConnMatrixRow()][c.gfd.ConnMatrixColumn()] = cm.table[row][column]
+			cm.table[cgfd.ConnMatrixRow()][cgfd.ConnMatrixColumn()] = cm.table[row][column]
 			cm.incCount(row, -1)
-			cm.incCount(c.gfd.ConnMatrixRow(), 1)
+			cm.incCount(cgfd.ConnMatrixRow(), 1)
 
 			if cm.connCounts[row] == 0 {
 				cm.table[row] = nil
