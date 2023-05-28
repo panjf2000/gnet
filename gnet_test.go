@@ -250,6 +250,9 @@ func (s *testServer) OnOpen(c Conn) (out []byte, action Action) {
 	nclients := atomic.AddInt32(&s.connected, 1)
 	if int(nclients) == s.nclients {
 		connCount := s.eng.CountConnections()
+		// TODO(panjf2000): this assertion is highly unlikely to fail,
+		//  but it does occur on macOS: https://github.com/panjf2000/gnet/actions/runs/5101902107/jobs/9171108782,
+		//  try to investigate the root cause and fix it.
 		require.EqualValuesf(s.tester, s.nclients, connCount, "expected connected clients: %d, but got: %d",
 			s.nclients, connCount)
 	}
