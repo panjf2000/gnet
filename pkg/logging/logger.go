@@ -58,6 +58,8 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
+// Flusher is the callback function which flushes any buffered log entries to the underlying writer.
+// It is usually called before the gnet process exits.
 type Flusher = func() error
 
 var (
