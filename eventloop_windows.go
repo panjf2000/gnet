@@ -195,12 +195,12 @@ func (el *eventloop) close(c *conn, err error) error {
 		return nil // ignore stale wakes.
 	}
 
+	delete(el.connections, c)
+	el.incConn(-1)
 	action := el.eventHandler.OnClose(c, err)
 	if err := c.rawConn.Close(); err != nil {
 		el.getLogger().Errorf("failed to close connection(%s), error:%v", c.remoteAddr.String(), err)
 	}
-	delete(el.connections, c)
-	el.incConn(-1)
 	c.release()
 
 	return el.handleAction(c, action)
