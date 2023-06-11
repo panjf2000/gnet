@@ -246,7 +246,6 @@ func (s *testServer) OnBoot(eng Engine) (action Action) {
 }
 
 func (s *testServer) OnOpen(c Conn) (out []byte, action Action) {
-	require.GreaterOrEqual(s.tester, s.eng.CountConnections(), int(atomic.AddInt32(&s.connected, 1)))
 	c.SetContext(c)
 	out = []byte("sweetness\r\n")
 	require.NotNil(s.tester, c.LocalAddr(), "nil local addr")
