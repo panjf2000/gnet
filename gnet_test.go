@@ -246,16 +246,8 @@ func (s *testServer) OnBoot(eng Engine) (action Action) {
 }
 
 func (s *testServer) OnOpen(c Conn) (out []byte, action Action) {
+	require.GreaterOrEqual(s.tester, s.eng.CountConnections(), int(atomic.AddInt32(&s.connected, 1)))
 	c.SetContext(c)
-	nclients := atomic.AddInt32(&s.connected, 1)
-	if int(nclients) == s.nclients {
-		connCount := s.eng.CountConnections()
-		// TODO(panjf2000): this assertion is highly unlikely to fail,
-		//  but it does occur on macOS: https://github.com/panjf2000/gnet/actions/runs/5101902107/jobs/9171108782,
-		//  try to investigate the root cause and fix it.
-		require.EqualValuesf(s.tester, s.nclients, connCount, "expected connected clients: %d, but got: %d",
-			s.nclients, connCount)
-	}
 	out = []byte("sweetness\r\n")
 	require.NotNil(s.tester, c.LocalAddr(), "nil local addr")
 	require.NotNil(s.tester, c.RemoteAddr(), "nil remote addr")
@@ -277,9 +269,8 @@ func (s *testServer) OnClose(c Conn, err error) (action Action) {
 		require.Equal(s.tester, c.Context(), c, "invalid context")
 	}
 
-	atomic.AddInt32(&s.disconnected, 1)
-	if atomic.LoadInt32(&s.connected) == atomic.LoadInt32(&s.disconnected) &&
-		atomic.LoadInt32(&s.disconnected) == int32(s.nclients) {
+	if disconnected := atomic.AddInt32(&s.disconnected, 1); disconnected == atomic.LoadInt32(&s.connected) && disconnected == int32(s.nclients) { //nolint:gocritic
+		require.EqualValues(s.tester, 0, s.eng.CountConnections())
 		action = Shutdown
 		s.workerPool.Release()
 	}
@@ -581,20 +572,26 @@ func TestShutdown(t *testing.T) {
 type testShutdownServer struct {
 	*BuiltinEventEngine
 	tester  *testing.T
+	eng     Engine
 	network string
 	addr    string
 	count   int
-	clients int64
+	clients int32
 	N       int
 }
 
+func (t *testShutdownServer) OnBoot(eng Engine) (action Action) {
+	t.eng = eng
+	return
+}
+
 func (t *testShutdownServer) OnOpen(Conn) (out []byte, action Action) {
-	atomic.AddInt64(&t.clients, 1)
+	require.EqualValues(t.tester, atomic.AddInt32(&t.clients, 1), t.eng.CountConnections())
 	return
 }
 
 func (t *testShutdownServer) OnClose(Conn, error) (action Action) {
-	atomic.AddInt64(&t.clients, -1)
+	atomic.AddInt32(&t.clients, -1)
 	return
 }
 
@@ -610,7 +607,7 @@ func (t *testShutdownServer) OnTick() (delay time.Duration, action Action) {
 				require.Error(t.tester, err)
 			}()
 		}
-	} else if int(atomic.LoadInt64(&t.clients)) == t.N {
+	} else if int(atomic.LoadInt32(&t.clients)) == t.N {
 		action = Shutdown
 	}
 	t.count++
@@ -619,7 +616,7 @@ func (t *testShutdownServer) OnTick() (delay time.Duration, action Action) {
 }
 
 func testShutdown(t *testing.T, network, addr string) {
-	events := &testShutdownServer{tester: t, network: network, addr: addr, N: 10}
+	events := &testShutdownServer{tester: t, network: network, addr: addr, N: 256}
 	err := Run(events, network+"://"+addr, WithTicker(true), WithReadBufferCap(512), WithWriteBufferCap(512))
 	assert.NoError(t, err)
 	require.Equal(t, 0, int(events.clients), "did not close all clients")
