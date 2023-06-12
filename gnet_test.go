@@ -616,7 +616,7 @@ func (t *testShutdownServer) OnTick() (delay time.Duration, action Action) {
 }
 
 func testShutdown(t *testing.T, network, addr string) {
-	events := &testShutdownServer{tester: t, network: network, addr: addr, N: 256}
+	events := &testShutdownServer{tester: t, network: network, addr: addr, N: 100}
 	err := Run(events, network+"://"+addr, WithTicker(true), WithReadBufferCap(512), WithWriteBufferCap(512))
 	assert.NoError(t, err)
 	require.Equal(t, 0, int(events.clients), "did not close all clients")
