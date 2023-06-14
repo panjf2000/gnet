@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build (freebsd || dragonfly || darwin) && (amd64 || arm64 || ppc64 || ppc64le || mips64 || mips64le || riscv64)
+//go:build (freebsd || dragonfly || netbsd || openbsd || darwin) && (amd64 || arm64 || ppc64 || ppc64le || mips64 || mips64le || riscv64)
+// +build freebsd dragonfly netbsd openbsd darwin
+// +build amd64 arm64 ppc64 ppc64le mips64 mips64le riscv64
 
 package netpoll
 

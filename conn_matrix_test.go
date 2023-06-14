@@ -1,5 +1,5 @@
-//go:build (linux || freebsd || dragonfly || darwin) && gc_opt
-// +build linux freebsd dragonfly darwin
+//go:build (linux || freebsd || dragonfly || netbsd || openbsd || darwin) && gc_opt
+// +build linux freebsd dragonfly netbsd openbsd darwin
 // +build gc_opt
 
 package gnet
