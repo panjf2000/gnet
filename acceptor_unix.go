@@ -44,7 +44,7 @@ func (eng *engine) accept(fd int, _ netpoll.IOEvent) error {
 		}
 	}
 
-	if err = os.NewSyscallError("fcntl nonblock", unix.SetNonblock(nfd, true)); err != nil {
+	if err = os.NewSyscallError("fcntl nonblock", setNonBlock(nfd, true)); err != nil {
 		return err
 	}
 	remoteAddr := socket.SockaddrToTCPOrUnixAddr(sa)
@@ -83,7 +83,7 @@ func (el *eventloop) accept(fd int, ev netpoll.IOEvent) error {
 		}
 	}
 
-	if err = os.NewSyscallError("fcntl nonblock", unix.SetNonblock(nfd, true)); err != nil {
+	if err = os.NewSyscallError("fcntl nonblock", setNonBlock(nfd, true)); err != nil {
 		return err
 	}
 	remoteAddr := socket.SockaddrToTCPOrUnixAddr(sa)
