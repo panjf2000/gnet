@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2022-02-26"
+last_modified_on: "2023-06-21"
 id: benchmark
 title: "Benchmark"
 description: "Benchmark results with other similar frameworks in Go"
@@ -7,25 +7,24 @@ description: "Benchmark results with other similar frameworks in Go"
 
 ## Benchmarks on TechEmpower
 
-```powershell
+```bash
 # Hardware Environment
-CPU: 28 HT Cores Intel(R) Xeon(R) Gold 5120 CPU @ 2.20GHz
-Mem: 32GB RAM
-OS : Ubuntu 18.04.3 4.15.0-88-generic #88-Ubuntu
-Net: Switched 10-gigabit ethernet
-Go : go1.14.x linux/amd64
+* 28 HT Cores Intel(R) Xeon(R) Gold 5120 CPU @ 2.20GHz
+* 32GB RAM
+* Ubuntu 18.04.3 4.15.0-88-generic #88-Ubuntu
+* Dedicated Cisco 10-gigabit Ethernet switch
+* Go1.19.x linux/amd64
 ```
 
-![All language](https://raw.githubusercontent.com/panjf2000/illustrations/master/benchmark/techempower-plaintext-top50-dark.jpg)
+![](https://raw.githubusercontent.com/panjf2000/illustrations/master/benchmark/techempower-plaintext-top50-light.jpg)
 
-This is the ***top 50*** on the framework ranking of all programming languages consists of a total of ***422 frameworks*** from all over the world where `gnet` is the ***runner-up***.
+This is a leaderboard of the top ***50*** out of ***499*** frameworks that encompass various programming languages worldwide, in which `gnet` is ranked ***first***.
 
-
-![Golang](https://raw.githubusercontent.com/panjf2000/illustrations/master/benchmark/techempower-plaintext-topN-go-dark.png)
+![](https://raw.githubusercontent.com/panjf2000/illustrations/master/benchmark/techempower-plaintext-topN-go-light.png)
 
 This is the full framework ranking of Go and `gnet` tops all the other frameworks, which makes `gnet` the ***fastest*** networking framework in Go.
 
-To see the full ranking list, visit [TechEmpower Plaintext Benchmark](https://www.techempower.com/benchmarks/#section=test&runid=53c6220a-e110-466c-a333-2e879fea21ad&hw=ph&test=plaintext).
+To see the full ranking list, visit [TechEmpower Plaintext Benchmark](https://www.techempower.com/benchmarks/#section=test&runid=a07a7117-f861-49b2-a710-94970c5767d0&test=plaintext).
 
 ## Contrasts to the similar networking libraries
 
@@ -33,7 +32,7 @@ To see the full ranking list, visit [TechEmpower Plaintext Benchmark](https://ww
 
 ### Test Environment
 
-```powershell
+```bash
 # Machine information
         OS : Ubuntu 20.04/x86_64
        CPU : 8 CPU cores, AMD EPYC 7K62 48-Core Processor
@@ -59,7 +58,7 @@ Test duration   : 15s
 
 ### Test Environment
 
-```powershell
+```bash
 # Machine information
         OS : MacOS Big Sur/x86_64
        CPU : 6 CPU cores, Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz
