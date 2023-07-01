@@ -14,16 +14,16 @@ module.exports = {
   },
   "latest_post": {
     "author_github": "https://github.com/panjf2000",
-    "date": "2022-02-27",
-    "description": "Hello World! We present you, gnet v2.0.0!",
-    "id": "announcing-gnet-v2",
-    "path": "website/blog/2022-02-27-announcing-gnet-v2.md",
-    "permalink": "/blog/announcing-gnet-v2/",
+    "date": "2023-07-01",
+    "description": "Hello World! We present you, gnet v2.3.0!",
+    "id": "announcing-gnet-v2-3-0",
+    "path": "website/blog/2023-07-01-announcing-gnet-v2-3-0.md",
+    "permalink": "/blog/announcing-gnet-v2-3-0/",
     "tags": [
-      "type: 官宣",
-      "domain: 展示"
+      "type: announcement",
+      "domain: presentation"
     ],
-    "title": "Announcing gnet v2.0.0"
+    "title": "Announcing gnet v2.3.0"
   },
   "post_tags": [
     "type: announcement",

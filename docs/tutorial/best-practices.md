@@ -34,6 +34,6 @@ Visit [#230](https://github.com/panjf2000/gnet/pull/230) for code details.
 
 By default, `gnet` uses `map` as the internal storage of connections, but now you can run `go build` with build tags `gc_opt`, like this: `go build -tags=gc_opt`, and `gnet` will switch to the optimized implementation of connections storage that uses a new data structure `matrix` for managing connections, in which case `gnet` eliminates the pointers in `map` to reduce the GC latency significantly.
 
-Visit [Release candidate for gnet v2.3.0](https://gnet.host/highlights/2023-05-19-release-candidate-for-gnet-v2-3-0) for more details.
+Visit [Announcing gnet v2.3.0](https://gnet.host/blog/announcing-gnet-v2-3-0/) for more details.
 
 ### To be continued
