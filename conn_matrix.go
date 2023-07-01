@@ -107,6 +107,7 @@ func (cm *connMatrix) delConn(c *conn) {
 		if cm.connCounts[row] == 0 {
 			continue
 		}
+
 		columnMin := -1
 		if row == cgfd.ConnMatrixRow() {
 			columnMin = cgfd.ConnMatrixColumn()

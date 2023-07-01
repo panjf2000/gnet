@@ -8,6 +8,9 @@ on:
       - 1.x
     paths-ignore:
       - '**.md'
+      - '**.yml'
+      - '**.yaml'
+      - '!.github/workflows/test_gc_opt.yml'
   pull_request:
     branches:
       - master
@@ -15,6 +18,9 @@ on:
       - 1.x
     paths-ignore:
       - '**.md'
+      - '**.yml'
+      - '**.yaml'
+      - '!.github/workflows/test_gc_opt.yml'
 
 env:
   GO111MODULE: on

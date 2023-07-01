@@ -8,6 +8,9 @@ on:
       - 1.x
     paths-ignore:
       - '**.md'
+      - '**.yml'
+      - '**.yaml'
+      - '!.github/workflows/codeql.yml'
   pull_request:
     branches:
       - master
@@ -15,6 +18,9 @@ on:
       - 1.x
     paths-ignore:
       - '**.md'
+      - '**.yml'
+      - '**.yaml'
+      - '!.github/workflows/codeql.yml'
   schedule:
     #        ┌───────────── minute (0 - 59)
     #        │  ┌───────────── hour (0 - 23)
