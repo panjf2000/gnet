@@ -8,10 +8,9 @@ on:
       - 1.x
     paths-ignore:
       - '**.md'
-      - '.github/FUNDING.yml'
-      - '.github/release-drafter.yml'
-      - '.github/ISSUE_TEMPLATE/*'
-      - '.github/workflows/release-drafter.yaml'
+      - '**.yml'
+      - '**.yaml'
+      - '!.github/workflows/test.yml'
   pull_request:
     branches:
       - master
@@ -19,10 +18,9 @@ on:
       - 1.x
     paths-ignore:
       - '**.md'
-      - '.github/FUNDING.yml'
-      - '.github/release-drafter.yml'
-      - '.github/ISSUE_TEMPLATE/*'
-      - '.github/workflows/release-drafter.yaml'
+      - '**.yml'
+      - '**.yaml'
+      - '!.github/workflows/test.yml'
 
 env:
   GO111MODULE: on
