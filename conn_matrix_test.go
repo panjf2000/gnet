@@ -1,5 +1,5 @@
-//go:build (linux || freebsd || dragonfly || darwin) && gc_opt
-// +build linux freebsd dragonfly darwin
+//go:build (linux || freebsd || dragonfly || netbsd || openbsd || darwin) && gc_opt
+// +build linux freebsd dragonfly netbsd openbsd darwin
 // +build gc_opt
 
 package gnet
@@ -105,9 +105,8 @@ func testConnMatrix(t *testing.T, n int) {
 			if !ok {
 				t.Fatalf("missing gfd for fd %d", c.fd)
 			}
-			if i != gfd.ConnMatrixRow() || j != gfd.ConnMatrixColumn() {
-				t.Fatalf("unexpected row %d, column %d, expected row %d, column %d",
-					gfd.ConnMatrixRow(), gfd.ConnMatrixColumn(), i, j)
+			if gfd != c.gfd {
+				t.Fatalf("expected gfd: %v, but got gfd: %v", c.gfd, gfd)
 			}
 		}
 	}

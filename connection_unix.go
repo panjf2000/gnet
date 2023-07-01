@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build linux || freebsd || dragonfly || darwin
-// +build linux freebsd dragonfly darwin
+//go:build linux || freebsd || dragonfly || netbsd || openbsd || darwin
+// +build linux freebsd dragonfly netbsd openbsd darwin
 
 package gnet
 
@@ -288,8 +288,6 @@ func (c *conn) resetBuffer() {
 	c.inboundBuffer.Reset()
 }
 
-// ================================== Non-concurrency-safe API's ==================================
-
 func (c *conn) Read(p []byte) (n int, err error) {
 	if c.inboundBuffer.IsEmpty() {
 		n = copy(p, c.buffer)
@@ -449,18 +447,6 @@ func (c *conn) OutboundBuffered() int {
 	return c.outboundBuffer.Buffered()
 }
 
-func (*conn) SetDeadline(_ time.Time) error {
-	return gerrors.ErrUnsupportedOp
-}
-
-func (*conn) SetReadDeadline(_ time.Time) error {
-	return gerrors.ErrUnsupportedOp
-}
-
-func (*conn) SetWriteDeadline(_ time.Time) error {
-	return gerrors.ErrUnsupportedOp
-}
-
 func (c *conn) Context() interface{}       { return c.ctx }
 func (c *conn) SetContext(ctx interface{}) { c.ctx = ctx }
 func (c *conn) LocalAddr() net.Addr        { return c.localAddr }
@@ -487,8 +473,6 @@ func (c *conn) SetNoDelay(noDelay bool) error {
 func (c *conn) SetKeepAlivePeriod(d time.Duration) error {
 	return socket.SetKeepAlivePeriod(c.fd, int(d.Seconds()))
 }
-
-// ==================================== Concurrency-safe API's ====================================
 
 func (c *conn) AsyncWrite(buf []byte, callback AsyncCallback) error {
 	if c.isDatagram {
@@ -534,6 +518,18 @@ func (c *conn) Close() error {
 		err = c.loop.close(c, nil)
 		return
 	}, nil)
+}
+
+func (*conn) SetDeadline(_ time.Time) error {
+	return gerrors.ErrUnsupportedOp
+}
+
+func (*conn) SetReadDeadline(_ time.Time) error {
+	return gerrors.ErrUnsupportedOp
+}
+
+func (*conn) SetWriteDeadline(_ time.Time) error {
+	return gerrors.ErrUnsupportedOp
 }
 
 func (c *conn) UpgradeTLS(config *tls.Config) (err error) {

@@ -1,5 +1,5 @@
-//go:build linux || freebsd || dragonfly || darwin
-// +build linux freebsd dragonfly darwin
+//go:build linux || freebsd || dragonfly || netbsd || openbsd || darwin
+// +build linux freebsd dragonfly netbsd openbsd darwin
 
 package gnet
 
@@ -129,7 +129,7 @@ func (s *benchmarkServerGC) OnBoot(eng Engine) (action Action) {
 	s.eng = eng
 	go func() {
 		for {
-			if s.eng.eng.lb.len() == s.elNum && s.eng.CountConnections() == s.elNum*int(s.initConnCount) {
+			if s.eng.eng.eventLoops.len() == s.elNum && s.eng.CountConnections() == s.elNum*int(s.initConnCount) {
 				break
 			}
 			time.Sleep(time.Millisecond)

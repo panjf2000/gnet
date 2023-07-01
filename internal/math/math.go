@@ -19,9 +19,9 @@ const (
 	maxintHeadBit = 1 << (bitSize - 2)
 )
 
-// IsPowerOfTwo reports whether given integer is a power of two.
+// IsPowerOfTwo reports whether the given n is a power of two.
 func IsPowerOfTwo(n int) bool {
-	return n&(n-1) == 0
+	return n > 0 && n&(n-1) == 0
 }
 
 // CeilToPowerOfTwo returns n if it is a power-of-two, otherwise the next-highest power-of-two.

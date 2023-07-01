@@ -17,6 +17,7 @@ package gnet
 import (
 	"context"
 	"runtime"
+	"sync"
 	"sync/atomic"
 
 	"golang.org/x/sync/errgroup"
@@ -25,10 +26,10 @@ import (
 )
 
 type engine struct {
-	ln     *listener
-	lb     loadBalancer // event-loops for handling events
-	opts   *Options     // options with engine
-	ticker struct {
+	ln         *listener
+	opts       *Options     // options with engine
+	eventLoops loadBalancer // event-loops for handling events
+	ticker     struct {
 		ctx    context.Context
 		cancel context.CancelFunc
 	}
@@ -38,6 +39,7 @@ type engine struct {
 
 		shutdownCtx context.Context
 		shutdown    context.CancelFunc
+		once        sync.Once
 	}
 	eventHandler EventHandler // user eventHandler
 }
@@ -54,6 +56,14 @@ func (eng *engine) shutdown(err error) {
 	eng.workerPool.shutdown()
 }
 
+func (eng *engine) closeEventLoops() {
+	eng.eventLoops.iterate(func(i int, el *eventloop) bool {
+		el.ch <- errorx.ErrEngineShutdown
+		return true
+	})
+	eng.ln.close()
+}
+
 func (eng *engine) start(numEventLoop int) error {
 	for i := 0; i < numEventLoop; i++ {
 		el := eventloop{
@@ -63,7 +73,7 @@ func (eng *engine) start(numEventLoop int) error {
 			connections:  make(map[*conn]struct{}),
 			eventHandler: eng.eventHandler,
 		}
-		eng.lb.register(&el)
+		eng.eventLoops.register(&el)
 		eng.workerPool.Go(el.run)
 		if i == 0 && eng.opts.Ticker {
 			eng.workerPool.Go(func() error {
@@ -84,16 +94,11 @@ func (eng *engine) stop(engine Engine) error {
 	eng.opts.Logger.Infof("engine is being shutdown...")
 	eng.eventHandler.OnShutdown(engine)
 
-	eng.ln.close()
-
-	eng.lb.iterate(func(i int, el *eventloop) bool {
-		el.ch <- errorx.ErrEngineShutdown
-		return true
-	})
-
 	if eng.ticker.cancel != nil {
 		eng.ticker.cancel()
 	}
+
+	eng.closeEventLoops()
 
 	if err := eng.workerPool.Wait(); err != nil {
 		eng.opts.Logger.Errorf("engine shutdown error: %v", err)
@@ -123,16 +128,17 @@ func run(eventHandler EventHandler, listener *listener, options *Options, protoA
 			*errgroup.Group
 			shutdownCtx context.Context
 			shutdown    context.CancelFunc
-		}{&errgroup.Group{}, shutdownCtx, shutdown},
+			once        sync.Once
+		}{&errgroup.Group{}, shutdownCtx, shutdown, sync.Once{}},
 	}
 
 	switch options.LB {
 	case RoundRobin:
-		eng.lb = new(roundRobinLoadBalancer)
+		eng.eventLoops = new(roundRobinLoadBalancer)
 	case LeastConnections:
-		eng.lb = new(leastConnectionsLoadBalancer)
+		eng.eventLoops = new(leastConnectionsLoadBalancer)
 	case SourceAddrHash:
-		eng.lb = new(sourceAddrHashLoadBalancer)
+		eng.eventLoops = new(sourceAddrHashLoadBalancer)
 	}
 
 	if options.Ticker {

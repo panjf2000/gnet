@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021 The Gnet Authors. All rights reserved.
+ * Copyright (c) 2023 The Gnet Authors. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,22 +15,10 @@
  *
  */
 
-package io
+package gnet
 
 import "golang.org/x/sys/unix"
 
-// Writev calls writev() on Linux.
-func Writev(fd int, iov [][]byte) (int, error) {
-	if len(iov) == 0 {
-		return 0, nil
-	}
-	return unix.Writev(fd, iov)
-}
-
-// Readv calls readv() on Linux.
-func Readv(fd int, iov [][]byte) (int, error) {
-	if len(iov) == 0 {
-		return 0, nil
-	}
-	return unix.Readv(fd, iov)
+func setNonBlock(fd int, nonBlocking bool) error {
+	return unix.SetNonblock(fd, nonBlocking)
 }

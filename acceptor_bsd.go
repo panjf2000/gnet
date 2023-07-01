@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//      http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -12,10 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build (freebsd || dragonfly || netbsd || openbsd || darwin) && (amd64 || arm64 || ppc64 || ppc64le || mips64 || mips64le || riscv64)
+//go:build freebsd || dragonfly || netbsd || openbsd || darwin
 // +build freebsd dragonfly netbsd openbsd darwin
-// +build amd64 arm64 ppc64 ppc64le mips64 mips64le riscv64
 
-package netpoll
+package gnet
 
-type keventIdent = uint64
+// The canonical BSD sockets implementation will inherit file status flags
+// from the listening socket, so we don't need to set the non-blocking flag
+// for the accepted sockets explicitly.
+func setNonBlock(_ int, _ bool) error {
+	return nil
+}

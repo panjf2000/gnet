@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build (freebsd || dragonfly || darwin) && (386 || arm || mips || mipsle)
+//go:build (freebsd || dragonfly || netbsd || openbsd || darwin) && (386 || arm || mips || mipsle)
+// +build freebsd dragonfly netbsd openbsd darwin
+// +build 386 arm mips mipsle
 
 package netpoll
 

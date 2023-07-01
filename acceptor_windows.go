@@ -38,7 +38,7 @@ func (eng *engine) listen() (err error) {
 				return
 			}
 
-			el := eng.lb.next(addr)
+			el := eng.eventLoops.next(addr)
 			c := newUDPConn(el, eng.ln.addr, addr)
 			el.ch <- packUDPConn(c, buffer[:n])
 		} else {
@@ -49,7 +49,7 @@ func (eng *engine) listen() (err error) {
 				eng.opts.Logger.Errorf("Accept() fails due to error: %v", err)
 				return
 			}
-			el := eng.lb.next(tc.RemoteAddr())
+			el := eng.eventLoops.next(tc.RemoteAddr())
 			c := newTCPConn(tc, el)
 			el.ch <- c
 			go func(c *conn, tc net.Conn, el *eventloop) {

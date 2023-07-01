@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build linux || freebsd || dragonfly || darwin
-// +build linux freebsd dragonfly darwin
+//go:build linux || freebsd || dragonfly || netbsd || openbsd || darwin
+// +build linux freebsd dragonfly netbsd openbsd darwin
 
 package gnet
 
@@ -44,7 +44,7 @@ func (eng *engine) accept(fd int, _ netpoll.IOEvent) error {
 		}
 	}
 
-	if err = os.NewSyscallError("fcntl nonblock", unix.SetNonblock(nfd, true)); err != nil {
+	if err = os.NewSyscallError("fcntl nonblock", setNonBlock(nfd, true)); err != nil {
 		return err
 	}
 	remoteAddr := socket.SockaddrToTCPOrUnixAddr(sa)
@@ -53,7 +53,7 @@ func (eng *engine) accept(fd int, _ netpoll.IOEvent) error {
 		logging.Error(err)
 	}
 
-	el := eng.lb.next(remoteAddr)
+	el := eng.eventLoops.next(remoteAddr)
 	c := newTCPConn(nfd, el, sa, el.ln.addr, remoteAddr)
 
 	if el.engine.opts.TLSconfig != nil {
@@ -90,7 +90,7 @@ func (el *eventloop) accept(fd int, ev netpoll.IOEvent) error {
 		}
 	}
 
-	if err = os.NewSyscallError("fcntl nonblock", unix.SetNonblock(nfd, true)); err != nil {
+	if err = os.NewSyscallError("fcntl nonblock", setNonBlock(nfd, true)); err != nil {
 		return err
 	}
 	remoteAddr := socket.SockaddrToTCPOrUnixAddr(sa)

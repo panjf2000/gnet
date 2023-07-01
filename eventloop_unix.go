@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build linux || freebsd || dragonfly || darwin
-// +build linux freebsd dragonfly darwin
+//go:build linux || freebsd || dragonfly || netbsd || openbsd || darwin
+// +build linux freebsd dragonfly netbsd openbsd darwin
 
 package gnet
 
@@ -196,6 +196,7 @@ func (el *eventloop) read(c *conn) error {
 	return nil
 }
 
+// The default value of UIO_MAXIOV/IOV_MAX is 1024 on Linux and most BSD-like OSs.
 const iovMax = 1024
 
 func (el *eventloop) write(c *conn) error {

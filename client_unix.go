@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build linux || freebsd || dragonfly || darwin
-// +build linux freebsd dragonfly darwin
+//go:build linux || freebsd || dragonfly || netbsd || openbsd || darwin
+// +build linux freebsd dragonfly netbsd openbsd darwin
 
 package gnet
 
@@ -22,6 +22,7 @@ import (
 	"errors"
 	"net"
 	"strconv"
+	"sync"
 	"syscall"
 
 	"golang.org/x/sync/errgroup"
@@ -66,14 +67,15 @@ func NewClient(eh EventHandler, opts ...Option) (cli *Client, err error) {
 
 	shutdownCtx, shutdown := context.WithCancel(context.Background())
 	eng := engine{
-		ln:           &listener{network: "udp"},
+		ln:           &listener{},
 		opts:         options,
 		eventHandler: eh,
 		workerPool: struct {
 			*errgroup.Group
 			shutdownCtx context.Context
 			shutdown    context.CancelFunc
-		}{&errgroup.Group{}, shutdownCtx, shutdown},
+			once        sync.Once
+		}{&errgroup.Group{}, shutdownCtx, shutdown, sync.Once{}},
 	}
 	if options.Ticker {
 		eng.ticker.ctx, eng.ticker.cancel = context.WithCancel(context.Background())

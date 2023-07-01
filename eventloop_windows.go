@@ -127,7 +127,7 @@ func (el *eventloop) readUDP(c *conn) error {
 	if action == Shutdown {
 		return errors.ErrEngineShutdown
 	}
-	c.releaseUDP()
+	c.release()
 	return nil
 }
 
@@ -187,7 +187,7 @@ func (el *eventloop) close(c *conn, err error) error {
 				el.getLogger().Errorf("failed to close connection(%s), error:%v", c.remoteAddr.String(), err)
 			}
 		}
-		c.releaseUDP()
+		c.release()
 		return el.handleAction(c, action)
 	}
 
@@ -195,13 +195,13 @@ func (el *eventloop) close(c *conn, err error) error {
 		return nil // ignore stale wakes.
 	}
 
+	delete(el.connections, c)
+	el.incConn(-1)
 	action := el.eventHandler.OnClose(c, err)
 	if err := c.rawConn.Close(); err != nil {
 		el.getLogger().Errorf("failed to close connection(%s), error:%v", c.remoteAddr.String(), err)
 	}
-	delete(el.connections, c)
-	el.incConn(-1)
-	c.releaseTCP()
+	c.release()
 
 	return el.handleAction(c, action)
 }

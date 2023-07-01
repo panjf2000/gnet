@@ -60,10 +60,11 @@ func packTCPConn(c *conn, buf []byte) *tcpConn {
 
 func unpackTCPConn(tc *tcpConn) {
 	tc.c.buffer = tc.buf
+	tc.buf = nil
 }
 
 func resetTCPConn(tc *tcpConn) {
-	bbPool.Put(tc.buf)
+	bbPool.Put(tc.c.buffer)
 	tc.c.buffer = nil
 }
 
@@ -83,11 +84,13 @@ func newTCPConn(nc net.Conn, el *eventloop) (c *conn) {
 	return
 }
 
-func (c *conn) releaseTCP() {
+func (c *conn) release() {
 	c.ctx = nil
 	c.localAddr = nil
-	c.remoteAddr = nil
-	c.rawConn = nil
+	if c.rawConn != nil {
+		c.rawConn = nil
+		c.remoteAddr = nil
+	}
 	c.inboundBuffer.Done()
 	bbPool.Put(c.buffer)
 	c.buffer = nil
@@ -102,19 +105,10 @@ func newUDPConn(el *eventloop, localAddr, remoteAddr net.Addr) *conn {
 	}
 }
 
-func (c *conn) releaseUDP() {
-	c.ctx = nil
-	c.localAddr = nil
-	bbPool.Put(c.buffer)
-	c.buffer = nil
-}
-
 func (c *conn) resetBuffer() {
 	c.buffer.Reset()
 	c.inboundBuffer.Reset()
 }
-
-// ================================== Non-concurrency-safe API's ==================================
 
 func (c *conn) Read(p []byte) (n int, err error) {
 	if c.inboundBuffer.IsEmpty() {
@@ -264,17 +258,6 @@ func (c *conn) OutboundBuffered() int {
 	return 0
 }
 
-func (*conn) SetDeadline(_ time.Time) error {
-	return errorx.ErrUnsupportedOp
-}
-
-func (*conn) SetReadDeadline(_ time.Time) error {
-	return errorx.ErrUnsupportedOp
-}
-
-func (*conn) SetWriteDeadline(_ time.Time) error {
-	return errorx.ErrUnsupportedOp
-}
 func (c *conn) Context() interface{}       { return c.ctx }
 func (c *conn) SetContext(ctx interface{}) { c.ctx = ctx }
 func (c *conn) LocalAddr() net.Addr        { return c.localAddr }
@@ -412,8 +395,6 @@ func (c *conn) SetKeepAlivePeriod(d time.Duration) error {
 // this method is only implemented for compatibility, don't use it on Windows.
 // func (c *conn) Gfd() gfd.GFD { return gfd.GFD{} }
 
-// ==================================== Concurrency-safe API's ====================================
-
 func (c *conn) AsyncWrite(buf []byte, cb AsyncCallback) error {
 	if cb == nil {
 		cb = func(c Conn, err error) error { return nil }
@@ -481,4 +462,16 @@ func (c *conn) CloseWithCallback(cb AsyncCallback) error {
 		return c.loop.close(c, nil)
 	}
 	return nil
+}
+
+func (*conn) SetDeadline(_ time.Time) error {
+	return errorx.ErrUnsupportedOp
+}
+
+func (*conn) SetReadDeadline(_ time.Time) error {
+	return errorx.ErrUnsupportedOp
+}
+
+func (*conn) SetWriteDeadline(_ time.Time) error {
+	return errorx.ErrUnsupportedOp
 }

@@ -12,14 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build linux || freebsd || dragonfly || darwin
-// +build linux freebsd dragonfly darwin
+//go:build linux || freebsd || dragonfly || netbsd || openbsd || darwin
+// +build linux freebsd dragonfly netbsd openbsd darwin
 
 package gnet
 
 import (
 	"context"
 	"runtime"
+	"sync"
 	"sync/atomic"
 
 	"golang.org/x/sync/errgroup"
@@ -31,9 +32,9 @@ import (
 
 type engine struct {
 	ln         *listener    // the listener for accepting new connections
-	lb         loadBalancer // event-loops for handling events
 	opts       *Options     // options with engine
-	mainLoop   *eventloop   // main event-loop for accepting connections
+	acceptor   *eventloop   // main event-loop for accepting connections
+	eventLoops loadBalancer // event-loops for handling events
 	inShutdown int32        // whether the engine is in shutdown
 	ticker     struct {
 		ctx    context.Context    // context for ticker
@@ -44,6 +45,7 @@ type engine struct {
 
 		shutdownCtx context.Context
 		shutdown    context.CancelFunc
+		once        sync.Once
 	}
 	eventHandler EventHandler // user eventHandler
 }
@@ -58,25 +60,35 @@ func (eng *engine) shutdown(err error) {
 		eng.opts.Logger.Errorf("engine is being shutdown with error: %v", err)
 	}
 
-	eng.workerPool.shutdown()
+	eng.workerPool.once.Do(func() {
+		eng.workerPool.shutdown()
+	})
 }
 
 func (eng *engine) startEventLoops() {
-	eng.lb.iterate(func(i int, el *eventloop) bool {
+	eng.eventLoops.iterate(func(i int, el *eventloop) bool {
 		eng.workerPool.Go(el.run)
 		return true
 	})
 }
 
 func (eng *engine) closeEventLoops() {
-	eng.lb.iterate(func(i int, el *eventloop) bool {
+	eng.eventLoops.iterate(func(i int, el *eventloop) bool {
+		el.ln.close()
 		_ = el.poller.Close()
 		return true
 	})
+	if eng.acceptor != nil {
+		eng.ln.close()
+		err := eng.acceptor.poller.Close()
+		if err != nil {
+			eng.opts.Logger.Errorf("failed to close poller when stopping engine: %v", err)
+		}
+	}
 }
 
 func (eng *engine) startSubReactors() {
-	eng.lb.iterate(func(i int, el *eventloop) bool {
+	eng.eventLoops.iterate(func(i int, el *eventloop) bool {
 		eng.workerPool.Go(el.activateSubReactor)
 		return true
 	})
@@ -85,7 +97,6 @@ func (eng *engine) startSubReactors() {
 func (eng *engine) activateEventLoops(numEventLoop int) (err error) {
 	network, address := eng.ln.network, eng.ln.address
 	ln := eng.ln
-	eng.ln = nil
 	var striker *eventloop
 	// Create loops locally and bind the listeners.
 	for i := 0; i < numEventLoop; i++ {
@@ -106,7 +117,7 @@ func (eng *engine) activateEventLoops(numEventLoop int) (err error) {
 			if err = el.poller.AddRead(el.ln.packPollAttachment(el.accept)); err != nil {
 				return
 			}
-			eng.lb.register(el)
+			eng.eventLoops.register(el)
 
 			// Start the ticker.
 			if el.idx == 0 && eng.opts.Ticker {
@@ -138,7 +149,7 @@ func (eng *engine) activateReactors(numEventLoop int) error {
 			el.buffer = make([]byte, eng.opts.ReadBufferCap)
 			el.connections.init()
 			el.eventHandler = eng.eventHandler
-			eng.lb.register(el)
+			eng.eventLoops.register(el)
 		} else {
 			return err
 		}
@@ -157,7 +168,7 @@ func (eng *engine) activateReactors(numEventLoop int) error {
 		if err = el.poller.AddRead(eng.ln.packPollAttachment(eng.accept)); err != nil {
 			return err
 		}
-		eng.mainLoop = el
+		eng.acceptor = el
 
 		// Start main reactor in background.
 		eng.workerPool.Go(el.activateMainReactor)
@@ -168,7 +179,7 @@ func (eng *engine) activateReactors(numEventLoop int) error {
 	// Start the ticker.
 	if eng.opts.Ticker {
 		eng.workerPool.Go(func() error {
-			eng.mainLoop.ticker(eng.ticker.ctx)
+			eng.acceptor.ticker(eng.ticker.ctx)
 			return nil
 		})
 	}
@@ -190,18 +201,16 @@ func (eng *engine) stop(s Engine) {
 
 	eng.eventHandler.OnShutdown(s)
 
-	// Notify all loops to close by closing all listeners
-	eng.lb.iterate(func(i int, el *eventloop) bool {
+	// Notify all event-loops to exit.
+	eng.eventLoops.iterate(func(i int, el *eventloop) bool {
 		err := el.poller.UrgentTrigger(func(_ interface{}) error { return errors.ErrEngineShutdown }, nil)
 		if err != nil {
 			eng.opts.Logger.Errorf("failed to call UrgentTrigger on sub event-loop when stopping engine: %v", err)
 		}
 		return true
 	})
-
-	if eng.mainLoop != nil {
-		eng.ln.close()
-		err := eng.mainLoop.poller.UrgentTrigger(func(_ interface{}) error { return errors.ErrEngineShutdown }, nil)
+	if eng.acceptor != nil {
+		err := eng.acceptor.poller.UrgentTrigger(func(_ interface{}) error { return errors.ErrEngineShutdown }, nil)
 		if err != nil {
 			eng.opts.Logger.Errorf("failed to call UrgentTrigger on main event-loop when stopping engine: %v", err)
 		}
@@ -216,15 +225,10 @@ func (eng *engine) stop(s Engine) {
 		eng.opts.Logger.Errorf("engine shutdown error: %v", err)
 	}
 
+	// Close all listeners and pollers of event-loops.
 	eng.closeEventLoops()
 
-	if eng.mainLoop != nil {
-		err := eng.mainLoop.poller.Close()
-		if err != nil {
-			eng.opts.Logger.Errorf("failed to close poller when stopping engine: %v", err)
-		}
-	}
-
+	// Put the engine into the shutdown state.
 	atomic.StoreInt32(&eng.inShutdown, 1)
 }
 
@@ -249,16 +253,17 @@ func run(eventHandler EventHandler, listener *listener, options *Options, protoA
 			*errgroup.Group
 			shutdownCtx context.Context
 			shutdown    context.CancelFunc
-		}{&errgroup.Group{}, shutdownCtx, shutdown},
+			once        sync.Once
+		}{&errgroup.Group{}, shutdownCtx, shutdown, sync.Once{}},
 		eventHandler: eventHandler,
 	}
 	switch options.LB {
 	case RoundRobin:
-		eng.lb = new(roundRobinLoadBalancer)
+		eng.eventLoops = new(roundRobinLoadBalancer)
 	case LeastConnections:
-		eng.lb = new(leastConnectionsLoadBalancer)
+		eng.eventLoops = new(leastConnectionsLoadBalancer)
 	case SourceAddrHash:
-		eng.lb = new(sourceAddrHashLoadBalancer)
+		eng.eventLoops = new(sourceAddrHashLoadBalancer)
 	}
 
 	if eng.opts.Ticker {
@@ -289,7 +294,7 @@ func (eng *engine) sendCmd(cmd *asyncCmd, urgent bool) error {
 	if !gfd.Validate(cmd.fd) {
 		return errors.ErrInvalidConn
 	}
-	el := eng.lb.index(cmd.fd.EventLoopIndex())
+	el := eng.eventLoops.index(cmd.fd.EventLoopIndex())
 	if el == nil {
 		return errors.ErrInvalidConn
 	}
