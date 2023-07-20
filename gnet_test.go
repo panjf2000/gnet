@@ -1160,7 +1160,7 @@ func TestMultiInstLoggerRace(t *testing.T) {
 		return err
 	})
 
-	assert.Error(t, g.Wait())
+	assert.ErrorIs(t, g.Wait(), gerr.ErrUnsupportedProtocol)
 }
 
 var errIncompletePacket = errors.New("incomplete packet")
