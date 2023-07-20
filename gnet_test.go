@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 
 	gerr "github.com/panjf2000/gnet/v2/pkg/errors"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
@@ -1133,6 +1134,33 @@ func (s *testClosedWakeUpServer) OnClose(Conn, error) (action Action) {
 		close(s.serverClosed)
 	}
 	return
+}
+
+type testMultiInstLoggerRaceServer struct {
+	*BuiltinEventEngine
+}
+
+func (t *testMultiInstLoggerRaceServer) OnBoot(_ Engine) (action Action) {
+	return Shutdown
+}
+
+func TestMultiInstLoggerRace(t *testing.T) {
+	logger1, _ := zap.NewDevelopment()
+	events1 := new(testMultiInstLoggerRaceServer)
+	g := errgroup.Group{}
+	g.Go(func() error {
+		err := Run(events1, "tulip://howdy", WithLogger(logger1.Sugar()))
+		return err
+	})
+
+	logger2, _ := zap.NewDevelopment()
+	events2 := new(testMultiInstLoggerRaceServer)
+	g.Go(func() error {
+		err := Run(events2, "tulip://howdy", WithLogger(logger2.Sugar()))
+		return err
+	})
+
+	assert.Error(t, g.Wait())
 }
 
 var errIncompletePacket = errors.New("incomplete packet")
