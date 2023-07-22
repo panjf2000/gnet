@@ -50,6 +50,7 @@ import (
 	"errors"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 
 	"go.uber.org/zap"
@@ -63,6 +64,7 @@ import (
 type Flusher = func() error
 
 var (
+	mu                  sync.RWMutex
 	defaultLogger       Logger
 	defaultLoggingLevel Level
 	defaultFlusher      Flusher
@@ -171,30 +173,28 @@ func getProdEncoder() zapcore.Encoder {
 
 // GetDefaultLogger returns the default logger.
 func GetDefaultLogger() Logger {
+	mu.RLock()
+	defer mu.RUnlock()
 	return defaultLogger
 }
 
 // GetDefaultFlusher returns the default flusher.
 func GetDefaultFlusher() Flusher {
+	mu.RLock()
+	defer mu.RUnlock()
 	return defaultFlusher
 }
 
-var setupOnce sync.Once
-
 // SetDefaultLoggerAndFlusher sets the default logger and its flusher.
-//
-// Note that this function should only be called once at the
-// start of the program and not thereafter for the entire runtime,
-// otherwise it will only keep the first setup.
 func SetDefaultLoggerAndFlusher(logger Logger, flusher Flusher) {
-	setupOnce.Do(func() {
-		defaultLogger, defaultFlusher = logger, flusher
-	})
+	mu.Lock()
+	defaultLogger, defaultFlusher = logger, flusher
+	mu.Unlock()
 }
 
 // LogLevel tells what the default logging level is.
 func LogLevel() string {
-	return defaultLoggingLevel.String()
+	return strings.ToUpper(defaultLoggingLevel.String())
 }
 
 // CreateLoggerAsLocalFile setups the logger by local file path.
@@ -227,41 +227,55 @@ func CreateLoggerAsLocalFile(localFilePath string, logLevel Level) (logger Logge
 
 // Cleanup does something windup for logger, like closing, flushing, etc.
 func Cleanup() {
+	mu.RLock()
 	if defaultFlusher != nil {
 		_ = defaultFlusher()
 	}
+	mu.RUnlock()
 }
 
 // Error prints err if it's not nil.
 func Error(err error) {
 	if err != nil {
+		mu.RLock()
 		defaultLogger.Errorf("error occurs during runtime, %v", err)
+		mu.RUnlock()
 	}
 }
 
 // Debugf logs messages at DEBUG level.
 func Debugf(format string, args ...interface{}) {
+	mu.RLock()
 	defaultLogger.Debugf(format, args...)
+	mu.RUnlock()
 }
 
 // Infof logs messages at INFO level.
 func Infof(format string, args ...interface{}) {
+	mu.RLock()
 	defaultLogger.Infof(format, args...)
+	mu.RUnlock()
 }
 
 // Warnf logs messages at WARN level.
 func Warnf(format string, args ...interface{}) {
+	mu.RLock()
 	defaultLogger.Warnf(format, args...)
+	mu.RUnlock()
 }
 
 // Errorf logs messages at ERROR level.
 func Errorf(format string, args ...interface{}) {
+	mu.RLock()
 	defaultLogger.Errorf(format, args...)
+	mu.RUnlock()
 }
 
 // Fatalf logs messages at FATAL level.
 func Fatalf(format string, args ...interface{}) {
+	mu.RLock()
 	defaultLogger.Fatalf(format, args...)
+	mu.RUnlock()
 }
 
 // Logger is used for logging formatted messages.
