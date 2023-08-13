@@ -54,7 +54,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: ['1.17', '1.18', '1.19', '1.20']
+        go: ['1.17', '1.21']
         os: [ubuntu-latest, macos-latest]
     name: Go ${{ matrix.go }} @ ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
