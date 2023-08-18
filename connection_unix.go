@@ -422,12 +422,15 @@ func (c *conn) SetKeepAlivePeriod(d time.Duration) error {
 
 func (c *conn) AsyncWrite(buf []byte, callback AsyncCallback) error {
 	if c.isDatagram {
-		defer func() {
-			if callback != nil {
-				_ = callback(nil, nil)
-			}
-		}()
-		return c.sendTo(buf)
+		err := c.sendTo(buf)
+		// TODO: it will not go asynchronously with UDP, so calling a callback is needless,
+		//  we may remove this branch in the future, please don't rely on the callback
+		// 	to do something important under UDP, if you're working with UDP, just call Conn.Write
+		// 	to send back your data.
+		if callback != nil {
+			_ = callback(nil, nil)
+		}
+		return err
 	}
 	return c.loop.poller.Trigger(c.asyncWrite, &asyncWriteHook{callback, buf})
 }
