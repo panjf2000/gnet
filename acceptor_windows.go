@@ -15,8 +15,12 @@
 package gnet
 
 import (
+	"errors"
 	"net"
 	"runtime"
+	"sync/atomic"
+
+	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
 )
 
 func (eng *engine) listen() (err error) {
@@ -34,7 +38,15 @@ func (eng *engine) listen() (err error) {
 			n, addr, e := eng.ln.pc.ReadFrom(buffer[:])
 			if e != nil {
 				err = e
-				eng.opts.Logger.Errorf("failed to receive data from UDP fd due to error:%v", err)
+				if atomic.LoadInt32(&eng.beingShutdown) == 0 {
+					eng.opts.Logger.Errorf("failed to receive data from UDP fd due to error:%v", err)
+				} else if errors.Is(err, net.ErrClosed) {
+					err = errorx.ErrEngineShutdown
+					// TODO: errors.Join() is not supported until Go 1.20,
+					// 	we will uncomment this line after we bump up the
+					// 	minimal supported go version to 1.20.
+					// err = errors.Join(err, errorx.ErrEngineShutdown)
+				}
 				return
 			}
 
@@ -46,7 +58,13 @@ func (eng *engine) listen() (err error) {
 			tc, e := eng.ln.ln.Accept()
 			if e != nil {
 				err = e
-				eng.opts.Logger.Errorf("Accept() fails due to error: %v", err)
+				if atomic.LoadInt32(&eng.beingShutdown) == 0 {
+					eng.opts.Logger.Errorf("Accept() fails due to error: %v", err)
+				} else if errors.Is(err, net.ErrClosed) {
+					err = errorx.ErrEngineShutdown
+					// TODO: ditto.
+					// err = errors.Join(err, errorx.ErrEngineShutdown)
+				}
 				return
 			}
 			el := eng.eventLoops.next(tc.RemoteAddr())

@@ -31,7 +31,7 @@ import (
 	"github.com/panjf2000/gnet/v2/internal/netpoll"
 	"github.com/panjf2000/gnet/v2/internal/socket"
 	"github.com/panjf2000/gnet/v2/pkg/buffer/elastic"
-	gerrors "github.com/panjf2000/gnet/v2/pkg/errors"
+	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
 	bsPool "github.com/panjf2000/gnet/v2/pkg/pool/byteslice"
 )
@@ -355,7 +355,7 @@ func (c *conn) Write(p []byte) (int, error) {
 
 func (c *conn) Writev(bs [][]byte) (int, error) {
 	if c.isDatagram {
-		return 0, gerrors.ErrUnsupportedOp
+		return 0, errorx.ErrUnsupportedOp
 	}
 	return c.writev(bs)
 }
@@ -422,19 +422,22 @@ func (c *conn) SetKeepAlivePeriod(d time.Duration) error {
 
 func (c *conn) AsyncWrite(buf []byte, callback AsyncCallback) error {
 	if c.isDatagram {
-		defer func() {
-			if callback != nil {
-				_ = callback(nil, nil)
-			}
-		}()
-		return c.sendTo(buf)
+		err := c.sendTo(buf)
+		// TODO: it will not go asynchronously with UDP, so calling a callback is needless,
+		//  we may remove this branch in the future, please don't rely on the callback
+		// 	to do something important under UDP, if you're working with UDP, just call Conn.Write
+		// 	to send back your data.
+		if callback != nil {
+			_ = callback(nil, nil)
+		}
+		return err
 	}
 	return c.loop.poller.Trigger(c.asyncWrite, &asyncWriteHook{callback, buf})
 }
 
 func (c *conn) AsyncWritev(bs [][]byte, callback AsyncCallback) error {
 	if c.isDatagram {
-		return gerrors.ErrUnsupportedOp
+		return errorx.ErrUnsupportedOp
 	}
 	return c.loop.poller.Trigger(c.asyncWritev, &asyncWritevHook{callback, bs})
 }
@@ -467,13 +470,13 @@ func (c *conn) Close() error {
 }
 
 func (*conn) SetDeadline(_ time.Time) error {
-	return gerrors.ErrUnsupportedOp
+	return errorx.ErrUnsupportedOp
 }
 
 func (*conn) SetReadDeadline(_ time.Time) error {
-	return gerrors.ErrUnsupportedOp
+	return errorx.ErrUnsupportedOp
 }
 
 func (*conn) SetWriteDeadline(_ time.Time) error {
-	return gerrors.ErrUnsupportedOp
+	return errorx.ErrUnsupportedOp
 }
