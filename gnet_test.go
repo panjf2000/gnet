@@ -552,6 +552,11 @@ func (t *testWakeConnServer) OnTick() (delay time.Duration, action Action) {
 }
 
 func testWakeConn(t *testing.T, network, addr string) {
+	currentLogger, currentFlusher := logging.GetDefaultLogger(), logging.GetDefaultFlusher()
+	t.Cleanup(func() {
+		logging.SetDefaultLoggerAndFlusher(currentLogger, currentFlusher) // restore
+	})
+
 	svr := &testWakeConnServer{tester: t, network: network, addr: addr, conn: make(chan Conn, 1)}
 	logger := zap.NewExample()
 	err := Run(svr, network+"://"+addr,
@@ -1145,6 +1150,11 @@ func (t *testMultiInstLoggerRaceServer) OnBoot(_ Engine) (action Action) {
 }
 
 func TestMultiInstLoggerRace(t *testing.T) {
+	currentLogger, currentFlusher := logging.GetDefaultLogger(), logging.GetDefaultFlusher()
+	t.Cleanup(func() {
+		logging.SetDefaultLoggerAndFlusher(currentLogger, currentFlusher) // restore
+	})
+
 	logger1, _ := zap.NewDevelopment()
 	events1 := new(testMultiInstLoggerRaceServer)
 	g := errgroup.Group{}

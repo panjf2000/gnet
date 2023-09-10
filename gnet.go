@@ -226,6 +226,12 @@ type Writer interface {
 	// AsyncWrite writes bytes to peer asynchronously, it's goroutine-safe,
 	// you don't have to invoke it within any method in EventHandler,
 	// usually you would call it in an individual goroutine.
+	//
+	// Note that it will go synchronously with UDP, so it is needless to call
+	// this asynchronous method, we may disable this method for UDP and just
+	// return ErrUnsupportedOp in the future, therefore, please don't rely on
+	// this method to do something important under UDP, if you're working with UDP,
+	// just call Conn.Write to send back your data.
 	AsyncWrite(buf []byte, callback AsyncCallback) (err error)
 
 	// AsyncWritev writes multiple byte slices to peer asynchronously,
