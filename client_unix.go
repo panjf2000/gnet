@@ -32,7 +32,7 @@ import (
 	"github.com/panjf2000/gnet/v2/internal/netpoll"
 	"github.com/panjf2000/gnet/v2/internal/socket"
 	"github.com/panjf2000/gnet/v2/pkg/buffer/ring"
-	gerrors "github.com/panjf2000/gnet/v2/pkg/errors"
+	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
 )
 
@@ -126,7 +126,7 @@ func (cli *Client) Start() error {
 
 // Stop stops the client event-loop.
 func (cli *Client) Stop() (err error) {
-	logging.Error(cli.el.poller.UrgentTrigger(func(_ interface{}) error { return gerrors.ErrEngineShutdown }, nil))
+	logging.Error(cli.el.poller.UrgentTrigger(func(_ interface{}) error { return errorx.ErrEngineShutdown }, nil))
 	// Stop the ticker.
 	if cli.opts.Ticker {
 		cli.el.engine.ticker.cancel()
@@ -215,7 +215,7 @@ func (cli *Client) Enroll(c net.Conn) (Conn, error) {
 		}
 		gc = newUDPConn(dupFD, cli.el, c.LocalAddr(), sockAddr, true)
 	default:
-		return nil, gerrors.ErrUnsupportedProtocol
+		return nil, errorx.ErrUnsupportedProtocol
 	}
 	err = cli.el.poller.UrgentTrigger(cli.el.register, gc)
 	if err != nil {
