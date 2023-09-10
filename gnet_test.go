@@ -19,7 +19,7 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
-	gerr "github.com/panjf2000/gnet/v2/pkg/errors"
+	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
 	bbPool "github.com/panjf2000/gnet/v2/pkg/pool/bytebuffer"
 	goPool "github.com/panjf2000/gnet/v2/pkg/pool/goroutine"
@@ -814,8 +814,8 @@ func testShutdownActionOnOpen(t *testing.T, network, addr string) {
 	err := Run(events, network+"://"+addr, WithTicker(true))
 	assert.NoError(t, err)
 	_, err = events.eng.Dup()
-	assert.ErrorIsf(t, err, gerr.ErrEngineInShutdown, "expected error: %v, but got: %v",
-		gerr.ErrEngineInShutdown, err)
+	assert.ErrorIsf(t, err, errorx.ErrEngineInShutdown, "expected error: %v, but got: %v",
+		errorx.ErrEngineInShutdown, err)
 }
 
 func TestUDPShutdown(t *testing.T) {
@@ -887,7 +887,7 @@ func (t *testCloseConnectionServer) OnTraffic(c Conn) (action Action) {
 	go func() {
 		time.Sleep(time.Second)
 		_ = c.CloseWithCallback(func(c Conn, err error) error {
-			assert.ErrorIsf(t.tester, err, gerr.ErrEngineShutdown, "should be engine shutdown error")
+			assert.ErrorIsf(t.tester, err, errorx.ErrEngineShutdown, "should be engine shutdown error")
 			return nil
 		})
 	}()
@@ -923,7 +923,7 @@ func testCloseConnection(t *testing.T, network, addr string) {
 
 func TestServerOptionsCheck(t *testing.T) {
 	err := Run(&BuiltinEventEngine{}, "tcp://:3500", WithNumEventLoop(10001), WithLockOSThread(true))
-	assert.EqualError(t, err, gerr.ErrTooManyEventLoopThreads.Error(), "error returned with LockOSThread option")
+	assert.EqualError(t, err, errorx.ErrTooManyEventLoopThreads.Error(), "error returned with LockOSThread option")
 }
 
 func TestStopServer(t *testing.T) {
@@ -1066,7 +1066,7 @@ func testEngineStop(t *testing.T, network, addr string) {
 	require.Greater(t, events2.exchngCount, int64(0))
 	require.Equal(t, int64(2+1+5+1), events1.exchngCount+events2.exchngCount)
 	// stop an already stopped engine
-	require.Equal(t, gerr.ErrEngineInShutdown, events1.eng.Stop(context.Background()))
+	require.Equal(t, errorx.ErrEngineInShutdown, events1.eng.Stop(context.Background()))
 }
 
 // Test should not panic when we wake-up server_closed conn.
@@ -1170,7 +1170,7 @@ func TestMultiInstLoggerRace(t *testing.T) {
 		return err
 	})
 
-	assert.ErrorIs(t, g.Wait(), gerr.ErrUnsupportedProtocol)
+	assert.ErrorIs(t, g.Wait(), errorx.ErrUnsupportedProtocol)
 }
 
 var errIncompletePacket = errors.New("incomplete packet")
