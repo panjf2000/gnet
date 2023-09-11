@@ -31,7 +31,7 @@ import (
 	"github.com/panjf2000/gnet/v2/internal/netpoll"
 	"github.com/panjf2000/gnet/v2/internal/socket"
 	"github.com/panjf2000/gnet/v2/pkg/buffer/elastic"
-	gerrors "github.com/panjf2000/gnet/v2/pkg/errors"
+	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
 	bsPool "github.com/panjf2000/gnet/v2/pkg/pool/byteslice"
 	"github.com/panjf2000/gnet/v2/pkg/tls"
@@ -406,7 +406,7 @@ func (c *conn) WriteTCP(p []byte) (int, error) {
 
 func (c *conn) Writev(bs [][]byte) (int, error) {
 	if c.isDatagram {
-		return 0, gerrors.ErrUnsupportedOp
+		return 0, errorx.ErrUnsupportedOp
 	}
 	if c.tlsconn != nil {
 		return c.writevTLS(bs)
@@ -491,7 +491,7 @@ func (c *conn) AsyncWrite(buf []byte, callback AsyncCallback) error {
 
 func (c *conn) AsyncWritev(bs [][]byte, callback AsyncCallback) error {
 	if c.isDatagram {
-		return gerrors.ErrUnsupportedOp
+		return errorx.ErrUnsupportedOp
 	}
 	return c.loop.poller.Trigger(c.asyncWritev, &asyncWritevHook{callback, bs})
 }
@@ -524,15 +524,15 @@ func (c *conn) Close() error {
 }
 
 func (*conn) SetDeadline(_ time.Time) error {
-	return gerrors.ErrUnsupportedOp
+	return errorx.ErrUnsupportedOp
 }
 
 func (*conn) SetReadDeadline(_ time.Time) error {
-	return gerrors.ErrUnsupportedOp
+	return errorx.ErrUnsupportedOp
 }
 
 func (*conn) SetWriteDeadline(_ time.Time) error {
-	return gerrors.ErrUnsupportedOp
+	return errorx.ErrUnsupportedOp
 }
 
 func (c *conn) UpgradeTLS(config *tls.Config) (err error) {

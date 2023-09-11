@@ -30,7 +30,7 @@ import (
 
 	"github.com/panjf2000/gnet/v2/internal/io"
 	"github.com/panjf2000/gnet/v2/internal/netpoll"
-	gerrors "github.com/panjf2000/gnet/v2/pkg/errors"
+	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
 )
 
@@ -189,7 +189,7 @@ func (el *eventloop) read(c *conn) error {
 	case Close:
 		return el.close(c, nil)
 	case Shutdown:
-		return gerrors.ErrEngineShutdown
+		return errorx.ErrEngineShutdown
 	}
 	_, _ = c.inboundBuffer.Write(c.buffer)
 	c.buffer = c.buffer[:0]
@@ -239,7 +239,7 @@ func (el *eventloop) close(c *conn, err error) (rerr error) {
 			el.connections.delConn(c)
 		}
 		if el.eventHandler.OnClose(c, err) == Shutdown {
-			return gerrors.ErrEngineShutdown
+			return errorx.ErrEngineShutdown
 		}
 		c.release()
 		return
@@ -290,7 +290,7 @@ func (el *eventloop) close(c *conn, err error) (rerr error) {
 
 	el.connections.delConn(c)
 	if el.eventHandler.OnClose(c, err) == Shutdown {
-		rerr = gerrors.ErrEngineShutdown
+		rerr = errorx.ErrEngineShutdown
 	}
 	c.release()
 
@@ -326,7 +326,7 @@ func (el *eventloop) ticker(ctx context.Context) {
 		switch action {
 		case None:
 		case Shutdown:
-			err := el.poller.UrgentTrigger(func(_ interface{}) error { return gerrors.ErrEngineShutdown }, nil)
+			err := el.poller.UrgentTrigger(func(_ interface{}) error { return errorx.ErrEngineShutdown }, nil)
 			el.getLogger().Debugf("stopping ticker in event-loop(%d) from OnTick(), UrgentTrigger:%v", el.idx, err)
 		}
 		if timer == nil {
@@ -350,7 +350,7 @@ func (el *eventloop) handleAction(c *conn, action Action) error {
 	case Close:
 		return el.close(c, nil)
 	case Shutdown:
-		return gerrors.ErrEngineShutdown
+		return errorx.ErrEngineShutdown
 	default:
 		return nil
 	}
@@ -377,7 +377,7 @@ func (el *eventloop) readUDP(fd int, _ netpoll.IOEvent) error {
 		c.release()
 	}
 	if action == Shutdown {
-		return gerrors.ErrEngineShutdown
+		return errorx.ErrEngineShutdown
 	}
 	return nil
 }
@@ -387,7 +387,7 @@ func (el *eventloop) execCmd(itf interface{}) (err error) {
 	cmd := itf.(*asyncCmd)
 	c := el.connections.getConnByGFD(cmd.fd)
 	if c == nil || c.gfd != cmd.fd {
-		return gerrors.ErrInvalidConn
+		return errorx.ErrInvalidConn
 	}
 
 	defer func() {
@@ -406,7 +406,7 @@ func (el *eventloop) execCmd(itf interface{}) (err error) {
 	case asyncCmdWritev:
 		_, err = c.Writev(cmd.arg.([][]byte))
 	default:
-		return gerrors.ErrUnsupportedOp
+		return errorx.ErrUnsupportedOp
 	}
 	return
 }

@@ -19,7 +19,7 @@ import (
 	"math"
 
 	"github.com/panjf2000/gnet/v2/pkg/buffer/linkedlist"
-	gerrors "github.com/panjf2000/gnet/v2/pkg/errors"
+	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
 )
 
 // Buffer combines ring-buffer and list-buffer.
@@ -35,7 +35,7 @@ type Buffer struct {
 // New instantiates an elastic.Buffer and returns it.
 func New(maxStaticBytes int) (*Buffer, error) {
 	if maxStaticBytes <= 0 {
-		return nil, gerrors.ErrNegativeSize
+		return nil, errorx.ErrNegativeSize
 	}
 	return &Buffer{maxStaticBytes: maxStaticBytes}, nil
 }

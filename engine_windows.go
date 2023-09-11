@@ -16,6 +16,7 @@ package gnet
 
 import (
 	"context"
+	"errors"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -33,8 +34,9 @@ type engine struct {
 		ctx    context.Context
 		cancel context.CancelFunc
 	}
-	inShutdown int32 // whether the engine is in shutdown
-	workerPool struct {
+	inShutdown    int32 // whether the engine is in shutdown
+	beingShutdown int32 // whether the engine is being shutdown
+	workerPool    struct {
 		*errgroup.Group
 
 		shutdownCtx context.Context
@@ -50,10 +52,11 @@ func (eng *engine) isInShutdown() bool {
 
 // shutdown signals the engine to shut down.
 func (eng *engine) shutdown(err error) {
-	if err != nil && err != errorx.ErrEngineShutdown {
+	if err != nil && !errors.Is(err, errorx.ErrEngineShutdown) {
 		eng.opts.Logger.Errorf("engine is being shutdown with error: %v", err)
 	}
 	eng.workerPool.shutdown()
+	atomic.StoreInt32(&eng.beingShutdown, 1)
 }
 
 func (eng *engine) closeEventLoops() {
@@ -91,7 +94,6 @@ func (eng *engine) start(numEventLoop int) error {
 func (eng *engine) stop(engine Engine) error {
 	<-eng.workerPool.shutdownCtx.Done()
 
-	eng.opts.Logger.Infof("engine is being shutdown...")
 	eng.eventHandler.OnShutdown(engine)
 
 	if eng.ticker.cancel != nil {
@@ -100,7 +102,7 @@ func (eng *engine) stop(engine Engine) error {
 
 	eng.closeEventLoops()
 
-	if err := eng.workerPool.Wait(); err != nil {
+	if err := eng.workerPool.Wait(); err != nil && !errors.Is(err, errorx.ErrEngineShutdown) {
 		eng.opts.Logger.Errorf("engine shutdown error: %v", err)
 	}
 

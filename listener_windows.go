@@ -90,9 +90,6 @@ func (l *listener) close() {
 			return
 		}
 		logging.Error(os.NewSyscallError("close", l.ln.Close()))
-		if l.network == "unix" {
-			logging.Error(os.RemoveAll(l.address))
-		}
 	})
 }
 
@@ -124,7 +121,7 @@ func initListener(network, addr string, options *Options) (l *listener, err erro
 		}
 		l.addr = l.pc.LocalAddr()
 	case "unix":
-		logging.Error(os.Remove(addr))
+		_ = os.Remove(addr)
 		fallthrough
 	case "tcp", "tcp4", "tcp6":
 		if l.ln, err = lc.Listen(context.Background(), network, addr); err != nil {
