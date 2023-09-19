@@ -1,12 +1,12 @@
 module github.com/panjf2000/gnet/v2
 
 require (
-	github.com/panjf2000/ants/v2 v2.8.1
+	github.com/panjf2000/ants/v2 v2.8.2
 	github.com/stretchr/testify v1.8.4
 	github.com/valyala/bytebufferpool v1.0.0
 	go.uber.org/zap v1.21.0
 	golang.org/x/sync v0.3.0
-	golang.org/x/sys v0.11.0
+	golang.org/x/sys v0.12.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
 
