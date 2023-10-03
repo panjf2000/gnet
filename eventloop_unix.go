@@ -123,7 +123,7 @@ func (el *eventloop) readTLS(c *conn) error {
 			return el.close(c, nil)
 		case Shutdown:
 			c.tlsconn.DataDone()
-			return gerrors.ErrEngineShutdown
+			return errorx.ErrEngineShutdown
 		}
 		_, _ = c.inboundBuffer.Write(c.buffer)
 		c.buffer = c.buffer[:0]
