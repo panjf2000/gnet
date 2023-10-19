@@ -111,6 +111,13 @@ func (c *conn) resetBuffer() {
 }
 
 func (c *conn) Read(p []byte) (n int, err error) {
+	if c.buffer == nil {
+		if len(p) == 0 {
+			return 0, nil
+		}
+		return 0, io.ErrShortBuffer
+	}
+
 	if c.inboundBuffer.IsEmpty() {
 		n = copy(p, c.buffer.B)
 		c.buffer.B = c.buffer.B[n:]
@@ -130,6 +137,13 @@ func (c *conn) Read(p []byte) (n int, err error) {
 }
 
 func (c *conn) Next(n int) (buf []byte, err error) {
+	if c.buffer == nil {
+		if n <= 0 {
+			return nil, nil
+		}
+		return nil, io.ErrShortBuffer
+	}
+
 	inBufferLen := c.inboundBuffer.Buffered()
 	if totalLen := inBufferLen + c.buffer.Len(); n > totalLen {
 		return nil, io.ErrShortBuffer
@@ -160,6 +174,13 @@ func (c *conn) Next(n int) (buf []byte, err error) {
 }
 
 func (c *conn) Peek(n int) (buf []byte, err error) {
+	if c.buffer == nil {
+		if n <= 0 {
+			return nil, nil
+		}
+		return nil, io.ErrShortBuffer
+	}
+
 	inBufferLen := c.inboundBuffer.Buffered()
 	if totalLen := inBufferLen + c.buffer.Len(); n > totalLen {
 		return nil, io.ErrShortBuffer
@@ -186,6 +207,10 @@ func (c *conn) Peek(n int) (buf []byte, err error) {
 }
 
 func (c *conn) Discard(n int) (int, error) {
+	if c.buffer == nil {
+		return 0, nil
+	}
+
 	inBufferLen := c.inboundBuffer.Buffered()
 	tempBufferLen := c.buffer.Len()
 	if inBufferLen+tempBufferLen < n || n <= 0 {
@@ -242,6 +267,10 @@ func (c *conn) WriteTo(w io.Writer) (n int64, err error) {
 			return
 		}
 	}
+
+	if c.buffer == nil {
+		return 0, nil
+	}
 	defer c.buffer.Reset()
 	return c.buffer.WriteTo(w)
 }
@@ -251,6 +280,9 @@ func (c *conn) Flush() error {
 }
 
 func (c *conn) InboundBuffered() int {
+	if c.buffer == nil {
+		return 0
+	}
 	return c.inboundBuffer.Buffered() + c.buffer.Len()
 }
 
