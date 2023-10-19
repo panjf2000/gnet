@@ -251,7 +251,7 @@ func (c *conn) Read(p []byte) (n int, err error) {
 		n = copy(p, c.buffer)
 		c.buffer = c.buffer[n:]
 		if n == 0 && len(p) > 0 {
-			err = io.EOF
+			err = io.ErrShortBuffer
 		}
 		return
 	}
