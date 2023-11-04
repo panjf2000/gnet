@@ -4,6 +4,7 @@
 package gnet
 
 import (
+	"io"
 	"math/rand"
 	"net"
 	"sync"
@@ -60,7 +61,8 @@ func (ev *clientEvents) OnTraffic(c Conn) (action Action) {
 	} else { // UDP
 		ev.packetLen = 1024
 	}
-	buf, _ := c.Next(-1)
+	buf, err := c.Next(-1)
+	assert.NoError(ev.tester, err)
 	p = append(p, buf...)
 	if len(p) < ev.packetLen {
 		c.SetContext(p)
@@ -338,6 +340,8 @@ func startGnetClient(t *testing.T, cli *Client, ev *clientEvents, network, addr 
 	}
 	require.NoError(t, err)
 	defer c.Close()
+	err = c.Wake(nil)
+	require.NoError(t, err)
 	var rspCh chan []byte
 	if network == "udp" {
 		rspCh = make(chan []byte, 1)
@@ -386,4 +390,104 @@ func startGnetClient(t *testing.T, cli *Client, ev *clientEvents, network, addr 
 			)
 		}
 	}
+}
+
+type clientEventsForWake struct {
+	BuiltinEventEngine
+	tester *testing.T
+	ch     chan struct{}
+}
+
+func (ev *clientEventsForWake) OnBoot(_ Engine) Action {
+	ev.ch = make(chan struct{})
+	return None
+}
+
+func (ev *clientEventsForWake) OnTraffic(c Conn) (action Action) {
+	n, err := c.Read(nil)
+	assert.Zerof(ev.tester, n, "expected: %v, but got: %v", 0, n)
+	assert.NoErrorf(ev.tester, err, "expected: %v, but got: %v", nil, err)
+	buf := make([]byte, 10)
+	n, err = c.Read(buf)
+	assert.Zerof(ev.tester, n, "expected: %v, but got: %v", 0, n)
+	assert.ErrorIsf(ev.tester, err, io.ErrShortBuffer, "expected error: %v, but got: %v", io.ErrShortBuffer, err)
+	buf, err = c.Next(10)
+	assert.Nilf(ev.tester, buf, "expected: %v, but got: %v", nil, buf)
+	assert.ErrorIsf(ev.tester, err, io.ErrShortBuffer, "expected error: %v, but got: %v", io.ErrShortBuffer, err)
+	buf, err = c.Next(-1)
+	assert.Nilf(ev.tester, buf, "expected: %v, but got: %v", nil, buf)
+	assert.NoErrorf(ev.tester, err, "expected: %v, but got: %v", nil, err)
+	buf, err = c.Peek(10)
+	assert.Nilf(ev.tester, buf, "expected: %v, but got: %v", nil, buf)
+	assert.ErrorIsf(ev.tester, err, io.ErrShortBuffer, "expected error: %v, but got: %v", io.ErrShortBuffer, err)
+	buf, err = c.Peek(-1)
+	assert.Nilf(ev.tester, buf, "expected: %v, but got: %v", nil, buf)
+	assert.NoErrorf(ev.tester, err, "expected: %v, but got: %v", nil, err)
+	n, err = c.Discard(10)
+	assert.Zerof(ev.tester, n, "expected: %v, but got: %v", 0, n)
+	assert.NoErrorf(ev.tester, err, "expected: %v, but got: %v", nil, err)
+	n, err = c.Discard(-1)
+	assert.Zerof(ev.tester, n, "expected: %v, but got: %v", 0, n)
+	assert.NoErrorf(ev.tester, err, "expected: %v, but got: %v", nil, err)
+	m, err := c.WriteTo(io.Discard)
+	assert.Zerof(ev.tester, n, "expected: %v, but got: %v", 0, m)
+	assert.NoErrorf(ev.tester, err, "expected: %v, but got: %v", nil, err)
+	n = c.InboundBuffered()
+	assert.Zerof(ev.tester, n, "expected: %v, but got: %v", 0, m)
+	<-ev.ch
+	return None
+}
+
+type serverEventsForWake struct {
+	BuiltinEventEngine
+	network, addr string
+	client        *Client
+	clientEV      *clientEventsForWake
+	tester        *testing.T
+	clients       int32
+	started       int32
+}
+
+func (ev *serverEventsForWake) OnOpen(_ Conn) ([]byte, Action) {
+	atomic.AddInt32(&ev.clients, 1)
+	return nil, None
+}
+
+func (ev *serverEventsForWake) OnClose(_ Conn, _ error) Action {
+	if atomic.AddInt32(&ev.clients, -1) == 0 {
+		return Shutdown
+	}
+	return None
+}
+
+func (ev *serverEventsForWake) OnTick() (time.Duration, Action) {
+	if atomic.CompareAndSwapInt32(&ev.started, 0, 1) {
+		go testConnWakeImmediately(ev.tester, ev.client, ev.clientEV, ev.network, ev.addr)
+	}
+	return 100 * time.Millisecond, None
+}
+
+func testConnWakeImmediately(t *testing.T, client *Client, clientEV *clientEventsForWake, network, addr string) {
+	c, err := client.Dial(network, addr)
+	assert.NoErrorf(t, err, "failed to dial: %v", err)
+	err = c.Wake(nil)
+	assert.NoError(t, err)
+	err = c.Close()
+	assert.NoError(t, err)
+	clientEV.ch <- struct{}{}
+}
+
+func TestWakeConnImmediately(t *testing.T) {
+	clientEV := &clientEventsForWake{tester: t}
+	client, err := NewClient(clientEV, WithLogLevel(logging.DebugLevel))
+	assert.NoError(t, err)
+
+	err = client.Start()
+	assert.NoError(t, err)
+	defer client.Stop() //nolint:errcheck
+
+	serverEV := &serverEventsForWake{tester: t, network: "tcp", addr: ":18888", client: client, clientEV: clientEV}
+
+	err = Run(serverEV, serverEV.network+"://"+serverEV.addr, WithTicker(true))
+	assert.NoError(t, err)
 }
