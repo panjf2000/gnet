@@ -201,7 +201,7 @@ func (c *conn) asyncWrite(itf interface{}) (err error) {
 	hook := itf.(*asyncWriteHook)
 	defer func() {
 		if hook.callback != nil {
-			_ = hook.callback(c, err)
+			err = hook.callback(c, err)
 		}
 	}()
 
@@ -222,7 +222,7 @@ func (c *conn) asyncWritev(itf interface{}) (err error) {
 	hook := itf.(*asyncWritevHook)
 	defer func() {
 		if hook.callback != nil {
-			_ = hook.callback(c, err)
+			err = hook.callback(c, err)
 		}
 	}()
 
