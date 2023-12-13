@@ -90,6 +90,8 @@ This is the full framework ranking of Go and `gnet` tops all the other framework
 
 To see the full ranking list, visit [TechEmpower Plaintext Benchmark](https://www.techempower.com/benchmarks/#section=test&runid=a07a7117-f861-49b2-a710-94970c5767d0&test=plaintext).
 
+***Note that the HTTP implementation of gnet on TechEmpower is half-baked and fine-tuned for benchmark purposes only and far from production-ready.***
+
 ## Contrasts to the similar networking libraries
 
 ## On Linux (epoll)

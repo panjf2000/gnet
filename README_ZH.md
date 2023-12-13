@@ -90,6 +90,8 @@ go get -u github.com/panjf2000/gnet
 
 完整的排行可以通过 [TechEmpower Plaintext Benchmark](https://www.techempower.com/benchmarks/#section=test&runid=a07a7117-f861-49b2-a710-94970c5767d0&test=plaintext) 查看。
 
+***请注意，TechEmpower 上的 gnet 的 HTTP 实现是不完备且针对性调优的，仅仅是用于压测目的，不是生产可用的***。
+
 ## 同类型的网络库性能对比
 
 ## On Linux (epoll)
