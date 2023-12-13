@@ -38,7 +38,7 @@ Note that some event handlers' name has been changed in gnet v2, learn about the
 
 We redesigned and reimplemented the internal buffers for connections, the diagram shows below:
 
-![](https://img.taohuawu.club/gallery/elastic-buffer.png)
+![](https://res.strikefreedom.top/static_res/blog/figures/elastic-buffer.png)
 
 We go from the ring-buffer to the mixed-buffer that combines ring-buffer and a kind of new buffer type: linked-list buffer, which makes it more flexible and efficient, this new elastic buffer can save more memory.
 

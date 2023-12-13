@@ -80,7 +80,7 @@ description: "宏观角度陈述 gnet 框架。"
 #### Elastic Ring&Linked-list Buffer
 
 <p align="center">
-<img src="https://img.taohuawu.club/gallery/elastic-buffer.png" />
+<img src="https://res.strikefreedom.top/static_res/blog/figures/elastic-buffer.png" />
 </p>
 
 `gnet` 内置了inbound 和 outbound 两个 buffers，分别用来缓冲输入输出的网络数据以及管理内存，gnet 里面的 inbound 和 outbound buffer 经过设计和调优，达到重用内存以及按需扩缩容的目的。

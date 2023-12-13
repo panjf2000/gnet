@@ -82,7 +82,7 @@ The details about integrating `gnet`  with `ants` are shown [here](#echo-server-
 #### Elastic Ring & Linked-list Buffer
 
 <p align="center">
-<img src="https://img.taohuawu.club/gallery/elastic-buffer.png" />
+<img src="https://res.strikefreedom.top/static_res/blog/figures/elastic-buffer.png" />
 </p>
 
 There are two buffers inside `gnet`: inbound buffer (elastic-ring-buffer) and outbound buffer (elastic-ring&linked-list-buffer) to buffer and manage inbound/outbound network data, inbound and outbound buffers inside gnet are designed and tuned to reuse memory and be auto-scaling on demand.

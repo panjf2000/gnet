@@ -227,6 +227,7 @@ function Performance() {
         <p className="hero--subtitle">This is the full framework ranking of Go and <code>gnet</code> tops all the other frameworks, which makes <code>gnet</code> the <strong><em>fastest</em></strong> networking framework in Go.</p>
         <br />
         <p className="hero--subtitle">To check the full ranking list, visit <Link to="https://www.techempower.com/benchmarks/#section=test&runid=a07a7117-f861-49b2-a710-94970c5767d0&test=plaintext">TechEmpower Plaintext Benchmark</Link>.</p>
+        <p className="hero--subtitle">Note that the HTTP implementation of gnet on TechEmpower is half-baked and fine-tuned for benchmark purposes only and is far from production-ready.</p>
       </div>
     </section>
   );
@@ -238,12 +239,12 @@ function UseCases() {
       <div className="container">
         <AnchoredH2 id="usecases">Use cases</AnchoredH2>
         <div className="sub-title">The following companies/organizations use <code>gnet</code> as the underlying network service in production.</div>
-        <a href="https://www.tencent.com"><img src="https://img.taohuawu.club/gallery/tencent_logo.png" width="300" align="middle"/></a>
-        <a href="https://www.iqiyi.com" target="_blank"><img src="https://img.taohuawu.club/gallery/iqiyi-logo.png" width="300" align="middle"/></a>
-        <a href="https://www.mi.com" target="_blank"><img src="https://img.taohuawu.club/gallery/mi-logo.png" width="300" align="middle"/></a>
-        <a href="https://www.360.com" target="_blank"><img src="https://img.taohuawu.club/gallery/360-logo.png" width="300" align="middle"/></a>
-        <a href="https://tieba.baidu.com" target="_blank"><img src="https://img.taohuawu.club/gallery/baidu-tieba-logo.png" width="300" align="middle"/></a>
-        <a href="https://game.qq.com" target="_blank"><img src="https://img.taohuawu.club/gallery/tencent-games-logo.png" width="300" align="middle"/></a>
+        <a href="https://www.tencent.com"><img src="https://res.strikefreedom.top/static_res/logos/tencent_logo.png" width="300" align="middle"/></a>
+        <a href="https://www.iqiyi.com" target="_blank"><img src="https://res.strikefreedom.top/static_res/logos/iqiyi-logo.png" width="300" align="middle"/></a>
+        <a href="https://www.mi.com" target="_blank"><img src="https://res.strikefreedom.top/static_res/logos/mi-logo.png" width="300" align="middle"/></a>
+        <a href="https://www.360.com" target="_blank"><img src="https://res.strikefreedom.top/static_res/logos/360-logo.png" width="300" align="middle"/></a>
+        <a href="https://tieba.baidu.com" target="_blank"><img src="https://res.strikefreedom.top/static_res/logos/baidu-tieba-logo.png" width="300" align="middle"/></a>
+        <a href="https://game.qq.com" target="_blank"><img src="https://res.strikefreedom.top/static_res/logos/tencent-games-logo.png" width="300" align="middle"/></a>
         <br />
         <p className="hero--subtitle">If your projects are also using <code>gnet</code>, feel free to open a <Link to="https://github.com/panjf2000/gnet/pulls">pull request</Link> refreshing this list.</p>
       </div>
