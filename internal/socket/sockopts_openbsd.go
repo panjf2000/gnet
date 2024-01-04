@@ -14,9 +14,7 @@
 
 package socket
 
-import (
-	"golang.org/x/sys/unix"
-)
+import "golang.org/x/sys/unix"
 
 // SetKeepAlivePeriod sets whether the operating system should send
 // keep-alive messages on the connection and sets period between TCP keep-alive probes.
