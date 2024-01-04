@@ -47,7 +47,7 @@ jobs:
       - name: Setup and run golangci-lint
         uses: golangci/golangci-lint-action@v3
         with:
-          version: v1.52.2
+          version: v1.55.2
           args: -v -E gofumpt -E gocritic -E misspell -E revive -E godot
   test:
     needs: lint

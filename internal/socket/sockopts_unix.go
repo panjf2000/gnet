@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build linux || freebsd || dragonfly || netbsd || openbsd
-// +build linux freebsd dragonfly netbsd openbsd
+//go:build linux || freebsd || dragonfly || netbsd
+// +build linux freebsd dragonfly netbsd
 
 package socket
 
@@ -30,11 +30,22 @@ func SetKeepAlivePeriod(fd, secs int) error {
 	if secs <= 0 {
 		return errors.New("invalid time duration")
 	}
-	if err := os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_KEEPALIVE, 1)); err != nil {
-		return err
+
+	if err := unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_KEEPALIVE, 1); err != nil {
+		return os.NewSyscallError("setsockopt", err)
 	}
-	if err := os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.IPPROTO_TCP, unix.TCP_KEEPINTVL, secs)); err != nil {
-		return err
+
+	if err := unix.SetsockoptInt(fd, unix.IPPROTO_TCP, unix.TCP_KEEPIDLE, secs); err != nil {
+		return os.NewSyscallError("setsockopt", err)
 	}
-	return os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.IPPROTO_TCP, unix.TCP_KEEPIDLE, secs))
+
+	interval := secs / 5
+	if interval == 0 {
+		interval = 1
+	}
+	if err := unix.SetsockoptInt(fd, unix.IPPROTO_TCP, unix.TCP_KEEPINTVL, interval); err != nil {
+		return os.NewSyscallError("setsockopt", err)
+	}
+
+	return os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.IPPROTO_TCP, unix.TCP_KEEPCNT, 5))
 }
