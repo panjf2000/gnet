@@ -27,13 +27,28 @@ func SetKeepAlivePeriod(fd, secs int) error {
 	if secs <= 0 {
 		return errors.New("invalid time duration")
 	}
-	if err := os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_KEEPALIVE, 1)); err != nil {
-		return err
+
+	if err := unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_KEEPALIVE, 1); err != nil {
+		return os.NewSyscallError("setsockopt", err)
 	}
-	switch err := os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.IPPROTO_TCP, unix.TCP_KEEPINTVL, secs)); err {
-	case nil, unix.ENOPROTOOPT: // OS X 10.7 and earlier don't support this option
-	default:
-		return err
+
+	if err := unix.SetsockoptInt(fd, unix.IPPROTO_TCP, unix.TCP_KEEPALIVE, secs); err != nil {
+		return os.NewSyscallError("setsockopt", err)
 	}
-	return os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.IPPROTO_TCP, unix.TCP_KEEPALIVE, secs))
+
+	interval := secs / 5
+	if interval == 0 {
+		interval = 1
+	}
+	if err := unix.SetsockoptInt(fd, unix.IPPROTO_TCP, unix.TCP_KEEPINTVL, interval); err != nil {
+		// In earlier versions, macOS only supported setting TCP_KEEPALIVE (the equivalent of TCP_KEEPIDLE on other platforms),
+		// but since macOS 10.8 it has supported TCP_KEEPINTVL and TCP_KEEPCNT.
+		// If the current OS is macOS and the error is ENOPROTOOPT, ignore it.
+		if err == unix.ENOPROTOOPT {
+			err = nil
+		}
+		return os.NewSyscallError("setsockopt", err)
+	}
+
+	return os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.IPPROTO_TCP, unix.TCP_KEEPCNT, 5))
 }
