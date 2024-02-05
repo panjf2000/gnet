@@ -136,7 +136,10 @@ func (p *Poller) Polling() error {
 		for i := 0; i < n; i++ {
 			ev := &el.events[i]
 			pollAttachment := *(**PollAttachment)(unsafe.Pointer(&ev.data))
-			if pollAttachment.FD != p.epa.FD {
+			if pollAttachment.FD == p.epa.FD { // poller is awakened to run tasks in queues.
+				doChores = true
+				_, _ = unix.Read(p.epa.FD, p.efdBuf)
+			} else {
 				switch err = pollAttachment.Callback(pollAttachment.FD, ev.events); err {
 				case nil:
 				case errors.ErrAcceptSocket, errors.ErrEngineShutdown:
@@ -144,9 +147,6 @@ func (p *Poller) Polling() error {
 				default:
 					logging.Warnf("error occurs in event-loop: %v", err)
 				}
-			} else { // poller is awakened to run tasks in queues.
-				doChores = true
-				_, _ = unix.Read(p.epa.FD, p.efdBuf)
 			}
 		}
 
