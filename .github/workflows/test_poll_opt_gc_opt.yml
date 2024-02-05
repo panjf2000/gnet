@@ -89,6 +89,8 @@ jobs:
             ${{ steps.go-env.outputs.GO_CACHE }}
             ~/go/pkg/mod
             ~/.cache/go-build
+            ~/Library/Caches/go-build
+            ~\AppData\Local\go-build
           key: ${{ runner.os }}-${{ matrix.go }}-go-ci-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-${{ matrix.go }}-go-ci-
