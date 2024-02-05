@@ -17,6 +17,16 @@
 
 package gnet
 
+import "github.com/panjf2000/gnet/v2/internal/netpoll"
+
+func (eng *engine) accept(fd int, ev netpoll.IOEvent, flags netpoll.IOFlags) error {
+	return eng.accept1(fd, ev, flags)
+}
+
+func (el *eventloop) accept(fd int, ev netpoll.IOEvent, flags netpoll.IOFlags) error {
+	return el.accept1(fd, ev, flags)
+}
+
 // The canonical BSD sockets implementation will inherit file status flags
 // from the listening socket, so we don't need to set the non-blocking flag
 // for the accepted sockets explicitly.

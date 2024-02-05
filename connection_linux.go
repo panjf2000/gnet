@@ -42,3 +42,7 @@ func (c *conn) handleEvents(_ int, ev uint32) error {
 
 	return nil
 }
+
+func (el *eventloop) readUDP(fd int, ev netpoll.IOEvent) error {
+	return el.readUDP1(fd, ev, 0)
+}

@@ -491,3 +491,85 @@ func TestWakeConnImmediately(t *testing.T) {
 	err = Run(serverEV, serverEV.network+"://"+serverEV.addr, WithTicker(true))
 	assert.NoError(t, err)
 }
+
+func TestClientReadOnEOF(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:9999")
+	assert.NoError(t, err)
+	defer ln.Close()
+
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				break
+			}
+			go process(conn)
+		}
+	}()
+
+	ev := &clientReadOnEOF{
+		result: make(chan struct {
+			data []byte
+			err  error
+		}, 1),
+		data: []byte("test"),
+	}
+	cli, err := NewClient(ev)
+	assert.NoError(t, err)
+	defer cli.Stop() //nolint:errcheck
+
+	err = cli.Start()
+	assert.NoError(t, err)
+
+	_, err = cli.Dial("tcp", "127.0.0.1:9999")
+	assert.NoError(t, err)
+
+	select {
+	case res := <-ev.result:
+		assert.NoError(t, res.err)
+		assert.EqualValuesf(t, ev.data, res.data, "expected: %v, but got: %v", ev.data, res.data)
+	case <-time.After(5 * time.Second):
+		t.Errorf("timeout waiting for the result")
+	}
+}
+
+func process(conn net.Conn) {
+	defer conn.Close() //noliint:errcheck
+	buf := make([]byte, 8)
+	n, err := conn.Read(buf)
+	if err != nil {
+		return
+	}
+	_, _ = conn.Write(buf[:n])
+	_ = conn.Close()
+}
+
+type clientReadOnEOF struct {
+	BuiltinEventEngine
+	data   []byte
+	result chan struct {
+		data []byte
+		err  error
+	}
+}
+
+func (clientReadOnEOF) OnBoot(Engine) (action Action) {
+	return None
+}
+
+func (cli clientReadOnEOF) OnOpen(Conn) (out []byte, action Action) {
+	return cli.data, None
+}
+
+func (clientReadOnEOF) OnClose(Conn, error) (action Action) {
+	return Close
+}
+
+func (cli clientReadOnEOF) OnTraffic(c Conn) (action Action) {
+	data, err := c.Next(-1)
+	cli.result <- struct {
+		data []byte
+		err  error
+	}{data: data, err: err}
+	return None
+}

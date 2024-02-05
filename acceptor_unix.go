@@ -29,7 +29,7 @@ import (
 	"github.com/panjf2000/gnet/v2/pkg/logging"
 )
 
-func (eng *engine) accept(fd int, _ netpoll.IOEvent) error {
+func (eng *engine) accept1(fd int, _ netpoll.IOEvent, _ netpoll.IOFlags) error {
 	nfd, sa, err := unix.Accept(fd)
 	if err != nil {
 		switch err {
@@ -64,9 +64,9 @@ func (eng *engine) accept(fd int, _ netpoll.IOEvent) error {
 	return nil
 }
 
-func (el *eventloop) accept(fd int, ev netpoll.IOEvent) error {
+func (el *eventloop) accept1(fd int, ev netpoll.IOEvent, flags netpoll.IOFlags) error {
 	if el.ln.network == "udp" {
-		return el.readUDP(fd, ev)
+		return el.readUDP1(fd, ev, flags)
 	}
 
 	nfd, sa, err := unix.Accept(el.ln.fd)

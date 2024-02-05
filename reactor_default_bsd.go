@@ -19,9 +19,8 @@
 package gnet
 
 import (
+	"io"
 	"runtime"
-
-	"golang.org/x/sys/unix"
 
 	"github.com/panjf2000/gnet/v2/internal/netpoll"
 	"github.com/panjf2000/gnet/v2/pkg/errors"
@@ -33,7 +32,7 @@ func (el *eventloop) activateMainReactor() error {
 		defer runtime.UnlockOSThread()
 	}
 
-	err := el.poller.Polling(func(fd int, filter int16) error { return el.engine.accept(fd, filter) })
+	err := el.poller.Polling(el.engine.accept)
 	if err == errors.ErrEngineShutdown {
 		el.engine.opts.Logger.Debugf("main reactor is exiting in terms of the demand from user, %v", err)
 		err = nil
@@ -52,17 +51,24 @@ func (el *eventloop) activateSubReactor() error {
 		defer runtime.UnlockOSThread()
 	}
 
-	err := el.poller.Polling(func(fd int, filter int16) (err error) {
+	err := el.poller.Polling(func(fd int, filter int16, flags uint16) (err error) {
 		if c := el.connections.getConn(fd); c != nil {
-			switch filter {
-			case netpoll.EVFilterSock:
-				err = el.close(c, unix.ECONNRESET)
-			case netpoll.EVFilterWrite:
+			switch {
+			case flags&netpoll.EVFlagsDelete != 0:
+			case flags&netpoll.EVFlagsEOF != 0:
+				if filter == netpoll.EVFilterRead { // read the remaining data after the peer wrote and closed immediately
+					err = el.read(c)
+				} else if filter == netpoll.EVFilterWrite && !c.outboundBuffer.IsEmpty() {
+					err = el.write(c)
+				} else {
+					err = el.close(c, io.EOF)
+				}
+			case filter == netpoll.EVFilterRead:
+				err = el.read(c)
+			case filter == netpoll.EVFilterWrite:
 				if !c.outboundBuffer.IsEmpty() {
 					err = el.write(c)
 				}
-			case netpoll.EVFilterRead:
-				err = el.read(c)
 			}
 		}
 		return
@@ -86,21 +92,28 @@ func (el *eventloop) run() error {
 		defer runtime.UnlockOSThread()
 	}
 
-	err := el.poller.Polling(func(fd int, filter int16) (err error) {
+	err := el.poller.Polling(func(fd int, filter int16, flags uint16) (err error) {
 		if c := el.connections.getConn(fd); c != nil {
-			switch filter {
-			case netpoll.EVFilterSock:
-				err = el.close(c, unix.ECONNRESET)
-			case netpoll.EVFilterWrite:
+			switch {
+			case flags&netpoll.EVFlagsDelete != 0:
+			case flags&netpoll.EVFlagsEOF != 0:
+				if filter == netpoll.EVFilterRead { // read the remaining data after the peer wrote and closed immediately
+					err = el.read(c)
+				} else if filter == netpoll.EVFilterWrite && !c.outboundBuffer.IsEmpty() {
+					err = el.write(c)
+				} else {
+					err = el.close(c, io.EOF)
+				}
+			case filter == netpoll.EVFilterRead:
+				err = el.read(c)
+			case filter == netpoll.EVFilterWrite:
 				if !c.outboundBuffer.IsEmpty() {
 					err = el.write(c)
 				}
-			case netpoll.EVFilterRead:
-				err = el.read(c)
 			}
 			return
 		}
-		return el.accept(fd, filter)
+		return el.accept(fd, filter, flags)
 	})
 	if err == errors.ErrEngineShutdown {
 		el.engine.opts.Logger.Debugf("event-loop(%d) is exiting in terms of the demand from user, %v", el.idx, err)

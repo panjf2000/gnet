@@ -18,21 +18,32 @@
 package gnet
 
 import (
-	"golang.org/x/sys/unix"
+	"io"
 
 	"github.com/panjf2000/gnet/v2/internal/netpoll"
 )
 
-func (c *conn) handleEvents(_ int, filter int16) (err error) {
-	switch filter {
-	case netpoll.EVFilterSock:
-		err = c.loop.close(c, unix.ECONNRESET)
-	case netpoll.EVFilterWrite:
+func (c *conn) handleEvents(_ int, filter int16, flags uint16) (err error) {
+	switch {
+	case flags&netpoll.EVFlagsDelete != 0:
+	case flags&netpoll.EVFlagsEOF != 0:
+		if filter == netpoll.EVFilterRead { // read the remaining data after the peer wrote and closed immediately
+			err = c.loop.read(c)
+		} else if filter == netpoll.EVFilterWrite && !c.outboundBuffer.IsEmpty() {
+			err = c.loop.write(c)
+		} else {
+			err = c.loop.close(c, io.EOF)
+		}
+	case filter == netpoll.EVFilterRead:
+		err = c.loop.read(c)
+	case filter == netpoll.EVFilterWrite:
 		if !c.outboundBuffer.IsEmpty() {
 			err = c.loop.write(c)
 		}
-	case netpoll.EVFilterRead:
-		err = c.loop.read(c)
 	}
 	return
+}
+
+func (el *eventloop) readUDP(fd int, filter netpoll.IOEvent, flags netpoll.IOFlags) error {
+	return el.readUDP1(fd, filter, flags)
 }
