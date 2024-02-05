@@ -56,19 +56,18 @@ func (el *eventloop) activateSubReactor() error {
 			switch {
 			case flags&netpoll.EVFlagsDelete != 0:
 			case flags&netpoll.EVFlagsEOF != 0:
-				if filter == netpoll.EVFilterRead { // read the remaining data after the peer wrote and closed immediately
+				switch {
+				case filter == netpoll.EVFilterRead: // read the remaining data after the peer wrote and closed immediately
 					err = el.read(c)
-				} else if filter == netpoll.EVFilterWrite && !c.outboundBuffer.IsEmpty() {
+				case filter == netpoll.EVFilterWrite && !c.outboundBuffer.IsEmpty():
 					err = el.write(c)
-				} else {
+				default:
 					err = el.close(c, io.EOF)
 				}
 			case filter == netpoll.EVFilterRead:
 				err = el.read(c)
-			case filter == netpoll.EVFilterWrite:
-				if !c.outboundBuffer.IsEmpty() {
-					err = el.write(c)
-				}
+			case filter == netpoll.EVFilterWrite && !c.outboundBuffer.IsEmpty():
+				err = el.write(c)
 			}
 		}
 		return
@@ -97,19 +96,18 @@ func (el *eventloop) run() error {
 			switch {
 			case flags&netpoll.EVFlagsDelete != 0:
 			case flags&netpoll.EVFlagsEOF != 0:
-				if filter == netpoll.EVFilterRead { // read the remaining data after the peer wrote and closed immediately
+				switch {
+				case filter == netpoll.EVFilterRead: // read the remaining data after the peer wrote and closed immediately
 					err = el.read(c)
-				} else if filter == netpoll.EVFilterWrite && !c.outboundBuffer.IsEmpty() {
+				case filter == netpoll.EVFilterWrite && !c.outboundBuffer.IsEmpty():
 					err = el.write(c)
-				} else {
+				default:
 					err = el.close(c, io.EOF)
 				}
 			case filter == netpoll.EVFilterRead:
 				err = el.read(c)
-			case filter == netpoll.EVFilterWrite:
-				if !c.outboundBuffer.IsEmpty() {
-					err = el.write(c)
-				}
+			case filter == netpoll.EVFilterWrite && !c.outboundBuffer.IsEmpty():
+				err = el.write(c)
 			}
 			return
 		}

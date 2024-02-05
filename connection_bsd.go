@@ -27,11 +27,12 @@ func (c *conn) handleEvents(_ int, filter int16, flags uint16) (err error) {
 	switch {
 	case flags&netpoll.EVFlagsDelete != 0:
 	case flags&netpoll.EVFlagsEOF != 0:
-		if filter == netpoll.EVFilterRead { // read the remaining data after the peer wrote and closed immediately
+		switch {
+		case filter == netpoll.EVFilterRead: // read the remaining data after the peer wrote and closed immediately
 			err = c.loop.read(c)
-		} else if filter == netpoll.EVFilterWrite && !c.outboundBuffer.IsEmpty() {
+		case filter == netpoll.EVFilterWrite && !c.outboundBuffer.IsEmpty():
 			err = c.loop.write(c)
-		} else {
+		default:
 			err = c.loop.close(c, io.EOF)
 		}
 	case filter == netpoll.EVFilterRead:
