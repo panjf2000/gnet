@@ -37,10 +37,8 @@ func (c *conn) handleEvents(_ int, filter int16, flags uint16) (err error) {
 		}
 	case filter == netpoll.EVFilterRead:
 		err = c.loop.read(c)
-	case filter == netpoll.EVFilterWrite:
-		if !c.outboundBuffer.IsEmpty() {
-			err = c.loop.write(c)
-		}
+	case filter == netpoll.EVFilterWrite && !c.outboundBuffer.IsEmpty():
+		err = c.loop.write(c)
 	}
 	return
 }
