@@ -19,12 +19,12 @@ package gnet
 
 import "github.com/panjf2000/gnet/v2/internal/netpoll"
 
-func (eng *engine) accept(fd int, ev netpoll.IOEvent, flags netpoll.IOFlags) error {
-	return eng.accept1(fd, ev, flags)
+func (eng *engine) accept(fd int, filter netpoll.IOEvent, flags netpoll.IOFlags) error {
+	return eng.accept1(fd, filter, flags)
 }
 
-func (el *eventloop) accept(fd int, ev netpoll.IOEvent, flags netpoll.IOFlags) error {
-	return el.accept1(fd, ev, flags)
+func (el *eventloop) accept(fd int, filter netpoll.IOEvent, flags netpoll.IOFlags) error {
+	return el.accept1(fd, filter, flags)
 }
 
 // The canonical BSD sockets implementation will inherit file status flags
