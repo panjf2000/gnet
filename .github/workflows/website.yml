@@ -46,6 +46,10 @@ jobs:
           HostName github.com
           IdentityFile ~/.ssh/id_rsa
           EOT
+      - name: Update Root Certificates
+        run: | 
+          sudo apt-get update 
+          sudo apt-get install ca-certificates
       - name: Release to GitHub Pages
         env:
           USE_SSH: true
