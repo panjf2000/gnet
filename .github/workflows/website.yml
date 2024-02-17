@@ -46,10 +46,6 @@ jobs:
           HostName github.com
           IdentityFile ~/.ssh/id_rsa
           EOT
-      - name: Update Root Certificates
-        run: | 
-          sudo apt-get update 
-          sudo apt-get install ca-certificates
       - name: Release to GitHub Pages
         env:
           USE_SSH: true
@@ -58,6 +54,7 @@ jobs:
           git config --global user.email "actions@gihub.com"
           git config --global user.name "gh-actions"
           if [ -e yarn.lock ]; then
+          yarn config set strict-ssl false
           yarn install --frozen-lockfile
           elif [ -e package-lock.json ]; then
           npm ci
