@@ -13,13 +13,6 @@ To avoid blocking event-loops, asynchronize your blocking code, for example by s
 
 If you're not familiar with how gnet works, go back and read [this](https://gnet.host/docs/about/overview/#networking-model-of-multiple-threadsgoroutines).
 
-### Either loop read data in OnTraffic() or invoke c.Wake() regularly
-
-Despite the fact that gnet leverages epoll/kqueue with level-triggered mode under the hood, OnTraffic() won't be invoked constantly given there is data left in the inbound buffer of a connection, OnTraffic() is only invoked when the connection has new data arriving, which is like edge-triggered mode from the user's point of view.
-
-Thus, you should loop call c.Read()/c.Peek()/c.Next() for a connection in OnTraffic() to drain the inbound buffer of incoming data, but if you don't, then make sure you call c.Wake() periodically, otherwise you may never get a chance to read the rest of the data sent by the peer endpoint (client or server) unless the peer endpoint sends new data over.
-
-
 ### Leverage Conn.Context() to monopolize data instead of sharing it across connections
 
 It's recommended to use Conn.Context() to store necessary resource for each connection, so that each connection can take advantage of its exclusive resource, avoiding the contention of single resource across connections.
