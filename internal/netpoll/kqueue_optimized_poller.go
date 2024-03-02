@@ -127,24 +127,19 @@ func (p *Poller) Polling() error {
 		}
 		tsp = &ts
 
-		var evFilter int16
 		for i := 0; i < n; i++ {
 			ev := &el.events[i]
-			if ev.Ident != 0 {
-				evFilter = ev.Filter
-				if (ev.Flags&unix.EV_EOF != 0) || (ev.Flags&unix.EV_ERROR != 0) {
-					evFilter = EVFilterSock
-				}
+			if ev.Ident == 0 { // poller is awakened to run tasks in queues
+				doChores = true
+			} else {
 				pollAttachment := (*PollAttachment)(unsafe.Pointer(ev.Udata))
-				switch err = pollAttachment.Callback(int(ev.Ident), evFilter); err {
+				switch err = pollAttachment.Callback(int(ev.Ident), ev.Filter, ev.Flags); err {
 				case nil:
 				case errors.ErrAcceptSocket, errors.ErrEngineShutdown:
 					return err
 				default:
 					logging.Warnf("error occurs in event-loop: %v", err)
 				}
-			} else { // poller is awakened to run tasks in queues.
-				doChores = true
 			}
 		}
 

@@ -115,7 +115,7 @@ func (p *Poller) Trigger(fn queue.TaskFunc, arg interface{}) (err error) {
 }
 
 // Polling blocks the current goroutine, waiting for network-events.
-func (p *Poller) Polling(callback func(fd int, ev uint32) error) error {
+func (p *Poller) Polling(callback PollEventHandler) error {
 	el := newEventList(InitPollEventsCap)
 	var doChores bool
 
@@ -134,7 +134,10 @@ func (p *Poller) Polling(callback func(fd int, ev uint32) error) error {
 
 		for i := 0; i < n; i++ {
 			ev := &el.events[i]
-			if fd := int(ev.Fd); fd != p.efd {
+			if fd := int(ev.Fd); fd == p.efd { // poller is awakened to run tasks in queues.
+				doChores = true
+				_, _ = unix.Read(p.efd, p.efdBuf)
+			} else {
 				switch err = callback(fd, ev.Events); err {
 				case nil:
 				case errors.ErrAcceptSocket, errors.ErrEngineShutdown:
@@ -142,9 +145,6 @@ func (p *Poller) Polling(callback func(fd int, ev uint32) error) error {
 				default:
 					logging.Warnf("error occurs in event-loop: %v", err)
 				}
-			} else { // poller is awakened to run tasks in queues.
-				doChores = true
-				_, _ = unix.Read(p.efd, p.efdBuf)
 			}
 		}
 
