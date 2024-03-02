@@ -17,11 +17,7 @@
 
 package gnet
 
-import (
-	"golang.org/x/sys/unix"
-
-	"github.com/panjf2000/gnet/v2/internal/netpoll"
-)
+import "github.com/panjf2000/gnet/v2/internal/netpoll"
 
 func (eng *engine) accept(fd int, ev netpoll.IOEvent) error {
 	return eng.accept1(fd, ev, 0)
@@ -29,8 +25,4 @@ func (eng *engine) accept(fd int, ev netpoll.IOEvent) error {
 
 func (el *eventloop) accept(fd int, ev netpoll.IOEvent) error {
 	return el.accept1(fd, ev, 0)
-}
-
-func setNonBlock(fd int, nonBlocking bool) error {
-	return unix.SetNonblock(fd, nonBlocking)
 }

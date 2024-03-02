@@ -66,14 +66,14 @@ func (eng *engine) shutdown(err error) {
 }
 
 func (eng *engine) startEventLoops() {
-	eng.eventLoops.iterate(func(i int, el *eventloop) bool {
+	eng.eventLoops.iterate(func(_ int, el *eventloop) bool {
 		eng.workerPool.Go(el.run)
 		return true
 	})
 }
 
 func (eng *engine) closeEventLoops() {
-	eng.eventLoops.iterate(func(i int, el *eventloop) bool {
+	eng.eventLoops.iterate(func(_ int, el *eventloop) bool {
 		el.ln.close()
 		_ = el.poller.Close()
 		return true
@@ -88,7 +88,7 @@ func (eng *engine) closeEventLoops() {
 }
 
 func (eng *engine) startSubReactors() {
-	eng.eventLoops.iterate(func(i int, el *eventloop) bool {
+	eng.eventLoops.iterate(func(_ int, el *eventloop) bool {
 		eng.workerPool.Go(el.activateSubReactor)
 		return true
 	})
@@ -202,7 +202,7 @@ func (eng *engine) stop(s Engine) {
 	eng.eventHandler.OnShutdown(s)
 
 	// Notify all event-loops to exit.
-	eng.eventLoops.iterate(func(i int, el *eventloop) bool {
+	eng.eventLoops.iterate(func(_ int, el *eventloop) bool {
 		err := el.poller.UrgentTrigger(func(_ interface{}) error { return errors.ErrEngineShutdown }, nil)
 		if err != nil {
 			eng.opts.Logger.Errorf("failed to call UrgentTrigger on sub event-loop when stopping engine: %v", err)
