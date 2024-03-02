@@ -886,7 +886,7 @@ func (t *testCloseConnectionServer) OnTraffic(c Conn) (action Action) {
 	_, _ = c.Discard(-1)
 	go func() {
 		time.Sleep(time.Second)
-		_ = c.CloseWithCallback(func(c Conn, err error) error {
+		_ = c.CloseWithCallback(func(_ Conn, err error) error {
 			assert.ErrorIsf(t.tester, err, errorx.ErrEngineShutdown, "should be engine shutdown error")
 			return nil
 		})

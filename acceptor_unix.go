@@ -18,7 +18,6 @@
 package gnet
 
 import (
-	"os"
 	"time"
 
 	"golang.org/x/sys/unix"
@@ -30,7 +29,7 @@ import (
 )
 
 func (eng *engine) accept1(fd int, _ netpoll.IOEvent, _ netpoll.IOFlags) error {
-	nfd, sa, err := unix.Accept(fd)
+	nfd, sa, err := socket.Accept(fd)
 	if err != nil {
 		switch err {
 		case unix.EINTR, unix.EAGAIN, unix.ECONNABORTED:
@@ -44,9 +43,6 @@ func (eng *engine) accept1(fd int, _ netpoll.IOEvent, _ netpoll.IOFlags) error {
 		}
 	}
 
-	if err = os.NewSyscallError("fcntl nonblock", setNonBlock(nfd, true)); err != nil {
-		return err
-	}
 	remoteAddr := socket.SockaddrToTCPOrUnixAddr(sa)
 	if eng.opts.TCPKeepAlive > 0 && eng.ln.network == "tcp" {
 		err = socket.SetKeepAlivePeriod(nfd, int(eng.opts.TCPKeepAlive.Seconds()))
@@ -69,7 +65,7 @@ func (el *eventloop) accept1(fd int, ev netpoll.IOEvent, flags netpoll.IOFlags) 
 		return el.readUDP1(fd, ev, flags)
 	}
 
-	nfd, sa, err := unix.Accept(el.ln.fd)
+	nfd, sa, err := socket.Accept(el.ln.fd)
 	if err != nil {
 		switch err {
 		case unix.EINTR, unix.EAGAIN, unix.ECONNABORTED:
@@ -83,9 +79,6 @@ func (el *eventloop) accept1(fd int, ev netpoll.IOEvent, flags netpoll.IOFlags) 
 		}
 	}
 
-	if err = os.NewSyscallError("fcntl nonblock", setNonBlock(nfd, true)); err != nil {
-		return err
-	}
 	remoteAddr := socket.SockaddrToTCPOrUnixAddr(sa)
 	if el.engine.opts.TCPKeepAlive > 0 && el.ln.network == "tcp" {
 		err = socket.SetKeepAlivePeriod(nfd, int(el.engine.opts.TCPKeepAlive/time.Second))
