@@ -22,6 +22,8 @@ package socket
 
 import (
 	"net"
+
+	"golang.org/x/sys/unix"
 )
 
 // Option is used for setting an option on socket.
@@ -43,4 +45,10 @@ func UDPSocket(proto, addr string, connect bool, sockOpts ...Option) (int, net.A
 // UnixSocket calls the internal udsSocket.
 func UnixSocket(proto, addr string, passive bool, sockOpts ...Option) (int, net.Addr, error) {
 	return udsSocket(proto, addr, passive, sockOpts...)
+}
+
+// Accept accepts the next incoming socket along with setting
+// O_NONBLOCK and O_CLOEXEC flags on it.
+func Accept(fd int) (int, unix.Sockaddr, error) {
+	return sysAccept(fd)
 }

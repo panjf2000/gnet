@@ -17,6 +17,9 @@
 
 package netpoll
 
+// IOFlags represents the flags of IO events.
+type IOFlags = uint16
+
 // PollAttachment is the user data which is about to be stored in "void *ptr" of epoll_data or "void *udata" of kevent.
 type PollAttachment struct {
 	FD       int
