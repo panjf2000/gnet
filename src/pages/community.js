@@ -37,11 +37,11 @@ function Community() {
                 </a>
               </div>
               <div className="col">
-                <a href="https://twitter.com/_andy_pan" target="_blank" className="panel panel--button">
+                <a href="https://twitter.com/panjf2000" target="_blank" className="panel panel--button">
                   <div className="panel--icon">
                     <i className="feather icon-twitter" title="Twitter"></i>
                   </div>
-                  <div className="panel--title">@_andy_pan</div>
+                  <div className="panel--title">@panjf2000</div>
                   <div className="panel--description">Follow me in real-time</div>
                 </a>
               </div>
