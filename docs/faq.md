@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2022-02-26"
+last_modified_on: "2024-03-04"
 id: faq
 title: "FAQ"
 description: "Frequently asked questions about gnet."
@@ -9,7 +9,7 @@ description: "Frequently asked questions about gnet."
 
 ###  Why is gnet so fast?
 
-gnet's networking model is a `Reactor` networking model with a event-driven mechanism that is designed and tuned to manage millions of network connections and handle a zillion requests, which backs gnet up to be the fatest networking framework in Go, and all it takes is a few goroutines.
+gnet's networking model is a `Reactor` networking model with a event-driven mechanism that is designed and tuned to manage millions of network connections and handle a zillion requests, which backs gnet up to be the fastest networking framework in Go, and all it takes is a few goroutines.
 
 In addition to the first-class networking model, the implementation of auto-scaling and reusable elastic buffers in gnet is also one of the critical essentials for its high performance.
 
@@ -17,9 +17,9 @@ In addition to the first-class networking model, the implementation of auto-scal
 
 ## Stability
 
-### Is gnet solid enough to be used in production?
+### Is gnet production-ready?
 
-Sure it is! 
+Sure it is!
 
 Actually, there are already many companies/organizations using `gnet` as the underlying network service in production and they have been worked well for a long time.
 
