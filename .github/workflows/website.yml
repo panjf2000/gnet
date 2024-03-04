@@ -11,10 +11,10 @@ jobs:
     if: github.event_name != 'push'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: 16
+          node-version: 20
       - name: Test Build
         run: |
           if [ -e yarn.lock ]; then
@@ -29,10 +29,10 @@ jobs:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: 16
+          node-version: 20
       - name: Add key to allow access to repository
         env:
           SSH_AUTH_SOCK: /tmp/ssh_agent.sock
@@ -50,6 +50,7 @@ jobs:
         env:
           USE_SSH: true
           GIT_USER: git
+          NODE_OPTIONS: --openssl-legacy-provider
         run: |
           git config --global user.email "actions@gihub.com"
           git config --global user.name "gh-actions"
