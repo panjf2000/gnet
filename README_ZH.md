@@ -22,7 +22,7 @@
 
 `gnet` 和 [net](https://golang.org/pkg/net/) 有着不一样的网络编程模式。因此，用 `gnet` 开发网络应用和用 [net](https://golang.org/pkg/net/) 开发区别很大，而且两者之间不可调和。社区里有其他同类的产品像是 [libevent](https://github.com/libevent/libevent), [libuv](https://github.com/libuv/libuv), [netty](https://github.com/netty/netty), [twisted](https://github.com/twisted/twisted), [tornado](https://github.com/tornadoweb/tornado)，`gnet` 的底层工作原理和这些框架非常类似。
 
-`gnet` 不是为了取代 [net](https://golang.org/pkg/net/) 而生的，而是在 Go 生态中为开发者提供一个开发性能敏感的网络服务的替代品。也正因如此，`gnet` 在功能上的全面性并不如 Go [net](https://golang.org/pkg/net/)，它只会提供网络应用所需的最核心的功能和最精简的 APIs，而且 `gnet` 也并没有打算变成一个无所不包的网络框架，因为我觉得 Go [net](https://golang.org/pkg/net/) 在这方面已经做得足够好了。
+`gnet` 不是为了取代 [net](https://golang.org/pkg/net/) 而生的，而是在 Go 生态中为开发者提供一个开发性能敏感的网络服务的替代品。也正因如此，`gnet` 在功能全面性上比不了 Go [net](https://golang.org/pkg/net/)，它只会提供网络应用所需的最核心的功能和最精简的 APIs，而且 `gnet` 也并没有打算变成一个无所不包的网络框架，因为我觉得 Go [net](https://golang.org/pkg/net/) 在这方面已经做得足够好了。
 
 `gnet` 的卖点在于它是一个高性能、轻量级、非阻塞的纯 Go 语言实现的传输层（TCP/UDP/Unix Domain Socket）网络框架。开发者可以使用 `gnet` 来实现自己的应用层网络协议(HTTP、RPC、Redis、WebSocket 等等)，从而构建出自己的应用层网络服务。比如在 `gnet` 上实现 HTTP 协议就可以创建出一个 HTTP 服务器 或者 Web 开发框架，实现 Redis 协议就可以创建出自己的 Redis 服务器等等。
 
