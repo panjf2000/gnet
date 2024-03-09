@@ -40,12 +40,12 @@ function Contact() {
                   </div>
                   <div className="panel--title">@_andy_pan</div>
                   <div className="panel--description">
-                    Tweet at me 
+                    Tweet at me
                   </div>
                 </a>
               </div>
               <div className="col">
-                <a href="https://gitter.im/gnet-io/gnet" target="_blank" className="panel text--center">
+                <a href="https://discord.gg/UyKD7NZcfH" target="_blank" className="panel text--center">
                   <div className="panel--icon">
                     <i className="feather icon-message-circle"></i>
                   </div>

@@ -54,4 +54,4 @@ gnet is [open-source](https://github.com/panjf2000/gnet) and welcomes contributi
 
 1. Read our [contribution guide](https://github.com/panjf2000/gnet/blob/master/CONTRIBUTING.md).
 2. Start with [good first issues](https://github.com/panjf2000/gnet/issues?q=is%3Aissue+label%3A"good+first+issue").
-3. Join our [chat](https://gitter.im/gnet-io/gnet) if you have any questions. We are happy to help!
+3. Join our [chat](https://discord.gg/UyKD7NZcfH) if you have any questions. We are happy to help!

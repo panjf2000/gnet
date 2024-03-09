@@ -28,7 +28,7 @@ function Community() {
           <div className="container">
             <div className="row">
               <div className="col">
-                <a href="https://gitter.im/gnet-io/gnet" target="_blank" className="panel panel--button">
+                <a href="https://discord.gg/UyKD7NZcfH" target="_blank" className="panel panel--button">
                   <div className="panel--icon">
                     <i className="feather icon-message-circle"></i>
                   </div>

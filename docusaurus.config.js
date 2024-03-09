@@ -63,7 +63,7 @@ module.exports = {
           items: [
             {
               label: "Chat",
-              to: "https://gitter.im/gnet-io/gnet",
+              to: "https://discord.gg/UyKD7NZcfH",
             },
             {
               label: "Github",
