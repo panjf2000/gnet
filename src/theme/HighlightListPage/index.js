@@ -50,7 +50,7 @@ function HighlightListPage(props) {
         <div className="container container--xs">
           <h1>gnet Highlights</h1>
           <div className="hero--subtitle">
-            New features &amp; updates. Follow <a href="https://twitter.com/_andy_pan" target="_blank"> <i className="feather icon-twitter"></i> @_andy_pan</a> for real-time updates!
+            New features &amp; updates. Follow <a href="https://twitter.com/panjf2000" target="_blank"> <i className="feather icon-twitter"></i> @panjf2000</a> for real-time updates!
           </div>
           <div className="hero--search">
             <input

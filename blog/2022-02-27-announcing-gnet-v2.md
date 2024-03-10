@@ -11,7 +11,7 @@ Today, I'm thrilled to announce the release of [gnet v2.0.0](https://github.com/
 
 In this blog post, we'll go through the most notable changes to gnet 2.0.
 
-P.S. Follow me on Twitter [@_andy_pan](https://twitter.com/_andy_pan) to get the latest updates about gnet!
+P.S. Follow me on Twitter [@panjf2000](https://twitter.com/panjf2000) to get the latest updates about gnet!
 
 ## Features
 

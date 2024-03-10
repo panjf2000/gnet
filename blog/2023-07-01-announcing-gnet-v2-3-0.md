@@ -9,7 +9,7 @@ tags: ["type: announcement", "domain: presentation"]
 
 Today, I'm thrilled to announce the official release of [gnet v2.3.0](https://github.com/panjf2000/gnet/releases/tag/v2.3.0).
 
-P.S. Follow me on Twitter [@_andy_pan](https://twitter.com/_andy_pan) to get the latest updates about gnet!
+P.S. Follow me on Twitter [@panjf2000](https://twitter.com/panjf2000) to get the latest updates about gnet!
 
 ## Intro
 

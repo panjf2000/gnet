@@ -34,11 +34,11 @@ function Contact() {
                 </a>
               </div>
               <div className="col">
-                <a href="https://twitter.com/_andy_pan" target="_blank" className="panel text--center">
+                <a href="https://twitter.com/panjf2000" target="_blank" className="panel text--center">
                   <div className="panel--icon">
                     <i className="feather icon-twitter"></i>
                   </div>
-                  <div className="panel--title">@_andy_pan</div>
+                  <div className="panel--title">@panjf2000</div>
                   <div className="panel--description">
                     Tweet at me
                   </div>

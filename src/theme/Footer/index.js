@@ -64,7 +64,7 @@ function Footer() {
                 <MailingListForm description={false} width="150px" />
               </div>
               <div>
-                <a href="https://twitter.com/_andy_pan" target="_blank"><i className="feather icon-twitter" alt="gnet's Twitter"></i></a>
+                <a href="https://twitter.com/panjf2000" target="_blank"><i className="feather icon-twitter" alt="gnet's Twitter"></i></a>
                 &nbsp;&nbsp;&nbsp;&nbsp;
                 <a href="https://github.com/panjf2000/gnet" target="_blank"><i className="feather icon-github" alt="gnet's Github Repo"></i></a>
                 &nbsp;&nbsp;&nbsp;&nbsp;

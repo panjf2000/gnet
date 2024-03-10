@@ -75,7 +75,7 @@ module.exports = {
             },
             {
               label: "Twitter",
-              to: "https://twitter.com/_andy_pan",
+              to: "https://twitter.com/panjf2000",
             },
             {
               label: "Blog",
