@@ -7,7 +7,6 @@ import (
 	"io"
 	"math/rand"
 	"net"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -21,12 +20,17 @@ import (
 	goPool "github.com/panjf2000/gnet/v2/pkg/pool/goroutine"
 )
 
+type connHandler struct {
+	network string
+	rspCh   chan []byte
+	data    []byte
+}
+
 type clientEvents struct {
 	*BuiltinEventEngine
 	tester    *testing.T
 	svr       *testClientServer
 	packetLen int
-	rspChMap  sync.Map
 }
 
 func (ev *clientEvents) OnBoot(e Engine) Action {
@@ -38,9 +42,6 @@ func (ev *clientEvents) OnBoot(e Engine) Action {
 }
 
 func (ev *clientEvents) OnOpen(c Conn) ([]byte, Action) {
-	c.SetContext([]byte{})
-	rspCh := make(chan []byte, 1)
-	ev.rspChMap.Store(c.LocalAddr().String(), rspCh)
 	return nil, None
 }
 
@@ -54,24 +55,18 @@ func (ev *clientEvents) OnClose(Conn, error) Action {
 }
 
 func (ev *clientEvents) OnTraffic(c Conn) (action Action) {
-	ctx := c.Context()
-	var p []byte
-	if ctx != nil {
-		p = ctx.([]byte)
-	} else { // UDP
+	handler := c.Context().(*connHandler)
+	if handler.network == "udp" {
 		ev.packetLen = 1024
 	}
 	buf, err := c.Next(-1)
 	assert.NoError(ev.tester, err)
-	p = append(p, buf...)
-	if len(p) < ev.packetLen {
-		c.SetContext(p)
+	handler.data = append(handler.data, buf...)
+	if len(handler.data) < ev.packetLen {
 		return
 	}
-	v, _ := ev.rspChMap.Load(c.LocalAddr().String())
-	rspCh := v.(chan []byte)
-	rspCh <- p
-	c.SetContext([]byte{})
+	handler.rspCh <- handler.data
+	handler.data = handler.data[:0]
 	return
 }
 
@@ -330,38 +325,23 @@ func startGnetClient(t *testing.T, cli *Client, ev *clientEvents, network, addr 
 		c   Conn
 		err error
 	)
+	var handler = &connHandler{
+		network: network,
+		rspCh:   make(chan []byte, 1),
+	}
 	if netDial {
 		var netConn net.Conn
 		netConn, err = NetDial(network, addr)
 		require.NoError(t, err)
-		c, err = cli.Enroll(netConn)
+		c, err = cli.EnrollWithContext(netConn, handler)
 	} else {
-		c, err = cli.Dial(network, addr)
+		c, err = cli.DialWithContext(network, addr, handler)
 	}
 	require.NoError(t, err)
 	defer c.Close()
 	err = c.Wake(nil)
 	require.NoError(t, err)
-	var rspCh chan []byte
-	if network == "udp" {
-		rspCh = make(chan []byte, 1)
-		ev.rspChMap.Store(c.LocalAddr().String(), rspCh)
-	} else {
-		var (
-			v  interface{}
-			ok bool
-		)
-		start := time.Now()
-		for time.Since(start) < time.Second {
-			v, ok = ev.rspChMap.Load(c.LocalAddr().String())
-			if ok {
-				break
-			}
-			time.Sleep(10 * time.Millisecond)
-		}
-		require.True(t, ok)
-		rspCh = v.(chan []byte)
-	}
+	var rspCh = handler.rspCh
 	duration := time.Duration((rand.Float64()*2+1)*float64(time.Second)) / 2
 	t.Logf("test duration: %dms", duration/time.Millisecond)
 	start := time.Now()
