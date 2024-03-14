@@ -140,23 +140,25 @@ func (cli *Client) Stop() (err error) {
 
 // Dial is like net.Dial().
 func (cli *Client) Dial(network, address string) (Conn, error) {
-	return cli.DialWithContext(network, address, nil)
+	return cli.DialContext(network, address, nil)
 }
 
-func (cli *Client) DialWithContext(network, address string, ctx interface{}) (Conn, error) {
+// DialContext is like Dial but also accepts an empty interface ctx that can be obtained later via Conn.Context.
+func (cli *Client) DialContext(network, address string, ctx interface{}) (Conn, error) {
 	c, err := net.Dial(network, address)
 	if err != nil {
 		return nil, err
 	}
-	return cli.EnrollWithContext(c, ctx)
+	return cli.EnrollContext(c, ctx)
 }
 
 // Enroll converts a net.Conn to gnet.Conn and then adds it into Client.
 func (cli *Client) Enroll(c net.Conn) (Conn, error) {
-	return cli.EnrollWithContext(c, nil)
+	return cli.EnrollContext(c, nil)
 }
 
-func (cli *Client) EnrollWithContext(c net.Conn, ctx interface{}) (Conn, error) {
+// EnrollContext is like Enroll but also accepts an empty interface ctx that can be obtained later via Conn.Context.
+func (cli *Client) EnrollContext(c net.Conn, ctx interface{}) (Conn, error) {
 	defer c.Close()
 
 	sc, ok := c.(syscall.Conn)

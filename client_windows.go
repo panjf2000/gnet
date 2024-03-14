@@ -118,10 +118,10 @@ func unixAddr(addr string) string {
 }
 
 func (cli *Client) Dial(network, addr string) (Conn, error) {
-	return cli.DialWithContext(network, addr, nil)
+	return cli.DialContext(network, addr, nil)
 }
 
-func (cli *Client) DialWithContext(network, addr string, ctx interface{}) (Conn, error) {
+func (cli *Client) DialContext(network, addr string, ctx interface{}) (Conn, error) {
 	var (
 		c   net.Conn
 		err error
@@ -139,14 +139,14 @@ func (cli *Client) DialWithContext(network, addr string, ctx interface{}) (Conn,
 			return nil, err
 		}
 	}
-	return cli.EnrollWithContext(c, ctx)
+	return cli.EnrollContext(c, ctx)
 }
 
 func (cli *Client) Enroll(nc net.Conn) (gc Conn, err error) {
-	return cli.EnrollWithContext(nc, nil)
+	return cli.EnrollContext(nc, nil)
 }
 
-func (cli *Client) EnrollWithContext(nc net.Conn, ctx interface{}) (gc Conn, err error) {
+func (cli *Client) EnrollContext(nc net.Conn, ctx interface{}) (gc Conn, err error) {
 	switch v := nc.(type) {
 	case *net.TCPConn:
 		if cli.opts.TCPNoDelay == TCPNoDelay {

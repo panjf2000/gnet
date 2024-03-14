@@ -333,15 +333,15 @@ func startGnetClient(t *testing.T, cli *Client, ev *clientEvents, network, addr 
 		var netConn net.Conn
 		netConn, err = NetDial(network, addr)
 		require.NoError(t, err)
-		c, err = cli.EnrollWithContext(netConn, handler)
+		c, err = cli.EnrollContext(netConn, handler)
 	} else {
-		c, err = cli.DialWithContext(network, addr, handler)
+		c, err = cli.DialContext(network, addr, handler)
 	}
 	require.NoError(t, err)
 	defer c.Close()
 	err = c.Wake(nil)
 	require.NoError(t, err)
-	var rspCh = handler.rspCh
+	rspCh := handler.rspCh
 	duration := time.Duration((rand.Float64()*2+1)*float64(time.Second)) / 2
 	t.Logf("test duration: %dms", duration/time.Millisecond)
 	start := time.Now()
