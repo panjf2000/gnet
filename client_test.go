@@ -325,7 +325,7 @@ func startGnetClient(t *testing.T, cli *Client, ev *clientEvents, network, addr 
 		c   Conn
 		err error
 	)
-	var handler = &connHandler{
+	handler := &connHandler{
 		network: network,
 		rspCh:   make(chan []byte, 1),
 	}
