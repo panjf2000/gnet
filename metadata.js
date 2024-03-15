@@ -1,12 +1,12 @@
 module.exports = {
   "latest_highlight": {
     "author_github": "https://github.com/panjf2000",
-    "date": "2023-05-20",
+    "date": "2023-11-11",
     "description": "Gnet tops the TechEmpower benchmark leaderboard, becoming the world No. 1",
     "hide_on_release_notes": false,
-    "id": "2023-05-20-gnet-techempower-no1",
-    "path": "website/highlights/2023-05-20-gnet-techempower-benchmark-no1.md",
-    "permalink": "/highlights/2023-05-20-gnet-techempower-benchmark-no1/",
+    "id": "2023-11-11-gnet-techempower-benchmark-top1",
+    "path": "website/highlights/2023-11-11-gnet-techempower-benchmark-top1.md",
+    "permalink": "/highlights/2023-11-11-gnet-techempower-benchmark-top1/",
     "tags": [
       "release",
     ],
