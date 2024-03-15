@@ -123,7 +123,7 @@ func (es *echoServer) React(c gnet.Conn) (out []byte, action gnet.Action) {
 func main() {
 	p := goroutine.Default()
 	defer p.Release()
-	
+
 	echo := &echoServer{pool: p}
 	log.Fatal(gnet.Serve(echo, "tcp://:9000", gnet.WithMulticore(true)))
 }
@@ -190,13 +190,13 @@ Current supported I/O events in `gnet`:
 
 ## poll_opt mode
 
-By default, `gnet` utilizes the standard package `golang.org/x/sys/unix` to implement pollers with `epoll` or `kqueue`, where a HASH MAP of `fd->conn` is introduced to help retrieve connections by file descriptors returned from pollers, but now the user can run `go build` with build tags `poll_opt`, like this: `go build -tags=poll_opt`, and `gnet` then switch to the optimized implementations of pollers that invoke the system calls of `epoll` or `kqueue` directly and add file descriptors to the interest list along with storing the corresponding connection pointers into `epoll_data` or `kevent`, in which case `gnet` can get rid of the HASH MAP of `fd->conn` and regain each connection pointer by the conversion of `void*` pointer in the I/O event-looping. In theory, it ought to achieve a higher performance with this optimization. 
+By default, `gnet` utilizes the standard package `golang.org/x/sys/unix` to implement pollers with `epoll` or `kqueue`, where a HASH MAP of `fd->conn` is introduced to help retrieve connections by file descriptors returned from pollers, but now the user can run `go build` with build tags `poll_opt`, like this: `go build -tags=poll_opt`, and `gnet` then switch to the optimized implementations of pollers that invoke the system calls of `epoll` or `kqueue` directly and add file descriptors to the interest list along with storing the corresponding connection pointers into `epoll_data` or `kevent`, in which case `gnet` can get rid of the HASH MAP of `fd->conn` and regain each connection pointer by the conversion of `void*` pointer in the I/O event-looping. In theory, it ought to achieve a higher performance with this optimization.
 
 See [#230](https://github.com/panjf2000/gnet/pull/230) for code details.
 
 ## Ticker
 
-The `EventHandler.Tick` event fires ticks at a specified interval. 
+The `EventHandler.Tick` event fires ticks at a specified interval.
 The first tick fires right after the gnet server starts up and if you intend to set up a ticker event, don't forget to pass an option: `gnet.WithTicker(true)` to `gnet.Serve`.
 
 ```go
@@ -209,7 +209,7 @@ events.Tick = func() (delay time.Duration, action Action){
 
 ## UDP
 
-`gnet` supports UDP protocol so the `gnet.Serve` method can bind to UDP addresses. 
+`gnet` supports UDP protocol so the `gnet.Serve` method can bind to UDP addresses.
 
 - All incoming and outgoing packets will not be buffered but read and sent directly, which means all functions of `gnet.Conn` that manipulate the internal buffers are not available; users should use the `frame []byte` from the `gnet.React(frame []byte, c gnet.Conn)` as the UDP packet instead calling functions of `gnet.Conn`, like `c.Read()`, `c.ResetBuffer()`, `c.BufferLength()` and so on, to process data.
 - The `EventHandler.OnOpened` and `EventHandler.OnClosed` events are not available for UDP sockets, only the `React` event.
@@ -257,22 +257,22 @@ Here is an [example](https://github.com/gnet-io/gnet-examples/tree/master/exampl
 
 ```bash
 # Hardware Environment
-* 28 HT Cores Intel(R) Xeon(R) Gold 5120 CPU @ 2.20GHz
+* 28 HT Cores Intel(R) Xeon(R) Gold 5120 CPU @ 3.20GHz
 * 32GB RAM
-* Ubuntu 18.04.3 4.15.0-88-generic #88-Ubuntu
 * Dedicated Cisco 10-gigabit Ethernet switch
+* Debian 12 "bookworm"
 * Go1.19.x linux/amd64
 ```
 
-![All languages](https://raw.githubusercontent.com/panjf2000/illustrations/master/benchmark/techempower-plaintext-top50-dark.jpg)
+![](https://raw.githubusercontent.com/panjf2000/illustrations/master/benchmark/techempower-plaintext-top50-light.jpg)
 
-This is a leaderboard of the top ***50*** out of ***499*** frameworks that encompass various programming languages worldwide, in which `gnet` is ranked ***first***.
+This is a leaderboard of the top ***50*** out of ***486*** frameworks that encompass various programming languages worldwide, in which `gnet` is ranked ***first***.
 
-![Golang](https://raw.githubusercontent.com/panjf2000/illustrations/master/benchmark/techempower-plaintext-topN-go-dark.png)
+![](https://raw.githubusercontent.com/panjf2000/illustrations/master/benchmark/techempower-plaintext-topN-go-light.png)
 
 This is the full framework ranking of Go and `gnet` tops all the other frameworks, which makes `gnet` the ***fastest*** networking framework in Go.
 
-To see the full ranking list, visit [TechEmpower Plaintext Benchmark](https://www.techempower.com/benchmarks/#section=test&runid=a07a7117-f861-49b2-a710-94970c5767d0&test=plaintext).
+To see the full ranking list, visit [TechEmpower Benchmark **Round 22**](https://www.techempower.com/benchmarks/#hw=ph&test=plaintext&section=data-r22).
 
 ## Contrasts to the similar networking libraries
 

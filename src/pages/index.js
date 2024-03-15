@@ -27,7 +27,7 @@ const features = [
     description: (
       <>
         Built in <a href="https://go.dev/">Go</a>, gnet is <a href="#performance">ultra-fast and
-        memory efficient</a> based on the event-driven mechanism. 
+        memory efficient</a> based on the event-driven mechanism.
         It's designed to create a networking server framework for Go that performs on par with Redis and Haproxy for networking packets handling.
       </>
     ),
@@ -75,7 +75,7 @@ const features = [
     icon: 'briefcase',
     description: (
       <>
-        There is a rich set of libraries in gnet, such as memory pool, goroutine pool, elastic buffers, logging package, etc., 
+        There is a rich set of libraries in gnet, such as memory pool, goroutine pool, elastic buffers, logging package, etc.,
         which makes it convenient for developers to build fast and efficient networking applications.
       </>
     ),
@@ -183,13 +183,13 @@ function InstallationSection() {
 
         <h3 className={styles.installSubTitle}>How to install gnet</h3>
         <div className="sub-title">
-            <p className="hero--subsubtitle">`gnet` is available as a Go module 
-            and we highly recommend that you use `gnet` via <a href="https://go.dev/blog/using-go-modules" target="_blank">Go Modules</a>, 
+            <p className="hero--subsubtitle">`gnet` is available as a Go module
+            and we highly recommend that you use `gnet` via <a href="https://go.dev/blog/using-go-modules" target="_blank">Go Modules</a>,
             with Go 1.11 Modules enabled (Go 1.11+), you can just simply add `import "github.com/panjf2000/gnet/v2"`
             to the codebase and run `go mod download/go mod tidy` or `go [build|run|test]` to download the necessary dependencies automatically.
             </p>
         </div>
-        
+
         <p className="hero--subtitle">Run <strong><em>go get</em></strong> to download gnet:</p>
 
         <h4 className={styles.installSubTitle}>With v2</h4>
@@ -204,10 +204,10 @@ function InstallationSection() {
 
 const hardware = `
 # Hardware Environment
-* 28 HT Cores Intel(R) Xeon(R) Gold 5120 CPU @ 2.20GHz
+* 28 HT Cores Intel(R) Xeon(R) Gold 5120 CPU @ 3.20GHz
 * 32GB RAM
-* Ubuntu 18.04.3 4.15.0-88-generic #88-Ubuntu
 * Dedicated Cisco 10-gigabit Ethernet switch
+* Debian 12 "bookworm"
 * Go1.19.x linux/amd64
 `
 
@@ -221,12 +221,12 @@ function Performance() {
         <br />
         <img src="/img/techempower-plaintext-top50-dark.jpg" alt="All languages" />
         <br />
-        <p className="hero--subtitle">This is a leaderboard of the top <strong><em>50</em></strong> out of <strong><em>499</em></strong> frameworks that encompass various programming languages worldwide, in which <code>gnet</code> is ranked <strong><em>first</em></strong>.</p>
+        <p className="hero--subtitle">This is a leaderboard of the top <strong><em>50</em></strong> out of <strong><em>486</em></strong> frameworks that encompass various programming languages worldwide, in which <code>gnet</code> is ranked <strong><em>first</em></strong>.</p>
         <img src="/img/techempower-plaintext-topN-go-dark.png" alt="Go" />
         <br />
         <p className="hero--subtitle">This is the full framework ranking of Go and <code>gnet</code> tops all the other frameworks, which makes <code>gnet</code> the <strong><em>fastest</em></strong> networking framework in Go.</p>
         <br />
-        <p className="hero--subtitle">To check the full ranking list, visit <Link to="https://www.techempower.com/benchmarks/#section=test&runid=a07a7117-f861-49b2-a710-94970c5767d0&test=plaintext">TechEmpower Plaintext Benchmark</Link>.</p>
+        <p className="hero--subtitle">To check the full ranking list, visit <Link to="https://www.techempower.com/benchmarks/#hw=ph&test=plaintext&section=data-r22">TechEmpower Benchmark <strong>Round 22</strong></Link>.</p>
         <p className="hero--subtitle">Note that the HTTP implementation of gnet on TechEmpower is half-baked and fine-tuned for benchmark purposes only and is far from production-ready.</p>
       </div>
     </section>

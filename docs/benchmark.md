@@ -9,22 +9,22 @@ description: "Benchmark results with other similar frameworks in Go"
 
 ```bash
 # Hardware Environment
-* 28 HT Cores Intel(R) Xeon(R) Gold 5120 CPU @ 2.20GHz
+* 28 HT Cores Intel(R) Xeon(R) Gold 5120 CPU @ 3.20GHz
 * 32GB RAM
-* Ubuntu 18.04.3 4.15.0-88-generic #88-Ubuntu
 * Dedicated Cisco 10-gigabit Ethernet switch
+* Debian 12 "bookworm"
 * Go1.19.x linux/amd64
 ```
 
 ![](https://raw.githubusercontent.com/panjf2000/illustrations/master/benchmark/techempower-plaintext-top50-light.jpg)
 
-This is a leaderboard of the top ***50*** out of ***499*** frameworks that encompass various programming languages worldwide, in which `gnet` is ranked ***first***.
+This is a leaderboard of the top ***50*** out of ***486*** frameworks that encompass various programming languages worldwide, in which `gnet` is ranked ***first***.
 
 ![](https://raw.githubusercontent.com/panjf2000/illustrations/master/benchmark/techempower-plaintext-topN-go-light.png)
 
 This is the full framework ranking of Go and `gnet` tops all the other frameworks, which makes `gnet` the ***fastest*** networking framework in Go.
 
-To see the full ranking list, visit [TechEmpower Plaintext Benchmark](https://www.techempower.com/benchmarks/#section=test&runid=a07a7117-f861-49b2-a710-94970c5767d0&test=plaintext).
+To see the full ranking list, visit [TechEmpower Benchmark **Round 22**](https://www.techempower.com/benchmarks/#hw=ph&test=plaintext&section=data-r22).
 
 ## Contrasts to the similar networking libraries
 
