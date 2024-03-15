@@ -76,22 +76,22 @@ go get -u github.com/panjf2000/gnet
 
 ```bash
 # 硬件环境
-* 28 HT Cores Intel(R) Xeon(R) Gold 5120 CPU @ 2.20GHz
+* 28 HT Cores Intel(R) Xeon(R) Gold 5120 CPU @ 3.20GHz
 * 32GB RAM
-* Ubuntu 18.04.3 4.15.0-88-generic #88-Ubuntu
 * Dedicated Cisco 10-gigabit Ethernet switch
+* Debian 12 "bookworm"
 * Go1.19.x linux/amd64
 ```
 
 ![](https://raw.githubusercontent.com/panjf2000/illustrations/master/benchmark/techempower-plaintext-top50-light.jpg)
 
-这是包含全部编程语言框架的性能排名***前 50*** 的结果，总榜单包含了全世界共计 ***499*** 个框架，其中 `gnet` 排名***第一***。
+这是包含全部编程语言框架的性能排名***前 50*** 的结果，总榜单包含了全世界共计 ***486*** 个框架，其中 `gnet` 排名***第一***。
 
 ![](https://raw.githubusercontent.com/panjf2000/illustrations/master/benchmark/techempower-plaintext-topN-go-light.png)
 
 这是 Go 语言分类下的全部排名，`gnet` 超越了其他所有框架，位列第一，是***最快***的 Go 网络框架。
 
-完整的排行可以通过 [TechEmpower Plaintext Benchmark](https://www.techempower.com/benchmarks/#section=test&runid=a07a7117-f861-49b2-a710-94970c5767d0&test=plaintext) 查看。
+完整的排行可以通过 [TechEmpower Benchmark **Round 22**](https://www.techempower.com/benchmarks/#hw=ph&test=plaintext&section=data-r22) 查看。
 
 ***请注意，TechEmpower 上的 gnet 的 HTTP 实现是不完备且针对性调优的，仅仅是用于压测目的，不是生产可用的***。
 
