@@ -52,7 +52,7 @@ const features = [
     ),
   },
   {
-    title: 'Multiple Porotocols',
+    title: 'Multiple Protocols',
     icon: 'grid',
     description: (
       <>
