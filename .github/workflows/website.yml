@@ -18,6 +18,7 @@ jobs:
       - name: Test Build
         run: |
           if [ -e yarn.lock ]; then
+          yarn config set strict-ssl false
           yarn install --frozen-lockfile
           elif [ -e package-lock.json ]; then
           npm ci
