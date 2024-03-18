@@ -87,9 +87,9 @@ func newTCPConn(nc net.Conn, el *eventloop) (c *conn) {
 func (c *conn) release() {
 	c.ctx = nil
 	c.localAddr = nil
+	c.remoteAddr = nil
 	if c.rawConn != nil {
 		c.rawConn = nil
-		c.remoteAddr = nil
 	}
 	c.inboundBuffer.Done()
 	bbPool.Put(c.buffer)
