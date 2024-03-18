@@ -227,11 +227,11 @@ func (cli *Client) EnrollContext(c net.Conn, ctx interface{}) (Conn, error) {
 	default:
 		return nil, errorx.ErrUnsupportedProtocol
 	}
+	gc.SetContext(ctx)
 	err = cli.el.poller.UrgentTrigger(cli.el.register, gc)
 	if err != nil {
 		gc.Close()
 		return nil, err
 	}
-	gc.SetContext(ctx)
 	return gc, nil
 }

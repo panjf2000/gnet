@@ -66,7 +66,7 @@ func (ev *clientEvents) OnTraffic(c Conn) (action Action) {
 		return
 	}
 	handler.rspCh <- handler.data
-	handler.data = handler.data[:0]
+	handler.data = nil
 	return
 }
 
