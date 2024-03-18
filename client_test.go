@@ -41,8 +41,7 @@ func (ev *clientEvents) OnBoot(e Engine) Action {
 	return None
 }
 
-func (ev *clientEvents) OnOpen(c Conn) ([]byte, Action) {
-	_ = c
+func (ev *clientEvents) OnOpen(_ Conn) ([]byte, Action) {
 	return nil, None
 }
 
