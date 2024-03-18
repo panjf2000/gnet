@@ -92,6 +92,12 @@ func (c *conn) release() {
 	if addr, ok := c.remoteAddr.(*net.TCPAddr); ok && len(addr.Zone) > 0 {
 		bsPool.Put(bs.StringToBytes(addr.Zone))
 	}
+	if addr, ok := c.localAddr.(*net.UDPAddr); ok && c.localAddr != c.loop.ln.addr && len(addr.Zone) > 0 {
+		bsPool.Put(bs.StringToBytes(addr.Zone))
+	}
+	if addr, ok := c.remoteAddr.(*net.UDPAddr); ok && len(addr.Zone) > 0 {
+		bsPool.Put(bs.StringToBytes(addr.Zone))
+	}
 	c.localAddr = nil
 	c.remoteAddr = nil
 	c.pollAttachment.FD, c.pollAttachment.Callback = 0, nil
