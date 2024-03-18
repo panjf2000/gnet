@@ -6,7 +6,6 @@
 <a title="Supported Platforms" target="_blank" href="https://github.com/panjf2000/gnet"><img src="https://img.shields.io/badge/platform-Linux%20%7C%20FreeBSD%20%7C%20DragonFly%20%7C%20NetBSD%20%7C%20OpenBSD%20%7C%20Darwin%20%7C%20Windows-549688?style=flat-square&logo=launchpad" /></a>
 <a title="Require Go Version" target="_blank" href="https://github.com/panjf2000/gnet"><img src="https://img.shields.io/badge/go-%3E%3D1.17-30dff3?style=flat-square&logo=go" /></a>
 <br />
-<a title="Chat Room" target="_blank" href="https://gitter.im/gnet-io/gnet?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=body_badge"><img src="https://badges.gitter.im/gnet-io/gnet.svg" /></a>
 <a title="Go Report Card" target="_blank" href="https://goreportcard.com/report/github.com/panjf2000/gnet"><img src="https://goreportcard.com/badge/github.com/panjf2000/gnet?style=flat-square" /></a>
 <a title="Doc for gnet" target="_blank" href="https://pkg.go.dev/github.com/panjf2000/gnet/v2#section-documentation"><img src="https://img.shields.io/badge/go.dev-doc-007d9c?style=flat-square&logo=read-the-docs" /></a>
 <a title="Mentioned in Awesome Go" target="_blank" href="https://github.com/avelino/awesome-go#networking"><img src="https://awesome.re/mentioned-badge-flat.svg" /></a>
@@ -16,13 +15,17 @@
 
 [英文](README.md) | 中文
 
+### 🎉🎉🎉 欢迎加入 `gnet` 在 [Discord 服务器上的频道](https://discord.gg/UyKD7NZcfH).
+
 # 📖 简介
 
-`gnet` 是一个基于事件驱动的高性能和轻量级网络框架。它直接使用 [epoll](https://en.wikipedia.org/wiki/Epoll) 和 [kqueue](https://en.wikipedia.org/wiki/Kqueue) 系统调用而非标准 Go 网络包：[net](https://golang.org/pkg/net/) 来构建网络应用，它的工作原理类似两个开源的网络库：[netty](https://github.com/netty/netty) 和 [libuv](https://github.com/libuv/libuv)，这也使得 `gnet` 达到了一个远超 Go [net](https://golang.org/pkg/net/) 的性能表现。
+`gnet` 是一个基于事件驱动的高性能和轻量级网络框架。这个框架是基于 [epoll](https://en.wikipedia.org/wiki/Epoll) 和 [kqueue](https://en.wikipedia.org/wiki/Kqueue) 从零开发的，而且相比 Go [net](https://golang.org/pkg/net/)，它能以更低的内存占用实现更高的性能。
 
-`gnet` 设计开发的初衷不是为了取代 Go 的标准网络库：[net](https://golang.org/pkg/net/)，而是为了创造出一个类似于 [Redis](http://redis.io)、[Haproxy](http://www.haproxy.org) 能高效处理网络包的 Go 语言网络客户端/服务器框架。因此，`gnet` 在功能上的全面性并不如 [net](https://golang.org/pkg/net/)，它只提供网络编程中最核心的功能和最精简的 APIs，而且 `gnet` 也并没有打算变成一个全功能、无所不包的网络库，因为我觉得 Go [net](https://golang.org/pkg/net/) 在这方面已经做得足够好了。
+`gnet` 和 [net](https://golang.org/pkg/net/) 有着不一样的网络编程模式。因此，用 `gnet` 开发网络应用和用 [net](https://golang.org/pkg/net/) 开发区别很大，而且两者之间不可调和。社区里有其他同类的产品像是 [libevent](https://github.com/libevent/libevent), [libuv](https://github.com/libuv/libuv), [netty](https://github.com/netty/netty), [twisted](https://github.com/twisted/twisted), [tornado](https://github.com/tornadoweb/tornado)，`gnet` 的底层工作原理和这些框架非常类似。
 
-`gnet` 的卖点在于它是一个高性能、轻量级、非阻塞的纯 Go 实现的传输层（TCP/UDP/Unix Domain Socket）网络框架，开发者可以使用 `gnet` 来实现自己的应用层网络协议(HTTP、RPC、Redis、WebSocket 等等)，从而构建出自己的应用层网络应用：比如在 `gnet` 上实现 HTTP 协议就可以创建出一个 HTTP 服务器 或者 Web 开发框架，实现 Redis 协议就可以创建出自己的 Redis 服务器等等。
+`gnet` 不是为了取代 [net](https://golang.org/pkg/net/) 而生的，而是在 Go 生态中为开发者提供一个开发性能敏感的网络服务的替代品。也正因如此，`gnet` 在功能全面性上比不了 Go [net](https://golang.org/pkg/net/)，它只会提供网络应用所需的最核心的功能和最精简的 APIs，而且 `gnet` 也并没有打算变成一个无所不包的网络框架，因为我觉得 Go [net](https://golang.org/pkg/net/) 在这方面已经做得足够好了。
+
+`gnet` 的卖点在于它是一个高性能、轻量级、非阻塞的纯 Go 语言实现的传输层（TCP/UDP/Unix Domain Socket）网络框架。开发者可以使用 `gnet` 来实现自己的应用层网络协议(HTTP、RPC、Redis、WebSocket 等等)，从而构建出自己的应用层网络服务。比如在 `gnet` 上实现 HTTP 协议就可以创建出一个 HTTP 服务器 或者 Web 开发框架，实现 Redis 协议就可以创建出自己的 Redis 服务器等等。
 
 **`gnet` 衍生自另一个项目：`evio`，但拥有更丰富的功能特性，且性能远胜之。**
 
@@ -73,22 +76,22 @@ go get -u github.com/panjf2000/gnet
 
 ```bash
 # 硬件环境
-* 28 HT Cores Intel(R) Xeon(R) Gold 5120 CPU @ 2.20GHz
+* 28 HT Cores Intel(R) Xeon(R) Gold 5120 CPU @ 3.20GHz
 * 32GB RAM
-* Ubuntu 18.04.3 4.15.0-88-generic #88-Ubuntu
 * Dedicated Cisco 10-gigabit Ethernet switch
+* Debian 12 "bookworm"
 * Go1.19.x linux/amd64
 ```
 
 ![](https://raw.githubusercontent.com/panjf2000/illustrations/master/benchmark/techempower-plaintext-top50-light.jpg)
 
-这是包含全部编程语言框架的性能排名***前 50*** 的结果，总榜单包含了全世界共计 ***499*** 个框架，其中 `gnet` 排名***第一***。
+这是包含全部编程语言框架的性能排名***前 50*** 的结果，总榜单包含了全世界共计 ***486*** 个框架，其中 `gnet` 排名***第一***。
 
 ![](https://raw.githubusercontent.com/panjf2000/illustrations/master/benchmark/techempower-plaintext-topN-go-light.png)
 
 这是 Go 语言分类下的全部排名，`gnet` 超越了其他所有框架，位列第一，是***最快***的 Go 网络框架。
 
-完整的排行可以通过 [TechEmpower Plaintext Benchmark](https://www.techempower.com/benchmarks/#section=test&runid=a07a7117-f861-49b2-a710-94970c5767d0&test=plaintext) 查看。
+完整的排行可以通过 [TechEmpower Benchmark **Round 22**](https://www.techempower.com/benchmarks/#hw=ph&test=plaintext&section=data-r22) 查看。
 
 ***请注意，TechEmpower 上的 gnet 的 HTTP 实现是不完备且针对性调优的，仅仅是用于压测目的，不是生产可用的***。
 

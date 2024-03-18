@@ -85,8 +85,6 @@ func newUDPConn(fd int, el *eventloop, localAddr net.Addr, sa unix.Sockaddr, con
 
 func (c *conn) release() {
 	c.ctx = nil
-	c.localAddr = nil
-	c.remoteAddr = nil
 	c.buffer = nil
 	if addr, ok := c.localAddr.(*net.TCPAddr); ok && c.localAddr != c.loop.ln.addr && len(addr.Zone) > 0 {
 		bsPool.Put(bs.StringToBytes(addr.Zone))
@@ -94,6 +92,14 @@ func (c *conn) release() {
 	if addr, ok := c.remoteAddr.(*net.TCPAddr); ok && len(addr.Zone) > 0 {
 		bsPool.Put(bs.StringToBytes(addr.Zone))
 	}
+	if addr, ok := c.localAddr.(*net.UDPAddr); ok && c.localAddr != c.loop.ln.addr && len(addr.Zone) > 0 {
+		bsPool.Put(bs.StringToBytes(addr.Zone))
+	}
+	if addr, ok := c.remoteAddr.(*net.UDPAddr); ok && len(addr.Zone) > 0 {
+		bsPool.Put(bs.StringToBytes(addr.Zone))
+	}
+	c.localAddr = nil
+	c.remoteAddr = nil
 	c.pollAttachment.FD, c.pollAttachment.Callback = 0, nil
 	if !c.isDatagram {
 		c.opened = false
