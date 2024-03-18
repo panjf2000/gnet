@@ -42,6 +42,7 @@ func (ev *clientEvents) OnBoot(e Engine) Action {
 }
 
 func (ev *clientEvents) OnOpen(c Conn) ([]byte, Action) {
+	_ = c
 	return nil, None
 }
 
@@ -272,7 +273,7 @@ func (s *testClientServer) OnTick() (delay time.Duration, action Action) {
 			if i%2 == 0 {
 				netConn = true
 			}
-			go startGnetClient(s.tester, s.client, s.clientEV, s.network, s.addr, s.multicore, s.async, netConn)
+			go startGnetClient(s.tester, s.client, s.network, s.addr, s.multicore, s.async, netConn)
 		}
 	}
 	if s.network == "udp" && atomic.LoadInt32(&s.clientActive) == 0 {
@@ -319,7 +320,7 @@ func testServeWithGnetClient(t *testing.T, network, addr string, reuseport, reus
 	assert.NoError(t, err)
 }
 
-func startGnetClient(t *testing.T, cli *Client, ev *clientEvents, network, addr string, multicore, async, netDial bool) {
+func startGnetClient(t *testing.T, cli *Client, network, addr string, multicore, async, netDial bool) {
 	rand.Seed(time.Now().UnixNano())
 	var (
 		c   Conn
