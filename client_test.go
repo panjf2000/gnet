@@ -41,10 +41,6 @@ func (ev *clientEvents) OnBoot(e Engine) Action {
 	return None
 }
 
-func (ev *clientEvents) OnOpen(Conn) ([]byte, Action) {
-	return nil, None
-}
-
 func (ev *clientEvents) OnClose(Conn, error) Action {
 	if ev.svr != nil {
 		if atomic.AddInt32(&ev.svr.clientActive, -1) == 0 {
@@ -195,7 +191,6 @@ func TestServeWithGnetClient(t *testing.T) {
 type testClientServer struct {
 	*BuiltinEventEngine
 	client       *Client
-	clientEV     *clientEvents
 	tester       *testing.T
 	eng          Engine
 	network      string
@@ -293,9 +288,9 @@ func testServeWithGnetClient(t *testing.T, network, addr string, reuseport, reus
 		workerPool: goPool.Default(),
 	}
 	var err error
-	ts.clientEV = &clientEvents{tester: t, packetLen: streamLen, svr: ts}
+	clientEV := &clientEvents{tester: t, packetLen: streamLen, svr: ts}
 	ts.client, err = NewClient(
-		ts.clientEV,
+		clientEV,
 		WithLogLevel(logging.DebugLevel),
 		WithLockOSThread(true),
 		WithTicker(true),
