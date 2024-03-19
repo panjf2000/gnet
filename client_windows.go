@@ -118,6 +118,10 @@ func unixAddr(addr string) string {
 }
 
 func (cli *Client) Dial(network, addr string) (Conn, error) {
+	return cli.DialContext(network, addr, nil)
+}
+
+func (cli *Client) DialContext(network, addr string, ctx interface{}) (Conn, error) {
 	var (
 		c   net.Conn
 		err error
@@ -135,10 +139,14 @@ func (cli *Client) Dial(network, addr string) (Conn, error) {
 			return nil, err
 		}
 	}
-	return cli.Enroll(c)
+	return cli.EnrollContext(c, ctx)
 }
 
 func (cli *Client) Enroll(nc net.Conn) (gc Conn, err error) {
+	return cli.EnrollContext(nc, nil)
+}
+
+func (cli *Client) EnrollContext(nc net.Conn, ctx interface{}) (gc Conn, err error) {
 	switch v := nc.(type) {
 	case *net.TCPConn:
 		if cli.opts.TCPNoDelay == TCPNoDelay {
@@ -156,6 +164,7 @@ func (cli *Client) Enroll(nc net.Conn) (gc Conn, err error) {
 		}
 
 		c := newTCPConn(nc, cli.el)
+		c.SetContext(ctx)
 		cli.el.ch <- c
 		go func(c *conn, tc net.Conn, el *eventloop) {
 			var buffer [0x10000]byte
@@ -171,6 +180,7 @@ func (cli *Client) Enroll(nc net.Conn) (gc Conn, err error) {
 		gc = c
 	case *net.UnixConn:
 		c := newTCPConn(nc, cli.el)
+		c.SetContext(ctx)
 		cli.el.ch <- c
 		go func(c *conn, uc net.Conn, el *eventloop) {
 			var buffer [0x10000]byte
@@ -192,6 +202,7 @@ func (cli *Client) Enroll(nc net.Conn) (gc Conn, err error) {
 		gc = c
 	case *net.UDPConn:
 		c := newUDPConn(cli.el, nc.LocalAddr(), nc.RemoteAddr())
+		c.SetContext(ctx)
 		c.rawConn = nc
 		go func(uc net.Conn, el *eventloop) {
 			var buffer [0x10000]byte
@@ -201,6 +212,7 @@ func (cli *Client) Enroll(nc net.Conn) (gc Conn, err error) {
 					return
 				}
 				c := newUDPConn(cli.el, uc.LocalAddr(), uc.RemoteAddr())
+				c.SetContext(ctx)
 				c.rawConn = uc
 				el.ch <- packUDPConn(c, buffer[:n])
 			}

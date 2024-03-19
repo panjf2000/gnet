@@ -140,15 +140,25 @@ func (cli *Client) Stop() (err error) {
 
 // Dial is like net.Dial().
 func (cli *Client) Dial(network, address string) (Conn, error) {
+	return cli.DialContext(network, address, nil)
+}
+
+// DialContext is like Dial but also accepts an empty interface ctx that can be obtained later via Conn.Context.
+func (cli *Client) DialContext(network, address string, ctx interface{}) (Conn, error) {
 	c, err := net.Dial(network, address)
 	if err != nil {
 		return nil, err
 	}
-	return cli.Enroll(c)
+	return cli.EnrollContext(c, ctx)
 }
 
 // Enroll converts a net.Conn to gnet.Conn and then adds it into Client.
 func (cli *Client) Enroll(c net.Conn) (Conn, error) {
+	return cli.EnrollContext(c, nil)
+}
+
+// EnrollContext is like Enroll but also accepts an empty interface ctx that can be obtained later via Conn.Context.
+func (cli *Client) EnrollContext(c net.Conn, ctx interface{}) (Conn, error) {
 	defer c.Close()
 
 	sc, ok := c.(syscall.Conn)
@@ -217,6 +227,7 @@ func (cli *Client) Enroll(c net.Conn) (Conn, error) {
 	default:
 		return nil, errorx.ErrUnsupportedProtocol
 	}
+	gc.SetContext(ctx)
 	err = cli.el.poller.UrgentTrigger(cli.el.register, gc)
 	if err != nil {
 		gc.Close()
