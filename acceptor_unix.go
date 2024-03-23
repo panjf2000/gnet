@@ -51,6 +51,13 @@ func (eng *engine) accept1(fd int, _ netpoll.IOEvent, _ netpoll.IOFlags) error {
 
 	el := eng.eventLoops.next(remoteAddr)
 	c := newTCPConn(nfd, el, sa, el.ln.addr, remoteAddr)
+
+	if el.engine.opts.TLSconfig != nil {
+		if err = c.UpgradeTLS(el.engine.opts.TLSconfig); err != nil {
+			return err
+		}
+	}
+
 	err = el.poller.UrgentTrigger(el.register, c)
 	if err != nil {
 		eng.opts.Logger.Errorf("UrgentTrigger() failed due to error: %v", err)
@@ -86,6 +93,13 @@ func (el *eventloop) accept1(fd int, ev netpoll.IOEvent, flags netpoll.IOFlags) 
 	}
 
 	c := newTCPConn(nfd, el, sa, el.ln.addr, remoteAddr)
+
+	if el.engine.opts.TLSconfig != nil {
+		if err = c.UpgradeTLS(el.engine.opts.TLSconfig); err != nil {
+			return err
+		}
+	}
+
 	if err = el.poller.AddRead(&c.pollAttachment); err != nil {
 		return err
 	}
