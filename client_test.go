@@ -261,7 +261,7 @@ func (s *testClientServer) OnTraffic(c Conn) (action Action) {
 		require.Equal(s.tester, string(pingMsg), string(ping), "bad header")
 	}
 	v := c.Context()
-	if v != nil && s.network != "udp" {
+	if v != nil {
 		v.(*sync.Once).Do(readHeader)
 	}
 
@@ -275,7 +275,7 @@ func (s *testClientServer) OnTraffic(c Conn) (action Action) {
 			_ = c.OutboundBuffered()
 			_, _ = c.Discard(1)
 		}
-		if s.network == "udp" && bytes.Equal(buf.Bytes(), pingMsg) {
+		if v == nil && bytes.Equal(buf.Bytes(), pingMsg) {
 			atomic.AddInt32(&s.udpReadHeader, 1)
 			buf.Reset()
 		}
@@ -290,7 +290,7 @@ func (s *testClientServer) OnTraffic(c Conn) (action Action) {
 	}
 
 	buf, _ := c.Next(-1)
-	if s.network == "udp" && bytes.Equal(buf, pingMsg) {
+	if v == nil && bytes.Equal(buf, pingMsg) {
 		atomic.AddInt32(&s.udpReadHeader, 1)
 		buf = nil
 	}

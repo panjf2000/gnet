@@ -194,7 +194,7 @@ func (cli *Client) EnrollContext(c net.Conn, ctx interface{}) (Conn, error) {
 
 	var (
 		sockAddr unix.Sockaddr
-		gc       Conn
+		gc       *conn
 	)
 	switch c.(type) {
 	case *net.UnixConn:
@@ -227,7 +227,7 @@ func (cli *Client) EnrollContext(c net.Conn, ctx interface{}) (Conn, error) {
 	default:
 		return nil, errorx.ErrUnsupportedProtocol
 	}
-	gc.SetContext(ctx)
+	gc.ctx = ctx
 
 	connOpened := make(chan struct{})
 	ccb := &connWithCallback{c: gc, cb: func() {
@@ -238,6 +238,7 @@ func (cli *Client) EnrollContext(c net.Conn, ctx interface{}) (Conn, error) {
 		gc.Close()
 		return nil, err
 	}
+
 	<-connOpened
 	return gc, nil
 }

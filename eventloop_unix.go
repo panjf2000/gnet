@@ -62,7 +62,7 @@ func (el *eventloop) closeConns() {
 }
 
 type connWithCallback struct {
-	c  Conn
+	c  *conn
 	cb func()
 }
 
@@ -70,7 +70,7 @@ func (el *eventloop) register(itf interface{}) error {
 	c, ok := itf.(*conn)
 	if !ok {
 		ccb := itf.(*connWithCallback)
-		c = ccb.c.(*conn)
+		c = ccb.c
 		defer ccb.cb()
 	}
 
