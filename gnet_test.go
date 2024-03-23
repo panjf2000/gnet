@@ -25,7 +25,10 @@ import (
 	goPool "github.com/panjf2000/gnet/v2/pkg/pool/goroutine"
 )
 
-var streamLen = 1024 * 1024
+var (
+	datagramLen = 1024
+	streamLen   = 1024 * 1024
+)
 
 func TestServe(t *testing.T) {
 	// start an engine
@@ -415,7 +418,7 @@ func startClient(t *testing.T, network, addr string, multicore, async bool) {
 	for time.Since(start) < duration {
 		reqData := make([]byte, streamLen)
 		if network == "udp" {
-			reqData = reqData[:1024]
+			reqData = reqData[:datagramLen]
 		}
 		_, err = rand.Read(reqData)
 		require.NoError(t, err)

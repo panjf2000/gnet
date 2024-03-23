@@ -228,10 +228,16 @@ func (cli *Client) EnrollContext(c net.Conn, ctx interface{}) (Conn, error) {
 		return nil, errorx.ErrUnsupportedProtocol
 	}
 	gc.SetContext(ctx)
-	err = cli.el.poller.UrgentTrigger(cli.el.register, gc)
+
+	connOpened := make(chan struct{})
+	ccb := &connWithCallback{c: gc, cb: func() {
+		close(connOpened)
+	}}
+	err = cli.el.poller.UrgentTrigger(cli.el.register, ccb)
 	if err != nil {
 		gc.Close()
 		return nil, err
 	}
+	<-connOpened
 	return gc, nil
 }

@@ -84,6 +84,7 @@ func newUDPConn(fd int, el *eventloop, localAddr net.Addr, sa unix.Sockaddr, con
 }
 
 func (c *conn) release() {
+	c.opened = false
 	c.ctx = nil
 	c.buffer = nil
 	if addr, ok := c.localAddr.(*net.TCPAddr); ok && c.localAddr != c.loop.ln.addr && len(addr.Zone) > 0 {
@@ -102,7 +103,6 @@ func (c *conn) release() {
 	c.remoteAddr = nil
 	c.pollAttachment.FD, c.pollAttachment.Callback = 0, nil
 	if !c.isDatagram {
-		c.opened = false
 		c.peer = nil
 		c.inboundBuffer.Done()
 		c.outboundBuffer.Release()
@@ -110,6 +110,10 @@ func (c *conn) release() {
 }
 
 func (c *conn) open(buf []byte) error {
+	if c.isDatagram && c.peer == nil {
+		return unix.Send(c.fd, buf, 0)
+	}
+
 	n, err := unix.Write(c.fd, buf)
 	if err != nil && err == unix.EAGAIN {
 		_, _ = c.outboundBuffer.Write(buf)

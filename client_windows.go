@@ -147,6 +147,7 @@ func (cli *Client) Enroll(nc net.Conn) (gc Conn, err error) {
 }
 
 func (cli *Client) EnrollContext(nc net.Conn, ctx interface{}) (gc Conn, err error) {
+	connOpened := make(chan struct{})
 	switch v := nc.(type) {
 	case *net.TCPConn:
 		if cli.opts.TCPNoDelay == TCPNoDelay {
@@ -165,7 +166,7 @@ func (cli *Client) EnrollContext(nc net.Conn, ctx interface{}) (gc Conn, err err
 
 		c := newTCPConn(nc, cli.el)
 		c.SetContext(ctx)
-		cli.el.ch <- c
+		cli.el.ch <- &openConn{c: c, cb: func() { close(connOpened) }}
 		go func(c *conn, tc net.Conn, el *eventloop) {
 			var buffer [0x10000]byte
 			for {
@@ -181,7 +182,7 @@ func (cli *Client) EnrollContext(nc net.Conn, ctx interface{}) (gc Conn, err err
 	case *net.UnixConn:
 		c := newTCPConn(nc, cli.el)
 		c.SetContext(ctx)
-		cli.el.ch <- c
+		cli.el.ch <- &openConn{c: c, cb: func() { close(connOpened) }}
 		go func(c *conn, uc net.Conn, el *eventloop) {
 			var buffer [0x10000]byte
 			for {
@@ -204,6 +205,7 @@ func (cli *Client) EnrollContext(nc net.Conn, ctx interface{}) (gc Conn, err err
 		c := newUDPConn(cli.el, nc.LocalAddr(), nc.RemoteAddr())
 		c.SetContext(ctx)
 		c.rawConn = nc
+		cli.el.ch <- &openConn{c: c, isDatagram: true, cb: func() { close(connOpened) }}
 		go func(uc net.Conn, el *eventloop) {
 			var buffer [0x10000]byte
 			for {
@@ -222,5 +224,6 @@ func (cli *Client) EnrollContext(nc net.Conn, ctx interface{}) (gc Conn, err err
 		return nil, errorx.ErrUnsupportedProtocol
 	}
 
+	<-connOpened
 	return
 }

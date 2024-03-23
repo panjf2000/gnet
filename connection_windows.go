@@ -42,6 +42,12 @@ type udpConn struct {
 	c *conn
 }
 
+type openConn struct {
+	c          *conn
+	cb         func()
+	isDatagram bool
+}
+
 type conn struct {
 	ctx           interface{}        // user-defined context
 	loop          *eventloop         // owner event-loop

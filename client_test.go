@@ -4,9 +4,11 @@
 package gnet
 
 import (
+	"bytes"
 	"io"
 	"math/rand"
 	"net"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -41,6 +43,13 @@ func (ev *clientEvents) OnBoot(e Engine) Action {
 	return None
 }
 
+var pingMsg = []byte("PING\r\n")
+
+func (ev *clientEvents) OnOpen(Conn) (out []byte, action Action) {
+	out = pingMsg
+	return
+}
+
 func (ev *clientEvents) OnClose(Conn, error) Action {
 	if ev.svr != nil {
 		if atomic.AddInt32(&ev.svr.clientActive, -1) == 0 {
@@ -53,7 +62,7 @@ func (ev *clientEvents) OnClose(Conn, error) Action {
 func (ev *clientEvents) OnTraffic(c Conn) (action Action) {
 	handler := c.Context().(*connHandler)
 	if handler.network == "udp" {
-		ev.packetLen = 1024
+		ev.packetLen = datagramLen
 	}
 	buf, err := c.Next(-1)
 	assert.NoError(ev.tester, err)
@@ -190,19 +199,20 @@ func TestServeWithGnetClient(t *testing.T) {
 
 type testClientServer struct {
 	*BuiltinEventEngine
-	client       *Client
-	tester       *testing.T
-	eng          Engine
-	network      string
-	addr         string
-	multicore    bool
-	async        bool
-	nclients     int
-	started      int32
-	connected    int32
-	clientActive int32
-	disconnected int32
-	workerPool   *goPool.Pool
+	client        *Client
+	tester        *testing.T
+	eng           Engine
+	network       string
+	addr          string
+	multicore     bool
+	async         bool
+	nclients      int
+	started       int32
+	connected     int32
+	clientActive  int32
+	disconnected  int32
+	workerPool    *goPool.Pool
+	udpReadHeader int32
 }
 
 func (s *testClientServer) OnBoot(eng Engine) (action Action) {
@@ -211,7 +221,7 @@ func (s *testClientServer) OnBoot(eng Engine) (action Action) {
 }
 
 func (s *testClientServer) OnOpen(c Conn) (out []byte, action Action) {
-	c.SetContext(c)
+	c.SetContext(&sync.Once{})
 	atomic.AddInt32(&s.connected, 1)
 	require.NotNil(s.tester, c.LocalAddr(), "nil local addr")
 	require.NotNil(s.tester, c.RemoteAddr(), "nil remote addr")
@@ -223,7 +233,7 @@ func (s *testClientServer) OnClose(c Conn, err error) (action Action) {
 		logging.Debugf("error occurred on closed, %v\n", err)
 	}
 	if s.network != "udp" {
-		require.Equal(s.tester, c.Context(), c, "invalid context")
+		require.IsType(s.tester, c.Context(), new(sync.Once), "invalid context")
 	}
 
 	atomic.AddInt32(&s.disconnected, 1)
@@ -236,7 +246,25 @@ func (s *testClientServer) OnClose(c Conn, err error) (action Action) {
 	return
 }
 
+func (s *testClientServer) OnShutdown(Engine) {
+	if s.network == "udp" {
+		require.EqualValues(s.tester, int32(s.nclients), atomic.LoadInt32(&s.udpReadHeader))
+	}
+}
+
 func (s *testClientServer) OnTraffic(c Conn) (action Action) {
+	readHeader := func() {
+		ping := make([]byte, len(pingMsg))
+		n, err := io.ReadFull(c, ping)
+		require.NoError(s.tester, err)
+		require.EqualValues(s.tester, len(pingMsg), n)
+		require.Equal(s.tester, string(pingMsg), string(ping), "bad header")
+	}
+	v := c.Context()
+	if v != nil && s.network != "udp" {
+		v.(*sync.Once).Do(readHeader)
+	}
+
 	if s.async {
 		buf := bbPool.Get()
 		_, _ = c.WriteTo(buf)
@@ -247,14 +275,30 @@ func (s *testClientServer) OnTraffic(c Conn) (action Action) {
 			_ = c.OutboundBuffered()
 			_, _ = c.Discard(1)
 		}
+		if s.network == "udp" && bytes.Equal(buf.Bytes(), pingMsg) {
+			atomic.AddInt32(&s.udpReadHeader, 1)
+			buf.Reset()
+		}
 		_ = s.workerPool.Submit(
 			func() {
-				_ = c.AsyncWrite(buf.Bytes(), nil)
+				if buf.Len() > 0 {
+					err := c.AsyncWrite(buf.Bytes(), nil)
+					require.NoError(s.tester, err)
+				}
 			})
 		return
 	}
+
 	buf, _ := c.Next(-1)
-	_, _ = c.Write(buf)
+	if s.network == "udp" && bytes.Equal(buf, pingMsg) {
+		atomic.AddInt32(&s.udpReadHeader, 1)
+		buf = nil
+	}
+	if len(buf) > 0 {
+		n, err := c.Write(buf)
+		require.NoError(s.tester, err)
+		require.EqualValues(s.tester, len(buf), n)
+	}
 	return
 }
 
@@ -343,7 +387,7 @@ func startGnetClient(t *testing.T, cli *Client, network, addr string, multicore,
 	for time.Since(start) < duration {
 		reqData := make([]byte, streamLen)
 		if network == "udp" {
-			reqData = reqData[:1024]
+			reqData = reqData[:datagramLen]
 		}
 		_, err = rand.Read(reqData)
 		require.NoError(t, err)
