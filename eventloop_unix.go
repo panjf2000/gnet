@@ -61,8 +61,19 @@ func (el *eventloop) closeConns() {
 	})
 }
 
+type connWithCallback struct {
+	c  *conn
+	cb func()
+}
+
 func (el *eventloop) register(itf interface{}) error {
-	c := itf.(*conn)
+	c, ok := itf.(*conn)
+	if !ok {
+		ccb := itf.(*connWithCallback)
+		c = ccb.c
+		defer ccb.cb()
+	}
+
 	if err := el.poller.AddRead(&c.pollAttachment); err != nil {
 		_ = unix.Close(c.fd)
 		c.release()
@@ -71,7 +82,7 @@ func (el *eventloop) register(itf interface{}) error {
 
 	el.connections.addConn(c, el.idx)
 
-	if c.isDatagram {
+	if c.isDatagram && c.peer != nil {
 		return nil
 	}
 	return el.open(c)

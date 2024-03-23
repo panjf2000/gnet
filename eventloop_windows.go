@@ -67,7 +67,7 @@ func (el *eventloop) run() (err error) {
 			err = v
 		case *netErr:
 			err = el.close(v.c, v.err)
-		case *conn:
+		case *openConn:
 			err = el.open(v)
 		case *tcpConn:
 			unpackTCPConn(v)
@@ -90,9 +90,16 @@ func (el *eventloop) run() (err error) {
 	return nil
 }
 
-func (el *eventloop) open(c *conn) error {
-	el.connections[c] = struct{}{}
-	el.incConn(1)
+func (el *eventloop) open(oc *openConn) error {
+	if oc.cb != nil {
+		defer oc.cb()
+	}
+
+	c := oc.c
+	if !oc.isDatagram {
+		el.connections[c] = struct{}{}
+		el.incConn(1)
+	}
 
 	out, action := el.eventHandler.OnOpen(c)
 	if out != nil {
