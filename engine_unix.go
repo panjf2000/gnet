@@ -27,6 +27,7 @@ import (
 
 	"github.com/panjf2000/gnet/v2/internal/gfd"
 	"github.com/panjf2000/gnet/v2/internal/netpoll"
+	"github.com/panjf2000/gnet/v2/internal/queue"
 	"github.com/panjf2000/gnet/v2/pkg/errors"
 )
 
@@ -203,14 +204,14 @@ func (eng *engine) stop(s Engine) {
 
 	// Notify all event-loops to exit.
 	eng.eventLoops.iterate(func(_ int, el *eventloop) bool {
-		err := el.poller.UrgentTrigger(func(_ interface{}) error { return errors.ErrEngineShutdown }, nil)
+		err := el.poller.Trigger(queue.HighPriority, func(_ interface{}) error { return errors.ErrEngineShutdown }, nil)
 		if err != nil {
 			eng.opts.Logger.Errorf("failed to call UrgentTrigger on sub event-loop when stopping engine: %v", err)
 		}
 		return true
 	})
 	if eng.acceptor != nil {
-		err := eng.acceptor.poller.UrgentTrigger(func(_ interface{}) error { return errors.ErrEngineShutdown }, nil)
+		err := eng.acceptor.poller.Trigger(queue.HighPriority, func(_ interface{}) error { return errors.ErrEngineShutdown }, nil)
 		if err != nil {
 			eng.opts.Logger.Errorf("failed to call UrgentTrigger on main event-loop when stopping engine: %v", err)
 		}

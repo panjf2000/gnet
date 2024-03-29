@@ -23,6 +23,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/panjf2000/gnet/v2/internal/netpoll"
+	"github.com/panjf2000/gnet/v2/internal/queue"
 	"github.com/panjf2000/gnet/v2/internal/socket"
 	"github.com/panjf2000/gnet/v2/pkg/errors"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
@@ -51,7 +52,7 @@ func (eng *engine) accept1(fd int, _ netpoll.IOEvent, _ netpoll.IOFlags) error {
 
 	el := eng.eventLoops.next(remoteAddr)
 	c := newTCPConn(nfd, el, sa, el.ln.addr, remoteAddr)
-	err = el.poller.UrgentTrigger(el.register, c)
+	err = el.poller.Trigger(queue.HighPriority, el.register, c)
 	if err != nil {
 		eng.opts.Logger.Errorf("UrgentTrigger() failed due to error: %v", err)
 		_ = unix.Close(nfd)

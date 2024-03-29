@@ -29,6 +29,7 @@ import (
 	"github.com/panjf2000/gnet/v2/internal/gfd"
 	gio "github.com/panjf2000/gnet/v2/internal/io"
 	"github.com/panjf2000/gnet/v2/internal/netpoll"
+	"github.com/panjf2000/gnet/v2/internal/queue"
 	"github.com/panjf2000/gnet/v2/internal/socket"
 	"github.com/panjf2000/gnet/v2/pkg/buffer/elastic"
 	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
@@ -442,18 +443,18 @@ func (c *conn) AsyncWrite(buf []byte, callback AsyncCallback) error {
 		}
 		return err
 	}
-	return c.loop.poller.Trigger(c.asyncWrite, &asyncWriteHook{callback, buf})
+	return c.loop.poller.Trigger(queue.HighPriority, c.asyncWrite, &asyncWriteHook{callback, buf})
 }
 
 func (c *conn) AsyncWritev(bs [][]byte, callback AsyncCallback) error {
 	if c.isDatagram {
 		return errorx.ErrUnsupportedOp
 	}
-	return c.loop.poller.Trigger(c.asyncWritev, &asyncWritevHook{callback, bs})
+	return c.loop.poller.Trigger(queue.HighPriority, c.asyncWritev, &asyncWritevHook{callback, bs})
 }
 
 func (c *conn) Wake(callback AsyncCallback) error {
-	return c.loop.poller.UrgentTrigger(func(_ interface{}) (err error) {
+	return c.loop.poller.Trigger(queue.LowPriority, func(_ interface{}) (err error) {
 		err = c.loop.wake(c)
 		if callback != nil {
 			_ = callback(c, err)
@@ -463,7 +464,7 @@ func (c *conn) Wake(callback AsyncCallback) error {
 }
 
 func (c *conn) CloseWithCallback(callback AsyncCallback) error {
-	return c.loop.poller.Trigger(func(_ interface{}) (err error) {
+	return c.loop.poller.Trigger(queue.LowPriority, func(_ interface{}) (err error) {
 		err = c.loop.close(c, nil)
 		if callback != nil {
 			_ = callback(c, err)
@@ -473,7 +474,7 @@ func (c *conn) CloseWithCallback(callback AsyncCallback) error {
 }
 
 func (c *conn) Close() error {
-	return c.loop.poller.Trigger(func(_ interface{}) (err error) {
+	return c.loop.poller.Trigger(queue.LowPriority, func(_ interface{}) (err error) {
 		err = c.loop.close(c, nil)
 		return
 	}, nil)

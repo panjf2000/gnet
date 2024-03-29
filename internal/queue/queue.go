@@ -43,4 +43,17 @@ type AsyncTaskQueue interface {
 	Enqueue(*Task)
 	Dequeue() *Task
 	IsEmpty() bool
+	Length() int32
 }
+
+// EventPriority is the priority of an event.
+type EventPriority int
+
+const (
+	// HighPriority is for the tasks expected to be executed
+	// as soon as possible.
+	HighPriority EventPriority = iota
+	// LowPriority is for the tasks that won't matter much
+	// even if they are deferred a little bit.
+	LowPriority
+)
