@@ -1,0 +1,16 @@
+name: 'issue-translator'
+on:
+  issue_comment:
+    types: [created]
+  issues:
+    types: [opened]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: usthe/issues-translate-action@v2.7
+        with:
+          BOT_GITHUB_TOKEN: ${{ secrets.GH_TRANSLATOR_TOKEN}}
+          IS_MODIFY_TITLE: true
+          CUSTOM_BOT_NOTE: Non-English text detected, translating...
