@@ -86,6 +86,8 @@ func (p *Poller) Trigger(priority queue.EventPriority, fn queue.TaskFunc, arg in
 	if priority > queue.HighPriority && p.urgentAsyncTaskQueue.Length() >= p.highPriorityEventsThreshold {
 		p.asyncTaskQueue.Enqueue(task)
 	} else {
+		// There might be some low-priority tasks overflowing into urgentAsyncTaskQueue in a flash,
+		// but that's tolerable because it ought to be a rare case.
 		p.urgentAsyncTaskQueue.Enqueue(task)
 	}
 	if atomic.CompareAndSwapInt32(&p.wakeupCall, 0, 1) {
