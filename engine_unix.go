@@ -203,17 +203,17 @@ func (eng *engine) stop(s Engine) {
 	eng.eventHandler.OnShutdown(s)
 
 	// Notify all event-loops to exit.
-	eng.eventLoops.iterate(func(_ int, el *eventloop) bool {
+	eng.eventLoops.iterate(func(i int, el *eventloop) bool {
 		err := el.poller.Trigger(queue.HighPriority, func(_ interface{}) error { return errors.ErrEngineShutdown }, nil)
 		if err != nil {
-			eng.opts.Logger.Errorf("failed to call UrgentTrigger on sub event-loop when stopping engine: %v", err)
+			eng.opts.Logger.Errorf("failed to enqueue shutdown signal of high-priority for event-loop(%d): %v", i, err)
 		}
 		return true
 	})
 	if eng.acceptor != nil {
 		err := eng.acceptor.poller.Trigger(queue.HighPriority, func(_ interface{}) error { return errors.ErrEngineShutdown }, nil)
 		if err != nil {
-			eng.opts.Logger.Errorf("failed to call UrgentTrigger on main event-loop when stopping engine: %v", err)
+			eng.opts.Logger.Errorf("failed to enqueue shutdown signal of high-priority for main event-loop: %v", err)
 		}
 	}
 
@@ -300,7 +300,7 @@ func (eng *engine) sendCmd(cmd *asyncCmd, urgent bool) error {
 		return errors.ErrInvalidConn
 	}
 	if urgent {
-		return el.poller.UrgentTrigger(el.execCmd, cmd)
+		return el.poller.Trigger(queue.LowPriority, el.execCmd, cmd)
 	}
 	return el.poller.Trigger(el.execCmd, cmd)
 }

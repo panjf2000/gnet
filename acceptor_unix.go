@@ -54,7 +54,7 @@ func (eng *engine) accept1(fd int, _ netpoll.IOEvent, _ netpoll.IOFlags) error {
 	c := newTCPConn(nfd, el, sa, el.ln.addr, remoteAddr)
 	err = el.poller.Trigger(queue.HighPriority, el.register, c)
 	if err != nil {
-		eng.opts.Logger.Errorf("UrgentTrigger() failed due to error: %v", err)
+		eng.opts.Logger.Errorf("failed to enqueue accepted socket of high-priority: %v", err)
 		_ = unix.Close(nfd)
 		c.release()
 	}
