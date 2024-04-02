@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/binary"
 	"errors"
 	"io"
@@ -38,6 +39,14 @@ func TestServe(t *testing.T) {
 	// the engine will echo back the data.
 	// waits for graceful connection closing.
 	t.Run("poll", func(t *testing.T) {
+		t.Run("tls", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				testTLSServe(t, "tcp", ":9991", false, false, false, false, false, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				testTLSServe(t, "tcp", ":9992", false, false, true, false, false, 10, LeastConnections)
+			})
+		})
 		t.Run("tcp", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
 				testServe(t, "tcp", ":9991", false, false, false, false, false, 10, RoundRobin)
@@ -105,6 +114,14 @@ func TestServe(t *testing.T) {
 	})
 
 	t.Run("poll-reuseport", func(t *testing.T) {
+		t.Run("tls", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				testTLSServe(t, "tcp", ":9991", true, false, false, false, false, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				testTLSServe(t, "tcp", ":9992", true, false, true, false, false, 10, LeastConnections)
+			})
+		})
 		t.Run("tcp", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
 				testServe(t, "tcp", ":9991", true, false, false, false, false, 10, RoundRobin)
@@ -172,6 +189,14 @@ func TestServe(t *testing.T) {
 	})
 
 	t.Run("poll-reuseaddr", func(t *testing.T) {
+		t.Run("tls", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				testTLSServe(t, "tcp", ":9991", false, true, false, false, false, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				testTLSServe(t, "tcp", ":9992", false, true, true, false, false, 10, LeastConnections)
+			})
+		})
 		t.Run("tcp", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
 				testServe(t, "tcp", ":9991", false, true, false, false, false, 10, RoundRobin)
@@ -238,6 +263,7 @@ type testServer struct {
 	clientActive int32
 	disconnected int32
 	workerPool   *goPool.Pool
+	isTLS        bool
 }
 
 func (s *testServer) OnBoot(eng Engine) (action Action) {
@@ -365,7 +391,7 @@ func (s *testServer) OnTick() (delay time.Duration, action Action) {
 		for i := 0; i < s.nclients; i++ {
 			atomic.AddInt32(&s.clientActive, 1)
 			go func() {
-				startClient(s.tester, s.network, s.addr, s.multicore, s.async)
+				startClient(s.tester, s.network, s.addr, s.multicore, s.async, s.isTLS)
 				atomic.AddInt32(&s.clientActive, -1)
 			}()
 		}
@@ -375,6 +401,32 @@ func (s *testServer) OnTick() (delay time.Duration, action Action) {
 		return
 	}
 	return
+}
+
+func testTLSServe(t *testing.T, network, addr string, reuseport, reuseaddr, multicore, async, writev bool, nclients int, lb LoadBalancing) {
+	ts := &testServer{
+		tester:     t,
+		network:    network,
+		addr:       addr,
+		multicore:  multicore,
+		async:      async,
+		writev:     writev,
+		nclients:   nclients,
+		workerPool: goPool.Default(),
+		isTLS:      true,
+	}
+	err := Run(ts,
+		network+"://"+addr,
+		WithLockOSThread(async),
+		WithMulticore(multicore),
+		WithReusePort(reuseport),
+		WithReuseAddr(reuseaddr),
+		WithTicker(true),
+		WithTCPKeepAlive(time.Minute*1),
+		WithTCPNoDelay(TCPDelay),
+		WithLoadBalancing(lb),
+		WithTLSConfig(getServerConfig()))
+	assert.NoError(t, err)
 }
 
 func testServe(t *testing.T, network, addr string, reuseport, reuseaddr, multicore, async, writev bool, nclients int, lb LoadBalancing) {
@@ -401,9 +453,18 @@ func testServe(t *testing.T, network, addr string, reuseport, reuseaddr, multico
 	assert.NoError(t, err)
 }
 
-func startClient(t *testing.T, network, addr string, multicore, async bool) {
+func startClient(t *testing.T, network, addr string, multicore, async bool, isTLS bool) {
 	rand.Seed(time.Now().UnixNano())
-	c, err := net.Dial(network, addr)
+	var (
+		c   net.Conn
+		err error
+	)
+	if isTLS {
+		// TLS client use golang tls.Dial
+		c, err = tls.Dial(network, addr, getGoClientTLSConfig())
+	} else {
+		c, err = net.Dial(network, addr)
+	}
 	require.NoError(t, err)
 	defer c.Close()
 	rd := bufio.NewReader(c)

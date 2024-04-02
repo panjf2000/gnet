@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/panjf2000/gnet/v2/pkg/logging"
+	"github.com/panjf2000/gnet/v2/pkg/tls"
 )
 
 // Option is a function that will set up option.
@@ -122,6 +123,9 @@ type Options struct {
 	// Logger is the customized logger for logging info, if it is not set,
 	// then gnet will use the default logger powered by go.uber.org/zap.
 	Logger logging.Logger
+
+	// TLSConfig support TLS
+	TLSConfig *tls.Config
 }
 
 // WithOptions sets up all options.
@@ -247,5 +251,12 @@ func WithLogger(logger logging.Logger) Option {
 func WithMulticastInterfaceIndex(idx int) Option {
 	return func(opts *Options) {
 		opts.MulticastInterfaceIndex = idx
+	}
+}
+
+// WithTLSConfig sets support TLS
+func WithTLSConfig(tlsConfig *tls.Config) Option {
+	return func(opts *Options) {
+		opts.TLSConfig = tlsConfig
 	}
 }

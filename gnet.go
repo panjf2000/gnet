@@ -441,6 +441,11 @@ var MaxStreamBufferCap = 64 * 1024 // 64KB
 func Run(eventHandler EventHandler, protoAddr string, opts ...Option) (err error) {
 	options := loadOptions(opts...)
 
+	// upgrade to TLS EventHandler
+	if options.TLSConfig != nil {
+		eventHandler = &tlsEventHandler{EventHandler: eventHandler, tlsConfig: options.TLSConfig}
+	}
+
 	logger, logFlusher := logging.GetDefaultLogger(), logging.GetDefaultFlusher()
 	if options.Logger == nil {
 		if options.LogPath != "" {
