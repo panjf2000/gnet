@@ -13,12 +13,10 @@ import (
 )
 
 type tlsConn struct {
-	raw                Conn
-	rawTLSConn         *tls.Conn
-	inboundBuffer      *bytes.Buffer
-	handshakeCompleted bool
-	count              int
-	ctx                interface{}
+	raw           Conn
+	rawTLSConn    *tls.Conn
+	inboundBuffer *bytes.Buffer
+	ctx           interface{}
 }
 
 func (c *tlsConn) Read(p []byte) (n int, err error) {

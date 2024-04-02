@@ -296,7 +296,13 @@ func (s *testServer) OnClose(c Conn, err error) (action Action) {
 		logging.Debugf("error occurred on closed, %v\n", err)
 	}
 	if s.network != "udp" {
-		require.Equal(s.tester, c.Context(), c, "invalid context")
+		if s.isTLS {
+			tc, ok := c.Context().(*tlsConn)
+			require.True(s.tester, ok, "tls context not is *tlsConn")
+			require.Equal(s.tester, tc.raw, c, "invalid context")
+		} else {
+			require.Equal(s.tester, c.Context(), c, "invalid context")
+		}
 	}
 
 	if disconnected := atomic.AddInt32(&s.disconnected, 1); disconnected == atomic.LoadInt32(&s.connected) && disconnected == int32(s.nclients) { //nolint:gocritic
