@@ -30,6 +30,7 @@ import (
 
 	"github.com/panjf2000/gnet/v2/internal/math"
 	"github.com/panjf2000/gnet/v2/internal/netpoll"
+	"github.com/panjf2000/gnet/v2/internal/queue"
 	"github.com/panjf2000/gnet/v2/internal/socket"
 	"github.com/panjf2000/gnet/v2/pkg/buffer/ring"
 	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
@@ -126,7 +127,7 @@ func (cli *Client) Start() error {
 
 // Stop stops the client event-loop.
 func (cli *Client) Stop() (err error) {
-	logging.Error(cli.el.poller.UrgentTrigger(func(_ interface{}) error { return errorx.ErrEngineShutdown }, nil))
+	logging.Error(cli.el.poller.Trigger(queue.HighPriority, func(_ interface{}) error { return errorx.ErrEngineShutdown }, nil))
 	// Stop the ticker.
 	if cli.opts.Ticker {
 		cli.el.engine.ticker.cancel()
@@ -140,15 +141,25 @@ func (cli *Client) Stop() (err error) {
 
 // Dial is like net.Dial().
 func (cli *Client) Dial(network, address string) (Conn, error) {
+	return cli.DialContext(network, address, nil)
+}
+
+// DialContext is like Dial but also accepts an empty interface ctx that can be obtained later via Conn.Context.
+func (cli *Client) DialContext(network, address string, ctx interface{}) (Conn, error) {
 	c, err := net.Dial(network, address)
 	if err != nil {
 		return nil, err
 	}
-	return cli.Enroll(c)
+	return cli.EnrollContext(c, ctx)
 }
 
 // Enroll converts a net.Conn to gnet.Conn and then adds it into Client.
 func (cli *Client) Enroll(c net.Conn) (Conn, error) {
+	return cli.EnrollContext(c, nil)
+}
+
+// EnrollContext is like Enroll but also accepts an empty interface ctx that can be obtained later via Conn.Context.
+func (cli *Client) EnrollContext(c net.Conn, ctx interface{}) (Conn, error) {
 	defer c.Close()
 
 	sc, ok := c.(syscall.Conn)
@@ -184,7 +195,7 @@ func (cli *Client) Enroll(c net.Conn) (Conn, error) {
 
 	var (
 		sockAddr unix.Sockaddr
-		gc       Conn
+		gc       *conn
 	)
 	switch c.(type) {
 	case *net.UnixConn:
@@ -217,10 +228,18 @@ func (cli *Client) Enroll(c net.Conn) (Conn, error) {
 	default:
 		return nil, errorx.ErrUnsupportedProtocol
 	}
-	err = cli.el.poller.UrgentTrigger(cli.el.register, gc)
+	gc.ctx = ctx
+
+	connOpened := make(chan struct{})
+	ccb := &connWithCallback{c: gc, cb: func() {
+		close(connOpened)
+	}}
+	err = cli.el.poller.Trigger(queue.HighPriority, cli.el.register, ccb)
 	if err != nil {
 		gc.Close()
 		return nil, err
 	}
+
+	<-connOpened
 	return gc, nil
 }

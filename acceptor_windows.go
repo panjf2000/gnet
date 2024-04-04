@@ -69,7 +69,7 @@ func (eng *engine) listen() (err error) {
 			}
 			el := eng.eventLoops.next(tc.RemoteAddr())
 			c := newTCPConn(tc, el)
-			el.ch <- c
+			el.ch <- &openConn{c: c}
 			go func(c *conn, tc net.Conn, el *eventloop) {
 				var buffer [0x10000]byte
 				for {

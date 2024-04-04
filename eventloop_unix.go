@@ -30,6 +30,7 @@ import (
 
 	"github.com/panjf2000/gnet/v2/internal/io"
 	"github.com/panjf2000/gnet/v2/internal/netpoll"
+	"github.com/panjf2000/gnet/v2/internal/queue"
 	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
 )
@@ -61,8 +62,19 @@ func (el *eventloop) closeConns() {
 	})
 }
 
+type connWithCallback struct {
+	c  *conn
+	cb func()
+}
+
 func (el *eventloop) register(itf interface{}) error {
-	c := itf.(*conn)
+	c, ok := itf.(*conn)
+	if !ok {
+		ccb := itf.(*connWithCallback)
+		c = ccb.c
+		defer ccb.cb()
+	}
+
 	if err := el.poller.AddRead(&c.pollAttachment); err != nil {
 		_ = unix.Close(c.fd)
 		c.release()
@@ -71,7 +83,7 @@ func (el *eventloop) register(itf interface{}) error {
 
 	el.connections.addConn(c, el.idx)
 
-	if c.isDatagram {
+	if c.isDatagram && c.peer != nil {
 		return nil
 	}
 	return el.open(c)
@@ -242,8 +254,10 @@ func (el *eventloop) ticker(ctx context.Context) {
 		switch action {
 		case None:
 		case Shutdown:
-			err := el.poller.UrgentTrigger(func(_ interface{}) error { return errorx.ErrEngineShutdown }, nil)
-			el.getLogger().Debugf("stopping ticker in event-loop(%d) from OnTick(), UrgentTrigger:%v", el.idx, err)
+			// It seems reasonable to mark this as low-priority, waiting for some tasks like asynchronous writes
+			// to finish up before shutting down the service.
+			err := el.poller.Trigger(queue.LowPriority, func(_ interface{}) error { return errorx.ErrEngineShutdown }, nil)
+			el.getLogger().Debugf("failed to enqueue shutdown signal of high-priority for event-loop(%d): %v", el.idx, err)
 		}
 		if timer == nil {
 			timer = time.NewTimer(delay)
