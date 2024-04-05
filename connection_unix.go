@@ -149,7 +149,7 @@ func (c *conn) write(data []byte) (n int, err error) {
 			logging.Errorf("failed to close connection(fd=%d,peer=%+v) on conn.write: %v",
 				c.fd, c.remoteAddr, err)
 		}
-		return -1, os.NewSyscallError("write", err)
+		return 0, os.NewSyscallError("write", err)
 	}
 	// Failed to send all data back to the peer, buffer the leftover data for the next round.
 	if sent < n {
@@ -183,7 +183,7 @@ func (c *conn) writev(bs [][]byte) (n int, err error) {
 			logging.Errorf("failed to close connection(fd=%d,peer=%+v) on conn.writev: %v",
 				c.fd, c.remoteAddr, err)
 		}
-		return -1, os.NewSyscallError("writev", err)
+		return 0, os.NewSyscallError("writev", err)
 	}
 	// Failed to send all data back to the peer, buffer the leftover data for the next round.
 	if sent < n {
