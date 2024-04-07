@@ -17,7 +17,6 @@ type tlsConn struct {
 	raw           Conn
 	rawTLSConn    *tls.Conn
 	inboundBuffer *bytes.Buffer
-	buffer        []byte // OnTraffic cache buffer
 	ctx           interface{}
 }
 
@@ -195,28 +194,17 @@ func (h *tlsEventHandler) OnTraffic(c Conn) (action Action) {
 		return None
 	}
 
-	// grow tlsConn buffer size
-	if len(tc.buffer) < tc.raw.InboundBuffered() {
-		tc.buffer = make([]byte, tc.raw.InboundBuffered())
+	bb := bbPool.Get()
+	defer bbPool.Put(bb)
+	n, err := bb.ReadFrom(tc.rawTLSConn)
+	// close when the error is not ErrNotEnough or EOF
+	if err != nil && (!errors.Is(err, tls.ErrNotEnough) || !errors.Is(err, io.EOF)) {
+		logging.Errorf("tls conn OnTraffic err: %v, stack: %s", err, debug.Stack())
+		return Close
 	}
 
-	for {
-		n, err := tc.rawTLSConn.Read(tc.buffer)
-		if errors.Is(err, tls.ErrNotEnough) || errors.Is(err, io.EOF) {
-			break
-		}
-
-		if err != nil {
-			logging.Errorf("tls conn OnTraffic err: %v, stack: %s", err, debug.Stack())
-			return Close
-		}
-
-		if n > 0 {
-			tc.inboundBuffer.Write(tc.buffer[:n])
-			if tc.raw.InboundBuffered() == 0 {
-				break
-			}
-		}
+	if n > 0 {
+		tc.inboundBuffer.Write(bb.Bytes())
 	}
 
 	if tc.inboundBuffer.Len() > 0 {
