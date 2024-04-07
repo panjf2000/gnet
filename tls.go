@@ -196,19 +196,20 @@ func (h *tlsEventHandler) OnTraffic(c Conn) (action Action) {
 	buffer := make([]byte, 1024*1024)
 	for {
 		n, err := tc.rawTLSConn.Read(buffer)
-		if errors.Is(err, tls.ErrNotEnough) {
+		if errors.Is(err, tls.ErrNotEnough) || errors.Is(err, io.EOF) {
 			break
 		}
+
 		if err != nil {
-			if errors.Is(err, io.EOF) {
-				return None
-			}
 			logging.Errorf("tls conn OnTraffic err: %v, stack: %s", err, debug.Stack())
 			return Close
 		}
-		tc.inboundBuffer.Write(buffer[:n])
-		if tc.raw.InboundBuffered() == 0 {
-			break
+
+		if n > 0 {
+			tc.inboundBuffer.Write(buffer[:n])
+			if tc.raw.InboundBuffered() == 0 {
+				break
+			}
 		}
 	}
 
