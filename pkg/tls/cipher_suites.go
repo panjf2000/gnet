@@ -17,7 +17,6 @@ import (
 	"hash"
 	"runtime"
 
-	"github.com/panjf2000/gnet/v2/pkg/tls/internal/boring"
 	"github.com/panjf2000/gnet/v2/pkg/tls/internal/cpu"
 
 	"golang.org/x/crypto/chacha20poly1305"
@@ -534,12 +533,7 @@ func aeadAESGCM(key, noncePrefix []byte) aead {
 		panic(err)
 	}
 	var aead cipher.AEAD
-	if boring.Enabled {
-		aead, err = boring.NewGCMTLS(aes)
-	} else {
-		boring.Unreachable()
-		aead, err = cipher.NewGCM(aes)
-	}
+	aead, err = cipher.NewGCM(aes)
 	if err != nil {
 		panic(err)
 	}
@@ -599,7 +593,6 @@ func (c *cthWrapper) Write(p []byte) (int, error) { return c.h.Write(p) }
 func (c *cthWrapper) Sum(b []byte) []byte         { return c.h.ConstantTimeSum(b) }
 
 func newConstantTimeHash(h func() hash.Hash) func() hash.Hash {
-	boring.Unreachable()
 	return func() hash.Hash {
 		return &cthWrapper{h().(constantTimeHash)}
 	}

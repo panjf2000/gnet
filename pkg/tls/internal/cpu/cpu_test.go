@@ -5,12 +5,9 @@
 package cpu_test
 
 import (
-	"internal/testenv"
 	"os"
 	"os/exec"
 	"testing"
-
-	"github.com/panjf2000/gnet/v2/pkg/tls/internal/godebug"
 
 	. "github.com/panjf2000/gnet/v2/pkg/tls/internal/cpu"
 )
@@ -27,8 +24,6 @@ func MustSupportFeatureDetection(t *testing.T) {
 
 func runDebugOptionsTest(t *testing.T, test string, options string) {
 	MustHaveDebugOptionsSupport(t)
-
-	testenv.MustHaveExec(t)
 
 	env := "GODEBUG=" + options
 
@@ -50,9 +45,9 @@ func TestDisableAllCapabilities(t *testing.T) {
 func TestAllCapabilitiesDisabled(t *testing.T) {
 	MustHaveDebugOptionsSupport(t)
 
-	if godebug.New("#cpu.all").Value() != "off" {
+	/*	if godebug.New("#cpu.all").Value() != "off" {
 		t.Skipf("skipping test: GODEBUG=cpu.all=off not set")
-	}
+	}*/
 
 	for _, o := range Options {
 		want := false
