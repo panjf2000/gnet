@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/panjf2000/gnet/v2/pkg/logging"
+	bbPool "github.com/panjf2000/gnet/v2/pkg/pool/bytebuffer"
 	"github.com/panjf2000/gnet/v2/pkg/tls"
 )
 
@@ -16,6 +17,7 @@ type tlsConn struct {
 	raw           Conn
 	rawTLSConn    *tls.Conn
 	inboundBuffer *bytes.Buffer
+	buffer        []byte // OnTraffic cache buffer
 	ctx           interface{}
 }
 
@@ -59,12 +61,12 @@ func (c *tlsConn) ReadFrom(r io.Reader) (n int64, err error) {
 }
 
 func (c *tlsConn) Writev(bs [][]byte) (n int, err error) {
-	// TODO:
-	var bb []byte
-	for _, b := range bs {
-		bb = append(bb, b...)
+	bb := bbPool.Get()
+	defer bbPool.Put(bb)
+	for i := range bs {
+		_, _ = bb.Write(bs[i])
 	}
-	return c.Write(bb)
+	return c.Write(bb.Bytes())
 }
 
 func (c *tlsConn) Flush() (err error) {
@@ -192,10 +194,14 @@ func (h *tlsEventHandler) OnTraffic(c Conn) (action Action) {
 
 		return None
 	}
-	// TODO: cache buffer
-	buffer := make([]byte, 1024*1024)
+
+	// grow tlsConn buffer size
+	if len(tc.buffer) < tc.raw.InboundBuffered() {
+		tc.buffer = make([]byte, tc.raw.InboundBuffered())
+	}
+
 	for {
-		n, err := tc.rawTLSConn.Read(buffer)
+		n, err := tc.rawTLSConn.Read(tc.buffer)
 		if errors.Is(err, tls.ErrNotEnough) || errors.Is(err, io.EOF) {
 			break
 		}
@@ -206,7 +212,7 @@ func (h *tlsEventHandler) OnTraffic(c Conn) (action Action) {
 		}
 
 		if n > 0 {
-			tc.inboundBuffer.Write(buffer[:n])
+			tc.inboundBuffer.Write(tc.buffer[:n])
 			if tc.raw.InboundBuffered() == 0 {
 				break
 			}
