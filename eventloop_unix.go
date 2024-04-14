@@ -100,7 +100,7 @@ func (el *eventloop) open(c *conn) error {
 	}
 
 	if !c.outboundBuffer.IsEmpty() {
-		if err := el.poller.AddWrite(&c.pollAttachment); err != nil {
+		if err := el.poller.ModReadWrite(&c.pollAttachment); err != nil {
 			return err
 		}
 	}
