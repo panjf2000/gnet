@@ -22,7 +22,7 @@ It's recommended to use `Conn.Context()` to store necessary resource for each co
 
 Despite the fact that `gnet` leverages `epoll`/`kqueue` with level-triggered mode under the hood, `OnTraffic()` won't be invoked constantly given there is data left in the inbound buffer of a connection, `OnTraffic()` is only invoked when there is new data arriving, which is like edge-triggered mode from the user's point of view.
 
-Thus, you should loop call `c.Read()`/`c.Peek()`/`c.Next()` for a connection in `OnTraffic()` to drain the inbound buffer for reading and decoding packets until it reaches an incomplete packet, but if you don't, then make sure you call `c.Wake()` periodically, otherwise you may never get a chance to read the rest of the leftover data until the peer endpoint sends new data over and there are new arrivals of data on the socket.
+Thus, you should loop call `c.Read()`/`c.Peek()`/`c.Next()` on a connection in `OnTraffic()` to drain the inbound buffer for reading and decoding packets until you reach an incomplete packet, but if you don't, then make sure you call `c.Wake()` periodically, otherwise you may never get a chance to read the leftover data until the peer endpoint sends new data over and there are new arrivals of data on the socket.
 
 ### Enable poll_opt mode to boost performance
 
