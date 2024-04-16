@@ -1,6 +1,6 @@
 ---
 id: best-practices
-last_modified_on: "2022-09-24"
+last_modified_on: "2024-04-16"
 title: "Best practices"
 description: "Best practices for writing code on top of gnet."
 ---
@@ -9,13 +9,20 @@ description: "Best practices for writing code on top of gnet."
 
 The above three event handlers (callbacks) are executed in event-loops, therefore, running blocking code in them blocks event-loops, which means that the subsequent tasks will have to wait for the preceding blocking event handlers to complete before they get executed.
 
-To avoid blocking event-loops, asynchronize your blocking code, for example by starting a goroutine with your blocking code and invoking c.AsyncWrite() or c.AsyncWritev() to send response data to the peer endpoint.
+To avoid blocking event-loops, asynchronize your blocking code, for example by starting a goroutine with your blocking code and invoking `Conn.AsyncWrite()` or `Conn.AsyncWritev()` to send response data to the peer endpoint.
 
-If you're not familiar with how gnet works, go back and read [this](https://gnet.host/docs/about/overview/#networking-model-of-multiple-threadsgoroutines).
+If you're not familiar with how `gnet` works, go back and read [this](https://gnet.host/docs/about/overview/#networking-model-of-multiple-threadsgoroutines).
 
 ### Leverage Conn.Context() to monopolize data instead of sharing it across connections
 
-It's recommended to use Conn.Context() to store necessary resource for each connection, so that each connection can take advantage of its exclusive resource, avoiding the contention of single resource across connections.
+It's recommended to use `Conn.Context()` to store necessary resource for each connection, so that each connection can take advantage of its exclusive resource, avoiding the contention of single resource across connections.
+
+
+### Either loop read data in OnTraffic() or invoke c.Wake() regularly
+
+Despite the fact that `gnet` leverages `epoll`/`kqueue` with level-triggered mode under the hood, `OnTraffic()` won't be invoked constantly given there is data left in the inbound buffer of a connection, `OnTraffic()` is only invoked when there is new data arriving, which is like edge-triggered mode from the user's point of view.
+
+Thus, you should loop call `c.Read()`/`c.Peek()`/`c.Next()` for a connection in `OnTraffic()` to drain the inbound buffer for reading and decoding packets until it reaches an incomplete packet, but if you don't, then make sure you call `c.Wake()` periodically, otherwise you may never get a chance to read the rest of the leftover data until the peer endpoint sends new data over and there are new arrivals of data on the socket.
 
 ### Enable poll_opt mode to boost performance
 
