@@ -492,6 +492,10 @@ func Run(eventHandler EventHandler, protoAddr string, opts ...Option) (err error
 	}
 	defer ln.close()
 
+	if ln.network == "udp" {
+		options.EdgeTriggeredIO = false
+	}
+
 	return run(eventHandler, ln, options, protoAddr)
 }
 

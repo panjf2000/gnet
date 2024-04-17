@@ -36,14 +36,16 @@ import (
 )
 
 type eventloop struct {
-	ln           *listener       // listener
-	idx          int             // loop index in the engine loops list
-	cache        bytes.Buffer    // temporary buffer for scattered bytes
-	engine       *engine         // engine in loop
-	poller       *netpoll.Poller // epoll or kqueue
-	buffer       []byte          // read packet buffer whose capacity is set by user, default value is 64KB
-	connections  connMatrix      // loop connections storage
-	eventHandler EventHandler    // user eventHandler
+	ln           *listener         // listener
+	idx          int               // loop index in the engine loops list
+	read         func(*conn) error // read event handler
+	write        func(*conn) error // write event handler
+	cache        bytes.Buffer      // temporary buffer for scattered bytes
+	engine       *engine           // engine in loop
+	poller       *netpoll.Poller   // epoll or kqueue
+	buffer       []byte            // read packet buffer whose capacity is set by user, default value is 64KB
+	connections  connMatrix        // loop connections storage
+	eventHandler EventHandler      // user eventHandler
 }
 
 func (el *eventloop) getLogger() logging.Logger {
@@ -75,7 +77,12 @@ func (el *eventloop) register(itf interface{}) error {
 		defer ccb.cb()
 	}
 
-	if err := el.poller.AddRead(&c.pollAttachment); err != nil {
+	addEvents := el.poller.AddRead
+	if el.engine.opts.EdgeTriggeredIO {
+		addEvents = el.poller.AddReadWrite
+	}
+
+	if err := addEvents(&c.pollAttachment, el.engine.opts.EdgeTriggeredIO); err != nil {
 		_ = unix.Close(c.fd)
 		c.release()
 		return err
@@ -99,8 +106,8 @@ func (el *eventloop) open(c *conn) error {
 		}
 	}
 
-	if !c.outboundBuffer.IsEmpty() {
-		if err := el.poller.ModReadWrite(&c.pollAttachment); err != nil {
+	if !c.outboundBuffer.IsEmpty() && !el.engine.opts.EdgeTriggeredIO {
+		if err := el.poller.ModReadWrite(&c.pollAttachment, false); err != nil {
 			return err
 		}
 	}
@@ -108,7 +115,7 @@ func (el *eventloop) open(c *conn) error {
 	return el.handleAction(c, action)
 }
 
-func (el *eventloop) read(c *conn) error {
+func (el *eventloop) readLT(c *conn) error {
 	n, err := unix.Read(c.fd, el.buffer)
 	if err != nil || n == 0 {
 		if err == unix.EAGAIN {
@@ -134,10 +141,46 @@ func (el *eventloop) read(c *conn) error {
 	return nil
 }
 
+func (el *eventloop) readET(c *conn) error {
+	var read int
+	buf := c.elasticBuffer.AllocNode(MaxStreamBufferCap)
+	for {
+		n, err := unix.Read(c.fd, buf[read:])
+		if err != nil || n == 0 {
+			if err == unix.EAGAIN {
+				c.elasticBuffer.Append(buf[:read])
+				break
+			}
+			if n == 0 {
+				err = unix.ECONNRESET
+			}
+			c.elasticBuffer.FreeNode(buf)
+			return el.close(c, os.NewSyscallError("read", err))
+		}
+		read += n
+		if read == MaxStreamBufferCap {
+			c.elasticBuffer.Append(buf)
+			read = 0
+			buf = c.elasticBuffer.AllocNode(MaxStreamBufferCap)
+		}
+	}
+
+	action := el.eventHandler.OnTraffic(c)
+	switch action {
+	case None:
+	case Close:
+		return el.close(c, nil)
+	case Shutdown:
+		return errorx.ErrEngineShutdown
+	}
+
+	return nil
+}
+
 // The default value of UIO_MAXIOV/IOV_MAX is 1024 on Linux and most BSD-like OSs.
 const iovMax = 1024
 
-func (el *eventloop) write(c *conn) error {
+func (el *eventloop) writeLT(c *conn) error {
 	iov := c.outboundBuffer.Peek(-1)
 	var (
 		n   int
@@ -160,10 +203,41 @@ func (el *eventloop) write(c *conn) error {
 		return el.close(c, os.NewSyscallError("write", err))
 	}
 
-	// All data have been drained, it's no need to monitor the writable events,
-	// remove the writable event from poller to help the future event-loops.
+	// All data have been sent, it's no need to monitor the writable events for LT mode,
+	// remove the writable event from poller to help the future event-loops if necessary.
 	if c.outboundBuffer.IsEmpty() {
-		_ = el.poller.ModRead(&c.pollAttachment)
+		_ = el.poller.ModRead(&c.pollAttachment, false)
+	}
+
+	return nil
+}
+
+func (el *eventloop) writeET(c *conn) error {
+	remaining := c.outboundBuffer.Buffered()
+	for {
+		var (
+			n   int
+			err error
+		)
+		iov := c.outboundBuffer.Peek(-1)
+		if len(iov) > 1 {
+			if len(iov) > iovMax {
+				iov = iov[:iovMax]
+			}
+			n, err = io.Writev(c.fd, iov)
+		} else {
+			n, err = unix.Write(c.fd, iov[0])
+		}
+		if n > 0 {
+			remaining -= n
+			_, _ = c.outboundBuffer.Discard(n)
+		}
+		if err == unix.EAGAIN || remaining == 0 {
+			break
+		}
+		if err != nil {
+			return el.close(c, os.NewSyscallError("write", err))
+		}
 	}
 
 	return nil

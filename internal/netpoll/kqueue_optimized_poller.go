@@ -181,10 +181,13 @@ func (p *Poller) Polling() error {
 }
 
 // AddReadWrite registers the given file-descriptor with readable and writable events to the poller.
-func (p *Poller) AddReadWrite(pa *PollAttachment) error {
+func (p *Poller) AddReadWrite(pa *PollAttachment, edgeTriggered bool) error {
 	var evs [2]unix.Kevent_t
 	evs[0].Ident = keventIdent(pa.FD)
 	evs[0].Flags = unix.EV_ADD
+	if edgeTriggered {
+		evs[0].Flags |= unix.EV_CLEAR
+	}
 	evs[0].Filter = unix.EVFILT_READ
 	evs[0].Udata = (*byte)(unsafe.Pointer(pa))
 	evs[1] = evs[0]
@@ -194,10 +197,13 @@ func (p *Poller) AddReadWrite(pa *PollAttachment) error {
 }
 
 // AddRead registers the given file-descriptor with readable event to the poller.
-func (p *Poller) AddRead(pa *PollAttachment) error {
+func (p *Poller) AddRead(pa *PollAttachment, edgeTriggered bool) error {
 	var evs [1]unix.Kevent_t
 	evs[0].Ident = keventIdent(pa.FD)
 	evs[0].Flags = unix.EV_ADD
+	if edgeTriggered {
+		evs[0].Flags |= unix.EV_CLEAR
+	}
 	evs[0].Filter = unix.EVFILT_READ
 	evs[0].Udata = (*byte)(unsafe.Pointer(pa))
 	_, err := unix.Kevent(p.fd, evs[:], nil, nil)
@@ -205,10 +211,13 @@ func (p *Poller) AddRead(pa *PollAttachment) error {
 }
 
 // AddWrite registers the given file-descriptor with writable event to the poller.
-func (p *Poller) AddWrite(pa *PollAttachment) error {
+func (p *Poller) AddWrite(pa *PollAttachment, edgeTriggered bool) error {
 	var evs [1]unix.Kevent_t
 	evs[0].Ident = keventIdent(pa.FD)
 	evs[0].Flags = unix.EV_ADD
+	if edgeTriggered {
+		evs[0].Flags |= unix.EV_CLEAR
+	}
 	evs[0].Filter = unix.EVFILT_WRITE
 	evs[0].Udata = (*byte)(unsafe.Pointer(pa))
 	_, err := unix.Kevent(p.fd, evs[:], nil, nil)
@@ -216,7 +225,7 @@ func (p *Poller) AddWrite(pa *PollAttachment) error {
 }
 
 // ModRead renews the given file-descriptor with readable event in the poller.
-func (p *Poller) ModRead(pa *PollAttachment) error {
+func (p *Poller) ModRead(pa *PollAttachment, _ bool) error {
 	var evs [1]unix.Kevent_t
 	evs[0].Ident = keventIdent(pa.FD)
 	evs[0].Flags = unix.EV_DELETE
@@ -227,10 +236,13 @@ func (p *Poller) ModRead(pa *PollAttachment) error {
 }
 
 // ModReadWrite renews the given file-descriptor with readable and writable events in the poller.
-func (p *Poller) ModReadWrite(pa *PollAttachment) error {
+func (p *Poller) ModReadWrite(pa *PollAttachment, edgeTriggered bool) error {
 	var evs [1]unix.Kevent_t
 	evs[0].Ident = keventIdent(pa.FD)
 	evs[0].Flags = unix.EV_ADD
+	if edgeTriggered {
+		evs[0].Flags |= unix.EV_CLEAR
+	}
 	evs[0].Filter = unix.EVFILT_WRITE
 	evs[0].Udata = (*byte)(unsafe.Pointer(pa))
 	_, err := unix.Kevent(p.fd, evs[:], nil, nil)

@@ -110,12 +110,19 @@ func (eng *engine) activateEventLoops(numEventLoop int) (err error) {
 		if p, err = netpoll.OpenPoller(); err == nil {
 			el := new(eventloop)
 			el.ln = ln
+			el.read = el.readLT
+			el.write = el.writeLT
+			if eng.opts.EdgeTriggeredIO {
+				el.read = el.readET
+				el.write = el.writeET
+			} else {
+				el.buffer = make([]byte, eng.opts.ReadBufferCap)
+			}
 			el.engine = eng
 			el.poller = p
-			el.buffer = make([]byte, eng.opts.ReadBufferCap)
 			el.connections.init()
 			el.eventHandler = eng.eventHandler
-			if err = el.poller.AddRead(el.ln.packPollAttachment(el.accept)); err != nil {
+			if err = el.poller.AddRead(el.ln.packPollAttachment(el.accept), false); err != nil {
 				return
 			}
 			eng.eventLoops.register(el)
@@ -145,9 +152,16 @@ func (eng *engine) activateReactors(numEventLoop int) error {
 		if p, err := netpoll.OpenPoller(); err == nil {
 			el := new(eventloop)
 			el.ln = eng.ln
+			el.read = el.readLT
+			el.write = el.writeLT
+			if eng.opts.EdgeTriggeredIO {
+				el.read = el.readET
+				el.write = el.writeET
+			} else {
+				el.buffer = make([]byte, eng.opts.ReadBufferCap)
+			}
 			el.engine = eng
 			el.poller = p
-			el.buffer = make([]byte, eng.opts.ReadBufferCap)
 			el.connections.init()
 			el.eventHandler = eng.eventHandler
 			eng.eventLoops.register(el)
@@ -166,7 +180,7 @@ func (eng *engine) activateReactors(numEventLoop int) error {
 		el.engine = eng
 		el.poller = p
 		el.eventHandler = eng.eventHandler
-		if err = el.poller.AddRead(eng.ln.packPollAttachment(eng.accept)); err != nil {
+		if err = el.poller.AddRead(eng.ln.packPollAttachment(eng.accept), false); err != nil {
 			return err
 		}
 		eng.acceptor = el

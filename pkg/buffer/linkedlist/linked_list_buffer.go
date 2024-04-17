@@ -61,6 +61,35 @@ func (llb *Buffer) Read(p []byte) (n int, err error) {
 	return
 }
 
+// AllocNode allocates a []byte with the given length that is expected to
+// be pushed into the Buffer.
+func (llb *Buffer) AllocNode(n int) []byte {
+	return bsPool.Get(n)
+}
+
+// FreeNode puts the given []byte back to the pool to free the memory.
+func (llb *Buffer) FreeNode(p []byte) {
+	bsPool.Put(p)
+}
+
+// Append is like PushBack but appends b without copying it.
+func (llb *Buffer) Append(p []byte) {
+	n := len(p)
+	if n == 0 {
+		return
+	}
+	llb.pushBack(&node{buf: p})
+}
+
+// Pop removes and returns the buffer of the head or nil if the list is empty.
+func (llb *Buffer) Pop() []byte {
+	n := llb.pop()
+	if n == nil {
+		return nil
+	}
+	return n.buf
+}
+
 // PushFront is a wrapper of pushFront, which accepts []byte as its argument.
 func (llb *Buffer) PushFront(p []byte) {
 	n := len(p)

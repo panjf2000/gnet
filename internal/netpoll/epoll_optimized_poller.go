@@ -58,7 +58,7 @@ func OpenPoller() (poller *Poller, err error) {
 	}
 	poller.efdBuf = make([]byte, 8)
 	poller.epa = &PollAttachment{FD: efd}
-	if err = poller.AddRead(poller.epa); err != nil {
+	if err = poller.AddRead(poller.epa, true); err != nil {
 		_ = poller.Close()
 		poller = nil
 		return
@@ -101,8 +101,13 @@ func (p *Poller) Trigger(priority queue.EventPriority, fn queue.TaskFunc, arg in
 		p.urgentAsyncTaskQueue.Enqueue(task)
 	}
 	if atomic.CompareAndSwapInt32(&p.wakeupCall, 0, 1) {
-		if _, err = unix.Write(p.epa.FD, b); err == unix.EAGAIN {
-			err = nil
+		for {
+			_, err = unix.Write(p.epa.FD, b)
+			if err == unix.EAGAIN {
+				_, _ = unix.Read(p.epa.FD, p.efdBuf)
+				continue
+			}
+			break
 		}
 	}
 	return os.NewSyscallError("write", err)
@@ -131,7 +136,6 @@ func (p *Poller) Polling() error {
 			pollAttachment := *(**PollAttachment)(unsafe.Pointer(&ev.data))
 			if pollAttachment.FD == p.epa.FD { // poller is awakened to run tasks in queues.
 				doChores = true
-				_, _ = unix.Read(p.epa.FD, p.efdBuf)
 			} else {
 				switch err = pollAttachment.Callback(pollAttachment.FD, ev.events); err {
 				case nil:
@@ -171,10 +175,16 @@ func (p *Poller) Polling() error {
 			}
 			atomic.StoreInt32(&p.wakeupCall, 0)
 			if (!p.asyncTaskQueue.IsEmpty() || !p.urgentAsyncTaskQueue.IsEmpty()) && atomic.CompareAndSwapInt32(&p.wakeupCall, 0, 1) {
-				switch _, err = unix.Write(p.epa.FD, b); err {
-				case nil, unix.EAGAIN:
-				default:
-					doChores = true
+				for {
+					_, err = unix.Write(p.epa.FD, b)
+					if err == unix.EAGAIN {
+						_, _ = unix.Read(p.epa.FD, p.efdBuf)
+						continue
+					}
+					if err != nil {
+						logging.Errorf("failed to notify next round of event-loop for leftover tasks, %v", os.NewSyscallError("write", err))
+					}
+					break
 				}
 			}
 		}
@@ -194,41 +204,56 @@ const (
 )
 
 // AddReadWrite registers the given file-descriptor with readable and writable events to the poller.
-func (p *Poller) AddReadWrite(pa *PollAttachment) error {
+func (p *Poller) AddReadWrite(pa *PollAttachment, edgeTriggered bool) error {
 	var ev epollevent
 	ev.events = readWriteEvents
+	if edgeTriggered {
+		ev.events |= unix.EPOLLET
+	}
 	*(**PollAttachment)(unsafe.Pointer(&ev.data)) = pa
 	return os.NewSyscallError("epoll_ctl add", epollCtl(p.fd, unix.EPOLL_CTL_ADD, pa.FD, &ev))
 }
 
 // AddRead registers the given file-descriptor with readable event to the poller.
-func (p *Poller) AddRead(pa *PollAttachment) error {
+func (p *Poller) AddRead(pa *PollAttachment, edgeTriggered bool) error {
 	var ev epollevent
 	ev.events = readEvents
+	if edgeTriggered {
+		ev.events |= unix.EPOLLET
+	}
 	*(**PollAttachment)(unsafe.Pointer(&ev.data)) = pa
 	return os.NewSyscallError("epoll_ctl add", epollCtl(p.fd, unix.EPOLL_CTL_ADD, pa.FD, &ev))
 }
 
 // AddWrite registers the given file-descriptor with writable event to the poller.
-func (p *Poller) AddWrite(pa *PollAttachment) error {
+func (p *Poller) AddWrite(pa *PollAttachment, edgeTriggered bool) error {
 	var ev epollevent
 	ev.events = writeEvents
+	if edgeTriggered {
+		ev.events |= unix.EPOLLET
+	}
 	*(**PollAttachment)(unsafe.Pointer(&ev.data)) = pa
 	return os.NewSyscallError("epoll_ctl add", epollCtl(p.fd, unix.EPOLL_CTL_ADD, pa.FD, &ev))
 }
 
 // ModRead renews the given file-descriptor with readable event in the poller.
-func (p *Poller) ModRead(pa *PollAttachment) error {
+func (p *Poller) ModRead(pa *PollAttachment, edgeTriggered bool) error {
 	var ev epollevent
 	ev.events = readEvents
+	if edgeTriggered {
+		ev.events |= unix.EPOLLET
+	}
 	*(**PollAttachment)(unsafe.Pointer(&ev.data)) = pa
 	return os.NewSyscallError("epoll_ctl mod", epollCtl(p.fd, unix.EPOLL_CTL_MOD, pa.FD, &ev))
 }
 
 // ModReadWrite renews the given file-descriptor with readable and writable events in the poller.
-func (p *Poller) ModReadWrite(pa *PollAttachment) error {
+func (p *Poller) ModReadWrite(pa *PollAttachment, edgeTriggered bool) error {
 	var ev epollevent
 	ev.events = readWriteEvents
+	if edgeTriggered {
+		ev.events |= unix.EPOLLET
+	}
 	*(**PollAttachment)(unsafe.Pointer(&ev.data)) = pa
 	return os.NewSyscallError("epoll_ctl mod", epollCtl(p.fd, unix.EPOLL_CTL_MOD, pa.FD, &ev))
 }

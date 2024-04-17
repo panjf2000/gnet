@@ -87,7 +87,11 @@ func (el *eventloop) accept1(fd int, ev netpoll.IOEvent, flags netpoll.IOFlags) 
 	}
 
 	c := newTCPConn(nfd, el, sa, el.ln.addr, remoteAddr)
-	if err = el.poller.AddRead(&c.pollAttachment); err != nil {
+	addEvents := el.poller.AddRead
+	if el.engine.opts.EdgeTriggeredIO {
+		addEvents = el.poller.AddReadWrite
+	}
+	if err = addEvents(&c.pollAttachment, el.engine.opts.EdgeTriggeredIO); err != nil {
 		return err
 	}
 	el.connections.addConn(c, el.idx)
