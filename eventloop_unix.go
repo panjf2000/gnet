@@ -143,12 +143,16 @@ func (el *eventloop) readLT(c *conn) error {
 
 func (el *eventloop) readET(c *conn) error {
 	var read int
-	buf := c.elasticBuffer.AllocNode(MaxStreamBufferCap)
+	readBlockSize := el.engine.opts.ReadBufferCap
+	buf := c.elasticBuffer.AllocNode(readBlockSize)
 	for {
 		n, err := unix.Read(c.fd, buf[read:])
 		if err != nil || n == 0 {
 			if err == unix.EAGAIN {
 				c.elasticBuffer.Append(buf[:read])
+				if read == 0 {
+					c.elasticBuffer.FreeNode(buf)
+				}
 				break
 			}
 			if n == 0 {
@@ -158,10 +162,10 @@ func (el *eventloop) readET(c *conn) error {
 			return el.close(c, os.NewSyscallError("read", err))
 		}
 		read += n
-		if read == MaxStreamBufferCap {
+		if read == readBlockSize {
 			c.elasticBuffer.Append(buf)
-			read = 0
 			buf = c.elasticBuffer.AllocNode(MaxStreamBufferCap)
+			read = 0
 		}
 	}
 
@@ -181,7 +185,7 @@ func (el *eventloop) readET(c *conn) error {
 const iovMax = 1024
 
 func (el *eventloop) writeLT(c *conn) error {
-	iov := c.outboundBuffer.Peek(-1)
+	iov, _ := c.outboundBuffer.Peek(-1)
 	var (
 		n   int
 		err error
@@ -219,7 +223,7 @@ func (el *eventloop) writeET(c *conn) error {
 			n   int
 			err error
 		)
-		iov := c.outboundBuffer.Peek(-1)
+		iov, _ := c.outboundBuffer.Peek(-1)
 		if len(iov) > 1 {
 			if len(iov) > iovMax {
 				iov = iov[:iovMax]
@@ -264,7 +268,7 @@ func (el *eventloop) close(c *conn, err error) (rerr error) {
 	// Send residual data in buffer back to the peer before actually closing the connection.
 	if !c.outboundBuffer.IsEmpty() {
 		for !c.outboundBuffer.IsEmpty() {
-			iov := c.outboundBuffer.Peek(0)
+			iov, _ := c.outboundBuffer.Peek(0)
 			if len(iov) > iovMax {
 				iov = iov[:iovMax]
 			}

@@ -414,15 +414,15 @@ func (c *conn) Next(n int) (buf []byte, err error) {
 
 func (c *conn) Peek(n int) (buf []byte, err error) {
 	if c.loop.engine.opts.EdgeTriggeredIO {
-		bs := c.elasticBuffer.Peek(n)
+		bs, err := c.elasticBuffer.Peek(n)
 		if len(bs) == 1 {
-			return bs[0], nil
+			return bs[0], err
 		}
 		c.loop.cache.Reset()
 		for _, b := range bs {
 			c.loop.cache.Write(b)
 		}
-		return c.loop.cache.Bytes(), nil
+		return c.loop.cache.Bytes(), err
 	}
 
 	inBufferLen := c.inboundBuffer.Buffered()

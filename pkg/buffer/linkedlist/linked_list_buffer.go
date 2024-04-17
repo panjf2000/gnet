@@ -58,6 +58,9 @@ func (llb *Buffer) Read(p []byte) (n int, err error) {
 			return
 		}
 	}
+	if n == 0 {
+		err = io.EOF
+	}
 	return
 }
 
@@ -114,43 +117,59 @@ func (llb *Buffer) PushBack(p []byte) {
 
 // Peek assembles the up to maxBytes of [][]byte based on the list of node,
 // it won't remove these nodes from l until Discard() is called.
-func (llb *Buffer) Peek(maxBytes int) [][]byte {
-	if maxBytes <= 0 {
+func (llb *Buffer) Peek(maxBytes int) ([][]byte, error) {
+	if maxBytes <= 0 || maxBytes == math.MaxInt32 {
 		maxBytes = math.MaxInt32
+	} else if maxBytes > llb.Buffered() {
+		return nil, io.ErrShortBuffer
 	}
 	llb.bs = llb.bs[:0]
 	var cum int
 	for iter := llb.head; iter != nil; iter = iter.next {
-		llb.bs = append(llb.bs, iter.buf)
-		if cum += iter.len(); cum >= maxBytes {
+		offset := iter.len()
+		if cum+offset > maxBytes {
+			offset = maxBytes - cum
+		}
+		llb.bs = append(llb.bs, iter.buf[:offset])
+		if cum += offset; cum == maxBytes {
 			break
 		}
 	}
-	return llb.bs
+	return llb.bs, nil
 }
 
 // PeekWithBytes is like Peek but accepts [][]byte and puts them onto head.
-func (llb *Buffer) PeekWithBytes(maxBytes int, bs ...[]byte) [][]byte {
-	if maxBytes <= 0 {
+func (llb *Buffer) PeekWithBytes(maxBytes int, bs ...[]byte) ([][]byte, error) {
+	if maxBytes <= 0 || maxBytes == math.MaxInt32 {
 		maxBytes = math.MaxInt32
+	} else if maxBytes > llb.Buffered() {
+		return nil, io.ErrShortBuffer
 	}
 	llb.bs = llb.bs[:0]
 	var cum int
 	for _, b := range bs {
 		if n := len(b); n > 0 {
-			llb.bs = append(llb.bs, b)
-			if cum += n; cum >= maxBytes {
-				return llb.bs
+			offset := n
+			if cum+offset > maxBytes {
+				offset = maxBytes - cum
+			}
+			llb.bs = append(llb.bs, b[:offset])
+			if cum += offset; cum == maxBytes {
+				return llb.bs, nil
 			}
 		}
 	}
 	for iter := llb.head; iter != nil; iter = iter.next {
-		llb.bs = append(llb.bs, iter.buf)
-		if cum += iter.len(); cum >= maxBytes {
+		offset := iter.len()
+		if cum+offset > maxBytes {
+			offset = maxBytes - cum
+		}
+		llb.bs = append(llb.bs, iter.buf[:offset])
+		if cum += offset; cum == maxBytes {
 			break
 		}
 	}
-	return llb.bs
+	return llb.bs, nil
 }
 
 // Discard removes some nodes based on n bytes.
