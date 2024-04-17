@@ -196,7 +196,7 @@ func (p *Poller) Polling(callback PollEventHandler) error {
 }
 
 const (
-	readEvents      = unix.EPOLLPRI | unix.EPOLLIN
+	readEvents      = unix.EPOLLIN | unix.EPOLLPRI | unix.EPOLLRDHUP
 	writeEvents     = unix.EPOLLOUT
 	readWriteEvents = readEvents | writeEvents
 )

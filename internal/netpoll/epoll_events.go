@@ -35,7 +35,7 @@ const (
 	// reading/writing from/to a closed socket, etc.
 	ErrEvents = unix.EPOLLERR | unix.EPOLLHUP | unix.EPOLLRDHUP
 	// OutEvents combines EPOLLOUT event and some exceptional events.
-	OutEvents = ErrEvents | unix.EPOLLOUT
+	OutEvents = unix.EPOLLERR | unix.EPOLLHUP | unix.EPOLLOUT
 	// InEvents combines EPOLLIN/EPOLLPRI events and some exceptional events.
 	InEvents = ErrEvents | unix.EPOLLIN | unix.EPOLLPRI
 )

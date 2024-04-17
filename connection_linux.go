@@ -17,20 +17,16 @@
 
 package gnet
 
-import "github.com/panjf2000/gnet/v2/internal/netpoll"
+import (
+	"golang.org/x/sys/unix"
+
+	"github.com/panjf2000/gnet/v2/internal/netpoll"
+)
 
 func (c *conn) handleEvents(_ int, ev uint32) error {
-	// Don't change the ordering of processing EPOLLOUT | EPOLLRDHUP / EPOLLIN unless you're 100%
-	// sure what you're doing!
-	// Re-ordering can easily introduce bugs and bad side-effects, as I found out painfully in the past.
-
-	// We should always check for the EPOLLOUT event first, as we must try to send the leftover data back to
-	// the peer when any error occurs on a connection.
-	//
-	// Either an EPOLLOUT or EPOLLERR event may be fired when a connection is refused.
-	// In either case write() should take care of it properly:
-	// 1) writing data back,
-	// 2) closing the connection.
+	if ev&netpoll.ErrEvents != 0 && ev&netpoll.InEvents == 0 && ev&netpoll.OutEvents == 0 {
+		return c.loop.close(c, unix.ECONNRESET)
+	}
 	if ev&netpoll.OutEvents != 0 && !c.outboundBuffer.IsEmpty() {
 		if err := c.loop.write(c); err != nil {
 			return err
