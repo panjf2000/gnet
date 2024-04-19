@@ -164,7 +164,7 @@ func (eng *engine) activateReactors(numEventLoop int) error {
 		eng.acceptor = el
 
 		// Start main reactor in background.
-		eng.workerPool.Go(el.launch)
+		eng.workerPool.Go(el.rotate)
 	} else {
 		return err
 	}

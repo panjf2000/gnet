@@ -41,13 +41,13 @@ type conn struct {
 	fd             int                    // file descriptor
 	gfd            gfd.GFD                // gnet file descriptor
 	ctx            interface{}            // user-defined context
-	peer           unix.Sockaddr          // remote socket address
+	remote         unix.Sockaddr          // remote socket address
 	localAddr      net.Addr               // local addr
 	remoteAddr     net.Addr               // remote addr
 	loop           *eventloop             // connected event-loop
-	outboundBuffer elastic.Buffer         // buffer for data that is eligible to be sent to the peer
+	outboundBuffer elastic.Buffer         // buffer for data that is eligible to be sent to the remote
 	pollAttachment netpoll.PollAttachment // connection attachment for poller
-	inboundBuffer  elastic.RingBuffer     // buffer for leftover data from the peer
+	inboundBuffer  elastic.RingBuffer     // buffer for leftover data from the remote
 	buffer         []byte                 // buffer for the latest bytes
 	isDatagram     bool                   // UDP protocol
 	opened         bool                   // connection opened event fired
@@ -57,7 +57,7 @@ type conn struct {
 func newTCPConn(fd int, el *eventloop, sa unix.Sockaddr, localAddr, remoteAddr net.Addr) (c *conn) {
 	c = &conn{
 		fd:             fd,
-		peer:           sa,
+		remote:         sa,
 		loop:           el,
 		localAddr:      localAddr,
 		remoteAddr:     remoteAddr,
@@ -72,7 +72,7 @@ func newUDPConn(fd int, el *eventloop, localAddr net.Addr, sa unix.Sockaddr, con
 	c = &conn{
 		fd:             fd,
 		gfd:            gfd.NewGFD(fd, el.idx, 0, 0),
-		peer:           sa,
+		remote:         sa,
 		loop:           el,
 		localAddr:      localAddr,
 		remoteAddr:     socket.SockaddrToUDPAddr(sa),
@@ -80,7 +80,7 @@ func newUDPConn(fd int, el *eventloop, localAddr net.Addr, sa unix.Sockaddr, con
 		pollAttachment: netpoll.PollAttachment{FD: fd, Callback: el.readUDP},
 	}
 	if connected {
-		c.peer = nil
+		c.remote = nil
 	}
 	return
 }
@@ -105,14 +105,14 @@ func (c *conn) release() {
 	c.localAddr = nil
 	c.remoteAddr = nil
 	if !c.isDatagram {
-		c.peer = nil
+		c.remote = nil
 		c.inboundBuffer.Done()
 		c.outboundBuffer.Release()
 	}
 }
 
 func (c *conn) open(buf []byte) error {
-	if c.isDatagram && c.peer == nil {
+	if c.isDatagram && c.remote == nil {
 		return unix.Send(c.fd, buf, 0)
 	}
 
@@ -137,8 +137,10 @@ func (c *conn) open(buf []byte) error {
 func (c *conn) write(data []byte) (n int, err error) {
 	isET := c.loop.engine.opts.EdgeTriggeredIO
 	n = len(data)
-	// If there is pending data in outbound buffer, the current data ought to be appended to the outbound buffer
-	// for maintaining the sequence of network packets.
+	// If there is pending data in outbound buffer,
+	// the current data ought to be appended to the
+	// outbound buffer for maintaining the sequence
+	// of network packets.
 	if !c.outboundBuffer.IsEmpty() {
 		_, _ = c.outboundBuffer.Write(data)
 		if isET {
@@ -150,7 +152,8 @@ func (c *conn) write(data []byte) (n int, err error) {
 	var sent int
 loop:
 	if sent, err = unix.Write(c.fd, data); err != nil {
-		// A temporary error occurs, append the data to outbound buffer, writing it back to the peer in the next round.
+		// A temporary error occurs, append the data to outbound buffer,
+		// writing it back to the remote in the next round for LT mode.
 		if err == unix.EAGAIN {
 			_, err = c.outboundBuffer.Write(data)
 			if !isET {
@@ -159,7 +162,7 @@ loop:
 			return
 		}
 		if err := c.loop.close(c, os.NewSyscallError("write", err)); err != nil {
-			logging.Errorf("failed to close connection(fd=%d,peer=%+v) on conn.write: %v",
+			logging.Errorf("failed to close connection(fd=%d,remote=%+v) on conn.write: %v",
 				c.fd, c.remoteAddr, err)
 		}
 		return 0, os.NewSyscallError("write", err)
@@ -168,7 +171,7 @@ loop:
 	if isET && len(data) > 0 {
 		goto loop
 	}
-	// Failed to send all data back to the peer, buffer the leftover data for the next round.
+	// Failed to send all data back to the remote, buffer the leftover data for the next round.
 	if len(data) > 0 {
 		_, _ = c.outboundBuffer.Write(data)
 		err = c.loop.poller.ModReadWrite(&c.pollAttachment, false)
@@ -184,8 +187,10 @@ func (c *conn) writev(bs [][]byte) (n int, err error) {
 		n += len(b)
 	}
 
-	// If there is pending data in outbound buffer, the current data ought to be appended to the outbound buffer
-	// for maintaining the sequence of network packets.
+	// If there is pending data in outbound buffer,
+	// the current data ought to be appended to the
+	// outbound buffer for maintaining the sequence
+	// of network packets.
 	if !c.outboundBuffer.IsEmpty() {
 		_, _ = c.outboundBuffer.Writev(bs)
 		if isET {
@@ -198,7 +203,8 @@ func (c *conn) writev(bs [][]byte) (n int, err error) {
 	var sent int
 loop:
 	if sent, err = gio.Writev(c.fd, bs); err != nil {
-		// A temporary error occurs, append the data to outbound buffer, writing it back to the peer in the next round.
+		// A temporary error occurs, append the data to outbound buffer,
+		// writing it back to the remote in the next round for LT mode.
 		if err == unix.EAGAIN {
 			_, err = c.outboundBuffer.Writev(bs)
 			if !isET {
@@ -207,7 +213,7 @@ loop:
 			return
 		}
 		if err := c.loop.close(c, os.NewSyscallError("writev", err)); err != nil {
-			logging.Errorf("failed to close connection(fd=%d,peer=%+v) on conn.writev: %v",
+			logging.Errorf("failed to close connection(fd=%d,remote=%+v) on conn.writev: %v",
 				c.fd, c.remoteAddr, err)
 		}
 		return 0, os.NewSyscallError("writev", err)
@@ -229,7 +235,7 @@ loop:
 		goto loop
 	}
 
-	// Failed to send all data back to the peer, buffer the leftover data for the next round.
+	// Failed to send all data back to the remote, buffer the leftover data for the next round.
 	if remaining > 0 {
 		_, _ = c.outboundBuffer.Writev(bs)
 		err = c.loop.poller.ModReadWrite(&c.pollAttachment, false)
@@ -281,10 +287,10 @@ func (c *conn) asyncWritev(itf interface{}) (err error) {
 }
 
 func (c *conn) sendTo(buf []byte) error {
-	if c.peer == nil {
+	if c.remote == nil {
 		return unix.Send(c.fd, buf, 0)
 	}
-	return unix.Sendto(c.fd, buf, 0, c.peer)
+	return unix.Sendto(c.fd, buf, 0, c.remote)
 }
 
 func (c *conn) resetBuffer() {

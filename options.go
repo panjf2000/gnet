@@ -68,7 +68,7 @@ type Options struct {
 
 	// ============================= Options for both server-side and client-side =============================
 
-	// ReadBufferCap is the maximum number of bytes that can be read from the peer when the readable event comes.
+	// ReadBufferCap is the maximum number of bytes that can be read from the remote when the readable event comes.
 	// The default value is 64KB, it can either be reduced to avoid starving the subsequent connections or increased
 	// to read more data from a socket.
 	//

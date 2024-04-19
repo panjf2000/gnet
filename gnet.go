@@ -207,7 +207,7 @@ type Writer interface {
 	io.Writer     // not concurrency-safe
 	io.ReaderFrom // not concurrency-safe
 
-	// Writev writes multiple byte slices to peer synchronously, it's not concurrency-safe,
+	// Writev writes multiple byte slices to remote synchronously, it's not concurrency-safe,
 	// you must invoke it within any method in EventHandler.
 	Writev(bs [][]byte) (n int, err error)
 
@@ -219,7 +219,7 @@ type Writer interface {
 	// it's not concurrency-safe, you must invoke it within any method in EventHandler.
 	OutboundBuffered() (n int)
 
-	// AsyncWrite writes bytes to peer asynchronously, it's concurrency-safe,
+	// AsyncWrite writes bytes to remote asynchronously, it's concurrency-safe,
 	// you don't have to invoke it within any method in EventHandler,
 	// usually you would call it in an individual goroutine.
 	//
@@ -230,7 +230,7 @@ type Writer interface {
 	// just call Conn.Write to send back your data.
 	AsyncWrite(buf []byte, callback AsyncCallback) (err error)
 
-	// AsyncWritev writes multiple byte slices to peer asynchronously,
+	// AsyncWritev writes multiple byte slices to remote asynchronously,
 	// you don't have to invoke it within any method in EventHandler,
 	// usually you would call it in an individual goroutine.
 	AsyncWritev(bs [][]byte, callback AsyncCallback) (err error)
@@ -314,7 +314,7 @@ type Conn interface {
 	// you must invoke it within any method in EventHandler.
 	LocalAddr() (addr net.Addr)
 
-	// RemoteAddr is the connection's remote peer address, it's not concurrency-safe,
+	// RemoteAddr is the connection's remote remote address, it's not concurrency-safe,
 	// you must invoke it within any method in EventHandler.
 	RemoteAddr() (addr net.Addr)
 
@@ -355,15 +355,15 @@ type (
 		// OnOpen fires when a new connection has been opened.
 		//
 		// The Conn c has information about the connection such as its local and remote addresses.
-		// The parameter out is the return value which is going to be sent back to the peer.
-		// Sending large amounts of data back to the peer in OnOpen is usually not recommended.
+		// The parameter out is the return value which is going to be sent back to the remote.
+		// Sending large amounts of data back to the remote in OnOpen is usually not recommended.
 		OnOpen(c Conn) (out []byte, action Action)
 
 		// OnClose fires when a connection has been closed.
 		// The parameter err is the last known connection error.
 		OnClose(c Conn, err error) (action Action)
 
-		// OnTraffic fires when a socket receives data from the peer.
+		// OnTraffic fires when a socket receives data from the remote.
 		//
 		// Note that the []byte returned from Conn.Peek(int)/Conn.Next(int) is not allowed to be passed to a new goroutine,
 		// as this []byte will be reused within event-loop after OnTraffic() returns.
@@ -394,7 +394,7 @@ func (*BuiltinEventEngine) OnShutdown(_ Engine) {
 }
 
 // OnOpen fires when a new connection has been opened.
-// The parameter out is the return value which is going to be sent back to the peer.
+// The parameter out is the return value which is going to be sent back to the remote.
 func (*BuiltinEventEngine) OnOpen(_ Conn) (out []byte, action Action) {
 	return
 }
@@ -405,7 +405,7 @@ func (*BuiltinEventEngine) OnClose(_ Conn, _ error) (action Action) {
 	return
 }
 
-// OnTraffic fires when a local socket receives data from the peer.
+// OnTraffic fires when a local socket receives data from the remote.
 func (*BuiltinEventEngine) OnTraffic(_ Conn) (action Action) {
 	return
 }

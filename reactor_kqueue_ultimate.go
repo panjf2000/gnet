@@ -24,7 +24,7 @@ import (
 	"github.com/panjf2000/gnet/v2/pkg/errors"
 )
 
-func (el *eventloop) launch() error {
+func (el *eventloop) rotate() error {
 	if el.engine.opts.LockOSThread {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()

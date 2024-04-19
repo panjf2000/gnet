@@ -27,7 +27,7 @@ import (
 	"github.com/panjf2000/gnet/v2/pkg/errors"
 )
 
-func (el *eventloop) launch() error {
+func (el *eventloop) rotate() error {
 	if el.engine.opts.LockOSThread {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -55,10 +55,10 @@ func (el *eventloop) orbit() error {
 	err := el.poller.Polling(func(fd int, filter int16, flags uint16) (err error) {
 		c := el.connections.getConn(fd)
 		if c == nil {
-			// This could happen when the connection has already been closed,
+			// This might happen when the connection has already been closed,
 			// the file descriptor will be deleted from kqueue automatically
 			// as documented in the manual pages, So we just print a warning log.
-			el.getLogger().Warnf("event[fd=%d|filter=%d|flags=%d] of a stale connection from event-loop(%d)", fd, filter, flags, el.idx)
+			el.getLogger().Warnf("received event[fd=%d|filter=%d|flags=%d] of a stale connection from event-loop(%d)", fd, filter, flags, el.idx)
 			return
 		}
 
@@ -68,10 +68,10 @@ func (el *eventloop) orbit() error {
 		case unix.EVFILT_WRITE:
 			err = el.write(c)
 		}
-		// EV_EOF indicates that the peer has closed the connection.
+		// EV_EOF indicates that the remote has closed the connection.
 		// We check for EV_EOF after processing the read/write event
 		// to ensure that nothing is left out on this event filter.
-		if flags&unix.EV_EOF != 0 && c.opened {
+		if flags&unix.EV_EOF != 0 && c.opened && err == nil {
 			switch filter {
 			case unix.EVFILT_READ:
 				// Receive the event of EVFILT_READ | EV_EOF, but the previous eventloop.read
@@ -79,10 +79,13 @@ func (el *eventloop) orbit() error {
 				c.isEOF = true
 				err = el.read(c)
 			case unix.EVFILT_WRITE:
-				// The peer is disconnected, don't bother to try writing pending data back.
-				c.outboundBuffer.Release()
-				fallthrough
+				// On macOS, the kqueue in both LT and ET mode will notify with one event for the EOF
+				// of the TCP remote: EVFILT_READ|EV_ADD|EV_CLEAR|EV_EOF. But for some reason, two
+				// events will be issued in ET mode for the EOF of the Unix remote in this order:
+				// 1) EVFILT_WRITE|EV_ADD|EV_CLEAR|EV_EOF, 2) EVFILT_READ|EV_ADD|EV_CLEAR|EV_EOF.
+				err = el.write(c)
 			default:
+				c.outboundBuffer.Release() // don't bother to write to a connection with some unknown error
 				err = el.close(c, io.EOF)
 			}
 		}
@@ -113,10 +116,10 @@ func (el *eventloop) run() error {
 			if fd == el.ln.fd {
 				return el.accept(fd, filter, flags)
 			}
-			// This could happen when the connection has already been closed,
+			// This might happen when the connection has already been closed,
 			// the file descriptor will be deleted from kqueue automatically
 			// as documented in the manual pages, So we just print a warning log.
-			el.getLogger().Warnf("event[fd=%d|filter=%d|flags=%d] of a stale connection from event-loop(%d)", fd, filter, flags, el.idx)
+			el.getLogger().Warnf("received event[fd=%d|filter=%d|flags=%d] of a stale connection from event-loop(%d)", fd, filter, flags, el.idx)
 			return
 		}
 
@@ -126,10 +129,10 @@ func (el *eventloop) run() error {
 		case unix.EVFILT_WRITE:
 			err = el.write(c)
 		}
-		// EV_EOF indicates that the peer has closed the connection.
+		// EV_EOF indicates that the remote has closed the connection.
 		// We check for EV_EOF after processing the read/write event
 		// to ensure that nothing is left out on this event filter.
-		if flags&unix.EV_EOF != 0 && c.opened {
+		if flags&unix.EV_EOF != 0 && c.opened && err == nil {
 			switch filter {
 			case unix.EVFILT_READ:
 				// Receive the event of EVFILT_READ | EV_EOF, but the previous eventloop.read
@@ -137,10 +140,13 @@ func (el *eventloop) run() error {
 				c.isEOF = true
 				err = el.read(c)
 			case unix.EVFILT_WRITE:
-				// The peer is disconnected, don't bother to try writing pending data back.
-				c.outboundBuffer.Release()
-				fallthrough
+				// On macOS, the kqueue in both LT and ET mode will notify with one event for the EOF
+				// of the TCP remote: EVFILT_READ|EV_ADD|EV_CLEAR|EV_EOF. But for some reason, two
+				// events will be issued in ET mode for the EOF of the Unix remote in this order:
+				// 1) EVFILT_WRITE|EV_ADD|EV_CLEAR|EV_EOF, 2) EVFILT_READ|EV_ADD|EV_CLEAR|EV_EOF.
+				err = el.write(c)
 			default:
+				c.outboundBuffer.Release() // don't bother to write to a connection with some unknown error
 				err = el.close(c, io.EOF)
 			}
 		}

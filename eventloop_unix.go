@@ -89,7 +89,7 @@ func (el *eventloop) register(itf interface{}) error {
 
 	el.connections.addConn(c, el.idx)
 
-	if c.isDatagram && c.peer != nil {
+	if c.isDatagram && c.remote != nil {
 		return nil
 	}
 	return el.open(c)
@@ -156,6 +156,9 @@ const iovMax = 1024
 
 func (el *eventloop) write(c *conn) error {
 	if c.outboundBuffer.IsEmpty() {
+		if c.isEOF {
+			el.getLogger().Warnf("empty outbound buffer, skip writing to fd=%d, EOF=%t", c.fd, c.isEOF)
+		}
 		return nil
 	}
 
@@ -175,6 +178,9 @@ loop:
 		n, err = unix.Write(c.fd, iov[0])
 	}
 	_, _ = c.outboundBuffer.Discard(n)
+	if c.isEOF {
+		el.getLogger().Warnf("writev(fd=%d)=%d, error: %v", c.fd, n, err)
+	}
 	switch err {
 	case nil:
 	case unix.EAGAIN:
@@ -188,7 +194,7 @@ loop:
 
 	// All data have been sent, it's no need to monitor the writable events for LT mode,
 	// remove the writable event from poller to help the future event-loops if necessary.
-	if c.outboundBuffer.IsEmpty() && !isET {
+	if !isET && c.outboundBuffer.IsEmpty() {
 		_ = el.poller.ModRead(&c.pollAttachment, false)
 	}
 
@@ -213,19 +219,17 @@ func (el *eventloop) close(c *conn, err error) (rerr error) {
 		return // ignore stale connections
 	}
 
-	// Send residual data in buffer back to the peer before actually closing the connection.
-	if !c.outboundBuffer.IsEmpty() {
-		for !c.outboundBuffer.IsEmpty() {
-			iov, _ := c.outboundBuffer.Peek(0)
-			if len(iov) > iovMax {
-				iov = iov[:iovMax]
-			}
-			if n, e := gio.Writev(c.fd, iov); e != nil {
-				el.getLogger().Warnf("close: error occurs when sending data back to peer, %v", e)
-				break
-			} else { //nolint:revive
-				_, _ = c.outboundBuffer.Discard(n)
-			}
+	// Send residual data in buffer back to the remote before actually closing the connection.
+	for !c.outboundBuffer.IsEmpty() {
+		iov, _ := c.outboundBuffer.Peek(0)
+		if len(iov) > iovMax {
+			iov = iov[:iovMax]
+		}
+		if n, e := gio.Writev(c.fd, iov); e != nil {
+			el.getLogger().Warnf("close: error occurs when sending data back to remote, %v", e)
+			break
+		} else { //nolint:revive
+			_, _ = c.outboundBuffer.Discard(n)
 		}
 	}
 
@@ -329,7 +333,7 @@ func (el *eventloop) readUDP1(fd int, _ netpoll.IOEvent, _ netpoll.IOFlags) erro
 	}
 	c.buffer = el.buffer[:n]
 	action := el.eventHandler.OnTraffic(c)
-	if c.peer != nil {
+	if c.remote != nil {
 		c.release()
 	}
 	if action == Shutdown {
