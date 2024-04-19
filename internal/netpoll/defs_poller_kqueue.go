@@ -31,14 +31,6 @@ const (
 	MinPollEventsCap = 16
 	// MaxAsyncTasksAtOneTime is the maximum amount of asynchronous tasks that the event-loop will process at one time.
 	MaxAsyncTasksAtOneTime = 128
-	// EVFilterWrite represents writeable events from sockets.
-	EVFilterWrite = unix.EVFILT_WRITE
-	// EVFilterRead represents readable events from sockets.
-	EVFilterRead = unix.EVFILT_READ
-	// EVFlagsEOF indicates filter-specific EOF condition.
-	EVFlagsEOF = unix.EV_EOF
-	// EVFlagsError indicates filter-specific error condition.
-	EVFlagsError = unix.EV_ERROR
 )
 
 // PollEventHandler is the callback for I/O events notified by the poller.
