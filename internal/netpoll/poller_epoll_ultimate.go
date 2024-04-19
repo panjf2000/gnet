@@ -199,7 +199,7 @@ func (p *Poller) Polling() error {
 
 const (
 	readEvents      = unix.EPOLLIN | unix.EPOLLPRI | unix.EPOLLRDHUP
-	writeEvents     = unix.EPOLLOUT
+	writeEvents     = unix.EPOLLOUT | unix.EPOLLRDHUP
 	readWriteEvents = readEvents | writeEvents
 )
 
