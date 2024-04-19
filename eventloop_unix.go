@@ -156,9 +156,6 @@ const iovMax = 1024
 
 func (el *eventloop) write(c *conn) error {
 	if c.outboundBuffer.IsEmpty() {
-		if c.isEOF {
-			el.getLogger().Warnf("empty outbound buffer, skip writing to fd=%d, EOF=%t", c.fd, c.isEOF)
-		}
 		return nil
 	}
 
@@ -178,9 +175,6 @@ loop:
 		n, err = unix.Write(c.fd, iov[0])
 	}
 	_, _ = c.outboundBuffer.Discard(n)
-	if c.isEOF {
-		el.getLogger().Warnf("writev(fd=%d)=%d, error: %v", c.fd, n, err)
-	}
 	switch err {
 	case nil:
 	case unix.EAGAIN:
