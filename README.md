@@ -42,6 +42,7 @@ English | [中文](README_ZH.md)
 - [x] Flexible ticker event
 - [x] Implementation of `gnet` Client
 - [x] **Windows** platform support (For compatibility in development only, do not use it in production)
+- [x] **Edge-triggered** I/O support
 - [ ] Multiple network addresses binding
 - [ ] **TLS** support
 - [ ] [io_uring](https://kernel.dk/io_uring.pdf) support
