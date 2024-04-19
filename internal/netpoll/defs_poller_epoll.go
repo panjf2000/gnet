@@ -12,54 +12,52 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build freebsd || dragonfly || netbsd || openbsd || darwin
-// +build freebsd dragonfly netbsd openbsd darwin
+//go:build linux
+// +build linux
 
 package netpoll
 
 import "golang.org/x/sys/unix"
 
-// IOEvent is the integer type of I/O events on BSD's.
-type IOEvent = int16
+// IOEvent is the integer type of I/O events on Linux.
+type IOEvent = uint32
 
 const (
 	// InitPollEventsCap represents the initial capacity of poller event-list.
-	InitPollEventsCap = 64
+	InitPollEventsCap = 128
 	// MaxPollEventsCap is the maximum limitation of events that the poller can process.
-	MaxPollEventsCap = 512
+	MaxPollEventsCap = 1024
 	// MinPollEventsCap is the minimum limitation of events that the poller can process.
-	MinPollEventsCap = 16
+	MinPollEventsCap = 32
 	// MaxAsyncTasksAtOneTime is the maximum amount of asynchronous tasks that the event-loop will process at one time.
-	MaxAsyncTasksAtOneTime = 128
-	// EVFilterWrite represents writeable events from sockets.
-	EVFilterWrite = unix.EVFILT_WRITE
-	// EVFilterRead represents readable events from sockets.
-	EVFilterRead = unix.EVFILT_READ
-	// EVFlagsDelete indicates an event has been removed from the kqueue.
-	EVFlagsDelete = unix.EV_DELETE
-	// EVFlagsEOF indicates filter-specific EOF condition.
-	EVFlagsEOF = unix.EV_EOF
+	MaxAsyncTasksAtOneTime = 256
+	// ErrEvents represents exceptional events that are not read/write, like socket being closed,
+	// reading/writing from/to a closed socket, etc.
+	ErrEvents = unix.EPOLLERR | unix.EPOLLHUP | unix.EPOLLRDHUP
 )
+
+// PollEventHandler is the callback for I/O events notified by the poller.
+type PollEventHandler func(int, uint32) error
 
 type eventList struct {
 	size   int
-	events []unix.Kevent_t
+	events []epollevent
 }
 
 func newEventList(size int) *eventList {
-	return &eventList{size, make([]unix.Kevent_t, size)}
+	return &eventList{size, make([]epollevent, size)}
 }
 
 func (el *eventList) expand() {
 	if newSize := el.size << 1; newSize <= MaxPollEventsCap {
 		el.size = newSize
-		el.events = make([]unix.Kevent_t, newSize)
+		el.events = make([]epollevent, newSize)
 	}
 }
 
 func (el *eventList) shrink() {
 	if newSize := el.size >> 1; newSize >= MinPollEventsCap {
 		el.size = newSize
-		el.events = make([]unix.Kevent_t, newSize)
+		el.events = make([]epollevent, newSize)
 	}
 }

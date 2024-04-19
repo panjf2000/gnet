@@ -15,7 +15,7 @@
 //go:build linux || freebsd || dragonfly || netbsd || openbsd || darwin
 // +build linux freebsd dragonfly netbsd openbsd darwin
 
-package netpoll
+package socket
 
 import (
 	"sync/atomic"

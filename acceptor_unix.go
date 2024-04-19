@@ -34,7 +34,7 @@ func (eng *engine) accept1(fd int, _ netpoll.IOEvent, _ netpoll.IOFlags) error {
 	if err != nil {
 		switch err {
 		case unix.EINTR, unix.EAGAIN, unix.ECONNABORTED:
-			// ECONNABORTED means that a socket on the listen
+			// ECONNABORTED indicates that a socket on the listen
 			// queue was closed before we Accept()ed it;
 			// it's a silly error, so try again.
 			return nil
@@ -66,11 +66,11 @@ func (el *eventloop) accept1(fd int, ev netpoll.IOEvent, flags netpoll.IOFlags) 
 		return el.readUDP1(fd, ev, flags)
 	}
 
-	nfd, sa, err := socket.Accept(el.ln.fd)
+	nfd, sa, err := socket.Accept(fd)
 	if err != nil {
 		switch err {
 		case unix.EINTR, unix.EAGAIN, unix.ECONNABORTED:
-			// ECONNABORTED means that a socket on the listen
+			// ECONNABORTED indicates that a socket on the listen
 			// queue was closed before we Accept()ed it;
 			// it's a silly error, so try again.
 			return nil
@@ -87,7 +87,11 @@ func (el *eventloop) accept1(fd int, ev netpoll.IOEvent, flags netpoll.IOFlags) 
 	}
 
 	c := newTCPConn(nfd, el, sa, el.ln.addr, remoteAddr)
-	if err = el.poller.AddRead(&c.pollAttachment); err != nil {
+	addEvents := el.poller.AddRead
+	if el.engine.opts.EdgeTriggeredIO {
+		addEvents = el.poller.AddReadWrite
+	}
+	if err = addEvents(&c.pollAttachment, el.engine.opts.EdgeTriggeredIO); err != nil {
 		return err
 	}
 	el.connections.addConn(c, el.idx)

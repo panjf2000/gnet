@@ -28,25 +28,27 @@ func TestLinkedListBuffer_Basic(t *testing.T) {
 	require.EqualValues(t, maxBlocks, llb.Len())
 	require.EqualValues(t, cum, llb.Buffered())
 
-	bs := llb.Peek(cum / 4)
+	bs, err := llb.Peek(cum / 4)
+	require.NoError(t, err)
 	var p []byte
 	for _, b := range bs {
 		p = append(p, b...)
 	}
 	pn := len(p)
-	require.GreaterOrEqual(t, pn, cum/4)
+	require.EqualValues(t, pn, cum/4)
 	require.EqualValues(t, buf.Bytes()[:pn], p)
 	tmpA := make([]byte, cum/16)
 	tmpB := make([]byte, cum/16)
 	rand.Read(tmpA)
 	rand.Read(tmpB)
-	bs = llb.PeekWithBytes(cum/4, tmpA, tmpB)
+	bs, err = llb.PeekWithBytes(cum/4, tmpA, tmpB)
+	require.NoError(t, err)
 	p = p[:0]
 	for _, b := range bs {
 		p = append(p, b...)
 	}
 	pn = len(p)
-	require.GreaterOrEqual(t, pn, cum/4)
+	require.EqualValues(t, pn, cum/4)
 	var tmpBuf bytes.Buffer
 	tmpBuf.Write(tmpA)
 	tmpBuf.Write(tmpB)

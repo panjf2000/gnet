@@ -54,8 +54,8 @@ type conn struct {
 	buffer        *bbPool.ByteBuffer // reuse memory of inbound data as a temporary buffer
 	rawConn       net.Conn           // original connection
 	localAddr     net.Addr           // local server addr
-	remoteAddr    net.Addr           // remote peer addr
-	inboundBuffer elastic.RingBuffer // buffer for data from the peer
+	remoteAddr    net.Addr           // remote addr
+	inboundBuffer elastic.RingBuffer // buffer for data from the remote
 }
 
 func packTCPConn(c *conn, buf []byte) *tcpConn {

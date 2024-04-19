@@ -53,13 +53,15 @@ func (mb *Buffer) Read(p []byte) (n int, err error) {
 }
 
 // Peek returns n bytes as [][]byte, these bytes won't be discarded until Buffer.Discard() is called.
-func (mb *Buffer) Peek(n int) [][]byte {
-	if n <= 0 {
+func (mb *Buffer) Peek(n int) ([][]byte, error) {
+	if n <= 0 || n == math.MaxInt32 {
 		n = math.MaxInt32
+	} else if n > mb.Buffered() {
+		return nil, io.ErrShortBuffer
 	}
 	head, tail := mb.ringBuffer.Peek(n)
-	if mb.ringBuffer.Buffered() >= n {
-		return [][]byte{head, tail}
+	if mb.ringBuffer.Buffered() == n {
+		return [][]byte{head, tail}, nil
 	}
 	return mb.listBuffer.PeekWithBytes(n, head, tail)
 }

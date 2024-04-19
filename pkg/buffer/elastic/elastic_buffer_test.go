@@ -34,21 +34,24 @@ func TestMixedBuffer_Basic(t *testing.T) {
 	require.EqualValues(t, newDataLen, mb.Buffered())
 	require.EqualValues(t, rbn, mb.ringBuffer.Buffered())
 
-	bs := mb.Peek(-1)
+	bs, err := mb.Peek(-1)
+	require.NoError(t, err)
 	var p []byte
 	for _, b := range bs {
 		p = append(p, b...)
 	}
 	require.EqualValues(t, data, p)
 
-	bs = mb.Peek(rbn)
+	bs, err = mb.Peek(rbn)
+	require.NoError(t, err)
 	p = bs[0]
 	require.EqualValues(t, data[:rbn], p)
 	n, err = mb.Discard(rbn)
 	require.NoError(t, err)
 	require.EqualValues(t, rbn, n)
 	require.NotNil(t, mb.ringBuffer)
-	bs = mb.Peek(newDataLen - rbn)
+	bs, err = mb.Peek(newDataLen - rbn)
+	require.NoError(t, err)
 	p = bs[0]
 	require.EqualValues(t, data[rbn:], p)
 	n, err = mb.Discard(newDataLen - rbn)
@@ -82,7 +85,8 @@ func TestMixedBuffer_Basic(t *testing.T) {
 	require.NoError(t, err)
 	require.EqualValues(t, cum-headCum, n)
 	require.EqualValues(t, cum, mb.Buffered())
-	bs = mb.Peek(-1)
+	bs, err = mb.Peek(-1)
+	require.NoError(t, err)
 	p = p[:0]
 	for _, b := range bs {
 		p = append(p, b...)
@@ -125,7 +129,8 @@ func TestMixedBuffer_ReadFrom(t *testing.T) {
 	require.NoError(t, err)
 	require.EqualValues(t, dataLen, m)
 	require.EqualValues(t, data, buf)
-	bs := mb.Peek(dataLen)
+	bs, err := mb.Peek(dataLen)
+	require.NoError(t, err)
 	var p []byte
 	for _, b := range bs {
 		p = append(p, b...)

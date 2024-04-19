@@ -124,6 +124,11 @@ type Options struct {
 	// then gnet will use the default logger powered by go.uber.org/zap.
 	Logger logging.Logger
 
+	// EdgeTriggeredIO enables the edge-triggered I/O for the underlying epoll/kqueue event-loop.
+	// Don't enable it unless you are 100% sure what you are doing.
+	// Note that this option is only available for TCP protocol.
+	EdgeTriggeredIO bool
+
 	// TLSConfig support TLS
 	TLSConfig *tls.Config
 }
@@ -251,6 +256,13 @@ func WithLogger(logger logging.Logger) Option {
 func WithMulticastInterfaceIndex(idx int) Option {
 	return func(opts *Options) {
 		opts.MulticastInterfaceIndex = idx
+	}
+}
+
+// WithEdgeTriggeredIO enables the edge-triggered I/O for the underlying epoll/kqueue event-loop.
+func WithEdgeTriggeredIO(et bool) Option {
+	return func(opts *Options) {
+		opts.EdgeTriggeredIO = et
 	}
 }
 
