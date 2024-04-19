@@ -12,53 +12,57 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build linux
-// +build linux
+//go:build freebsd || dragonfly || netbsd || openbsd || darwin
+// +build freebsd dragonfly netbsd openbsd darwin
 
 package netpoll
 
 import "golang.org/x/sys/unix"
 
-// IOEvent is the integer type of I/O events on Linux.
-type IOEvent = uint32
+// IOEvent is the integer type of I/O events on BSD's.
+type IOEvent = int16
 
 const (
 	// InitPollEventsCap represents the initial capacity of poller event-list.
-	InitPollEventsCap = 128
+	InitPollEventsCap = 64
 	// MaxPollEventsCap is the maximum limitation of events that the poller can process.
-	MaxPollEventsCap = 1024
+	MaxPollEventsCap = 512
 	// MinPollEventsCap is the minimum limitation of events that the poller can process.
-	MinPollEventsCap = 32
+	MinPollEventsCap = 16
 	// MaxAsyncTasksAtOneTime is the maximum amount of asynchronous tasks that the event-loop will process at one time.
-	MaxAsyncTasksAtOneTime = 256
-	// ErrEvents represents exceptional events that are not read/write, like socket being closed,
-	// reading/writing from/to a closed socket, etc.
-	ErrEvents = unix.EPOLLERR | unix.EPOLLHUP | unix.EPOLLRDHUP
-	// OutEvents combines EPOLLOUT event and some exceptional events.
-	OutEvents = unix.EPOLLERR | unix.EPOLLHUP | unix.EPOLLOUT
-	// InEvents combines EPOLLIN/EPOLLPRI events and some exceptional events.
-	InEvents = ErrEvents | unix.EPOLLIN | unix.EPOLLPRI
+	MaxAsyncTasksAtOneTime = 128
+	// EVFilterWrite represents writeable events from sockets.
+	EVFilterWrite = unix.EVFILT_WRITE
+	// EVFilterRead represents readable events from sockets.
+	EVFilterRead = unix.EVFILT_READ
+	// EVFlagsEOF indicates filter-specific EOF condition.
+	EVFlagsEOF = unix.EV_EOF
+	// EVFlagsError indicates filter-specific error condition.
+	EVFlagsError = unix.EV_ERROR
 )
+
+// PollEventHandler is the callback for I/O events notified by the poller.
+type PollEventHandler func(int, int16, uint16) error
 
 type eventList struct {
 	size   int
-	events []epollevent
+	events []unix.Kevent_t
 }
 
 func newEventList(size int) *eventList {
-	return &eventList{size, make([]epollevent, size)}
+	return &eventList{size, make([]unix.Kevent_t, size)}
 }
 
 func (el *eventList) expand() {
 	if newSize := el.size << 1; newSize <= MaxPollEventsCap {
 		el.size = newSize
-		el.events = make([]epollevent, newSize)
+		el.events = make([]unix.Kevent_t, newSize)
 	}
 }
 
 func (el *eventList) shrink() {
 	if newSize := el.size >> 1; newSize >= MinPollEventsCap {
 		el.size = newSize
-		el.events = make([]epollevent, newSize)
+		el.events = make([]unix.Kevent_t, newSize)
 	}
 }

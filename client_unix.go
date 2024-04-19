@@ -106,16 +106,9 @@ func NewClient(eh EventHandler, opts ...Option) (cli *Client, err error) {
 		options.WriteBufferCap = math.CeilToPowerOfTwo(wbc)
 	}
 
+	el.buffer = make([]byte, options.ReadBufferCap)
 	el.connections.init()
 	el.eventHandler = eh
-	el.read = el.readLT
-	el.write = el.writeLT
-	if options.EdgeTriggeredIO {
-		el.read = el.readET
-		el.write = el.writeET
-	} else {
-		el.buffer = make([]byte, options.ReadBufferCap)
-	}
 	cli.el = &el
 	return
 }

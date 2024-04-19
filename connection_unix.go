@@ -32,7 +32,6 @@ import (
 	"github.com/panjf2000/gnet/v2/internal/queue"
 	"github.com/panjf2000/gnet/v2/internal/socket"
 	"github.com/panjf2000/gnet/v2/pkg/buffer/elastic"
-	"github.com/panjf2000/gnet/v2/pkg/buffer/linkedlist"
 	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
 	bsPool "github.com/panjf2000/gnet/v2/pkg/pool/byteslice"
@@ -49,10 +48,10 @@ type conn struct {
 	outboundBuffer elastic.Buffer         // buffer for data that is eligible to be sent to the peer
 	pollAttachment netpoll.PollAttachment // connection attachment for poller
 	inboundBuffer  elastic.RingBuffer     // buffer for leftover data from the peer
-	elasticBuffer  linkedlist.Buffer      // elastic buffer for ET I/O
 	buffer         []byte                 // buffer for the latest bytes
 	isDatagram     bool                   // UDP protocol
 	opened         bool                   // connection opened event fired
+	isEOF          bool                   // whether the connection has reached EOF
 }
 
 func newTCPConn(fd int, el *eventloop, sa unix.Sockaddr, localAddr, remoteAddr net.Addr) (c *conn) {
@@ -88,6 +87,7 @@ func newUDPConn(fd int, el *eventloop, localAddr net.Addr, sa unix.Sockaddr, con
 
 func (c *conn) release() {
 	c.opened = false
+	c.isEOF = false
 	c.ctx = nil
 	c.buffer = nil
 	if addr, ok := c.localAddr.(*net.TCPAddr); ok && c.localAddr != c.loop.ln.addr && len(addr.Zone) > 0 {
@@ -134,21 +134,28 @@ func (c *conn) open(buf []byte) error {
 	return nil
 }
 
-func (c *conn) writeLT(data []byte) (n int, err error) {
+func (c *conn) write(data []byte) (n int, err error) {
+	isET := c.loop.engine.opts.EdgeTriggeredIO
 	n = len(data)
 	// If there is pending data in outbound buffer, the current data ought to be appended to the outbound buffer
 	// for maintaining the sequence of network packets.
 	if !c.outboundBuffer.IsEmpty() {
 		_, _ = c.outboundBuffer.Write(data)
+		if isET {
+			err = c.loop.write(c)
+		}
 		return
 	}
 
 	var sent int
+loop:
 	if sent, err = unix.Write(c.fd, data); err != nil {
 		// A temporary error occurs, append the data to outbound buffer, writing it back to the peer in the next round.
 		if err == unix.EAGAIN {
-			_, _ = c.outboundBuffer.Write(data)
-			err = c.loop.poller.ModReadWrite(&c.pollAttachment, false)
+			_, err = c.outboundBuffer.Write(data)
+			if !isET {
+				err = c.loop.poller.ModReadWrite(&c.pollAttachment, false)
+			}
 			return
 		}
 		if err := c.loop.close(c, os.NewSyscallError("write", err)); err != nil {
@@ -157,48 +164,22 @@ func (c *conn) writeLT(data []byte) (n int, err error) {
 		}
 		return 0, os.NewSyscallError("write", err)
 	}
+	data = data[sent:]
+	if isET && len(data) > 0 {
+		goto loop
+	}
 	// Failed to send all data back to the peer, buffer the leftover data for the next round.
-	if sent < n {
-		_, _ = c.outboundBuffer.Write(data[sent:])
+	if len(data) > 0 {
+		_, _ = c.outboundBuffer.Write(data)
 		err = c.loop.poller.ModReadWrite(&c.pollAttachment, false)
 	}
+
 	return
 }
 
-func (c *conn) writeET(data []byte) (n int, err error) {
-	n = len(data)
-	// If there is pending data in outbound buffer, the current data ought to be appended to the outbound buffer
-	// for maintaining the sequence of network packets.
-	if !c.outboundBuffer.IsEmpty() {
-		_, _ = c.outboundBuffer.Write(data)
-		return n, c.loop.writeET(c)
-	}
+func (c *conn) writev(bs [][]byte) (n int, err error) {
+	isET := c.loop.engine.opts.EdgeTriggeredIO
 
-	remaining := n
-	for {
-		n, err := unix.Write(c.fd, data)
-		if err != nil {
-			// A temporary error occurs, append the data to outbound buffer, writing it back to the peer in the next round.
-			if err == unix.EAGAIN {
-				_, _ = c.outboundBuffer.Write(data)
-				break
-			}
-			if err := c.loop.close(c, os.NewSyscallError("write", err)); err != nil {
-				logging.Errorf("failed to close connection(fd=%d,peer=%+v) on conn.write: %v",
-					c.fd, c.remoteAddr, err)
-			}
-			return 0, os.NewSyscallError("write", err)
-		}
-		remaining -= n
-		data = data[n:]
-		if remaining == 0 {
-			break
-		}
-	}
-	return
-}
-
-func (c *conn) writevLT(bs [][]byte) (n int, err error) {
 	for _, b := range bs {
 		n += len(b)
 	}
@@ -207,15 +188,22 @@ func (c *conn) writevLT(bs [][]byte) (n int, err error) {
 	// for maintaining the sequence of network packets.
 	if !c.outboundBuffer.IsEmpty() {
 		_, _ = c.outboundBuffer.Writev(bs)
+		if isET {
+			err = c.loop.write(c)
+		}
 		return
 	}
 
+	remaining := n
 	var sent int
+loop:
 	if sent, err = gio.Writev(c.fd, bs); err != nil {
 		// A temporary error occurs, append the data to outbound buffer, writing it back to the peer in the next round.
 		if err == unix.EAGAIN {
-			_, _ = c.outboundBuffer.Writev(bs)
-			err = c.loop.poller.ModReadWrite(&c.pollAttachment, false)
+			_, err = c.outboundBuffer.Writev(bs)
+			if !isET {
+				err = c.loop.poller.ModReadWrite(&c.pollAttachment, false)
+			}
 			return
 		}
 		if err := c.loop.close(c, os.NewSyscallError("writev", err)); err != nil {
@@ -224,9 +212,8 @@ func (c *conn) writevLT(bs [][]byte) (n int, err error) {
 		}
 		return 0, os.NewSyscallError("writev", err)
 	}
-	// Failed to send all data back to the peer, buffer the leftover data for the next round.
-	if sent < n {
-		var pos int
+	pos := len(bs)
+	if remaining -= sent; remaining > 0 {
 		for i := range bs {
 			bn := len(bs[i])
 			if sent < bn {
@@ -236,55 +223,18 @@ func (c *conn) writevLT(bs [][]byte) (n int, err error) {
 			}
 			sent -= bn
 		}
-		_, _ = c.outboundBuffer.Writev(bs[pos:])
+	}
+	bs = bs[pos:]
+	if isET && remaining > 0 {
+		goto loop
+	}
+
+	// Failed to send all data back to the peer, buffer the leftover data for the next round.
+	if remaining > 0 {
+		_, _ = c.outboundBuffer.Writev(bs)
 		err = c.loop.poller.ModReadWrite(&c.pollAttachment, false)
 	}
-	return
-}
 
-func (c *conn) writevET(bs [][]byte) (n int, err error) {
-	for _, b := range bs {
-		n += len(b)
-	}
-
-	// If there is pending data in outbound buffer, the current data ought to be appended to the outbound buffer
-	// for maintaining the sequence of network packets.
-	if !c.outboundBuffer.IsEmpty() {
-		_, _ = c.outboundBuffer.Writev(bs)
-		return n, c.loop.writeET(c)
-	}
-
-	remaining := n
-	for {
-		n, err := gio.Writev(c.fd, bs)
-		if err != nil {
-			// A temporary error occurs, append the data to outbound buffer, writing it back to the peer in the next round.
-			if err == unix.EAGAIN {
-				_, _ = c.outboundBuffer.Writev(bs)
-				break
-			}
-			if err := c.loop.close(c, os.NewSyscallError("writev", err)); err != nil {
-				logging.Errorf("failed to close connection(fd=%d,peer=%+v) on conn.writev: %v",
-					c.fd, c.remoteAddr, err)
-			}
-			return 0, os.NewSyscallError("writev", err)
-		}
-		remaining -= n
-		var pos int
-		for i := range bs {
-			bn := len(bs[i])
-			if n < bn {
-				bs[i] = bs[i][n:]
-				pos = i
-				break
-			}
-			n -= bn
-		}
-		bs = bs[pos:]
-		if remaining == 0 {
-			break
-		}
-	}
 	return
 }
 
@@ -305,11 +255,7 @@ func (c *conn) asyncWrite(itf interface{}) (err error) {
 		return net.ErrClosed
 	}
 
-	if c.loop.engine.opts.EdgeTriggeredIO {
-		_, err = c.writeET(hook.data)
-		return
-	}
-	_, err = c.writeLT(hook.data)
+	_, err = c.write(hook.data)
 	return
 }
 
@@ -330,11 +276,7 @@ func (c *conn) asyncWritev(itf interface{}) (err error) {
 		return net.ErrClosed
 	}
 
-	if c.loop.engine.opts.EdgeTriggeredIO {
-		_, err = c.writevET(hook.data)
-		return
-	}
-	_, err = c.writevLT(hook.data)
+	_, err = c.writev(hook.data)
 	return
 }
 
@@ -351,10 +293,6 @@ func (c *conn) resetBuffer() {
 }
 
 func (c *conn) Read(p []byte) (n int, err error) {
-	if c.loop.engine.opts.EdgeTriggeredIO {
-		return c.elasticBuffer.Read(p)
-	}
-
 	if c.inboundBuffer.IsEmpty() {
 		n = copy(p, c.buffer)
 		c.buffer = c.buffer[n:]
@@ -374,15 +312,6 @@ func (c *conn) Read(p []byte) (n int, err error) {
 }
 
 func (c *conn) Next(n int) (buf []byte, err error) {
-	if c.loop.engine.opts.EdgeTriggeredIO {
-		if n == -1 || n > c.elasticBuffer.Buffered() {
-			n = c.elasticBuffer.Buffered()
-		}
-		c.loop.cache.Reset()
-		_, err = c.loop.cache.ReadFrom(io.LimitReader(&c.elasticBuffer, int64(n)))
-		return c.loop.cache.Bytes(), err
-	}
-
 	inBufferLen := c.inboundBuffer.Buffered()
 	if totalLen := inBufferLen + len(c.buffer); n > totalLen {
 		return nil, io.ErrShortBuffer
@@ -413,18 +342,6 @@ func (c *conn) Next(n int) (buf []byte, err error) {
 }
 
 func (c *conn) Peek(n int) (buf []byte, err error) {
-	if c.loop.engine.opts.EdgeTriggeredIO {
-		bs, err := c.elasticBuffer.Peek(n)
-		if len(bs) == 1 {
-			return bs[0], err
-		}
-		c.loop.cache.Reset()
-		for _, b := range bs {
-			c.loop.cache.Write(b)
-		}
-		return c.loop.cache.Bytes(), err
-	}
-
 	inBufferLen := c.inboundBuffer.Buffered()
 	if totalLen := inBufferLen + len(c.buffer); n > totalLen {
 		return nil, io.ErrShortBuffer
@@ -451,10 +368,6 @@ func (c *conn) Peek(n int) (buf []byte, err error) {
 }
 
 func (c *conn) Discard(n int) (int, error) {
-	if c.loop.engine.opts.EdgeTriggeredIO {
-		return c.elasticBuffer.Discard(n)
-	}
-
 	inBufferLen := c.inboundBuffer.Buffered()
 	tempBufferLen := len(c.buffer)
 	if inBufferLen+tempBufferLen < n || n <= 0 {
@@ -483,35 +396,21 @@ func (c *conn) Write(p []byte) (int, error) {
 		}
 		return len(p), nil
 	}
-	if c.loop.engine.opts.EdgeTriggeredIO {
-		return c.writeET(p)
-	}
-	return c.writeLT(p)
+	return c.write(p)
 }
 
 func (c *conn) Writev(bs [][]byte) (int, error) {
 	if c.isDatagram {
 		return 0, errorx.ErrUnsupportedOp
 	}
-	if c.loop.engine.opts.EdgeTriggeredIO {
-		return c.writevET(bs)
-	}
-	return c.writevLT(bs)
+	return c.writev(bs)
 }
 
 func (c *conn) ReadFrom(r io.Reader) (int64, error) {
-	if c.loop.engine.opts.EdgeTriggeredIO {
-		return c.elasticBuffer.ReadFrom(r)
-	}
-
 	return c.outboundBuffer.ReadFrom(r)
 }
 
 func (c *conn) WriteTo(w io.Writer) (n int64, err error) {
-	if c.loop.engine.opts.EdgeTriggeredIO {
-		return c.elasticBuffer.WriteTo(w)
-	}
-
 	if !c.inboundBuffer.IsEmpty() {
 		if n, err = c.inboundBuffer.WriteTo(w); err != nil {
 			return
@@ -525,18 +424,10 @@ func (c *conn) WriteTo(w io.Writer) (n int64, err error) {
 }
 
 func (c *conn) Flush() error {
-	if c.outboundBuffer.IsEmpty() {
-		return nil
-	}
-
 	return c.loop.write(c)
 }
 
 func (c *conn) InboundBuffered() int {
-	if c.loop.engine.opts.EdgeTriggeredIO {
-		return c.elasticBuffer.Buffered()
-	}
-
 	return c.inboundBuffer.Buffered() + len(c.buffer)
 }
 
@@ -554,7 +445,7 @@ func (c *conn) RemoteAddr() net.Addr       { return c.remoteAddr }
 // func (c *conn) Gfd() gfd.GFD             { return c.gfd }
 
 func (c *conn) Fd() int                        { return c.fd }
-func (c *conn) Dup() (fd int, err error)       { fd, _, err = netpoll.Dup(c.fd); return }
+func (c *conn) Dup() (fd int, err error)       { fd, _, err = socket.Dup(c.fd); return }
 func (c *conn) SetReadBuffer(bytes int) error  { return socket.SetRecvBuffer(c.fd, bytes) }
 func (c *conn) SetWriteBuffer(bytes int) error { return socket.SetSendBuffer(c.fd, bytes) }
 func (c *conn) SetLinger(sec int) error        { return socket.SetLinger(c.fd, sec) }

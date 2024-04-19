@@ -22,13 +22,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"time"
 
 	"golang.org/x/sys/unix"
 
-	"github.com/panjf2000/gnet/v2/internal/io"
+	gio "github.com/panjf2000/gnet/v2/internal/io"
 	"github.com/panjf2000/gnet/v2/internal/netpoll"
 	"github.com/panjf2000/gnet/v2/internal/queue"
 	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
@@ -36,16 +37,14 @@ import (
 )
 
 type eventloop struct {
-	ln           *listener         // listener
-	idx          int               // loop index in the engine loops list
-	read         func(*conn) error // read event handler
-	write        func(*conn) error // write event handler
-	cache        bytes.Buffer      // temporary buffer for scattered bytes
-	engine       *engine           // engine in loop
-	poller       *netpoll.Poller   // epoll or kqueue
-	buffer       []byte            // read packet buffer whose capacity is set by user, default value is 64KB
-	connections  connMatrix        // loop connections storage
-	eventHandler EventHandler      // user eventHandler
+	ln           *listener       // listener
+	idx          int             // loop index in the engine loops list
+	cache        bytes.Buffer    // temporary buffer for scattered bytes
+	engine       *engine         // engine in loop
+	poller       *netpoll.Poller // epoll or kqueue
+	buffer       []byte          // read packet buffer whose capacity is set by user, default value is 64KB
+	connections  connMatrix      // loop connections storage
+	eventHandler EventHandler    // user eventHandler
 }
 
 func (el *eventloop) getLogger() logging.Logger {
@@ -115,14 +114,20 @@ func (el *eventloop) open(c *conn) error {
 	return el.handleAction(c, action)
 }
 
-func (el *eventloop) readLT(c *conn) error {
+func (el *eventloop) read(c *conn) error {
+	if !c.opened {
+		return nil
+	}
+
+	isET := el.engine.opts.EdgeTriggeredIO
+loop:
 	n, err := unix.Read(c.fd, el.buffer)
 	if err != nil || n == 0 {
 		if err == unix.EAGAIN {
 			return nil
 		}
 		if n == 0 {
-			err = unix.ECONNRESET
+			err = io.EOF
 		}
 		return el.close(c, os.NewSyscallError("read", err))
 	}
@@ -138,44 +143,9 @@ func (el *eventloop) readLT(c *conn) error {
 	}
 	_, _ = c.inboundBuffer.Write(c.buffer)
 	c.buffer = c.buffer[:0]
-	return nil
-}
 
-func (el *eventloop) readET(c *conn) error {
-	var read int
-	readBlockSize := el.engine.opts.ReadBufferCap
-	buf := c.elasticBuffer.AllocNode(readBlockSize)
-	for {
-		n, err := unix.Read(c.fd, buf[read:])
-		if err != nil || n == 0 {
-			if err == unix.EAGAIN {
-				c.elasticBuffer.Append(buf[:read])
-				if read == 0 {
-					c.elasticBuffer.FreeNode(buf)
-				}
-				break
-			}
-			if n == 0 {
-				err = unix.ECONNRESET
-			}
-			c.elasticBuffer.FreeNode(buf)
-			return el.close(c, os.NewSyscallError("read", err))
-		}
-		read += n
-		if read == readBlockSize {
-			c.elasticBuffer.Append(buf)
-			buf = c.elasticBuffer.AllocNode(MaxStreamBufferCap)
-			read = 0
-		}
-	}
-
-	action := el.eventHandler.OnTraffic(c)
-	switch action {
-	case None:
-	case Close:
-		return el.close(c, nil)
-	case Shutdown:
-		return errorx.ErrEngineShutdown
+	if isET || c.isEOF {
+		goto loop
 	}
 
 	return nil
@@ -184,17 +154,23 @@ func (el *eventloop) readET(c *conn) error {
 // The default value of UIO_MAXIOV/IOV_MAX is 1024 on Linux and most BSD-like OSs.
 const iovMax = 1024
 
-func (el *eventloop) writeLT(c *conn) error {
-	iov, _ := c.outboundBuffer.Peek(-1)
+func (el *eventloop) write(c *conn) error {
+	if c.outboundBuffer.IsEmpty() {
+		return nil
+	}
+
+	isET := el.engine.opts.EdgeTriggeredIO
 	var (
 		n   int
 		err error
 	)
+loop:
+	iov, _ := c.outboundBuffer.Peek(-1)
 	if len(iov) > 1 {
 		if len(iov) > iovMax {
 			iov = iov[:iovMax]
 		}
-		n, err = io.Writev(c.fd, iov)
+		n, err = gio.Writev(c.fd, iov)
 	} else {
 		n, err = unix.Write(c.fd, iov[0])
 	}
@@ -206,42 +182,14 @@ func (el *eventloop) writeLT(c *conn) error {
 	default:
 		return el.close(c, os.NewSyscallError("write", err))
 	}
+	if isET && !c.outboundBuffer.IsEmpty() {
+		goto loop
+	}
 
 	// All data have been sent, it's no need to monitor the writable events for LT mode,
 	// remove the writable event from poller to help the future event-loops if necessary.
-	if c.outboundBuffer.IsEmpty() {
+	if c.outboundBuffer.IsEmpty() && !isET {
 		_ = el.poller.ModRead(&c.pollAttachment, false)
-	}
-
-	return nil
-}
-
-func (el *eventloop) writeET(c *conn) error {
-	remaining := c.outboundBuffer.Buffered()
-	for {
-		var (
-			n   int
-			err error
-		)
-		iov, _ := c.outboundBuffer.Peek(-1)
-		if len(iov) > 1 {
-			if len(iov) > iovMax {
-				iov = iov[:iovMax]
-			}
-			n, err = io.Writev(c.fd, iov)
-		} else {
-			n, err = unix.Write(c.fd, iov[0])
-		}
-		if n > 0 {
-			remaining -= n
-			_, _ = c.outboundBuffer.Discard(n)
-		}
-		if err == unix.EAGAIN || remaining == 0 {
-			break
-		}
-		if err != nil {
-			return el.close(c, os.NewSyscallError("write", err))
-		}
 	}
 
 	return nil
@@ -272,7 +220,7 @@ func (el *eventloop) close(c *conn, err error) (rerr error) {
 			if len(iov) > iovMax {
 				iov = iov[:iovMax]
 			}
-			if n, e := io.Writev(c.fd, iov); e != nil {
+			if n, e := gio.Writev(c.fd, iov); e != nil {
 				el.getLogger().Warnf("close: error occurs when sending data back to peer, %v", e)
 				break
 			} else { //nolint:revive

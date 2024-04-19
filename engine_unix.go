@@ -66,13 +66,6 @@ func (eng *engine) shutdown(err error) {
 	})
 }
 
-func (eng *engine) startEventLoops() {
-	eng.eventLoops.iterate(func(_ int, el *eventloop) bool {
-		eng.workerPool.Go(el.run)
-		return true
-	})
-}
-
 func (eng *engine) closeEventLoops() {
 	eng.eventLoops.iterate(func(_ int, el *eventloop) bool {
 		el.ln.close()
@@ -88,14 +81,7 @@ func (eng *engine) closeEventLoops() {
 	}
 }
 
-func (eng *engine) startSubReactors() {
-	eng.eventLoops.iterate(func(_ int, el *eventloop) bool {
-		eng.workerPool.Go(el.activateSubReactor)
-		return true
-	})
-}
-
-func (eng *engine) activateEventLoops(numEventLoop int) (err error) {
+func (eng *engine) runEventLoops(numEventLoop int) (err error) {
 	network, address := eng.ln.network, eng.ln.address
 	ln := eng.ln
 	var striker *eventloop
@@ -110,16 +96,9 @@ func (eng *engine) activateEventLoops(numEventLoop int) (err error) {
 		if p, err = netpoll.OpenPoller(); err == nil {
 			el := new(eventloop)
 			el.ln = ln
-			el.read = el.readLT
-			el.write = el.writeLT
-			if eng.opts.EdgeTriggeredIO {
-				el.read = el.readET
-				el.write = el.writeET
-			} else {
-				el.buffer = make([]byte, eng.opts.ReadBufferCap)
-			}
 			el.engine = eng
 			el.poller = p
+			el.buffer = make([]byte, eng.opts.ReadBufferCap)
 			el.connections.init()
 			el.eventHandler = eng.eventHandler
 			if err = el.poller.AddRead(el.ln.packPollAttachment(el.accept), false); err != nil {
@@ -137,7 +116,10 @@ func (eng *engine) activateEventLoops(numEventLoop int) (err error) {
 	}
 
 	// Start event-loops in background.
-	eng.startEventLoops()
+	eng.eventLoops.iterate(func(_ int, el *eventloop) bool {
+		eng.workerPool.Go(el.run)
+		return true
+	})
 
 	eng.workerPool.Go(func() error {
 		striker.ticker(eng.ticker.ctx)
@@ -152,16 +134,9 @@ func (eng *engine) activateReactors(numEventLoop int) error {
 		if p, err := netpoll.OpenPoller(); err == nil {
 			el := new(eventloop)
 			el.ln = eng.ln
-			el.read = el.readLT
-			el.write = el.writeLT
-			if eng.opts.EdgeTriggeredIO {
-				el.read = el.readET
-				el.write = el.writeET
-			} else {
-				el.buffer = make([]byte, eng.opts.ReadBufferCap)
-			}
 			el.engine = eng
 			el.poller = p
+			el.buffer = make([]byte, eng.opts.ReadBufferCap)
 			el.connections.init()
 			el.eventHandler = eng.eventHandler
 			eng.eventLoops.register(el)
@@ -171,7 +146,10 @@ func (eng *engine) activateReactors(numEventLoop int) error {
 	}
 
 	// Start sub reactors in background.
-	eng.startSubReactors()
+	eng.eventLoops.iterate(func(_ int, el *eventloop) bool {
+		eng.workerPool.Go(el.orbit)
+		return true
+	})
 
 	if p, err := netpoll.OpenPoller(); err == nil {
 		el := new(eventloop)
@@ -186,7 +164,7 @@ func (eng *engine) activateReactors(numEventLoop int) error {
 		eng.acceptor = el
 
 		// Start main reactor in background.
-		eng.workerPool.Go(el.activateMainReactor)
+		eng.workerPool.Go(el.launch)
 	} else {
 		return err
 	}
@@ -204,7 +182,7 @@ func (eng *engine) activateReactors(numEventLoop int) error {
 
 func (eng *engine) start(numEventLoop int) error {
 	if eng.opts.ReusePort || eng.ln.network == "udp" {
-		return eng.activateEventLoops(numEventLoop)
+		return eng.runEventLoops(numEventLoop)
 	}
 
 	return eng.activateReactors(numEventLoop)

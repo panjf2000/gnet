@@ -18,24 +18,53 @@
 package gnet
 
 import (
+	"io"
+
 	"golang.org/x/sys/unix"
 
 	"github.com/panjf2000/gnet/v2/internal/netpoll"
 )
 
 func (c *conn) handleEvents(_ int, ev uint32) error {
-	if ev&netpoll.ErrEvents != 0 && ev&netpoll.InEvents == 0 && ev&netpoll.OutEvents == 0 {
-		return c.loop.close(c, unix.ECONNRESET)
+	el := c.loop
+	// First check for any unexpected non-IO events.
+	// For these events we just close the corresponding connection directly.
+	if ev&netpoll.ErrEvents != 0 && ev&unix.EPOLLIN == 0 && ev&unix.EPOLLOUT == 0 {
+		c.outboundBuffer.Release() // don't bother to write to the closed connection
+		return el.close(c, io.EOF)
 	}
-	if ev&netpoll.OutEvents != 0 && !c.outboundBuffer.IsEmpty() {
-		if err := c.loop.write(c); err != nil {
+	// Secondly, check for EPOLLOUT before EPOLLIN, the former has a higher priority
+	// than the latter regardless of the aliveness the current connection:
+	//
+	// 1. when the connection is alive and the system is overloaded, we need to
+	// offload the incoming traffic by writing the pending data back to the peers.
+	// 2. when the connection is dead, we need to write any pending data back to
+	// the peer and close the connection.
+	//
+	// eventloop.write will take good care of either case.
+	if ev&(unix.EPOLLOUT|unix.EPOLLERR) != 0 {
+		if err := el.write(c); err != nil {
 			return err
 		}
 	}
-	if ev&netpoll.InEvents != 0 {
-		return c.loop.read(c)
+	// Check for EPOLLIN before EPOLLRDHUP in case that there are pending data in
+	// the socket buffer.
+	if ev&(unix.EPOLLIN|unix.EPOLLERR) != 0 {
+		if err := el.read(c); err != nil {
+			return err
+		}
 	}
-
+	// Ultimately, check for EPOLLRDHUP, this event indicates that the peer has
+	// either closed connection or shut down the writing half of the connection.
+	if ev&unix.EPOLLRDHUP != 0 && c.opened {
+		if ev&unix.EPOLLIN == 0 { // unreadable EPOLLRDHUP, close the connection directly
+			return el.close(c, io.EOF)
+		}
+		// Received the event of EPOLLIN | EPOLLRDHUP, but the previous eventloop.read
+		// failed to drain the socket buffer, so we make sure we get it done this time.
+		c.isEOF = true
+		return el.read(c)
+	}
 	return nil
 }
 

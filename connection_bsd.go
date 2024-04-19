@@ -20,25 +20,36 @@ package gnet
 import (
 	"io"
 
+	"golang.org/x/sys/unix"
+
 	"github.com/panjf2000/gnet/v2/internal/netpoll"
 )
 
 func (c *conn) handleEvents(_ int, filter int16, flags uint16) (err error) {
-	switch {
-	case flags&netpoll.EVFlagsDelete != 0:
-	case flags&netpoll.EVFlagsEOF != 0:
-		switch {
-		case filter == netpoll.EVFilterRead: // read the remaining data after the peer wrote and closed immediately
-			err = c.loop.read(c)
-		case filter == netpoll.EVFilterWrite && !c.outboundBuffer.IsEmpty():
-			err = c.loop.write(c)
+	el := c.loop
+	switch filter {
+	case unix.EVFILT_READ:
+		err = el.read(c)
+	case unix.EVFILT_WRITE:
+		err = el.write(c)
+	}
+	// EV_EOF indicates that the peer has closed the connection.
+	// We check for EV_EOF after processing the read/write event
+	// to ensure that nothing is left out on this event filter.
+	if flags&unix.EV_EOF != 0 && c.opened {
+		switch filter {
+		case unix.EVFILT_READ:
+			// Receive the event of EVFILT_READ | EV_EOF, but the previous eventloop.read
+			// failed to drain the socket buffer, so we make sure we get it done this time.
+			c.isEOF = true
+			err = el.read(c)
+		case unix.EVFILT_WRITE:
+			// The peer is disconnected, don't bother to try writing pending data back.
+			c.outboundBuffer.Release()
+			fallthrough
 		default:
-			err = c.loop.close(c, io.EOF)
+			err = el.close(c, io.EOF)
 		}
-	case filter == netpoll.EVFilterRead:
-		err = c.loop.read(c)
-	case filter == netpoll.EVFilterWrite && !c.outboundBuffer.IsEmpty():
-		err = c.loop.write(c)
 	}
 	return
 }
