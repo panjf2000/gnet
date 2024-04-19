@@ -167,7 +167,7 @@ func (e Engine) Wake(fd gfd.GFD, cb AsyncCallback) error {
 
 // Reader is an interface that consists of a number of methods for reading that Conn must implement.
 //
-// Note that the methods in this interface are not goroutine-safe for concurrent use,
+// Note that the methods in this interface are not concurrency-safe for concurrent use,
 // you must invoke them within any method in EventHandler.
 type Reader interface {
 	io.Reader
@@ -175,8 +175,9 @@ type Reader interface {
 
 	// Next returns a slice containing the next n bytes from the buffer,
 	// advancing the buffer as if the bytes had been returned by Read.
-	// If there are fewer than n bytes in the buffer, Next returns the entire buffer.
-	// The error is ErrBufferFull if n is larger than b's buffer size.
+	// Calling this method has the same effect as calling Peek and Discard.
+	// If the amount of the available bytes is less than requested, a pair of (0, io.ErrShortBuffer)
+	// is returned.
 	//
 	// Note that the []byte buf returned by Next() is not allowed to be passed to a new goroutine,
 	// as this []byte will be reused within event-loop.
@@ -184,10 +185,9 @@ type Reader interface {
 	// to that new goroutine.
 	Next(n int) (buf []byte, err error)
 
-	// Peek returns the next n bytes without advancing the reader. The bytes stop
-	// being valid at the next read call. If Peek returns fewer than n bytes, it
-	// also returns an error explaining why the read is short. The error is
-	// ErrBufferFull if n is larger than b's buffer size.
+	// Peek returns the next n bytes without advancing the inbound buffer, the returned bytes
+	// remain valid until a Discard is called. If the amount of the available bytes is
+	// less than requested, a pair of (0, io.ErrShortBuffer) is returned.
 	//
 	// Note that the []byte buf returned by Peek() is not allowed to be passed to a new goroutine,
 	// as this []byte will be reused within event-loop.
@@ -195,11 +195,7 @@ type Reader interface {
 	// to that new goroutine.
 	Peek(n int) (buf []byte, err error)
 
-	// Discard skips the next n bytes, returning the number of bytes discarded.
-	//
-	// If Discard skips fewer than n bytes, it also returns an error.
-	// If 0 <= n <= b.Buffered(), Discard is guaranteed to succeed without
-	// reading from the underlying io.Reader.
+	// Discard advances the inbound buffer with next n bytes, returning the number of bytes discarded.
 	Discard(n int) (discarded int, err error)
 
 	// InboundBuffered returns the number of bytes that can be read from the current buffer.
@@ -208,22 +204,22 @@ type Reader interface {
 
 // Writer is an interface that consists of a number of methods for writing that Conn must implement.
 type Writer interface {
-	io.Writer     // not goroutine-safe
-	io.ReaderFrom // not goroutine-safe
+	io.Writer     // not concurrency-safe
+	io.ReaderFrom // not concurrency-safe
 
-	// Writev writes multiple byte slices to peer synchronously, it's not goroutine-safe,
+	// Writev writes multiple byte slices to remote synchronously, it's not concurrency-safe,
 	// you must invoke it within any method in EventHandler.
 	Writev(bs [][]byte) (n int, err error)
 
-	// Flush writes any buffered data to the underlying connection, it's not goroutine-safe,
+	// Flush writes any buffered data to the underlying connection, it's not concurrency-safe,
 	// you must invoke it within any method in EventHandler.
 	Flush() (err error)
 
 	// OutboundBuffered returns the number of bytes that can be read from the current buffer.
-	// it's not goroutine-safe, you must invoke it within any method in EventHandler.
+	// it's not concurrency-safe, you must invoke it within any method in EventHandler.
 	OutboundBuffered() (n int)
 
-	// AsyncWrite writes bytes to peer asynchronously, it's goroutine-safe,
+	// AsyncWrite writes bytes to remote asynchronously, it's concurrency-safe,
 	// you don't have to invoke it within any method in EventHandler,
 	// usually you would call it in an individual goroutine.
 	//
@@ -234,7 +230,7 @@ type Writer interface {
 	// just call Conn.Write to send back your data.
 	AsyncWrite(buf []byte, callback AsyncCallback) (err error)
 
-	// AsyncWritev writes multiple byte slices to peer asynchronously,
+	// AsyncWritev writes multiple byte slices to remote asynchronously,
 	// you don't have to invoke it within any method in EventHandler,
 	// usually you would call it in an individual goroutine.
 	AsyncWritev(bs [][]byte, callback AsyncCallback) (err error)
@@ -247,7 +243,7 @@ type AsyncCallback func(c Conn, err error) error
 
 // Socket is a set of functions which manipulate the underlying file descriptor of a connection.
 //
-// Note that the methods in this interface are goroutine-safe for concurrent use,
+// Note that the methods in this interface are concurrency-safe for concurrent use,
 // you don't have to invoke them within any method in EventHandler.
 type Socket interface {
 	// Gfd returns the gfd of socket.
@@ -302,35 +298,35 @@ type Socket interface {
 
 // Conn is an interface of underlying connection.
 type Conn interface {
-	Reader // all methods in Reader are not goroutine-safe.
-	Writer // some methods in Writer are goroutine-safe, some are not.
-	Socket // all methods in Socket are goroutine-safe.
+	Reader // all methods in Reader are not concurrency-safe.
+	Writer // some methods in Writer are concurrency-safe, some are not.
+	Socket // all methods in Socket are concurrency-safe.
 
-	// Context returns a user-defined context, it's not goroutine-safe,
+	// Context returns a user-defined context, it's not concurrency-safe,
 	// you must invoke it within any method in EventHandler.
 	Context() (ctx interface{})
 
-	// SetContext sets a user-defined context, it's not goroutine-safe,
+	// SetContext sets a user-defined context, it's not concurrency-safe,
 	// you must invoke it within any method in EventHandler.
 	SetContext(ctx interface{})
 
-	// LocalAddr is the connection's local socket address, it's not goroutine-safe,
+	// LocalAddr is the connection's local socket address, it's not concurrency-safe,
 	// you must invoke it within any method in EventHandler.
 	LocalAddr() (addr net.Addr)
 
-	// RemoteAddr is the connection's remote peer address, it's not goroutine-safe,
+	// RemoteAddr is the connection's remote remote address, it's not concurrency-safe,
 	// you must invoke it within any method in EventHandler.
 	RemoteAddr() (addr net.Addr)
 
-	// Wake triggers a OnTraffic event for the current connection, it's goroutine-safe.
+	// Wake triggers a OnTraffic event for the current connection, it's concurrency-safe.
 	Wake(callback AsyncCallback) (err error)
 
-	// CloseWithCallback closes the current connection, it's goroutine-safe.
+	// CloseWithCallback closes the current connection, it's concurrency-safe.
 	// Usually you should provide a non-nil callback for this method,
 	// otherwise your better choice is Close().
 	CloseWithCallback(callback AsyncCallback) (err error)
 
-	// Close closes the current connection, implements net.Conn, it's goroutine-safe.
+	// Close closes the current connection, implements net.Conn, it's concurrency-safe.
 	Close() (err error)
 
 	// SetDeadline implements net.Conn.
@@ -359,15 +355,15 @@ type (
 		// OnOpen fires when a new connection has been opened.
 		//
 		// The Conn c has information about the connection such as its local and remote addresses.
-		// The parameter out is the return value which is going to be sent back to the peer.
-		// Sending large amounts of data back to the peer in OnOpen is usually not recommended.
+		// The parameter out is the return value which is going to be sent back to the remote.
+		// Sending large amounts of data back to the remote in OnOpen is usually not recommended.
 		OnOpen(c Conn) (out []byte, action Action)
 
 		// OnClose fires when a connection has been closed.
 		// The parameter err is the last known connection error.
 		OnClose(c Conn, err error) (action Action)
 
-		// OnTraffic fires when a socket receives data from the peer.
+		// OnTraffic fires when a socket receives data from the remote.
 		//
 		// Note that the []byte returned from Conn.Peek(int)/Conn.Next(int) is not allowed to be passed to a new goroutine,
 		// as this []byte will be reused within event-loop after OnTraffic() returns.
@@ -398,7 +394,7 @@ func (*BuiltinEventEngine) OnShutdown(_ Engine) {
 }
 
 // OnOpen fires when a new connection has been opened.
-// The parameter out is the return value which is going to be sent back to the peer.
+// The parameter out is the return value which is going to be sent back to the remote.
 func (*BuiltinEventEngine) OnOpen(_ Conn) (out []byte, action Action) {
 	return
 }
@@ -409,7 +405,7 @@ func (*BuiltinEventEngine) OnClose(_ Conn, _ error) (action Action) {
 	return
 }
 
-// OnTraffic fires when a local socket receives data from the peer.
+// OnTraffic fires when a local socket receives data from the remote.
 func (*BuiltinEventEngine) OnTraffic(_ Conn) (action Action) {
 	return
 }
@@ -491,6 +487,10 @@ func Run(eventHandler EventHandler, protoAddr string, opts ...Option) (err error
 		return
 	}
 	defer ln.close()
+
+	if ln.network == "udp" {
+		options.EdgeTriggeredIO = false
+	}
 
 	return run(eventHandler, ln, options, protoAddr)
 }

@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build (freebsd || dragonfly || netbsd || openbsd || darwin) && poll_opt
-// +build freebsd dragonfly netbsd openbsd darwin
-// +build poll_opt
+//go:build linux && poll_opt
+// +build linux,poll_opt
 
 package gnet
 
@@ -24,7 +23,7 @@ import (
 	"github.com/panjf2000/gnet/v2/pkg/errors"
 )
 
-func (el *eventloop) activateMainReactor() error {
+func (el *eventloop) rotate() error {
 	if el.engine.opts.LockOSThread {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -32,10 +31,10 @@ func (el *eventloop) activateMainReactor() error {
 
 	err := el.poller.Polling()
 	if err == errors.ErrEngineShutdown {
-		el.engine.opts.Logger.Debugf("main reactor is exiting in terms of the demand from user, %v", err)
+		el.getLogger().Debugf("main reactor is exiting in terms of the demand from user, %v", err)
 		err = nil
 	} else if err != nil {
-		el.engine.opts.Logger.Errorf("main reactor is exiting due to error: %v", err)
+		el.getLogger().Errorf("main reactor is exiting due to error: %v", err)
 	}
 
 	el.engine.shutdown(err)
@@ -43,7 +42,7 @@ func (el *eventloop) activateMainReactor() error {
 	return err
 }
 
-func (el *eventloop) activateSubReactor() error {
+func (el *eventloop) orbit() error {
 	if el.engine.opts.LockOSThread {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -51,10 +50,10 @@ func (el *eventloop) activateSubReactor() error {
 
 	err := el.poller.Polling()
 	if err == errors.ErrEngineShutdown {
-		el.engine.opts.Logger.Debugf("event-loop(%d) is exiting in terms of the demand from user, %v", el.idx, err)
+		el.getLogger().Debugf("event-loop(%d) is exiting in terms of the demand from user, %v", el.idx, err)
 		err = nil
 	} else if err != nil {
-		el.engine.opts.Logger.Errorf("event-loop(%d) is exiting due to error: %v", el.idx, err)
+		el.getLogger().Errorf("event-loop(%d) is exiting due to error: %v", el.idx, err)
 	}
 
 	el.closeConns()
@@ -71,10 +70,10 @@ func (el *eventloop) run() error {
 
 	err := el.poller.Polling()
 	if err == errors.ErrEngineShutdown {
-		el.engine.opts.Logger.Debugf("event-loop(%d) is exiting in terms of the demand from user, %v", el.idx, err)
+		el.getLogger().Debugf("event-loop(%d) is exiting in terms of the demand from user, %v", el.idx, err)
 		err = nil
 	} else if err != nil {
-		el.engine.opts.Logger.Errorf("event-loop(%d) is exiting due to error: %v", el.idx, err)
+		el.getLogger().Errorf("event-loop(%d) is exiting due to error: %v", el.idx, err)
 	}
 
 	el.closeConns()
