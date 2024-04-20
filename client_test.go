@@ -484,7 +484,7 @@ func startGnetClient(t *testing.T, cli *Client, network, addr string, multicore,
 	require.NoError(t, err)
 	rspCh := handler.rspCh
 	duration := time.Duration((rand.Float64()*2+1)*float64(time.Second)) / 2
-	t.Logf("test duration: %dms", duration/time.Millisecond)
+	logging.Debugf("test duration: %v", duration)
 	start := time.Now()
 	for time.Since(start) < duration {
 		reqData := make([]byte, streamLen)

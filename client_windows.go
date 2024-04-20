@@ -50,8 +50,8 @@ func NewClient(eh EventHandler, opts ...Option) (cli *Client, err error) {
 
 	shutdownCtx, shutdown := context.WithCancel(context.Background())
 	eng := &engine{
-		ln:   &listener{},
-		opts: options,
+		listeners: []*listener{},
+		opts:      options,
 		workerPool: struct {
 			*errgroup.Group
 			shutdownCtx context.Context
@@ -70,7 +70,7 @@ func NewClient(eh EventHandler, opts ...Option) (cli *Client, err error) {
 }
 
 func (cli *Client) Start() error {
-	cli.el.eventHandler.OnBoot(Engine{})
+	cli.el.eventHandler.OnBoot(Engine{cli.el.eng})
 	cli.el.eng.workerPool.Go(cli.el.run)
 	if cli.opts.Ticker {
 		cli.el.eng.ticker.ctx, cli.el.eng.ticker.cancel = context.WithCancel(context.Background())
@@ -89,7 +89,7 @@ func (cli *Client) Stop() (err error) {
 		cli.el.eng.ticker.cancel()
 	}
 	_ = cli.el.eng.workerPool.Wait()
-	cli.el.eventHandler.OnShutdown(Engine{})
+	cli.el.eventHandler.OnShutdown(Engine{cli.el.eng})
 	logging.Cleanup()
 	return
 }
@@ -202,7 +202,7 @@ func (cli *Client) EnrollContext(nc net.Conn, ctx interface{}) (gc Conn, err err
 		}(c, nc, cli.el)
 		gc = c
 	case *net.UDPConn:
-		c := newUDPConn(cli.el, nc.LocalAddr(), nc.RemoteAddr())
+		c := newUDPConn(cli.el, nil, nc.LocalAddr(), nc.RemoteAddr())
 		c.SetContext(ctx)
 		c.rawConn = nc
 		cli.el.ch <- &openConn{c: c, isDatagram: true, cb: func() { close(connOpened) }}
@@ -213,7 +213,7 @@ func (cli *Client) EnrollContext(nc net.Conn, ctx interface{}) (gc Conn, err err
 				if err != nil {
 					return
 				}
-				c := newUDPConn(cli.el, uc.LocalAddr(), uc.RemoteAddr())
+				c := newUDPConn(cli.el, nil, uc.LocalAddr(), uc.RemoteAddr())
 				c.SetContext(ctx)
 				c.rawConn = uc
 				el.ch <- packUDPConn(c, buffer[:n])

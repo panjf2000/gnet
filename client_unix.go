@@ -68,7 +68,7 @@ func NewClient(eh EventHandler, opts ...Option) (cli *Client, err error) {
 
 	shutdownCtx, shutdown := context.WithCancel(context.Background())
 	eng := engine{
-		ln:           &listener{},
+		listeners:    make(map[int]*listener),
 		opts:         options,
 		eventHandler: eh,
 		workerPool: struct {
@@ -82,9 +82,9 @@ func NewClient(eh EventHandler, opts ...Option) (cli *Client, err error) {
 		eng.ticker.ctx, eng.ticker.cancel = context.WithCancel(context.Background())
 	}
 	el := eventloop{
-		ln:     eng.ln,
-		engine: &eng,
-		poller: p,
+		listeners: eng.listeners,
+		engine:    &eng,
+		poller:    p,
 	}
 
 	rbc := options.ReadBufferCap
@@ -115,7 +115,8 @@ func NewClient(eh EventHandler, opts ...Option) (cli *Client, err error) {
 
 // Start starts the client event-loop, handing IO events.
 func (cli *Client) Start() error {
-	cli.el.eventHandler.OnBoot(Engine{})
+	logging.Infof("Starting gnet client with 1 event-loop")
+	cli.el.eventHandler.OnBoot(Engine{cli.el.engine})
 	cli.el.engine.workerPool.Go(cli.el.run)
 	// Start the ticker.
 	if cli.opts.Ticker {
@@ -134,7 +135,7 @@ func (cli *Client) Stop() (err error) {
 	}
 	_ = cli.el.engine.workerPool.Wait()
 	logging.Error(cli.el.poller.Close())
-	cli.el.eventHandler.OnShutdown(Engine{})
+	cli.el.eventHandler.OnShutdown(Engine{cli.el.engine})
 	logging.Cleanup()
 	return
 }

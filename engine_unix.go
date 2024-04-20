@@ -20,6 +20,7 @@ package gnet
 import (
 	"context"
 	"runtime"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -29,14 +30,15 @@ import (
 	"github.com/panjf2000/gnet/v2/internal/netpoll"
 	"github.com/panjf2000/gnet/v2/internal/queue"
 	"github.com/panjf2000/gnet/v2/pkg/errors"
+	"github.com/panjf2000/gnet/v2/pkg/logging"
 )
 
 type engine struct {
-	ln         *listener    // the listener for accepting new connections
-	opts       *Options     // options with engine
-	acceptor   *eventloop   // main event-loop for accepting connections
-	eventLoops loadBalancer // event-loops for handling events
-	inShutdown int32        // whether the engine is in shutdown
+	listeners  map[int]*listener // listeners for accepting new connections
+	opts       *Options          // options with engine
+	acceptor   *eventloop        // main event-loop for accepting connections
+	eventLoops loadBalancer      // event-loops for handling events
+	inShutdown int32             // whether the engine is in shutdown
 	ticker     struct {
 		ctx    context.Context    // context for ticker
 		cancel context.CancelFunc // function to stop the ticker
@@ -68,12 +70,16 @@ func (eng *engine) shutdown(err error) {
 
 func (eng *engine) closeEventLoops() {
 	eng.eventLoops.iterate(func(_ int, el *eventloop) bool {
-		el.ln.close()
+		for _, ln := range el.listeners {
+			ln.close()
+		}
 		_ = el.poller.Close()
 		return true
 	})
 	if eng.acceptor != nil {
-		eng.ln.close()
+		for _, ln := range eng.listeners {
+			ln.close()
+		}
 		err := eng.acceptor.poller.Close()
 		if err != nil {
 			eng.opts.Logger.Errorf("failed to close poller when stopping engine: %v", err)
@@ -82,27 +88,33 @@ func (eng *engine) closeEventLoops() {
 }
 
 func (eng *engine) runEventLoops(numEventLoop int) (err error) {
-	network, address := eng.ln.network, eng.ln.address
-	ln := eng.ln
 	var striker *eventloop
 	// Create loops locally and bind the listeners.
 	for i := 0; i < numEventLoop; i++ {
+		lns := eng.listeners
 		if i > 0 {
-			if ln, err = initListener(network, address, eng.opts); err != nil {
-				return
+			lns = make(map[int]*listener, len(eng.listeners))
+			for _, ln := range lns {
+				l, e := initListener(ln.network, ln.address, eng.opts)
+				if e != nil {
+					return e
+				}
+				lns[l.fd] = l
 			}
 		}
 		var p *netpoll.Poller
 		if p, err = netpoll.OpenPoller(); err == nil {
 			el := new(eventloop)
-			el.ln = ln
+			el.listeners = lns
 			el.engine = eng
 			el.poller = p
 			el.buffer = make([]byte, eng.opts.ReadBufferCap)
 			el.connections.init()
 			el.eventHandler = eng.eventHandler
-			if err = el.poller.AddRead(el.ln.packPollAttachment(el.accept), false); err != nil {
-				return
+			for _, ln := range lns {
+				if err = el.poller.AddRead(ln.packPollAttachment(el.accept), false); err != nil {
+					return
+				}
 			}
 			eng.eventLoops.register(el)
 
@@ -133,7 +145,7 @@ func (eng *engine) activateReactors(numEventLoop int) error {
 	for i := 0; i < numEventLoop; i++ {
 		if p, err := netpoll.OpenPoller(); err == nil {
 			el := new(eventloop)
-			el.ln = eng.ln
+			el.listeners = eng.listeners
 			el.engine = eng
 			el.poller = p
 			el.buffer = make([]byte, eng.opts.ReadBufferCap)
@@ -153,13 +165,15 @@ func (eng *engine) activateReactors(numEventLoop int) error {
 
 	if p, err := netpoll.OpenPoller(); err == nil {
 		el := new(eventloop)
-		el.ln = eng.ln
+		el.listeners = eng.listeners
 		el.idx = -1
 		el.engine = eng
 		el.poller = p
 		el.eventHandler = eng.eventHandler
-		if err = el.poller.AddRead(eng.ln.packPollAttachment(eng.accept), false); err != nil {
-			return err
+		for _, ln := range eng.listeners {
+			if err = el.poller.AddRead(ln.packPollAttachment(eng.accept), false); err != nil {
+				return err
+			}
 		}
 		eng.acceptor = el
 
@@ -181,7 +195,14 @@ func (eng *engine) activateReactors(numEventLoop int) error {
 }
 
 func (eng *engine) start(numEventLoop int) error {
-	if eng.opts.ReusePort || eng.ln.network == "udp" {
+	var withUDP bool
+	for _, ln := range eng.listeners {
+		if ln.network == "udp" {
+			withUDP = true
+			break
+		}
+	}
+	if eng.opts.ReusePort || withUDP {
 		return eng.runEventLoops(numEventLoop)
 	}
 
@@ -225,8 +246,8 @@ func (eng *engine) stop(s Engine) {
 	atomic.StoreInt32(&eng.inShutdown, 1)
 }
 
-func run(eventHandler EventHandler, listener *listener, options *Options, protoAddr string) error {
-	// Figure out the proper number of event-loops/goroutines to run.
+func run(eventHandler EventHandler, listeners []*listener, options *Options, addrs []string) error {
+	// Figure out the proper number of event-loop to run.
 	numEventLoop := 1
 	if options.Multicore {
 		numEventLoop = runtime.NumCPU()
@@ -238,10 +259,17 @@ func run(eventHandler EventHandler, listener *listener, options *Options, protoA
 		numEventLoop = gfd.EventLoopIndexMax
 	}
 
+	logging.Infof("Launching gnet with %d event-loops, listening on: %s",
+		numEventLoop, strings.Join(addrs, " | "))
+
+	lns := make(map[int]*listener, len(listeners))
+	for _, ln := range listeners {
+		lns[ln.fd] = ln
+	}
 	shutdownCtx, shutdown := context.WithCancel(context.Background())
 	eng := engine{
-		ln:   listener,
-		opts: options,
+		listeners: lns,
+		opts:      options,
 		workerPool: struct {
 			*errgroup.Group
 			shutdownCtx context.Context
@@ -277,7 +305,9 @@ func run(eventHandler EventHandler, listener *listener, options *Options, protoA
 	}
 	defer eng.stop(e)
 
-	allEngines.Store(protoAddr, &eng)
+	for _, addr := range addrs {
+		allEngines.Store(addr, &eng)
+	}
 
 	return nil
 }
