@@ -18,12 +18,14 @@ import (
 	"context"
 	"errors"
 	"runtime"
+	"strings"
 	"sync"
 	"sync/atomic"
 
 	"golang.org/x/sync/errgroup"
 
 	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
+	"github.com/panjf2000/gnet/v2/pkg/logging"
 )
 
 type engine struct {
@@ -122,6 +124,9 @@ func run(eventHandler EventHandler, listeners []*listener, options *Options, add
 	if options.NumEventLoop > 0 {
 		numEventLoop = options.NumEventLoop
 	}
+
+	logging.Infof("Launching gnet with %d event-loops, listening on: %s",
+		numEventLoop, strings.Join(addrs, " | "))
 
 	shutdownCtx, shutdown := context.WithCancel(context.Background())
 	eng := engine{
