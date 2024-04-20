@@ -39,7 +39,7 @@ func TestServer(t *testing.T) {
 	// the engine will echo back the data.
 	// waits for graceful connection closing.
 	t.Run("poll-LT", func(t *testing.T) {
-		t.Run("tcp-addr", func(t *testing.T) {
+		t.Run("tcp", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
 				runServer(t, []string{"tcp://:9991"}, false, false, false, false, false, 10, RoundRobin)
 			})
