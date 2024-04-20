@@ -90,7 +90,17 @@ func (eng *engine) start(numEventLoop int) error {
 		}
 	}
 
-	eng.workerPool.Go(eng.listen)
+	for _, ln := range eng.listeners {
+		if ln.pc != nil {
+			eng.workerPool.Go(func() error {
+				return eng.ListenUDP(ln.pc)
+			})
+		} else {
+			eng.workerPool.Go(func() error {
+				return eng.listenStream(ln.ln)
+			})
+		}
+	}
 
 	return nil
 }
