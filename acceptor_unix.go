@@ -28,7 +28,7 @@ import (
 	"github.com/panjf2000/gnet/v2/pkg/errors"
 )
 
-func (eng *engine) accept1(fd int, _ netpoll.IOEvent, _ netpoll.IOFlags) error {
+func (el *eventloop) accept0(fd int, _ netpoll.IOEvent, _ netpoll.IOFlags) error {
 	for {
 		nfd, sa, err := socket.Accept(fd)
 		if err != nil {
@@ -41,33 +41,33 @@ func (eng *engine) accept1(fd int, _ netpoll.IOEvent, _ netpoll.IOFlags) error {
 				// It's a silly error, let's retry it.
 				continue
 			default:
-				eng.opts.Logger.Errorf("Accept() failed due to error: %v", err)
+				el.getLogger().Errorf("Accept() failed due to error: %v", err)
 				return errors.ErrAcceptSocket
 			}
 		}
 
 		remoteAddr := socket.SockaddrToTCPOrUnixAddr(sa)
-		if eng.opts.TCPKeepAlive > 0 && eng.listeners[fd].network == "tcp" {
-			err = socket.SetKeepAlivePeriod(nfd, int(eng.opts.TCPKeepAlive.Seconds()))
+		if el.engine.opts.TCPKeepAlive > 0 && el.listeners[fd].network == "tcp" {
+			err = socket.SetKeepAlivePeriod(nfd, int(el.engine.opts.TCPKeepAlive.Seconds()))
 			if err != nil {
-				eng.opts.Logger.Errorf("failed to set TCP keepalive on fd=%d: %v", fd, err)
+				el.getLogger().Errorf("failed to set TCP keepalive on fd=%d: %v", fd, err)
 			}
 		}
 
-		el := eng.eventLoops.next(remoteAddr)
+		el := el.engine.eventLoops.next(remoteAddr)
 		c := newTCPConn(nfd, el, sa, el.listeners[fd].addr, remoteAddr)
 		err = el.poller.Trigger(queue.HighPriority, el.register, c)
 		if err != nil {
-			eng.opts.Logger.Errorf("failed to enqueue accepted socket of high-priority: %v", err)
+			el.getLogger().Errorf("failed to enqueue the accepted socket fd=%d to poller: %v", c.fd, err)
 			_ = unix.Close(nfd)
 			c.release()
 		}
 	}
 }
 
-func (el *eventloop) accept1(fd int, ev netpoll.IOEvent, flags netpoll.IOFlags) error {
+func (el *eventloop) accept(fd int, ev netpoll.IOEvent, flags netpoll.IOFlags) error {
 	if el.listeners[fd].network == "udp" {
-		return el.readUDP1(fd, ev, flags)
+		return el.readUDP(fd, ev, flags)
 	}
 
 	nfd, sa, err := socket.Accept(fd)
@@ -98,6 +98,9 @@ func (el *eventloop) accept1(fd int, ev netpoll.IOEvent, flags netpoll.IOFlags) 
 		addEvents = el.poller.AddReadWrite
 	}
 	if err = addEvents(&c.pollAttachment, el.engine.opts.EdgeTriggeredIO); err != nil {
+		el.getLogger().Errorf("failed to register the accepted socket fd=%d to poller: %v", c.fd, err)
+		_ = unix.Close(c.fd)
+		c.release()
 		return err
 	}
 	el.connections.addConn(c, el.idx)

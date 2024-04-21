@@ -24,6 +24,7 @@ import (
 
 	"golang.org/x/sys/unix"
 
+	"github.com/panjf2000/gnet/v2/internal/netpoll"
 	"github.com/panjf2000/gnet/v2/pkg/errors"
 )
 
@@ -33,7 +34,7 @@ func (el *eventloop) rotate() error {
 		defer runtime.UnlockOSThread()
 	}
 
-	err := el.poller.Polling(el.engine.accept)
+	err := el.poller.Polling(el.accept0)
 	if err == errors.ErrEngineShutdown {
 		el.getLogger().Debugf("main reactor is exiting in terms of the demand from user, %v", err)
 		err = nil
@@ -52,7 +53,7 @@ func (el *eventloop) orbit() error {
 		defer runtime.UnlockOSThread()
 	}
 
-	err := el.poller.Polling(func(fd int, filter int16, flags uint16) (err error) {
+	err := el.poller.Polling(func(fd int, filter netpoll.IOEvent, flags netpoll.IOFlags) (err error) {
 		c := el.connections.getConn(fd)
 		if c == nil {
 			// This might happen when the connection has already been closed,
@@ -110,7 +111,7 @@ func (el *eventloop) run() error {
 		defer runtime.UnlockOSThread()
 	}
 
-	err := el.poller.Polling(func(fd int, filter int16, flags uint16) (err error) {
+	err := el.poller.Polling(func(fd int, filter netpoll.IOEvent, flags netpoll.IOFlags) (err error) {
 		c := el.connections.getConn(fd)
 		if c == nil {
 			if _, ok := el.listeners[fd]; ok {

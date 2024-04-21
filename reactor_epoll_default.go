@@ -33,7 +33,7 @@ func (el *eventloop) rotate() error {
 		defer runtime.UnlockOSThread()
 	}
 
-	err := el.poller.Polling(el.engine.accept)
+	err := el.poller.Polling(el.accept0)
 	if err == errors.ErrEngineShutdown {
 		el.getLogger().Debugf("main reactor is exiting in terms of the demand from user, %v", err)
 		err = nil
@@ -52,10 +52,10 @@ func (el *eventloop) orbit() error {
 		defer runtime.UnlockOSThread()
 	}
 
-	err := el.poller.Polling(func(fd int, ev uint32) error {
+	err := el.poller.Polling(func(fd int, ev netpoll.IOEvent, _ netpoll.IOFlags) error {
 		c := el.connections.getConn(fd)
 		if c == nil {
-			// Somehow epoll notify with an event for a stale fd that is not in our connection set.
+			// Somehow epoll notified with an event for a stale fd that is not in our connection set.
 			// We need to delete it from the epoll set.
 			return el.poller.Delete(fd)
 		}
@@ -121,13 +121,13 @@ func (el *eventloop) run() error {
 		defer runtime.UnlockOSThread()
 	}
 
-	err := el.poller.Polling(func(fd int, ev uint32) error {
+	err := el.poller.Polling(func(fd int, ev netpoll.IOEvent, flags netpoll.IOFlags) error {
 		c := el.connections.getConn(fd)
 		if c == nil {
 			if _, ok := el.listeners[fd]; ok {
-				return el.accept(fd, ev)
+				return el.accept(fd, ev, flags)
 			}
-			// Somehow epoll notify with an event for a stale fd that is not in our connection set.
+			// Somehow epoll notified with an event for a stale fd that is not in our connection set.
 			// We need to delete it from the epoll set.
 			return el.poller.Delete(fd)
 

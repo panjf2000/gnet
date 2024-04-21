@@ -25,7 +25,7 @@ import (
 	"github.com/panjf2000/gnet/v2/internal/netpoll"
 )
 
-func (c *conn) handleEvents(_ int, filter int16, flags uint16) (err error) {
+func (c *conn) processIO(_ int, filter netpoll.IOEvent, flags netpoll.IOFlags) (err error) {
 	el := c.loop
 	switch filter {
 	case unix.EVFILT_READ:
@@ -55,8 +55,4 @@ func (c *conn) handleEvents(_ int, filter int16, flags uint16) (err error) {
 		}
 	}
 	return
-}
-
-func (el *eventloop) readUDP(fd int, filter netpoll.IOEvent, flags netpoll.IOFlags) error {
-	return el.readUDP1(fd, filter, flags)
 }
