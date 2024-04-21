@@ -220,7 +220,6 @@ func (el *eventloop) close(c *conn, err error) (rerr error) {
 			iov = iov[:iovMax]
 		}
 		if n, e := gio.Writev(c.fd, iov); e != nil {
-			el.getLogger().Warnf("close: error occurs when sending data back to remote, %v", e)
 			break
 		} else { //nolint:revive
 			_, _ = c.outboundBuffer.Discard(n)
