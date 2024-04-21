@@ -310,7 +310,7 @@ func (el *eventloop) handleAction(c *conn, action Action) error {
 func (el *eventloop) readUDP1(fd int, _ netpoll.IOEvent, _ netpoll.IOFlags) error {
 	n, sa, err := unix.Recvfrom(fd, el.buffer, 0)
 	if err != nil {
-		if err == unix.EAGAIN || err == unix.EWOULDBLOCK {
+		if err == unix.EAGAIN {
 			return nil
 		}
 		return fmt.Errorf("failed to read UDP packet from fd=%d in event-loop(%d), %v",

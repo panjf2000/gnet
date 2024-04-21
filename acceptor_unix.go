@@ -26,39 +26,43 @@ import (
 	"github.com/panjf2000/gnet/v2/internal/queue"
 	"github.com/panjf2000/gnet/v2/internal/socket"
 	"github.com/panjf2000/gnet/v2/pkg/errors"
-	"github.com/panjf2000/gnet/v2/pkg/logging"
 )
 
 func (eng *engine) accept1(fd int, _ netpoll.IOEvent, _ netpoll.IOFlags) error {
-	nfd, sa, err := socket.Accept(fd)
-	if err != nil {
-		switch err {
-		case unix.EINTR, unix.EAGAIN, unix.ECONNABORTED:
-			// ECONNABORTED indicates that a socket on the listen
-			// queue was closed before we Accept()ed it;
-			// it's a silly error, so try again.
-			return nil
-		default:
-			eng.opts.Logger.Errorf("Accept() failed due to error: %v", err)
-			return errors.ErrAcceptSocket
+	for {
+		nfd, sa, err := socket.Accept(fd)
+		if err != nil {
+			switch err {
+			case unix.EAGAIN: // the Accept queue has been drained, we can return now
+				return nil
+			case unix.EINTR, unix.ECONNRESET, unix.ECONNABORTED:
+				// ECONNRESET or ECONNABORTED could indicate that a socket
+				// in the Accept queue was closed before we Accept()ed it.
+				// It's a silly error, let's retry it.
+				continue
+			default:
+				eng.opts.Logger.Errorf("Accept() failed due to error: %v", err)
+				return errors.ErrAcceptSocket
+			}
+		}
+
+		remoteAddr := socket.SockaddrToTCPOrUnixAddr(sa)
+		if eng.opts.TCPKeepAlive > 0 && eng.listeners[fd].network == "tcp" {
+			err = socket.SetKeepAlivePeriod(nfd, int(eng.opts.TCPKeepAlive.Seconds()))
+			if err != nil {
+				eng.opts.Logger.Errorf("failed to set TCP keepalive on fd=%d: %v", fd, err)
+			}
+		}
+
+		el := eng.eventLoops.next(remoteAddr)
+		c := newTCPConn(nfd, el, sa, el.listeners[fd].addr, remoteAddr)
+		err = el.poller.Trigger(queue.HighPriority, el.register, c)
+		if err != nil {
+			eng.opts.Logger.Errorf("failed to enqueue accepted socket of high-priority: %v", err)
+			_ = unix.Close(nfd)
+			c.release()
 		}
 	}
-
-	remoteAddr := socket.SockaddrToTCPOrUnixAddr(sa)
-	if eng.opts.TCPKeepAlive > 0 && eng.listeners[fd].network == "tcp" {
-		err = socket.SetKeepAlivePeriod(nfd, int(eng.opts.TCPKeepAlive.Seconds()))
-		logging.Error(err)
-	}
-
-	el := eng.eventLoops.next(remoteAddr)
-	c := newTCPConn(nfd, el, sa, el.listeners[fd].addr, remoteAddr)
-	err = el.poller.Trigger(queue.HighPriority, el.register, c)
-	if err != nil {
-		eng.opts.Logger.Errorf("failed to enqueue accepted socket of high-priority: %v", err)
-		_ = unix.Close(nfd)
-		c.release()
-	}
-	return nil
 }
 
 func (el *eventloop) accept1(fd int, ev netpoll.IOEvent, flags netpoll.IOFlags) error {
@@ -69,10 +73,10 @@ func (el *eventloop) accept1(fd int, ev netpoll.IOEvent, flags netpoll.IOFlags) 
 	nfd, sa, err := socket.Accept(fd)
 	if err != nil {
 		switch err {
-		case unix.EINTR, unix.EAGAIN, unix.ECONNABORTED:
-			// ECONNABORTED indicates that a socket on the listen
-			// queue was closed before we Accept()ed it;
-			// it's a silly error, so try again.
+		case unix.EINTR, unix.EAGAIN, unix.ECONNRESET, unix.ECONNABORTED:
+			// ECONNRESET or ECONNABORTED could indicate that a socket
+			// in the Accept queue was closed before we Accept()ed it.
+			// It's a silly error, let's retry it.
 			return nil
 		default:
 			el.getLogger().Errorf("Accept() failed due to error: %v", err)
@@ -83,7 +87,9 @@ func (el *eventloop) accept1(fd int, ev netpoll.IOEvent, flags netpoll.IOFlags) 
 	remoteAddr := socket.SockaddrToTCPOrUnixAddr(sa)
 	if el.engine.opts.TCPKeepAlive > 0 && el.listeners[fd].network == "tcp" {
 		err = socket.SetKeepAlivePeriod(nfd, int(el.engine.opts.TCPKeepAlive/time.Second))
-		logging.Error(err)
+		if err != nil {
+			el.getLogger().Errorf("failed to set TCP keepalive on fd=%d: %v", fd, err)
+		}
 	}
 
 	c := newTCPConn(nfd, el, sa, el.listeners[fd].addr, remoteAddr)
