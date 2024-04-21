@@ -48,11 +48,6 @@ func SetSendBuffer(fd, size int) error {
 	return unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_SNDBUF, size)
 }
 
-// SetReuseport enables SO_REUSEPORT option on socket.
-func SetReuseport(fd, reusePort int) error {
-	return os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_REUSEPORT, reusePort))
-}
-
 // SetReuseAddr enables SO_REUSEADDR option on socket.
 func SetReuseAddr(fd, reuseAddr int) error {
 	return os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_REUSEADDR, reuseAddr))
