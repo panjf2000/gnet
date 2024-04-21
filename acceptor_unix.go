@@ -45,13 +45,13 @@ func (eng *engine) accept1(fd int, _ netpoll.IOEvent, _ netpoll.IOFlags) error {
 	}
 
 	remoteAddr := socket.SockaddrToTCPOrUnixAddr(sa)
-	if eng.opts.TCPKeepAlive > 0 && eng.ln.network == "tcp" {
+	if eng.opts.TCPKeepAlive > 0 && eng.listeners[fd].network == "tcp" {
 		err = socket.SetKeepAlivePeriod(nfd, int(eng.opts.TCPKeepAlive.Seconds()))
 		logging.Error(err)
 	}
 
 	el := eng.eventLoops.next(remoteAddr)
-	c := newTCPConn(nfd, el, sa, el.ln.addr, remoteAddr)
+	c := newTCPConn(nfd, el, sa, el.listeners[fd].addr, remoteAddr)
 	err = el.poller.Trigger(queue.HighPriority, el.register, c)
 	if err != nil {
 		eng.opts.Logger.Errorf("failed to enqueue accepted socket of high-priority: %v", err)
@@ -62,7 +62,7 @@ func (eng *engine) accept1(fd int, _ netpoll.IOEvent, _ netpoll.IOFlags) error {
 }
 
 func (el *eventloop) accept1(fd int, ev netpoll.IOEvent, flags netpoll.IOFlags) error {
-	if el.ln.network == "udp" {
+	if el.listeners[fd].network == "udp" {
 		return el.readUDP1(fd, ev, flags)
 	}
 
@@ -81,12 +81,12 @@ func (el *eventloop) accept1(fd int, ev netpoll.IOEvent, flags netpoll.IOFlags) 
 	}
 
 	remoteAddr := socket.SockaddrToTCPOrUnixAddr(sa)
-	if el.engine.opts.TCPKeepAlive > 0 && el.ln.network == "tcp" {
+	if el.engine.opts.TCPKeepAlive > 0 && el.listeners[fd].network == "tcp" {
 		err = socket.SetKeepAlivePeriod(nfd, int(el.engine.opts.TCPKeepAlive/time.Second))
 		logging.Error(err)
 	}
 
-	c := newTCPConn(nfd, el, sa, el.ln.addr, remoteAddr)
+	c := newTCPConn(nfd, el, sa, el.listeners[fd].addr, remoteAddr)
 	addEvents := el.poller.AddRead
 	if el.engine.opts.EdgeTriggeredIO {
 		addEvents = el.poller.AddReadWrite

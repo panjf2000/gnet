@@ -113,7 +113,7 @@ func (el *eventloop) run() error {
 	err := el.poller.Polling(func(fd int, filter int16, flags uint16) (err error) {
 		c := el.connections.getConn(fd)
 		if c == nil {
-			if fd == el.ln.fd {
+			if _, ok := el.listeners[fd]; ok {
 				return el.accept(fd, filter, flags)
 			}
 			// This might happen when the connection has already been closed,
