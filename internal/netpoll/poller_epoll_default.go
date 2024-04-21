@@ -135,7 +135,7 @@ func (p *Poller) Polling(callback PollEventHandler) error {
 			if fd := int(ev.Fd); fd == p.efd { // poller is awakened to run tasks in queues.
 				doChores = true
 			} else {
-				switch err = callback(fd, ev.Events); err {
+				switch err = callback(fd, ev.Events, 0); err {
 				case nil:
 				case errors.ErrAcceptSocket, errors.ErrEngineShutdown:
 					return err

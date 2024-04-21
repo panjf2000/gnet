@@ -34,9 +34,9 @@ import (
 )
 
 type engine struct {
-	listeners  map[int]*listener // listeners for accepting new connections
+	listeners  map[int]*listener // listeners for accepting incoming connections
 	opts       *Options          // options with engine
-	acceptor   *eventloop        // main event-loop for accepting connections
+	ingress    *eventloop        // main event-loop that monitors all listeners
 	eventLoops loadBalancer      // event-loops for handling events
 	inShutdown int32             // whether the engine is in shutdown
 	ticker     struct {
@@ -76,11 +76,11 @@ func (eng *engine) closeEventLoops() {
 		_ = el.poller.Close()
 		return true
 	})
-	if eng.acceptor != nil {
+	if eng.ingress != nil {
 		for _, ln := range eng.listeners {
 			ln.close()
 		}
-		err := eng.acceptor.poller.Close()
+		err := eng.ingress.poller.Close()
 		if err != nil {
 			eng.opts.Logger.Errorf("failed to close poller when stopping engine: %v", err)
 		}
@@ -175,11 +175,11 @@ func (eng *engine) activateReactors(numEventLoop int) error {
 	el.poller = p
 	el.eventHandler = eng.eventHandler
 	for _, ln := range eng.listeners {
-		if err = el.poller.AddRead(ln.packPollAttachment(eng.accept), true); err != nil {
+		if err = el.poller.AddRead(ln.packPollAttachment(el.accept0), true); err != nil {
 			return err
 		}
 	}
-	eng.acceptor = el
+	eng.ingress = el
 
 	// Start main reactor in background.
 	eng.workerPool.Go(el.rotate)
@@ -187,7 +187,7 @@ func (eng *engine) activateReactors(numEventLoop int) error {
 	// Start the ticker.
 	if eng.opts.Ticker {
 		eng.workerPool.Go(func() error {
-			eng.acceptor.ticker(eng.ticker.ctx)
+			eng.ingress.ticker(eng.ticker.ctx)
 			return nil
 		})
 	}
@@ -217,8 +217,8 @@ func (eng *engine) stop(s Engine) {
 		}
 		return true
 	})
-	if eng.acceptor != nil {
-		err := eng.acceptor.poller.Trigger(queue.HighPriority, func(_ interface{}) error { return errors.ErrEngineShutdown }, nil)
+	if eng.ingress != nil {
+		err := eng.ingress.poller.Trigger(queue.HighPriority, func(_ interface{}) error { return errors.ErrEngineShutdown }, nil)
 		if err != nil {
 			eng.opts.Logger.Errorf("failed to enqueue shutdown signal of high-priority for main event-loop: %v", err)
 		}
