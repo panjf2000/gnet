@@ -175,7 +175,7 @@ func (eng *engine) activateReactors(numEventLoop int) error {
 	el.poller = p
 	el.eventHandler = eng.eventHandler
 	for _, ln := range eng.listeners {
-		if err = el.poller.AddRead(ln.packPollAttachment(eng.accept), true); err != nil {
+		if err = el.poller.AddRead(ln.packPollAttachment(el.accept0), true); err != nil {
 			return err
 		}
 	}

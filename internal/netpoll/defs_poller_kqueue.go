@@ -33,9 +33,6 @@ const (
 	MaxAsyncTasksAtOneTime = 128
 )
 
-// PollEventHandler is the callback for I/O events notified by the poller.
-type PollEventHandler func(int, int16, uint16) error
-
 type eventList struct {
 	size   int
 	events []unix.Kevent_t

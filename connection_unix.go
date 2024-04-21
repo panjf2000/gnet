@@ -63,7 +63,7 @@ func newTCPConn(fd int, el *eventloop, sa unix.Sockaddr, localAddr, remoteAddr n
 		remoteAddr:     remoteAddr,
 		pollAttachment: netpoll.PollAttachment{FD: fd},
 	}
-	c.pollAttachment.Callback = c.handleEvents
+	c.pollAttachment.Callback = c.processIO
 	c.outboundBuffer.Reset(el.engine.opts.WriteBufferCap)
 	return
 }

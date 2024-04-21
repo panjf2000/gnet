@@ -36,9 +36,6 @@ const (
 	ErrEvents = unix.EPOLLERR | unix.EPOLLHUP | unix.EPOLLRDHUP
 )
 
-// PollEventHandler is the callback for I/O events notified by the poller.
-type PollEventHandler func(int, uint32) error
-
 type eventList struct {
 	size   int
 	events []epollevent

@@ -25,7 +25,7 @@ import (
 	"github.com/panjf2000/gnet/v2/internal/netpoll"
 )
 
-func (c *conn) handleEvents(_ int, ev uint32) error {
+func (c *conn) processIO(_ int, ev netpoll.IOEvent, _ netpoll.IOFlags) error {
 	el := c.loop
 	// First check for any unexpected non-IO events.
 	// For these events we just close the corresponding connection directly.
@@ -67,8 +67,4 @@ func (c *conn) handleEvents(_ int, ev uint32) error {
 		return el.read(c)
 	}
 	return nil
-}
-
-func (el *eventloop) readUDP(fd int, ev netpoll.IOEvent) error {
-	return el.readUDP1(fd, ev, 0)
 }

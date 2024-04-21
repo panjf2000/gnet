@@ -33,7 +33,7 @@ func (el *eventloop) rotate() error {
 		defer runtime.UnlockOSThread()
 	}
 
-	err := el.poller.Polling(el.engine.accept)
+	err := el.poller.Polling(el.accept0)
 	if err == errors.ErrEngineShutdown {
 		el.getLogger().Debugf("main reactor is exiting in terms of the demand from user, %v", err)
 		err = nil
