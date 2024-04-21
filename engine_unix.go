@@ -88,6 +88,7 @@ func (eng *engine) closeEventLoops() {
 }
 
 func (eng *engine) runEventLoops(numEventLoop int) error {
+	var el0 *eventloop
 	lns := eng.listeners
 	// Create loops locally and bind the listeners.
 	for i := 0; i < numEventLoop; i++ {
@@ -121,10 +122,7 @@ func (eng *engine) runEventLoops(numEventLoop int) error {
 
 		// Start the ticker.
 		if eng.opts.Ticker && el.idx == 0 {
-			eng.workerPool.Go(func() error {
-				el.ticker(eng.ticker.ctx)
-				return nil
-			})
+			el0 = el
 		}
 	}
 
@@ -133,6 +131,13 @@ func (eng *engine) runEventLoops(numEventLoop int) error {
 		eng.workerPool.Go(el.run)
 		return true
 	})
+
+	if el0 != nil {
+		eng.workerPool.Go(func() error {
+			el0.ticker(eng.ticker.ctx)
+			return nil
+		})
+	}
 
 	return nil
 }

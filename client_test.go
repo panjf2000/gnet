@@ -196,7 +196,7 @@ func TestClient(t *testing.T) {
 		})
 	})
 
-	t.Run("poll-LT-reuseport", func(t *testing.T) {
+	t.Run("poll-reuseport-LT", func(t *testing.T) {
 		t.Run("tcp", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
 				runClient(t, "tcp", ":9991", false, true, false, false, 10, RoundRobin)
@@ -247,7 +247,7 @@ func TestClient(t *testing.T) {
 		})
 	})
 
-	t.Run("poll-ET-reuseport", func(t *testing.T) {
+	t.Run("poll-reuseport-ET", func(t *testing.T) {
 		t.Run("tcp", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
 				runClient(t, "tcp", ":9991", true, true, false, false, 10, RoundRobin)
@@ -405,7 +405,7 @@ func (s *testClient) OnTraffic(c Conn) (action Action) {
 }
 
 func (s *testClient) OnTick() (delay time.Duration, action Action) {
-	delay = time.Second / 5
+	delay = 100 * time.Millisecond
 	if atomic.CompareAndSwapInt32(&s.started, 0, 1) {
 		for i := 0; i < s.nclients; i++ {
 			atomic.AddInt32(&s.clientActive, 1)

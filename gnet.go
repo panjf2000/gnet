@@ -463,14 +463,15 @@ func createListeners(addrs []string, opts ...Option) ([]*listener, *Options, err
 		options.WriteBufferCap = math.CeilToPowerOfTwo(wbc)
 	}
 
-	// If there is UDP listener in the list, enable SO_REUSEPORT by default.
-	for i := 0; !options.ReusePort && i < len(addrs); i++ {
+	// If there is UDP listener in the list, enable SO_REUSEPORT and disable edge-triggered I/O by default.
+	for i := 0; (!options.ReusePort || options.EdgeTriggeredIO) && i < len(addrs); i++ {
 		proto, _, err := parseProtoAddr(addrs[i])
 		if err != nil {
 			return nil, nil, err
 		}
 		if strings.HasPrefix(proto, "udp") {
 			options.ReusePort = true
+			options.EdgeTriggeredIO = false
 		}
 	}
 
@@ -479,10 +480,6 @@ func createListeners(addrs []string, opts ...Option) ([]*listener, *Options, err
 		proto, addr, err := parseProtoAddr(a)
 		if err != nil {
 			return nil, nil, err
-		}
-		// Edge-triggered I/O is not pragmatic for UDP, so disable it by default.
-		if options.EdgeTriggeredIO && strings.HasPrefix(proto, "udp") {
-			options.EdgeTriggeredIO = false
 		}
 		ln, err := initListener(proto, addr, options)
 		if err != nil {
