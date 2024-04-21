@@ -126,7 +126,7 @@ type Options struct {
 
 	// EdgeTriggeredIO enables the edge-triggered I/O for the underlying epoll/kqueue event-loop.
 	// Don't enable it unless you are 100% sure what you are doing.
-	// Note that this option is only available for TCP protocol.
+	// Note that this option is only available for stream-oriented protocol.
 	EdgeTriggeredIO bool
 
 	// TLSConfig support TLS
