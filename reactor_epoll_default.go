@@ -124,7 +124,7 @@ func (el *eventloop) run() error {
 	err := el.poller.Polling(func(fd int, ev uint32) error {
 		c := el.connections.getConn(fd)
 		if c == nil {
-			if fd == el.ln.fd {
+			if _, ok := el.listeners[fd]; ok {
 				return el.accept(fd, ev)
 			}
 			// Somehow epoll notify with an event for a stale fd that is not in our connection set.

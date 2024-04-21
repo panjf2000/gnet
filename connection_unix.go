@@ -90,13 +90,13 @@ func (c *conn) release() {
 	c.isEOF = false
 	c.ctx = nil
 	c.buffer = nil
-	if addr, ok := c.localAddr.(*net.TCPAddr); ok && c.localAddr != c.loop.ln.addr && len(addr.Zone) > 0 {
+	if addr, ok := c.localAddr.(*net.TCPAddr); ok && len(c.loop.listeners) == 0 && len(addr.Zone) > 0 {
 		bsPool.Put(bs.StringToBytes(addr.Zone))
 	}
 	if addr, ok := c.remoteAddr.(*net.TCPAddr); ok && len(addr.Zone) > 0 {
 		bsPool.Put(bs.StringToBytes(addr.Zone))
 	}
-	if addr, ok := c.localAddr.(*net.UDPAddr); ok && c.localAddr != c.loop.ln.addr && len(addr.Zone) > 0 {
+	if addr, ok := c.localAddr.(*net.UDPAddr); ok && len(c.loop.listeners) == 0 && len(addr.Zone) > 0 {
 		bsPool.Put(bs.StringToBytes(addr.Zone))
 	}
 	if addr, ok := c.remoteAddr.(*net.UDPAddr); ok && len(addr.Zone) > 0 {
@@ -451,7 +451,7 @@ func (c *conn) RemoteAddr() net.Addr       { return c.remoteAddr }
 // func (c *conn) Gfd() gfd.GFD             { return c.gfd }
 
 func (c *conn) Fd() int                        { return c.fd }
-func (c *conn) Dup() (fd int, err error)       { fd, _, err = socket.Dup(c.fd); return }
+func (c *conn) Dup() (fd int, err error)       { return socket.Dup(c.fd) }
 func (c *conn) SetReadBuffer(bytes int) error  { return socket.SetRecvBuffer(c.fd, bytes) }
 func (c *conn) SetWriteBuffer(bytes int) error { return socket.SetSendBuffer(c.fd, bytes) }
 func (c *conn) SetLinger(sec int) error        { return socket.SetLinger(c.fd, sec) }

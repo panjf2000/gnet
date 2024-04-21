@@ -50,7 +50,7 @@ type Engine struct {
 
 // Validate checks whether the engine is available.
 func (e Engine) Validate() error {
-	if e.eng == nil {
+	if e.eng == nil || len(e.eng.listeners) == 0 {
 		return errors.ErrEmptyEngine
 	}
 	if e.eng.isInShutdown() {
@@ -76,14 +76,14 @@ func (e Engine) CountConnections() (count int) {
 // It is the caller's responsibility to close dupFD when finished.
 // Closing listener does not affect dupFD, and closing dupFD does not affect listener.
 func (e Engine) Dup() (fd int, err error) {
-	if err = e.Validate(); err != nil {
+	if err := e.Validate(); err != nil {
 		return -1, err
 	}
-
-	var sc string
-	fd, sc, err = e.eng.ln.dup()
-	if err != nil {
-		logging.Warnf("%s failed when duplicating new fd\n", sc)
+	if len(e.eng.listeners) > 1 {
+		return -1, errors.ErrUnsupportedOp
+	}
+	for _, ln := range e.eng.listeners {
+		fd, err = ln.dup()
 	}
 	return
 }
@@ -314,7 +314,7 @@ type Conn interface {
 	// you must invoke it within any method in EventHandler.
 	LocalAddr() (addr net.Addr)
 
-	// RemoteAddr is the connection's remote remote address, it's not concurrency-safe,
+	// RemoteAddr is the connection's remote address, it's not concurrency-safe,
 	// you must invoke it within any method in EventHandler.
 	RemoteAddr() (addr net.Addr)
 
@@ -419,22 +419,7 @@ func (*BuiltinEventEngine) OnTick() (delay time.Duration, action Action) {
 // MaxStreamBufferCap is the default buffer size for each stream-oriented connection(TCP/Unix).
 var MaxStreamBufferCap = 64 * 1024 // 64KB
 
-// Run starts handling events on the specified address.
-//
-// Address should use a scheme prefix and be formatted
-// like `tcp://192.168.0.10:9851` or `unix://socket`.
-// Valid network schemes:
-//
-//	tcp   - bind to both IPv4 and IPv6
-//	tcp4  - IPv4
-//	tcp6  - IPv6
-//	udp   - bind to both IPv4 and IPv6
-//	udp4  - IPv4
-//	udp6  - IPv6
-//	unix  - Unix Domain Socket
-//
-// The "tcp" network scheme is assumed when one is not specified.
-func Run(eventHandler EventHandler, protoAddr string, opts ...Option) (err error) {
+func createListeners(addrs []string, opts ...Option) ([]*listener, *Options, error) {
 	options := loadOptions(opts...)
 
 	// upgrade to TLS EventHandler
@@ -454,8 +439,6 @@ func Run(eventHandler EventHandler, protoAddr string, opts ...Option) (err error
 	}
 	logging.SetDefaultLoggerAndFlusher(logger, logFlusher)
 
-	defer logging.Cleanup()
-
 	logging.Debugf("default logging level is %s", logging.LogLevel())
 
 	// The maximum number of operating system threads that the Go program can use is initially set to 10000,
@@ -463,7 +446,7 @@ func Run(eventHandler EventHandler, protoAddr string, opts ...Option) (err error
 	if options.LockOSThread && options.NumEventLoop > 10000 {
 		logging.Errorf("too many event-loops under LockOSThread mode, should be less than 10,000 "+
 			"while you are trying to set up %d\n", options.NumEventLoop)
-		return errors.ErrTooManyEventLoopThreads
+		return nil, nil, errors.ErrTooManyEventLoopThreads
 	}
 
 	rbc := options.ReadBufferCap
@@ -485,19 +468,76 @@ func Run(eventHandler EventHandler, protoAddr string, opts ...Option) (err error
 		options.WriteBufferCap = math.CeilToPowerOfTwo(wbc)
 	}
 
-	network, addr := parseProtoAddr(protoAddr)
-
-	var ln *listener
-	if ln, err = initListener(network, addr, options); err != nil {
-		return
+	// If there is UDP listener in the list, enable SO_REUSEPORT and disable edge-triggered I/O by default.
+	for i := 0; (!options.ReusePort || options.EdgeTriggeredIO) && i < len(addrs); i++ {
+		proto, _, err := parseProtoAddr(addrs[i])
+		if err != nil {
+			return nil, nil, err
+		}
+		if strings.HasPrefix(proto, "udp") {
+			options.ReusePort = true
+			options.EdgeTriggeredIO = false
+		}
 	}
-	defer ln.close()
 
-	if ln.network == "udp" {
-		options.EdgeTriggeredIO = false
+	listeners := make([]*listener, len(addrs))
+	for i, a := range addrs {
+		proto, addr, err := parseProtoAddr(a)
+		if err != nil {
+			return nil, nil, err
+		}
+		ln, err := initListener(proto, addr, options)
+		if err != nil {
+			return nil, nil, err
+		}
+		listeners[i] = ln
 	}
 
-	return run(eventHandler, ln, options, protoAddr)
+	return listeners, options, nil
+}
+
+// Run starts handling events on the specified address.
+//
+// Address should use a scheme prefix and be formatted
+// like `tcp://192.168.0.10:9851` or `unix://socket`.
+// Valid network schemes:
+//
+//	tcp   - bind to both IPv4 and IPv6
+//	tcp4  - IPv4
+//	tcp6  - IPv6
+//	udp   - bind to both IPv4 and IPv6
+//	udp4  - IPv4
+//	udp6  - IPv6
+//	unix  - Unix Domain Socket
+//
+// The "tcp" network scheme is assumed when one is not specified.
+func Run(eventHandler EventHandler, protoAddr string, opts ...Option) error {
+	listeners, options, err := createListeners([]string{protoAddr}, opts...)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		for _, ln := range listeners {
+			ln.close()
+		}
+		logging.Cleanup()
+	}()
+	return run(eventHandler, listeners, options, []string{protoAddr})
+}
+
+// Rotate is like Run but accepts multiple network addresses.
+func Rotate(eventHandler EventHandler, addrs []string, opts ...Option) error {
+	listeners, options, err := createListeners(addrs, opts...)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		for _, ln := range listeners {
+			ln.close()
+		}
+		logging.Cleanup()
+	}()
+	return run(eventHandler, listeners, options, addrs)
 }
 
 var (
@@ -509,7 +549,12 @@ var (
 
 // Stop gracefully shuts down the engine without interrupting any active event-loops,
 // it waits indefinitely for connections and event-loops to be closed and then shuts down.
-// Deprecated: The global Stop only shuts down the last registered Engine with the same protocol and IP:Port as the previous Engine's, which can lead to leaks of Engine if you invoke gnet.Run multiple times using the same protocol and IP:Port under the condition that WithReuseAddr(true) and WithReusePort(true) are enabled. Use Engine.Stop instead.
+//
+// Deprecated: The global Stop only shuts down the last registered Engine with the same
+// protocol and IP:Port as the previous Engine's, which can lead to leaks of Engine if
+// you invoke gnet.Run multiple times using the same protocol and IP:Port under the
+// condition that WithReuseAddr(true) and WithReusePort(true) are enabled.
+// Use Engine.Stop instead.
 func Stop(ctx context.Context, protoAddr string) error {
 	var eng *engine
 	if s, ok := allEngines.Load(protoAddr); ok {
@@ -538,13 +583,20 @@ func Stop(ctx context.Context, protoAddr string) error {
 	}
 }
 
-func parseProtoAddr(addr string) (network, address string) {
-	network = "tcp"
-	address = strings.ToLower(addr)
-	if strings.Contains(address, "://") {
-		pair := strings.Split(address, "://")
-		network = pair[0]
-		address = pair[1]
+func parseProtoAddr(protoAddr string) (string, string, error) {
+	protoAddr = strings.ToLower(protoAddr)
+	if strings.Count(protoAddr, "://") != 1 {
+		return "", "", errors.ErrInvalidNetworkAddress
 	}
-	return
+	pair := strings.SplitN(protoAddr, "://", 2)
+	proto, addr := pair[0], pair[1]
+	switch proto {
+	case "tcp", "tcp4", "tcp6", "udp", "udp4", "udp6", "unix":
+	default:
+		return "", "", errors.ErrUnsupportedProtocol
+	}
+	if addr == "" {
+		return "", "", errors.ErrInvalidNetworkAddress
+	}
+	return proto, addr, nil
 }
