@@ -469,9 +469,9 @@ func createListeners(addrs []string, opts ...Option) ([]*listener, *Options, err
 	// Linux implemented SO_REUSEPORT with load balancing for incoming connections
 	// while *BSD implemented it for only binding to the same address and port, which
 	// makes it pointless to enable SO_REUSEPORT on *BSD and Darwin for gnet with
-	// multiple event-loops because only the first event-loop will be constantly woken
-	// up to accept incoming connections and handle I/O events while the rest of event
-	// loops remain idle.
+	// multiple event-loops because only the first or last event-loop will be constantly
+	// woken up to accept incoming connections and handle I/O events while the rest of
+	// event-loops remain idle.
 	// Thus, we disable SO_REUSEPORT on *BSD and Darwin by default.
 	//
 	// Note that FreeBSD 12 introduced a new socket option named SO_REUSEPORT_LB
