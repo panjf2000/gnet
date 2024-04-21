@@ -464,6 +464,16 @@ func createListeners(addrs []string, opts ...Option) ([]*listener, *Options, err
 		options.WriteBufferCap = math.CeilToPowerOfTwo(wbc)
 	}
 
+	var hasUDP, hasUnix bool
+	for _, addr := range addrs {
+		proto, _, err := parseProtoAddr(addr)
+		if err != nil {
+			return nil, nil, err
+		}
+		hasUDP = hasUDP || strings.HasPrefix(proto, "udp")
+		hasUnix = hasUnix || proto == "unix"
+	}
+
 	// SO_REUSEPORT enables duplicate address and port bindings across various
 	// Unix-like OSs, whereas there is platform-specific inconsistency:
 	// Linux implemented SO_REUSEPORT with load balancing for incoming connections
@@ -478,22 +488,19 @@ func createListeners(addrs []string, opts ...Option) ([]*listener, *Options, err
 	// with the capability of load balancing, it's the equivalent of Linux's SO_REUSEPORT.
 	// Also note that DragonFlyBSD 3.6.0 extended SO_REUSEPORT to distribute workload to
 	// available sockets, which make it the same as Linux's SO_REUSEPORT.
+	// AF_LOCAL with SO_REUSEPORT enables duplicate address and port bindings without
+	// load balancing on Linux and *BSD. Therefore, disable it for Unix domain sockets.
 	goos := runtime.GOOS
 	if (options.Multicore || options.NumEventLoop > 1) && options.ReusePort &&
-		goos != "linux" && goos != "dragonfly" && goos != "freebsd" {
+		((goos != "linux" && goos != "dragonfly" && goos != "freebsd") || hasUnix) {
 		options.ReusePort = false
 	}
 
-	// If there is UDP listener in the list, enable SO_REUSEPORT and disable edge-triggered I/O by default.
-	for i := 0; (!options.ReusePort || options.EdgeTriggeredIO) && i < len(addrs); i++ {
-		proto, _, err := parseProtoAddr(addrs[i])
-		if err != nil {
-			return nil, nil, err
-		}
-		if strings.HasPrefix(proto, "udp") {
-			options.ReusePort = true
-			options.EdgeTriggeredIO = false
-		}
+	// If there is UDP address in the list, we have no choice but to enable SO_REUSEPORT anyway,
+	// also disable edge-triggered I/O for UDP by default.
+	if hasUDP {
+		options.ReusePort = true
+		options.EdgeTriggeredIO = false
 	}
 
 	listeners := make([]*listener, len(addrs))
