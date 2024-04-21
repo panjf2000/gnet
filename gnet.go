@@ -18,6 +18,7 @@ import (
 	"context"
 	"io"
 	"net"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -466,6 +467,23 @@ func createListeners(addrs []string, opts ...Option) ([]*listener, *Options, err
 		options.WriteBufferCap = ring.DefaultBufferSize
 	default:
 		options.WriteBufferCap = math.CeilToPowerOfTwo(wbc)
+	}
+
+	// SO_REUSEPORT enables duplicate address and port bindings across various
+	// Unix-like OSs, whereas there is platform-specific inconsistency:
+	// Linux implemented SO_REUSEPORT with load balancing for incoming connections
+	// while *BSD implemented it for only binding to the same address and port, which
+	// makes it pointless to enable SO_REUSEPORT on *BSD and Darwin for gnet with
+	// multiple event-loops because only the first event-loop will be constantly woken
+	// up to accept incoming connections and handle I/O events while the rest of event
+	// loops remain idle.
+	// Thus, we disable SO_REUSEPORT on *BSD and Darwin by default.
+	//
+	// Note that FreeBSD 12 introduced a new socket option named SO_REUSEPORT_LB
+	// with the capability of load balancing, it's the equivalent of Linux's SO_REUSEPORT.
+	goos := runtime.GOOS
+	if (options.Multicore || options.NumEventLoop > 1) && options.ReusePort && goos != "linux" && goos != "freebsd" {
+		options.ReusePort = false
 	}
 
 	// If there is UDP listener in the list, enable SO_REUSEPORT and disable edge-triggered I/O by default.
