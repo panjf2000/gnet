@@ -87,43 +87,44 @@ func (eng *engine) closeEventLoops() {
 	}
 }
 
-func (eng *engine) runEventLoops(numEventLoop int) (err error) {
-	var striker *eventloop
+func (eng *engine) runEventLoops(numEventLoop int) error {
+	lns := eng.listeners
 	// Create loops locally and bind the listeners.
 	for i := 0; i < numEventLoop; i++ {
-		lns := eng.listeners
 		if i > 0 {
 			lns = make(map[int]*listener, len(eng.listeners))
-			for _, ln := range lns {
-				l, e := initListener(ln.network, ln.address, eng.opts)
-				if e != nil {
-					return e
+			for _, l := range eng.listeners {
+				ln, err := initListener(l.network, l.address, eng.opts)
+				if err != nil {
+					return err
 				}
-				lns[l.fd] = l
+				lns[ln.fd] = ln
 			}
 		}
-		var p *netpoll.Poller
-		if p, err = netpoll.OpenPoller(); err == nil {
-			el := new(eventloop)
-			el.listeners = lns
-			el.engine = eng
-			el.poller = p
-			el.buffer = make([]byte, eng.opts.ReadBufferCap)
-			el.connections.init()
-			el.eventHandler = eng.eventHandler
-			for _, ln := range lns {
-				if err = el.poller.AddRead(ln.packPollAttachment(el.accept), false); err != nil {
-					return
-				}
+		p, err := netpoll.OpenPoller()
+		if err != nil {
+			return err
+		}
+		el := new(eventloop)
+		el.listeners = lns
+		el.engine = eng
+		el.poller = p
+		el.buffer = make([]byte, eng.opts.ReadBufferCap)
+		el.connections.init()
+		el.eventHandler = eng.eventHandler
+		for _, ln := range lns {
+			if err = el.poller.AddRead(ln.packPollAttachment(el.accept), false); err != nil {
+				return err
 			}
-			eng.eventLoops.register(el)
+		}
+		eng.eventLoops.register(el)
 
-			// Start the ticker.
-			if el.idx == 0 && eng.opts.Ticker {
-				striker = el
-			}
-		} else {
-			return
+		// Start the ticker.
+		if eng.opts.Ticker && el.idx == 0 {
+			eng.workerPool.Go(func() error {
+				el.ticker(eng.ticker.ctx)
+				return nil
+			})
 		}
 	}
 
@@ -133,28 +134,23 @@ func (eng *engine) runEventLoops(numEventLoop int) (err error) {
 		return true
 	})
 
-	eng.workerPool.Go(func() error {
-		striker.ticker(eng.ticker.ctx)
-		return nil
-	})
-
-	return
+	return nil
 }
 
 func (eng *engine) activateReactors(numEventLoop int) error {
 	for i := 0; i < numEventLoop; i++ {
-		if p, err := netpoll.OpenPoller(); err == nil {
-			el := new(eventloop)
-			el.listeners = eng.listeners
-			el.engine = eng
-			el.poller = p
-			el.buffer = make([]byte, eng.opts.ReadBufferCap)
-			el.connections.init()
-			el.eventHandler = eng.eventHandler
-			eng.eventLoops.register(el)
-		} else {
+		p, err := netpoll.OpenPoller()
+		if err != nil {
 			return err
 		}
+		el := new(eventloop)
+		el.listeners = eng.listeners
+		el.engine = eng
+		el.poller = p
+		el.buffer = make([]byte, eng.opts.ReadBufferCap)
+		el.connections.init()
+		el.eventHandler = eng.eventHandler
+		eng.eventLoops.register(el)
 	}
 
 	// Start sub reactors in background.
@@ -163,25 +159,25 @@ func (eng *engine) activateReactors(numEventLoop int) error {
 		return true
 	})
 
-	if p, err := netpoll.OpenPoller(); err == nil {
-		el := new(eventloop)
-		el.listeners = eng.listeners
-		el.idx = -1
-		el.engine = eng
-		el.poller = p
-		el.eventHandler = eng.eventHandler
-		for _, ln := range eng.listeners {
-			if err = el.poller.AddRead(ln.packPollAttachment(eng.accept), false); err != nil {
-				return err
-			}
-		}
-		eng.acceptor = el
-
-		// Start main reactor in background.
-		eng.workerPool.Go(el.rotate)
-	} else {
+	p, err := netpoll.OpenPoller()
+	if err != nil {
 		return err
 	}
+	el := new(eventloop)
+	el.listeners = eng.listeners
+	el.idx = -1
+	el.engine = eng
+	el.poller = p
+	el.eventHandler = eng.eventHandler
+	for _, ln := range eng.listeners {
+		if err = el.poller.AddRead(ln.packPollAttachment(eng.accept), false); err != nil {
+			return err
+		}
+	}
+	eng.acceptor = el
+
+	// Start main reactor in background.
+	eng.workerPool.Go(el.rotate)
 
 	// Start the ticker.
 	if eng.opts.Ticker {
@@ -195,14 +191,7 @@ func (eng *engine) activateReactors(numEventLoop int) error {
 }
 
 func (eng *engine) start(numEventLoop int) error {
-	var withUDP bool
-	for _, ln := range eng.listeners {
-		if ln.network == "udp" {
-			withUDP = true
-			break
-		}
-	}
-	if eng.opts.ReusePort || withUDP {
+	if eng.opts.ReusePort {
 		return eng.runEventLoops(numEventLoop)
 	}
 

@@ -260,9 +260,6 @@ func (el *eventloop) wake(c *conn) error {
 }
 
 func (el *eventloop) ticker(ctx context.Context) {
-	if el == nil {
-		return
-	}
 	var (
 		action Action
 		delay  time.Duration
