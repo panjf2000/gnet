@@ -33,7 +33,7 @@ func (el *eventloop) accept0(fd int, _ netpoll.IOEvent, _ netpoll.IOFlags) error
 		nfd, sa, err := socket.Accept(fd)
 		if err != nil {
 			switch err {
-			case unix.EAGAIN: // the Accept queue has been drained, we can return now
+			case unix.EAGAIN: // the Accept queue has been drained out, we can return now
 				return nil
 			case unix.EINTR, unix.ECONNRESET, unix.ECONNABORTED:
 				// ECONNRESET or ECONNABORTED could indicate that a socket
@@ -93,16 +93,5 @@ func (el *eventloop) accept(fd int, ev netpoll.IOEvent, flags netpoll.IOFlags) e
 	}
 
 	c := newTCPConn(nfd, el, sa, el.listeners[fd].addr, remoteAddr)
-	addEvents := el.poller.AddRead
-	if el.engine.opts.EdgeTriggeredIO {
-		addEvents = el.poller.AddReadWrite
-	}
-	if err = addEvents(&c.pollAttachment, el.engine.opts.EdgeTriggeredIO); err != nil {
-		el.getLogger().Errorf("failed to register the accepted socket fd=%d to poller: %v", c.fd, err)
-		_ = unix.Close(c.fd)
-		c.release()
-		return err
-	}
-	el.connections.addConn(c, el.idx)
-	return el.open(c)
+	return el.register0(c)
 }
