@@ -45,8 +45,8 @@ func (ln *listener) packPollAttachment(handler netpoll.PollEventHandler) *netpol
 	return ln.pollAttachment
 }
 
-func (ln *listener) dup() (int, string, error) {
-	return netpoll.Dup(ln.fd)
+func (ln *listener) dup() (int, error) {
+	return socket.Dup(ln.fd)
 }
 
 func (ln *listener) normalize() (err error) {

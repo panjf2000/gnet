@@ -10,6 +10,7 @@ import (
 	"math/rand"
 	"net"
 	"runtime"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -30,194 +31,417 @@ var (
 	streamLen   = 1024 * 1024
 )
 
-func TestServe(t *testing.T) {
+func TestServer(t *testing.T) {
 	// start an engine
 	// connect 10 clients
 	// each client will pipe random data for 1-3 seconds.
 	// the writes to the engine will be random sizes. 0KB - 1MB.
 	// the engine will echo back the data.
 	// waits for graceful connection closing.
-	t.Run("poll", func(t *testing.T) {
+	t.Run("poll-LT", func(t *testing.T) {
 		t.Run("tcp", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe(t, "tcp", ":9991", false, false, false, false, false, 10, RoundRobin)
+				runServer(t, []string{"tcp://:9991"}, false, false, false, false, false, 10, RoundRobin)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe(t, "tcp", ":9992", false, false, true, false, false, 10, LeastConnections)
+				runServer(t, []string{"tcp://:9992"}, false, false, true, false, false, 10, LeastConnections)
 			})
 		})
 		t.Run("tcp-async", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe(t, "tcp", ":9991", false, false, false, true, false, 10, RoundRobin)
+				runServer(t, []string{"tcp://:9991"}, false, false, false, true, false, 10, RoundRobin)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe(t, "tcp", ":9992", false, false, true, true, false, 10, LeastConnections)
+				runServer(t, []string{"tcp://:9992"}, false, false, true, true, false, 10, LeastConnections)
 			})
 		})
 		t.Run("tcp-async-writev", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe(t, "tcp", ":9991", false, false, false, true, true, 10, RoundRobin)
+				runServer(t, []string{"tcp://:9991"}, false, false, false, true, true, 10, RoundRobin)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe(t, "tcp", ":9992", false, false, true, true, true, 10, LeastConnections)
+				runServer(t, []string{"tcp://:9992"}, false, false, true, true, true, 10, LeastConnections)
 			})
 		})
 		t.Run("udp", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe(t, "udp", ":9991", false, false, false, false, false, 10, RoundRobin)
+				runServer(t, []string{"udp://:9991"}, false, false, false, false, false, 10, RoundRobin)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe(t, "udp", ":9992", false, false, true, false, false, 10, LeastConnections)
+				runServer(t, []string{"udp://:9992"}, false, false, true, false, false, 10, LeastConnections)
 			})
 		})
 		t.Run("udp-async", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe(t, "udp", ":9991", false, false, false, true, false, 10, RoundRobin)
+				runServer(t, []string{"udp://:9991"}, false, false, false, true, false, 10, RoundRobin)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe(t, "udp", ":9992", false, false, true, true, false, 10, LeastConnections)
+				runServer(t, []string{"udp://:9992"}, false, false, true, true, false, 10, LeastConnections)
 			})
 		})
 		t.Run("unix", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe(t, "unix", "gnet1.sock", false, false, false, false, false, 10, RoundRobin)
+				runServer(t, []string{"unix://gnet1.sock"}, false, false, false, false, false, 10, RoundRobin)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe(t, "unix", "gnet2.sock", false, false, true, false, false, 10, SourceAddrHash)
+				runServer(t, []string{"unix://gnet2.sock"}, false, false, true, false, false, 10, SourceAddrHash)
 			})
 		})
 		t.Run("unix-async", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe(t, "unix", "gnet1.sock", false, false, false, true, false, 10, RoundRobin)
+				runServer(t, []string{"unix://gnet1.sock"}, false, false, false, true, false, 10, RoundRobin)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe(t, "unix", "gnet2.sock", false, false, true, true, false, 10, SourceAddrHash)
+				runServer(t, []string{"unix://gnet2.sock"}, false, false, true, true, false, 10, SourceAddrHash)
 			})
 		})
 		t.Run("unix-async-writev", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe(t, "unix", "gnet1.sock", false, false, false, true, true, 10, RoundRobin)
+				runServer(t, []string{"unix://gnet1.sock"}, false, false, false, true, true, 10, RoundRobin)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe(t, "unix", "gnet2.sock", false, false, true, true, true, 10, SourceAddrHash)
+				runServer(t, []string{"unix://gnet2.sock"}, false, false, true, true, true, 10, SourceAddrHash)
 			})
 		})
 	})
 
-	t.Run("poll-reuseport", func(t *testing.T) {
+	t.Run("poll-ET", func(t *testing.T) {
 		t.Run("tcp", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe(t, "tcp", ":9991", true, false, false, false, false, 10, RoundRobin)
+				runServer(t, []string{"tcp://:9991"}, true, false, false, false, false, 10, RoundRobin)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe(t, "tcp", ":9992", true, false, true, false, false, 10, LeastConnections)
+				runServer(t, []string{"tcp://:9992"}, true, false, true, false, false, 10, LeastConnections)
 			})
 		})
 		t.Run("tcp-async", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe(t, "tcp", ":9991", true, false, false, true, false, 10, RoundRobin)
+				runServer(t, []string{"tcp://:9991"}, true, false, false, true, false, 10, RoundRobin)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe(t, "tcp", ":9992", true, false, true, true, false, 10, LeastConnections)
+				runServer(t, []string{"tcp://:9992"}, true, false, true, true, false, 10, LeastConnections)
 			})
 		})
 		t.Run("tcp-async-writev", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe(t, "tcp", ":9991", true, false, false, true, true, 10, RoundRobin)
+				runServer(t, []string{"tcp://:9991"}, true, false, false, true, true, 10, RoundRobin)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe(t, "tcp", ":9992", true, false, true, true, true, 10, LeastConnections)
+				runServer(t, []string{"tcp://:9992"}, true, false, true, true, true, 10, LeastConnections)
 			})
 		})
 		t.Run("udp", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe(t, "udp", ":9991", true, false, false, false, false, 10, RoundRobin)
+				runServer(t, []string{"udp://:9991"}, true, false, false, false, false, 10, RoundRobin)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe(t, "udp", ":9992", true, false, true, false, false, 10, LeastConnections)
+				runServer(t, []string{"udp://:9992"}, true, false, true, false, false, 10, LeastConnections)
 			})
 		})
 		t.Run("udp-async", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe(t, "udp", ":9991", true, false, false, true, false, 10, RoundRobin)
+				runServer(t, []string{"udp://:9991"}, true, false, false, true, false, 10, RoundRobin)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe(t, "udp", ":9992", true, false, true, true, false, 10, LeastConnections)
+				runServer(t, []string{"udp://:9992"}, true, false, true, true, false, 10, LeastConnections)
 			})
 		})
 		t.Run("unix", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe(t, "unix", "gnet1.sock", true, false, false, false, false, 10, RoundRobin)
+				runServer(t, []string{"unix://gnet1.sock"}, true, false, false, false, false, 10, RoundRobin)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe(t, "unix", "gnet2.sock", true, false, true, false, false, 10, LeastConnections)
+				runServer(t, []string{"unix://gnet2.sock"}, true, false, true, false, false, 10, SourceAddrHash)
 			})
 		})
 		t.Run("unix-async", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe(t, "unix", "gnet1.sock", true, false, false, true, false, 10, RoundRobin)
+				runServer(t, []string{"unix://gnet1.sock"}, true, false, false, true, false, 10, RoundRobin)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe(t, "unix", "gnet2.sock", true, false, true, true, false, 10, LeastConnections)
+				runServer(t, []string{"unix://gnet2.sock"}, true, false, true, true, false, 10, SourceAddrHash)
 			})
 		})
 		t.Run("unix-async-writev", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe(t, "unix", "gnet1.sock", true, false, false, true, true, 10, RoundRobin)
+				runServer(t, []string{"unix://gnet1.sock"}, true, false, false, true, true, 10, RoundRobin)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe(t, "unix", "gnet2.sock", true, false, true, true, true, 10, LeastConnections)
+				runServer(t, []string{"unix://gnet2.sock"}, true, false, true, true, true, 10, SourceAddrHash)
 			})
 		})
 	})
 
-	t.Run("poll-reuseaddr", func(t *testing.T) {
+	t.Run("poll-reuseport-LT", func(t *testing.T) {
 		t.Run("tcp", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe(t, "tcp", ":9991", false, true, false, false, false, 10, RoundRobin)
+				runServer(t, []string{"tcp://:9991"}, false, true, false, false, false, 10, RoundRobin)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe(t, "tcp", ":9992", false, true, true, false, false, 10, LeastConnections)
+				runServer(t, []string{"tcp://:9992"}, false, true, true, false, false, 10, LeastConnections)
 			})
 		})
 		t.Run("tcp-async", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe(t, "tcp", ":9991", false, true, false, true, false, 10, RoundRobin)
+				runServer(t, []string{"tcp://:9991"}, false, true, false, true, false, 10, RoundRobin)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe(t, "tcp", ":9992", false, true, true, false, false, 10, LeastConnections)
+				runServer(t, []string{"tcp://:9992"}, false, true, true, true, false, 10, LeastConnections)
+			})
+		})
+		t.Run("tcp-async-writev", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runServer(t, []string{"tcp://:9991"}, false, true, false, true, true, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runServer(t, []string{"tcp://:9992"}, false, true, true, true, true, 10, LeastConnections)
 			})
 		})
 		t.Run("udp", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe(t, "udp", ":9991", false, true, false, false, false, 10, RoundRobin)
+				runServer(t, []string{"udp://:9991"}, false, true, false, false, false, 10, RoundRobin)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe(t, "udp", ":9992", false, true, true, false, false, 10, LeastConnections)
+				runServer(t, []string{"udp://:9992"}, false, true, true, false, false, 10, LeastConnections)
 			})
 		})
 		t.Run("udp-async", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe(t, "udp", ":9991", false, true, false, false, false, 10, RoundRobin)
+				runServer(t, []string{"udp://:9991"}, false, true, false, true, false, 10, RoundRobin)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe(t, "udp", ":9992", false, true, true, true, false, 10, LeastConnections)
+				runServer(t, []string{"udp://:9992"}, false, true, true, true, false, 10, LeastConnections)
 			})
 		})
 		t.Run("unix", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe(t, "unix", "gnet1.sock", false, true, false, false, false, 10, RoundRobin)
+				runServer(t, []string{"unix://gnet1.sock"}, false, true, false, false, false, 10, RoundRobin)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe(t, "unix", "gnet2.sock", false, true, true, false, false, 10, LeastConnections)
+				runServer(t, []string{"unix://gnet2.sock"}, false, true, true, false, false, 10, LeastConnections)
 			})
 		})
 		t.Run("unix-async", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				testServe(t, "unix", "gnet1.sock", false, true, false, true, false, 10, RoundRobin)
+				runServer(t, []string{"unix://gnet1.sock"}, false, true, false, true, false, 10, RoundRobin)
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				testServe(t, "unix", "gnet2.sock", false, true, true, true, false, 10, LeastConnections)
+				runServer(t, []string{"unix://gnet2.sock"}, false, true, true, true, false, 10, LeastConnections)
+			})
+		})
+		t.Run("unix-async-writev", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runServer(t, []string{"unix://gnet1.sock"}, false, true, false, true, true, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runServer(t, []string{"unix://gnet2.sock"}, false, true, true, true, true, 10, LeastConnections)
+			})
+		})
+	})
+
+	t.Run("poll-reuseport-ET", func(t *testing.T) {
+		t.Run("tcp", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runServer(t, []string{"tcp://:9991"}, true, true, false, false, false, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runServer(t, []string{"tcp://:9992"}, true, true, true, false, false, 10, LeastConnections)
+			})
+		})
+		t.Run("tcp-async", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runServer(t, []string{"tcp://:9991"}, true, true, false, true, false, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runServer(t, []string{"tcp://:9992"}, true, true, true, true, false, 10, LeastConnections)
+			})
+		})
+		t.Run("tcp-async-writev", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runServer(t, []string{"tcp://:9991"}, true, true, false, true, true, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runServer(t, []string{"tcp://:9992"}, true, true, true, true, true, 10, LeastConnections)
+			})
+		})
+		t.Run("udp", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runServer(t, []string{"udp://:9991"}, true, true, false, false, false, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runServer(t, []string{"udp://:9992"}, true, true, true, false, false, 10, LeastConnections)
+			})
+		})
+		t.Run("udp-async", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runServer(t, []string{"udp://:9991"}, true, true, false, true, false, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runServer(t, []string{"udp://:9992"}, true, true, true, true, false, 10, LeastConnections)
+			})
+		})
+		t.Run("unix", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runServer(t, []string{"unix://gnet1.sock"}, true, true, false, false, false, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runServer(t, []string{"unix://gnet2.sock"}, true, true, true, false, false, 10, LeastConnections)
+			})
+		})
+		t.Run("unix-async", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runServer(t, []string{"unix://gnet1.sock"}, true, true, false, true, false, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runServer(t, []string{"unix://gnet2.sock"}, true, true, true, true, false, 10, LeastConnections)
+			})
+		})
+		t.Run("unix-async-writev", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runServer(t, []string{"unix://gnet1.sock"}, true, true, false, true, true, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runServer(t, []string{"unix://gnet2.sock"}, true, true, true, true, true, 10, LeastConnections)
+			})
+		})
+	})
+
+	t.Run("poll-multi-addrs-LT", func(t *testing.T) {
+		t.Run("sync", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runServer(t, []string{"tcp://:9991", "tcp://:9992", "udp://:9993", "udp://:9994", "unix://gnet1.sock", "unix://gnet2.sock"}, false, false, false, false, false, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runServer(t, []string{"tcp://:9995", "tcp://:9996", "udp://:9997", "udp://:9998", "unix://gnet1.sock", "unix://gnet2.sock"}, false, false, true, false, false, 10, LeastConnections)
+			})
+		})
+		t.Run("sync-writev", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runServer(t, []string{"tcp://:9991", "tcp://:9992", "unix://gnet1.sock", "unix://gnet2.sock"}, false, false, false, false, true, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runServer(t, []string{"tcp://:9995", "tcp://:9996", "unix://gnet1.sock", "unix://gnet2.sock"}, false, false, true, false, true, 10, LeastConnections)
+			})
+		})
+		t.Run("async", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runServer(t, []string{"tcp://:9991", "tcp://:9992", "udp://:9993", "udp://:9994", "unix://gnet1.sock", "unix://gnet2.sock"}, false, false, false, true, false, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runServer(t, []string{"tcp://:9995", "tcp://:9996", "udp://:9997", "udp://:9998", "unix://gnet1.sock", "unix://gnet2.sock"}, false, false, true, true, false, 10, LeastConnections)
+			})
+		})
+		t.Run("async-writev", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runServer(t, []string{"tcp://:9991", "tcp://:9992", "unix://gnet1.sock", "unix://gnet2.sock"}, false, false, false, true, true, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runServer(t, []string{"tcp://:9995", "tcp://:9996", "unix://gnet1.sock", "unix://gnet2.sock"}, false, false, true, true, true, 10, LeastConnections)
+			})
+		})
+	})
+
+	t.Run("poll-multi-addrs-reuseport-LT", func(t *testing.T) {
+		t.Run("sync", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runServer(t, []string{"tcp://:9991", "tcp://:9992", "udp://:9993", "udp://:9994", "unix://gnet1.sock", "unix://gnet2.sock"}, false, true, false, false, false, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runServer(t, []string{"tcp://:9995", "tcp://:9996", "udp://:9997", "udp://:9998", "unix://gnet1.sock", "unix://gnet2.sock"}, false, true, true, false, false, 10, LeastConnections)
+			})
+		})
+		t.Run("sync-writev", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runServer(t, []string{"tcp://:9991", "tcp://:9992", "unix://gnet1.sock", "unix://gnet2.sock"}, false, true, false, false, true, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runServer(t, []string{"tcp://:9995", "tcp://:9996", "unix://gnet1.sock", "unix://gnet2.sock"}, false, true, true, false, true, 10, LeastConnections)
+			})
+		})
+		t.Run("async", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runServer(t, []string{"tcp://:9991", "tcp://:9992", "udp://:9993", "udp://:9994", "unix://gnet1.sock", "unix://gnet2.sock"}, false, true, false, true, false, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runServer(t, []string{"tcp://:9995", "tcp://:9996", "udp://:9997", "udp://:9998", "unix://gnet1.sock", "unix://gnet2.sock"}, false, true, true, true, false, 10, LeastConnections)
+			})
+		})
+		t.Run("async-writev", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runServer(t, []string{"tcp://:9991", "tcp://:9992", "unix://gnet1.sock", "unix://gnet2.sock"}, false, true, false, true, true, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runServer(t, []string{"tcp://:9995", "tcp://:9996", "unix://gnet1.sock", "unix://gnet2.sock"}, false, true, true, true, true, 10, LeastConnections)
+			})
+		})
+	})
+
+	t.Run("poll-multi-addrs-ET", func(t *testing.T) {
+		t.Run("sync", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runServer(t, []string{"tcp://:9991", "tcp://:9992", "udp://:9993", "udp://:9994", "unix://gnet1.sock", "unix://gnet2.sock"}, true, false, false, false, false, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runServer(t, []string{"tcp://:9995", "tcp://:9996", "udp://:9997", "udp://:9998", "unix://gnet1.sock", "unix://gnet2.sock"}, true, false, true, false, false, 10, LeastConnections)
+			})
+		})
+		t.Run("sync-writev", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runServer(t, []string{"tcp://:9991", "tcp://:9992", "unix://gnet1.sock", "unix://gnet2.sock"}, true, false, false, false, true, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runServer(t, []string{"tcp://:9995", "tcp://:9996", "unix://gnet1.sock", "unix://gnet2.sock"}, true, false, true, false, true, 10, LeastConnections)
+			})
+		})
+		t.Run("async", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runServer(t, []string{"tcp://:9991", "tcp://:9992", "udp://:9993", "udp://:9994", "unix://gnet1.sock", "unix://gnet2.sock"}, true, false, false, true, false, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runServer(t, []string{"tcp://:9995", "tcp://:9996", "udp://:9997", "udp://:9998", "unix://gnet1.sock", "unix://gnet2.sock"}, true, false, true, true, false, 10, LeastConnections)
+			})
+		})
+		t.Run("async-writev", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runServer(t, []string{"tcp://:9991", "tcp://:9992", "unix://gnet1.sock", "unix://gnet2.sock"}, true, false, false, true, true, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runServer(t, []string{"tcp://:9995", "tcp://:9996", "unix://gnet1.sock", "unix://gnet2.sock"}, true, false, true, true, true, 10, LeastConnections)
+			})
+		})
+	})
+
+	t.Run("poll-multi-addrs-reuseport-ET", func(t *testing.T) {
+		t.Run("sync", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runServer(t, []string{"tcp://:9991", "tcp://:9992", "udp://:9993", "udp://:9994", "unix://gnet1.sock", "unix://gnet2.sock"}, true, true, false, false, false, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runServer(t, []string{"tcp://:9995", "tcp://:9996", "udp://:9997", "udp://:9998", "unix://gnet1.sock", "unix://gnet2.sock"}, true, true, true, false, false, 10, LeastConnections)
+			})
+		})
+		t.Run("sync-writev", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runServer(t, []string{"tcp://:9991", "tcp://:9992", "unix://gnet1.sock", "unix://gnet2.sock"}, true, true, false, false, true, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runServer(t, []string{"tcp://:9995", "tcp://:9996", "unix://gnet1.sock", "unix://gnet2.sock"}, true, true, true, false, true, 10, LeastConnections)
+			})
+		})
+		t.Run("async", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runServer(t, []string{"tcp://:9991", "tcp://:9992", "udp://:9993", "udp://:9994", "unix://gnet1.sock", "unix://gnet2.sock"}, true, true, false, true, false, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runServer(t, []string{"tcp://:9995", "tcp://:9996", "udp://:9997", "udp://:9998", "unix://gnet1.sock", "unix://gnet2.sock"}, true, true, true, true, false, 10, LeastConnections)
+			})
+		})
+		t.Run("async-writev", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runServer(t, []string{"tcp://:9991", "tcp://:9992", "unix://gnet1.sock", "unix://gnet2.sock"}, true, true, false, true, true, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runServer(t, []string{"tcp://:9995", "tcp://:9996", "unix://gnet1.sock", "unix://gnet2.sock"}, true, true, true, true, true, 10, LeastConnections)
 			})
 		})
 	})
@@ -227,25 +451,28 @@ type testServer struct {
 	*BuiltinEventEngine
 	tester       *testing.T
 	eng          Engine
-	network      string
-	addr         string
+	addrs        []string
 	multicore    bool
 	async        bool
 	writev       bool
 	nclients     int
 	started      int32
 	connected    int32
-	clientActive int32
 	disconnected int32
+	clientActive int32
 	workerPool   *goPool.Pool
 }
 
 func (s *testServer) OnBoot(eng Engine) (action Action) {
 	s.eng = eng
 	fd, err := s.eng.Dup()
-	require.NoErrorf(s.tester, err, "dup error")
-	assert.Greaterf(s.tester, fd, 2, "expected fd: > 2, but got: %d", fd)
-	assert.NoErrorf(s.tester, SysClose(fd), "close fd error")
+	if len(s.addrs) > 1 {
+		assert.ErrorIsf(s.tester, err, errorx.ErrUnsupportedOp, "dup error")
+	} else {
+		require.NoErrorf(s.tester, err, "dup error")
+		assert.Greaterf(s.tester, fd, 2, "expected fd: > 2, but got: %d", fd)
+		assert.NoErrorf(s.tester, SysClose(fd), "close fd error")
+	}
 	return
 }
 
@@ -260,25 +487,24 @@ func (s *testServer) OnOpen(c Conn) (out []byte, action Action) {
 
 func (s *testServer) OnShutdown(_ Engine) {
 	fd, err := s.eng.Dup()
-	require.NoErrorf(s.tester, err, "dup error")
-	assert.Greaterf(s.tester, fd, 2, "expected fd: > 2, but got: %d", fd)
-	assert.NoErrorf(s.tester, SysClose(fd), "close fd error")
+	if len(s.addrs) > 1 {
+		assert.ErrorIsf(s.tester, err, errorx.ErrUnsupportedOp, "dup error")
+	} else {
+		require.NoErrorf(s.tester, err, "dup error")
+		assert.Greaterf(s.tester, fd, 2, "expected fd: > 2, but got: %d", fd)
+		assert.NoErrorf(s.tester, SysClose(fd), "close fd error")
+	}
 }
 
 func (s *testServer) OnClose(c Conn, err error) (action Action) {
 	if err != nil {
 		logging.Debugf("error occurred on closed, %v\n", err)
 	}
-	if s.network != "udp" {
+	if c.LocalAddr().Network() != "udp" {
 		require.Equal(s.tester, c.Context(), c, "invalid context")
 	}
 
-	if disconnected := atomic.AddInt32(&s.disconnected, 1); disconnected == atomic.LoadInt32(&s.connected) && disconnected == int32(s.nclients) { //nolint:gocritic
-		require.EqualValues(s.tester, 0, s.eng.CountConnections())
-		action = Shutdown
-		s.workerPool.Release()
-	}
-
+	atomic.AddInt32(&s.disconnected, 1)
 	return
 }
 
@@ -286,8 +512,7 @@ func (s *testServer) OnTraffic(c Conn) (action Action) {
 	if s.async {
 		buf := bbPool.Get()
 		_, _ = c.WriteTo(buf)
-
-		if s.network == "tcp" || s.network == "unix" {
+		if c.LocalAddr().Network() == "tcp" || c.LocalAddr().Network() == "unix" {
 			// just for test
 			_ = c.InboundBuffered()
 			_ = c.OutboundBuffered()
@@ -318,7 +543,7 @@ func (s *testServer) OnTraffic(c Conn) (action Action) {
 					}
 				})
 			return
-		} else if s.network == "udp" {
+		} else if c.LocalAddr().Network() == "udp" {
 			_ = s.workerPool.Submit(
 				func() {
 					_ = c.AsyncWrite(buf.Bytes(), nil)
@@ -329,7 +554,12 @@ func (s *testServer) OnTraffic(c Conn) (action Action) {
 	}
 
 	buf, _ := c.Next(-1)
-	_, _ = c.Write(buf)
+	if s.writev {
+		mid := len(buf) / 2
+		_, _ = c.Writev([][]byte{buf[:mid], buf[mid:]})
+	} else {
+		_, _ = c.Write(buf)
+	}
 
 	// Only for code coverage of testing.
 	if !s.multicore {
@@ -342,14 +572,14 @@ func (s *testServer) OnTraffic(c Conn) (action Action) {
 		// TODO(panjf2000): somehow these two system calls will fail with Unix Domain Socket,
 		//  returning "invalid argument" error on macOS in Github actions intermittently,
 		//  try to figure it out.
-		if s.network == "unix" && runtime.GOOS == "darwin" {
+		if c.LocalAddr().Network() == "unix" && runtime.GOOS == "darwin" {
 			_ = c.SetReadBuffer(streamLen)
 			_ = c.SetWriteBuffer(streamLen)
 		} else {
 			assert.NoErrorf(s.tester, c.SetReadBuffer(streamLen), "set read buffer error")
 			assert.NoErrorf(s.tester, c.SetWriteBuffer(streamLen), "set write buffer error")
 		}
-		if s.network == "tcp" {
+		if c.LocalAddr().Network() == "tcp" {
 			assert.NoErrorf(s.tester, c.SetLinger(1), "set linger error")
 			assert.NoErrorf(s.tester, c.SetNoDelay(false), "set no delay error")
 			assert.NoErrorf(s.tester, c.SetKeepAlivePeriod(time.Minute), "set keep alive period error")
@@ -360,44 +590,72 @@ func (s *testServer) OnTraffic(c Conn) (action Action) {
 }
 
 func (s *testServer) OnTick() (delay time.Duration, action Action) {
-	delay = time.Second / 5
+	delay = 100 * time.Millisecond
 	if atomic.CompareAndSwapInt32(&s.started, 0, 1) {
-		for i := 0; i < s.nclients; i++ {
-			atomic.AddInt32(&s.clientActive, 1)
-			go func() {
-				startClient(s.tester, s.network, s.addr, s.multicore, s.async)
-				atomic.AddInt32(&s.clientActive, -1)
-			}()
+		for _, protoAddr := range s.addrs {
+			proto, addr, err := parseProtoAddr(protoAddr)
+			assert.NoError(s.tester, err)
+			for i := 0; i < s.nclients; i++ {
+				atomic.AddInt32(&s.clientActive, 1)
+				go func() {
+					startClient(s.tester, proto, addr, s.multicore, s.async)
+					atomic.AddInt32(&s.clientActive, -1)
+				}()
+			}
 		}
 	}
-	if s.network == "udp" && atomic.LoadInt32(&s.clientActive) == 0 {
-		action = Shutdown
-		return
+	if atomic.LoadInt32(&s.clientActive) == 0 {
+		var streamAddrs int
+		for _, addr := range s.addrs {
+			if !strings.HasPrefix(addr, "udp") {
+				streamAddrs++
+			}
+		}
+		streamConns := s.nclients * streamAddrs
+		disconnected := atomic.LoadInt32(&s.disconnected)
+		if int(disconnected) == streamConns && disconnected == atomic.LoadInt32(&s.connected) {
+			action = Shutdown
+			s.workerPool.Release()
+			require.EqualValues(s.tester, 0, s.eng.CountConnections())
+		}
 	}
 	return
 }
 
-func testServe(t *testing.T, network, addr string, reuseport, reuseaddr, multicore, async, writev bool, nclients int, lb LoadBalancing) {
+func runServer(t *testing.T, addrs []string, et, reuseport, multicore, async, writev bool, nclients int, lb LoadBalancing) {
 	ts := &testServer{
 		tester:     t,
-		network:    network,
-		addr:       addr,
+		addrs:      addrs,
 		multicore:  multicore,
 		async:      async,
 		writev:     writev,
 		nclients:   nclients,
 		workerPool: goPool.Default(),
 	}
-	err := Run(ts,
-		network+"://"+addr,
-		WithLockOSThread(async),
-		WithMulticore(multicore),
-		WithReusePort(reuseport),
-		WithReuseAddr(reuseaddr),
-		WithTicker(true),
-		WithTCPKeepAlive(time.Minute*1),
-		WithTCPNoDelay(TCPDelay),
-		WithLoadBalancing(lb))
+	var err error
+	if len(addrs) > 1 {
+		err = Rotate(ts,
+			addrs,
+			WithEdgeTriggeredIO(et),
+			WithLockOSThread(async),
+			WithMulticore(multicore),
+			WithReusePort(reuseport),
+			WithTicker(true),
+			WithTCPKeepAlive(time.Minute),
+			WithTCPNoDelay(TCPDelay),
+			WithLoadBalancing(lb))
+	} else {
+		err = Run(ts,
+			addrs[0],
+			WithEdgeTriggeredIO(et),
+			WithLockOSThread(async),
+			WithMulticore(multicore),
+			WithReusePort(reuseport),
+			WithTicker(true),
+			WithTCPKeepAlive(time.Minute),
+			WithTCPNoDelay(TCPDelay),
+			WithLoadBalancing(lb))
+	}
 	assert.NoError(t, err)
 }
 
@@ -413,7 +671,7 @@ func startClient(t *testing.T, network, addr string, multicore, async bool) {
 		require.Equal(t, string(msg), "sweetness\r\n", "bad header")
 	}
 	duration := time.Duration((rand.Float64()*2+1)*float64(time.Second)) / 2
-	t.Logf("test duration: %dms", duration/time.Millisecond)
+	logging.Debugf("test duration: %v", duration)
 	start := time.Now()
 	for time.Since(start) < duration {
 		reqData := make([]byte, streamLen)
@@ -463,11 +721,11 @@ func (t *testBadAddrServer) OnBoot(_ Engine) (action Action) {
 func TestBadAddresses(t *testing.T) {
 	events := new(testBadAddrServer)
 	err := Run(events, "tulip://howdy")
-	assert.Error(t, err)
+	assert.ErrorIs(t, err, errorx.ErrUnsupportedProtocol)
 	err = Run(events, "howdy")
-	assert.Error(t, err)
+	assert.ErrorIs(t, err, errorx.ErrInvalidNetworkAddress)
 	err = Run(events, "tcp://")
-	assert.NoError(t, err)
+	assert.ErrorIs(t, err, errorx.ErrInvalidNetworkAddress)
 }
 
 func TestTick(t *testing.T) {
@@ -1226,7 +1484,7 @@ func (s *simServer) OnTraffic(c Conn) (action Action) {
 	var packets [][]byte
 	for {
 		data, err := codec.Decode(c)
-		if err == errIncompletePacket {
+		if errors.Is(err, errIncompletePacket) {
 			break
 		}
 		if err != nil {
@@ -1248,7 +1506,7 @@ func (s *simServer) OnTick() (delay time.Duration, action Action) {
 	if atomic.CompareAndSwapInt32(&s.started, 0, 1) {
 		for i := 0; i < s.nclients; i++ {
 			go func() {
-				runClient(s.tester, s.network, s.addr, s.packetSize, s.packetBatch)
+				runSimClient(s.tester, s.network, s.addr, s.packetSize, s.packetBatch)
 			}()
 		}
 	}
@@ -1339,32 +1597,32 @@ func (codec testCodec) Unpack(buf []byte) ([]byte, error) {
 
 func TestSimServer(t *testing.T) {
 	t.Run("packet-size=128,batch=100", func(t *testing.T) {
-		testSimServer(t, ":7200", 10, 128, 100)
+		runSimServer(t, ":7200", false, 10, 128, 100)
 	})
 	t.Run("packet-size=256,batch=50", func(t *testing.T) {
-		testSimServer(t, ":7201", 10, 256, 50)
+		runSimServer(t, ":7201", true, 10, 256, 50)
 	})
 	t.Run("packet-size=512,batch=30", func(t *testing.T) {
-		testSimServer(t, ":7202", 10, 512, 30)
+		runSimServer(t, ":7202", false, 10, 512, 30)
 	})
 	t.Run("packet-size=1024,batch=20", func(t *testing.T) {
-		testSimServer(t, ":7203", 10, 1024, 20)
+		runSimServer(t, ":7203", true, 10, 1024, 20)
 	})
 	t.Run("packet-size=64*1024,batch=10", func(t *testing.T) {
-		testSimServer(t, ":7204", 10, 64*1024, 10)
+		runSimServer(t, ":7204", false, 10, 64*1024, 10)
 	})
 	t.Run("packet-size=128*1024,batch=5", func(t *testing.T) {
-		testSimServer(t, ":7205", 10, 128*1024, 5)
+		runSimServer(t, ":7205", true, 10, 128*1024, 5)
 	})
 	t.Run("packet-size=512*1024,batch=3", func(t *testing.T) {
-		testSimServer(t, ":7206", 10, 512*1024, 3)
+		runSimServer(t, ":7206", false, 10, 512*1024, 3)
 	})
 	t.Run("packet-size=1024*1024,batch=2", func(t *testing.T) {
-		testSimServer(t, ":7207", 10, 1024*1024, 2)
+		runSimServer(t, ":7207", true, 10, 1024*1024, 2)
 	})
 }
 
-func testSimServer(t *testing.T, addr string, nclients, packetSize, packetBatch int) {
+func runSimServer(t *testing.T, addr string, et bool, nclients, packetSize, packetBatch int) {
 	ts := &simServer{
 		tester:      t,
 		network:     "tcp",
@@ -1376,13 +1634,14 @@ func testSimServer(t *testing.T, addr string, nclients, packetSize, packetBatch 
 	}
 	err := Run(ts,
 		ts.network+"://"+ts.addr,
+		WithEdgeTriggeredIO(et),
 		WithMulticore(ts.multicore),
 		WithTicker(true),
 		WithTCPKeepAlive(time.Minute*1))
 	assert.NoError(t, err)
 }
 
-func runClient(t *testing.T, network, addr string, packetSize, batch int) {
+func runSimClient(t *testing.T, network, addr string, packetSize, batch int) {
 	rand.Seed(time.Now().UnixNano())
 	c, err := net.Dial(network, addr)
 	require.NoError(t, err)
@@ -1403,7 +1662,7 @@ func runClient(t *testing.T, network, addr string, packetSize, batch int) {
 	default:
 		duration = 5 * time.Second
 	}
-	t.Logf("test duration: %ds", duration/time.Second)
+	logging.Debugf("test duration: %v", duration)
 	start := time.Now()
 	for time.Since(start) < duration {
 		batchSendAndRecv(t, c, rd, packetSize, batch)

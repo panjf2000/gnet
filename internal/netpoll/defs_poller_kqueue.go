@@ -31,14 +31,6 @@ const (
 	MinPollEventsCap = 16
 	// MaxAsyncTasksAtOneTime is the maximum amount of asynchronous tasks that the event-loop will process at one time.
 	MaxAsyncTasksAtOneTime = 128
-	// EVFilterWrite represents writeable events from sockets.
-	EVFilterWrite = unix.EVFILT_WRITE
-	// EVFilterRead represents readable events from sockets.
-	EVFilterRead = unix.EVFILT_READ
-	// EVFlagsDelete indicates an event has been removed from the kqueue.
-	EVFlagsDelete = unix.EV_DELETE
-	// EVFlagsEOF indicates filter-specific EOF condition.
-	EVFlagsEOF = unix.EV_EOF
 )
 
 type eventList struct {

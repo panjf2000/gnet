@@ -1,4 +1,4 @@
-// Copyright (c) 2023 The Gnet Authors. All rights reserved.
+// Copyright (c) 2021 The Gnet Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,17 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build freebsd || dragonfly || netbsd || openbsd || darwin
-// +build freebsd dragonfly netbsd openbsd darwin
+//go:build linux || dragonfly || netbsd || openbsd || darwin
+// +build linux dragonfly netbsd openbsd darwin
 
-package gnet
+package socket
 
-import "github.com/panjf2000/gnet/v2/internal/netpoll"
+import (
+	"os"
 
-func (eng *engine) accept(fd int, filter netpoll.IOEvent, flags netpoll.IOFlags) error {
-	return eng.accept1(fd, filter, flags)
-}
+	"golang.org/x/sys/unix"
+)
 
-func (el *eventloop) accept(fd int, filter netpoll.IOEvent, flags netpoll.IOFlags) error {
-	return el.accept1(fd, filter, flags)
+// SetReuseport enables SO_REUSEPORT option on socket.
+func SetReuseport(fd, reusePort int) error {
+	return os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_REUSEPORT, reusePort))
 }

@@ -18,6 +18,7 @@ import (
 	"context"
 	"io"
 	"net"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -50,7 +51,7 @@ type Engine struct {
 
 // Validate checks whether the engine is available.
 func (e Engine) Validate() error {
-	if e.eng == nil {
+	if e.eng == nil || len(e.eng.listeners) == 0 {
 		return errors.ErrEmptyEngine
 	}
 	if e.eng.isInShutdown() {
@@ -76,14 +77,14 @@ func (e Engine) CountConnections() (count int) {
 // It is the caller's responsibility to close dupFD when finished.
 // Closing listener does not affect dupFD, and closing dupFD does not affect listener.
 func (e Engine) Dup() (fd int, err error) {
-	if err = e.Validate(); err != nil {
+	if err := e.Validate(); err != nil {
 		return -1, err
 	}
-
-	var sc string
-	fd, sc, err = e.eng.ln.dup()
-	if err != nil {
-		logging.Warnf("%s failed when duplicating new fd\n", sc)
+	if len(e.eng.listeners) > 1 {
+		return -1, errors.ErrUnsupportedOp
+	}
+	for _, ln := range e.eng.listeners {
+		fd, err = ln.dup()
 	}
 	return
 }
@@ -167,7 +168,7 @@ func (e Engine) Wake(fd gfd.GFD, cb AsyncCallback) error {
 
 // Reader is an interface that consists of a number of methods for reading that Conn must implement.
 //
-// Note that the methods in this interface are not goroutine-safe for concurrent use,
+// Note that the methods in this interface are not concurrency-safe for concurrent use,
 // you must invoke them within any method in EventHandler.
 type Reader interface {
 	io.Reader
@@ -175,8 +176,9 @@ type Reader interface {
 
 	// Next returns a slice containing the next n bytes from the buffer,
 	// advancing the buffer as if the bytes had been returned by Read.
-	// If there are fewer than n bytes in the buffer, Next returns the entire buffer.
-	// The error is ErrBufferFull if n is larger than b's buffer size.
+	// Calling this method has the same effect as calling Peek and Discard.
+	// If the amount of the available bytes is less than requested, a pair of (0, io.ErrShortBuffer)
+	// is returned.
 	//
 	// Note that the []byte buf returned by Next() is not allowed to be passed to a new goroutine,
 	// as this []byte will be reused within event-loop.
@@ -184,10 +186,9 @@ type Reader interface {
 	// to that new goroutine.
 	Next(n int) (buf []byte, err error)
 
-	// Peek returns the next n bytes without advancing the reader. The bytes stop
-	// being valid at the next read call. If Peek returns fewer than n bytes, it
-	// also returns an error explaining why the read is short. The error is
-	// ErrBufferFull if n is larger than b's buffer size.
+	// Peek returns the next n bytes without advancing the inbound buffer, the returned bytes
+	// remain valid until a Discard is called. If the amount of the available bytes is
+	// less than requested, a pair of (0, io.ErrShortBuffer) is returned.
 	//
 	// Note that the []byte buf returned by Peek() is not allowed to be passed to a new goroutine,
 	// as this []byte will be reused within event-loop.
@@ -195,11 +196,7 @@ type Reader interface {
 	// to that new goroutine.
 	Peek(n int) (buf []byte, err error)
 
-	// Discard skips the next n bytes, returning the number of bytes discarded.
-	//
-	// If Discard skips fewer than n bytes, it also returns an error.
-	// If 0 <= n <= b.Buffered(), Discard is guaranteed to succeed without
-	// reading from the underlying io.Reader.
+	// Discard advances the inbound buffer with next n bytes, returning the number of bytes discarded.
 	Discard(n int) (discarded int, err error)
 
 	// InboundBuffered returns the number of bytes that can be read from the current buffer.
@@ -208,22 +205,22 @@ type Reader interface {
 
 // Writer is an interface that consists of a number of methods for writing that Conn must implement.
 type Writer interface {
-	io.Writer     // not goroutine-safe
-	io.ReaderFrom // not goroutine-safe
+	io.Writer     // not concurrency-safe
+	io.ReaderFrom // not concurrency-safe
 
-	// Writev writes multiple byte slices to peer synchronously, it's not goroutine-safe,
+	// Writev writes multiple byte slices to remote synchronously, it's not concurrency-safe,
 	// you must invoke it within any method in EventHandler.
 	Writev(bs [][]byte) (n int, err error)
 
-	// Flush writes any buffered data to the underlying connection, it's not goroutine-safe,
+	// Flush writes any buffered data to the underlying connection, it's not concurrency-safe,
 	// you must invoke it within any method in EventHandler.
 	Flush() (err error)
 
 	// OutboundBuffered returns the number of bytes that can be read from the current buffer.
-	// it's not goroutine-safe, you must invoke it within any method in EventHandler.
+	// it's not concurrency-safe, you must invoke it within any method in EventHandler.
 	OutboundBuffered() (n int)
 
-	// AsyncWrite writes bytes to peer asynchronously, it's goroutine-safe,
+	// AsyncWrite writes bytes to remote asynchronously, it's concurrency-safe,
 	// you don't have to invoke it within any method in EventHandler,
 	// usually you would call it in an individual goroutine.
 	//
@@ -234,7 +231,7 @@ type Writer interface {
 	// just call Conn.Write to send back your data.
 	AsyncWrite(buf []byte, callback AsyncCallback) (err error)
 
-	// AsyncWritev writes multiple byte slices to peer asynchronously,
+	// AsyncWritev writes multiple byte slices to remote asynchronously,
 	// you don't have to invoke it within any method in EventHandler,
 	// usually you would call it in an individual goroutine.
 	AsyncWritev(bs [][]byte, callback AsyncCallback) (err error)
@@ -247,7 +244,7 @@ type AsyncCallback func(c Conn, err error) error
 
 // Socket is a set of functions which manipulate the underlying file descriptor of a connection.
 //
-// Note that the methods in this interface are goroutine-safe for concurrent use,
+// Note that the methods in this interface are concurrency-safe for concurrent use,
 // you don't have to invoke them within any method in EventHandler.
 type Socket interface {
 	// Gfd returns the gfd of socket.
@@ -302,35 +299,35 @@ type Socket interface {
 
 // Conn is an interface of underlying connection.
 type Conn interface {
-	Reader // all methods in Reader are not goroutine-safe.
-	Writer // some methods in Writer are goroutine-safe, some are not.
-	Socket // all methods in Socket are goroutine-safe.
+	Reader // all methods in Reader are not concurrency-safe.
+	Writer // some methods in Writer are concurrency-safe, some are not.
+	Socket // all methods in Socket are concurrency-safe.
 
-	// Context returns a user-defined context, it's not goroutine-safe,
+	// Context returns a user-defined context, it's not concurrency-safe,
 	// you must invoke it within any method in EventHandler.
 	Context() (ctx interface{})
 
-	// SetContext sets a user-defined context, it's not goroutine-safe,
+	// SetContext sets a user-defined context, it's not concurrency-safe,
 	// you must invoke it within any method in EventHandler.
 	SetContext(ctx interface{})
 
-	// LocalAddr is the connection's local socket address, it's not goroutine-safe,
+	// LocalAddr is the connection's local socket address, it's not concurrency-safe,
 	// you must invoke it within any method in EventHandler.
 	LocalAddr() (addr net.Addr)
 
-	// RemoteAddr is the connection's remote peer address, it's not goroutine-safe,
+	// RemoteAddr is the connection's remote address, it's not concurrency-safe,
 	// you must invoke it within any method in EventHandler.
 	RemoteAddr() (addr net.Addr)
 
-	// Wake triggers a OnTraffic event for the current connection, it's goroutine-safe.
+	// Wake triggers a OnTraffic event for the current connection, it's concurrency-safe.
 	Wake(callback AsyncCallback) (err error)
 
-	// CloseWithCallback closes the current connection, it's goroutine-safe.
+	// CloseWithCallback closes the current connection, it's concurrency-safe.
 	// Usually you should provide a non-nil callback for this method,
 	// otherwise your better choice is Close().
 	CloseWithCallback(callback AsyncCallback) (err error)
 
-	// Close closes the current connection, implements net.Conn, it's goroutine-safe.
+	// Close closes the current connection, implements net.Conn, it's concurrency-safe.
 	Close() (err error)
 
 	// SetDeadline implements net.Conn.
@@ -359,15 +356,15 @@ type (
 		// OnOpen fires when a new connection has been opened.
 		//
 		// The Conn c has information about the connection such as its local and remote addresses.
-		// The parameter out is the return value which is going to be sent back to the peer.
-		// Sending large amounts of data back to the peer in OnOpen is usually not recommended.
+		// The parameter out is the return value which is going to be sent back to the remote.
+		// Sending large amounts of data back to the remote in OnOpen is usually not recommended.
 		OnOpen(c Conn) (out []byte, action Action)
 
 		// OnClose fires when a connection has been closed.
 		// The parameter err is the last known connection error.
 		OnClose(c Conn, err error) (action Action)
 
-		// OnTraffic fires when a socket receives data from the peer.
+		// OnTraffic fires when a socket receives data from the remote.
 		//
 		// Note that the []byte returned from Conn.Peek(int)/Conn.Next(int) is not allowed to be passed to a new goroutine,
 		// as this []byte will be reused within event-loop after OnTraffic() returns.
@@ -398,7 +395,7 @@ func (*BuiltinEventEngine) OnShutdown(_ Engine) {
 }
 
 // OnOpen fires when a new connection has been opened.
-// The parameter out is the return value which is going to be sent back to the peer.
+// The parameter out is the return value which is going to be sent back to the remote.
 func (*BuiltinEventEngine) OnOpen(_ Conn) (out []byte, action Action) {
 	return
 }
@@ -409,7 +406,7 @@ func (*BuiltinEventEngine) OnClose(_ Conn, _ error) (action Action) {
 	return
 }
 
-// OnTraffic fires when a local socket receives data from the peer.
+// OnTraffic fires when a local socket receives data from the remote.
 func (*BuiltinEventEngine) OnTraffic(_ Conn) (action Action) {
 	return
 }
@@ -423,22 +420,7 @@ func (*BuiltinEventEngine) OnTick() (delay time.Duration, action Action) {
 // MaxStreamBufferCap is the default buffer size for each stream-oriented connection(TCP/Unix).
 var MaxStreamBufferCap = 64 * 1024 // 64KB
 
-// Run starts handling events on the specified address.
-//
-// Address should use a scheme prefix and be formatted
-// like `tcp://192.168.0.10:9851` or `unix://socket`.
-// Valid network schemes:
-//
-//	tcp   - bind to both IPv4 and IPv6
-//	tcp4  - IPv4
-//	tcp6  - IPv6
-//	udp   - bind to both IPv4 and IPv6
-//	udp4  - IPv4
-//	udp6  - IPv6
-//	unix  - Unix Domain Socket
-//
-// The "tcp" network scheme is assumed when one is not specified.
-func Run(eventHandler EventHandler, protoAddr string, opts ...Option) (err error) {
+func createListeners(addrs []string, opts ...Option) ([]*listener, *Options, error) {
 	options := loadOptions(opts...)
 
 	logger, logFlusher := logging.GetDefaultLogger(), logging.GetDefaultFlusher()
@@ -453,8 +435,6 @@ func Run(eventHandler EventHandler, protoAddr string, opts ...Option) (err error
 	}
 	logging.SetDefaultLoggerAndFlusher(logger, logFlusher)
 
-	defer logging.Cleanup()
-
 	logging.Debugf("default logging level is %s", logging.LogLevel())
 
 	// The maximum number of operating system threads that the Go program can use is initially set to 10000,
@@ -462,7 +442,7 @@ func Run(eventHandler EventHandler, protoAddr string, opts ...Option) (err error
 	if options.LockOSThread && options.NumEventLoop > 10000 {
 		logging.Errorf("too many event-loops under LockOSThread mode, should be less than 10,000 "+
 			"while you are trying to set up %d\n", options.NumEventLoop)
-		return errors.ErrTooManyEventLoopThreads
+		return nil, nil, errors.ErrTooManyEventLoopThreads
 	}
 
 	rbc := options.ReadBufferCap
@@ -484,15 +464,103 @@ func Run(eventHandler EventHandler, protoAddr string, opts ...Option) (err error
 		options.WriteBufferCap = math.CeilToPowerOfTwo(wbc)
 	}
 
-	network, addr := parseProtoAddr(protoAddr)
-
-	var ln *listener
-	if ln, err = initListener(network, addr, options); err != nil {
-		return
+	var hasUDP, hasUnix bool
+	for _, addr := range addrs {
+		proto, _, err := parseProtoAddr(addr)
+		if err != nil {
+			return nil, nil, err
+		}
+		hasUDP = hasUDP || strings.HasPrefix(proto, "udp")
+		hasUnix = hasUnix || proto == "unix"
 	}
-	defer ln.close()
 
-	return run(eventHandler, ln, options, protoAddr)
+	// SO_REUSEPORT enables duplicate address and port bindings across various
+	// Unix-like OSs, whereas there is platform-specific inconsistency:
+	// Linux implemented SO_REUSEPORT with load balancing for incoming connections
+	// while *BSD implemented it for only binding to the same address and port, which
+	// makes it pointless to enable SO_REUSEPORT on *BSD and Darwin for gnet with
+	// multiple event-loops because only the first or last event-loop will be constantly
+	// woken up to accept incoming connections and handle I/O events while the rest of
+	// event-loops remain idle.
+	// Thus, we disable SO_REUSEPORT on *BSD and Darwin by default.
+	//
+	// Note that FreeBSD 12 introduced a new socket option named SO_REUSEPORT_LB
+	// with the capability of load balancing, it's the equivalent of Linux's SO_REUSEPORT.
+	// Also note that DragonFlyBSD 3.6.0 extended SO_REUSEPORT to distribute workload to
+	// available sockets, which make it the same as Linux's SO_REUSEPORT.
+	// AF_LOCAL with SO_REUSEPORT enables duplicate address and port bindings without
+	// load balancing on Linux and *BSD. Therefore, disable it for Unix domain sockets.
+	goos := runtime.GOOS
+	if (options.Multicore || options.NumEventLoop > 1) && options.ReusePort &&
+		((goos != "linux" && goos != "dragonfly" && goos != "freebsd") || hasUnix) {
+		options.ReusePort = false
+	}
+
+	// If there is UDP address in the list, we have no choice but to enable SO_REUSEPORT anyway,
+	// also disable edge-triggered I/O for UDP by default.
+	if hasUDP {
+		options.ReusePort = true
+		options.EdgeTriggeredIO = false
+	}
+
+	listeners := make([]*listener, len(addrs))
+	for i, a := range addrs {
+		proto, addr, err := parseProtoAddr(a)
+		if err != nil {
+			return nil, nil, err
+		}
+		ln, err := initListener(proto, addr, options)
+		if err != nil {
+			return nil, nil, err
+		}
+		listeners[i] = ln
+	}
+
+	return listeners, options, nil
+}
+
+// Run starts handling events on the specified address.
+//
+// Address should use a scheme prefix and be formatted
+// like `tcp://192.168.0.10:9851` or `unix://socket`.
+// Valid network schemes:
+//
+//	tcp   - bind to both IPv4 and IPv6
+//	tcp4  - IPv4
+//	tcp6  - IPv6
+//	udp   - bind to both IPv4 and IPv6
+//	udp4  - IPv4
+//	udp6  - IPv6
+//	unix  - Unix Domain Socket
+//
+// The "tcp" network scheme is assumed when one is not specified.
+func Run(eventHandler EventHandler, protoAddr string, opts ...Option) error {
+	listeners, options, err := createListeners([]string{protoAddr}, opts...)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		for _, ln := range listeners {
+			ln.close()
+		}
+		logging.Cleanup()
+	}()
+	return run(eventHandler, listeners, options, []string{protoAddr})
+}
+
+// Rotate is like Run but accepts multiple network addresses.
+func Rotate(eventHandler EventHandler, addrs []string, opts ...Option) error {
+	listeners, options, err := createListeners(addrs, opts...)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		for _, ln := range listeners {
+			ln.close()
+		}
+		logging.Cleanup()
+	}()
+	return run(eventHandler, listeners, options, addrs)
 }
 
 var (
@@ -504,7 +572,12 @@ var (
 
 // Stop gracefully shuts down the engine without interrupting any active event-loops,
 // it waits indefinitely for connections and event-loops to be closed and then shuts down.
-// Deprecated: The global Stop only shuts down the last registered Engine with the same protocol and IP:Port as the previous Engine's, which can lead to leaks of Engine if you invoke gnet.Run multiple times using the same protocol and IP:Port under the condition that WithReuseAddr(true) and WithReusePort(true) are enabled. Use Engine.Stop instead.
+//
+// Deprecated: The global Stop only shuts down the last registered Engine with the same
+// protocol and IP:Port as the previous Engine's, which can lead to leaks of Engine if
+// you invoke gnet.Run multiple times using the same protocol and IP:Port under the
+// condition that WithReuseAddr(true) and WithReusePort(true) are enabled.
+// Use Engine.Stop instead.
 func Stop(ctx context.Context, protoAddr string) error {
 	var eng *engine
 	if s, ok := allEngines.Load(protoAddr); ok {
@@ -533,13 +606,20 @@ func Stop(ctx context.Context, protoAddr string) error {
 	}
 }
 
-func parseProtoAddr(addr string) (network, address string) {
-	network = "tcp"
-	address = strings.ToLower(addr)
-	if strings.Contains(address, "://") {
-		pair := strings.Split(address, "://")
-		network = pair[0]
-		address = pair[1]
+func parseProtoAddr(protoAddr string) (string, string, error) {
+	protoAddr = strings.ToLower(protoAddr)
+	if strings.Count(protoAddr, "://") != 1 {
+		return "", "", errors.ErrInvalidNetworkAddress
 	}
-	return
+	pair := strings.SplitN(protoAddr, "://", 2)
+	proto, addr := pair[0], pair[1]
+	switch proto {
+	case "tcp", "tcp4", "tcp6", "udp", "udp4", "udp6", "unix":
+	default:
+		return "", "", errors.ErrUnsupportedProtocol
+	}
+	if addr == "" {
+		return "", "", errors.ErrInvalidNetworkAddress
+	}
+	return proto, addr, nil
 }

@@ -17,32 +17,54 @@
 
 package gnet
 
-import "github.com/panjf2000/gnet/v2/internal/netpoll"
+import (
+	"io"
 
-func (c *conn) handleEvents(_ int, ev uint32) error {
-	// Don't change the ordering of processing EPOLLOUT | EPOLLRDHUP / EPOLLIN unless you're 100%
-	// sure what you're doing!
-	// Re-ordering can easily introduce bugs and bad side-effects, as I found out painfully in the past.
+	"golang.org/x/sys/unix"
 
-	// We should always check for the EPOLLOUT event first, as we must try to send the leftover data back to
-	// the peer when any error occurs on a connection.
+	"github.com/panjf2000/gnet/v2/internal/netpoll"
+)
+
+func (c *conn) processIO(_ int, ev netpoll.IOEvent, _ netpoll.IOFlags) error {
+	el := c.loop
+	// First check for any unexpected non-IO events.
+	// For these events we just close the connection directly.
+	if ev&netpoll.ErrEvents != 0 && ev&unix.EPOLLIN == 0 && ev&unix.EPOLLOUT == 0 {
+		c.outboundBuffer.Release() // don't bother to write to a connection with some unknown error
+		return el.close(c, io.EOF)
+	}
+	// Secondly, check for EPOLLOUT before EPOLLIN, the former has a higher priority
+	// than the latter regardless of the aliveness of the current connection:
 	//
-	// Either an EPOLLOUT or EPOLLERR event may be fired when a connection is refused.
-	// In either case write() should take care of it properly:
-	// 1) writing data back,
-	// 2) closing the connection.
-	if ev&netpoll.OutEvents != 0 && !c.outboundBuffer.IsEmpty() {
-		if err := c.loop.write(c); err != nil {
+	// 1. When the connection is alive and the system is overloaded, we want to
+	// offload the incoming traffic by writing all pending data back to the remotes
+	// before continuing to read and handle requests.
+	// 2. When the connection is dead, we need to try writing any pending data back
+	// to the remote first and then close the connection.
+	//
+	// We perform eventloop.write for EPOLLOUT because it can take good care of either case.
+	if ev&(unix.EPOLLOUT|unix.EPOLLERR) != 0 {
+		if err := el.write(c); err != nil {
 			return err
 		}
 	}
-	if ev&netpoll.InEvents != 0 {
-		return c.loop.read(c)
+	// Check for EPOLLIN before EPOLLRDHUP in case that there are pending data in
+	// the socket buffer.
+	if ev&(unix.EPOLLIN|unix.EPOLLERR) != 0 {
+		if err := el.read(c); err != nil {
+			return err
+		}
 	}
-
+	// Ultimately, check for EPOLLRDHUP, this event indicates that the remote has
+	// either closed connection or shut down the writing half of the connection.
+	if ev&unix.EPOLLRDHUP != 0 && c.opened {
+		if ev&unix.EPOLLIN == 0 { // unreadable EPOLLRDHUP, close the connection directly
+			return el.close(c, io.EOF)
+		}
+		// Received the event of EPOLLIN|EPOLLRDHUP, but the previous eventloop.read
+		// failed to drain the socket buffer, so we ensure to get it done this time.
+		c.isEOF = true
+		return el.read(c)
+	}
 	return nil
-}
-
-func (el *eventloop) readUDP(fd int, ev netpoll.IOEvent) error {
-	return el.readUDP1(fd, ev, 0)
 }
