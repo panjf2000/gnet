@@ -198,7 +198,7 @@ func (h *tlsEventHandler) OnTraffic(c Conn) (action Action) {
 	defer bbPool.Put(bb)
 	n, err := bb.ReadFrom(tc.rawTLSConn)
 	// close when the error is not ErrNotEnough or EOF
-	if err != nil && (!errors.Is(err, tls.ErrNotEnough) || !errors.Is(err, io.EOF)) {
+	if err != nil && (!errors.Is(err, tls.ErrNotEnough) && !errors.Is(err, io.EOF)) {
 		logging.Errorf("tls conn OnTraffic err: %v, stack: %s", err, debug.Stack())
 		return Close
 	}
