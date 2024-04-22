@@ -1,0 +1,1 @@
+(window.webpackJsonp=window.webpackJsonp||[]).push([[45],{189:function(a){a.exports=JSON.parse('{"allTagsPath":"/highlights/tags","slug":"domain-load-balancing","name":"domain: load-balancing","count":2,"permalink":"/highlights/tags/domain-load-balancing"}')}}]);
