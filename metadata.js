@@ -1,29 +1,29 @@
 module.exports = {
   "latest_highlight": {
     "author_github": "https://github.com/panjf2000",
-    "date": "2023-11-11",
-    "description": "Gnet tops the TechEmpower benchmark leaderboard, becoming the world No. 1",
+    "date": "2024-04-22",
+    "description": "Release of the official stable version of v2.5.0",
     "hide_on_release_notes": false,
-    "id": "2023-11-11-gnet-techempower-benchmark-top1",
-    "path": "website/highlights/2023-11-11-gnet-techempower-benchmark-top1.md",
-    "permalink": "/highlights/2023-11-11-gnet-techempower-benchmark-top1/",
+    "id": "2024-04-22-release-of-gnet-v2-5-0",
+    "path": "website/highlights/2024-04-22-release-of-gnet-v2-5-0.md",
+    "permalink": "/highlights/2024-04-22-release-of-gnet-v2-5-0/",
     "tags": [
       "release",
     ],
-    "title": "Gnet tops the TechEmpower benchmark leaderboard"
+    "title": "Release of the official stable version of v2.5.0"
   },
   "latest_post": {
     "author_github": "https://github.com/panjf2000",
-    "date": "2023-07-01",
-    "description": "Hello World! We present you, gnet v2.3.0!",
-    "id": "announcing-gnet-v2-3-0",
-    "path": "website/blog/2023-07-01-announcing-gnet-v2-3-0.md",
-    "permalink": "/blog/announcing-gnet-v2-3-0/",
+    "date": "2024-04-22",
+    "description": "Hello World! We present you, gnet v2.5.0!",
+    "id": "announcing-gnet-v2-5-0",
+    "path": "website/blog/2024-04-22-announcing-gnet-v2-5-0.md",
+    "permalink": "/blog/announcing-gnet-v2-5-0/",
     "tags": [
       "type: announcement",
       "domain: presentation"
     ],
-    "title": "Announcing gnet v2.3.0"
+    "title": "Announcing gnet v2.5.0"
   },
   "post_tags": [
     "type: announcement",
