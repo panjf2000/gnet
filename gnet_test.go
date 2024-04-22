@@ -1484,7 +1484,7 @@ func (s *simServer) OnTraffic(c Conn) (action Action) {
 	var packets [][]byte
 	for {
 		data, err := codec.Decode(c)
-		if err == errIncompletePacket {
+		if errors.Is(err, errIncompletePacket) {
 			break
 		}
 		if err != nil {

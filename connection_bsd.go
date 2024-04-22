@@ -39,14 +39,14 @@ func (c *conn) processIO(_ int, filter netpoll.IOEvent, flags netpoll.IOFlags) (
 	if flags&unix.EV_EOF != 0 && c.opened && err == nil {
 		switch filter {
 		case unix.EVFILT_READ:
-			// Receive the event of EVFILT_READ | EV_EOF, but the previous eventloop.read
+			// Received the event of EVFILT_READ|EV_EOF, but the previous eventloop.read
 			// failed to drain the socket buffer, so we make sure we get it done this time.
 			c.isEOF = true
 			err = el.read(c)
 		case unix.EVFILT_WRITE:
-			// On macOS, the kqueue in both LT and ET mode will notify with one event for the EOF
-			// of the TCP remote: EVFILT_READ|EV_ADD|EV_CLEAR|EV_EOF. But for some reason, two
-			// events will be issued in ET mode for the EOF of the Unix remote in this order:
+			// On macOS, the kqueue in either LT or ET mode will notify with one event for the
+			// EOF of the TCP remote: EVFILT_READ|EV_ADD|EV_CLEAR|EV_EOF. But for some reason,
+			// two events will be issued in ET mode for the EOF of the Unix remote in this order:
 			// 1) EVFILT_WRITE|EV_ADD|EV_CLEAR|EV_EOF, 2) EVFILT_READ|EV_ADD|EV_CLEAR|EV_EOF.
 			err = el.write(c)
 		default:
