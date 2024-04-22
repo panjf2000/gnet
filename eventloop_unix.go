@@ -75,20 +75,20 @@ func (el *eventloop) register(itf interface{}) error {
 		c = ccb.c
 		defer ccb.cb()
 	}
+	return el.register0(c)
+}
 
+func (el *eventloop) register0(c *conn) error {
 	addEvents := el.poller.AddRead
 	if el.engine.opts.EdgeTriggeredIO {
 		addEvents = el.poller.AddReadWrite
 	}
-
 	if err := addEvents(&c.pollAttachment, el.engine.opts.EdgeTriggeredIO); err != nil {
 		_ = unix.Close(c.fd)
 		c.release()
 		return err
 	}
-
 	el.connections.addConn(c, el.idx)
-
 	if c.isDatagram && c.remote != nil {
 		return nil
 	}

@@ -19,9 +19,10 @@
 package gnet
 
 import (
+	"errors"
 	"runtime"
 
-	"github.com/panjf2000/gnet/v2/pkg/errors"
+	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
 )
 
 func (el *eventloop) rotate() error {
@@ -31,7 +32,7 @@ func (el *eventloop) rotate() error {
 	}
 
 	err := el.poller.Polling()
-	if err == errors.ErrEngineShutdown {
+	if errors.Is(err, errorx.ErrEngineShutdown) {
 		el.getLogger().Debugf("main reactor is exiting in terms of the demand from user, %v", err)
 		err = nil
 	} else if err != nil {
@@ -50,7 +51,7 @@ func (el *eventloop) orbit() error {
 	}
 
 	err := el.poller.Polling()
-	if err == errors.ErrEngineShutdown {
+	if errors.Is(err, errorx.ErrEngineShutdown) {
 		el.getLogger().Debugf("event-loop(%d) is exiting in terms of the demand from user, %v", el.idx, err)
 		err = nil
 	} else if err != nil {
@@ -70,7 +71,7 @@ func (el *eventloop) run() error {
 	}
 
 	err := el.poller.Polling()
-	if err == errors.ErrEngineShutdown {
+	if errors.Is(err, errorx.ErrEngineShutdown) {
 		el.getLogger().Debugf("event-loop(%d) is exiting in terms of the demand from user, %v", el.idx, err)
 		err = nil
 	} else if err != nil {

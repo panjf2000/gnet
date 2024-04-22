@@ -18,13 +18,11 @@
 package gnet
 
 import (
-	"io"
+	"errors"
 	"runtime"
 
-	"golang.org/x/sys/unix"
-
 	"github.com/panjf2000/gnet/v2/internal/netpoll"
-	"github.com/panjf2000/gnet/v2/pkg/errors"
+	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
 )
 
 func (el *eventloop) rotate() error {
@@ -34,7 +32,7 @@ func (el *eventloop) rotate() error {
 	}
 
 	err := el.poller.Polling(el.accept0)
-	if err == errors.ErrEngineShutdown {
+	if errors.Is(err, errorx.ErrEngineShutdown) {
 		el.getLogger().Debugf("main reactor is exiting in terms of the demand from user, %v", err)
 		err = nil
 	} else if err != nil {
@@ -52,57 +50,16 @@ func (el *eventloop) orbit() error {
 		defer runtime.UnlockOSThread()
 	}
 
-	err := el.poller.Polling(func(fd int, ev netpoll.IOEvent, _ netpoll.IOFlags) error {
+	err := el.poller.Polling(func(fd int, ev netpoll.IOEvent, flags netpoll.IOFlags) error {
 		c := el.connections.getConn(fd)
 		if c == nil {
 			// Somehow epoll notified with an event for a stale fd that is not in our connection set.
 			// We need to delete it from the epoll set.
 			return el.poller.Delete(fd)
 		}
-
-		// First check for any unexpected non-IO events.
-		// For these events we just close the corresponding connection directly.
-		if ev&netpoll.ErrEvents != 0 && ev&unix.EPOLLIN == 0 && ev&unix.EPOLLOUT == 0 {
-			c.outboundBuffer.Release() // don't bother to write to a connection with some unknown error
-			return el.close(c, io.EOF)
-		}
-		// Secondly, check for EPOLLOUT before EPOLLIN, the former has a higher priority
-		// than the latter regardless of the aliveness of the current connection:
-		//
-		// 1. When the connection is alive and the system is overloaded, we want to
-		// offload the incoming traffic by writing all pending data back to the remotes
-		// before continuing to read and handle requests.
-		// 2. When the connection is dead, we need to try writing any pending data back
-		// to the remote and close the connection first.
-		//
-		// We perform eventloop.write for EPOLLOUT because it will take good care of either case.
-		if ev&(unix.EPOLLOUT|unix.EPOLLERR) != 0 {
-			if err := el.write(c); err != nil {
-				return err
-			}
-		}
-		// Check for EPOLLIN before EPOLLRDHUP in case that there are pending data in
-		// the socket buffer.
-		if ev&(unix.EPOLLIN|unix.EPOLLERR) != 0 {
-			if err := el.read(c); err != nil {
-				return err
-			}
-		}
-		// Ultimately, check for EPOLLRDHUP, this event indicates that the remote has
-		// either closed connection or shut down the writing half of the connection.
-		if ev&unix.EPOLLRDHUP != 0 && c.opened {
-			if ev&unix.EPOLLIN == 0 { // unreadable EPOLLRDHUP, close the connection directly
-				return el.close(c, io.EOF)
-			}
-			// Received the event of EPOLLIN | EPOLLRDHUP, but the previous eventloop.read
-			// failed to drain the socket buffer, so we make sure we get it done this time.
-			c.isEOF = true
-			return el.read(c)
-		}
-		return nil
+		return c.processIO(fd, ev, flags)
 	})
-
-	if err == errors.ErrEngineShutdown {
+	if errors.Is(err, errorx.ErrEngineShutdown) {
 		el.getLogger().Debugf("event-loop(%d) is exiting in terms of the demand from user, %v", el.idx, err)
 		err = nil
 	} else if err != nil {
@@ -130,52 +87,10 @@ func (el *eventloop) run() error {
 			// Somehow epoll notified with an event for a stale fd that is not in our connection set.
 			// We need to delete it from the epoll set.
 			return el.poller.Delete(fd)
-
 		}
-
-		// First check for any unexpected non-IO events.
-		// For these events we just close the corresponding connection directly.
-		if ev&netpoll.ErrEvents != 0 && ev&unix.EPOLLIN == 0 && ev&unix.EPOLLOUT == 0 {
-			c.outboundBuffer.Release() // don't bother to write to a connection with some unknown error
-			return el.close(c, io.EOF)
-		}
-		// Secondly, check for EPOLLOUT before EPOLLIN, the former has a higher priority
-		// than the latter regardless of the aliveness of the current connection:
-		//
-		// 1. When the connection is alive and the system is overloaded, we want to
-		// offload the incoming traffic by writing all pending data back to the remotes
-		// before continuing to read and handle requests.
-		// 2. When the connection is dead, we need to try writing any pending data back
-		// to the remote and close the connection first.
-		//
-		// We perform eventloop.write for EPOLLOUT because it will take good care of either case.
-		if ev&(unix.EPOLLOUT|unix.EPOLLERR) != 0 {
-			if err := el.write(c); err != nil {
-				return err
-			}
-		}
-		// Check for EPOLLIN before EPOLLRDHUP in case that there are pending data in
-		// the socket buffer.
-		if ev&(unix.EPOLLIN|unix.EPOLLERR) != 0 {
-			if err := el.read(c); err != nil {
-				return err
-			}
-		}
-		// Ultimately, check for EPOLLRDHUP, this event indicates that the remote has
-		// either closed connection or shut down the writing half of the connection.
-		if ev&unix.EPOLLRDHUP != 0 && c.opened {
-			if ev&unix.EPOLLIN == 0 { // unreadable EPOLLRDHUP, close the connection directly
-				return el.close(c, io.EOF)
-			}
-			// Received the event of EPOLLIN | EPOLLRDHUP, but the previous eventloop.read
-			// failed to drain the socket buffer, so we make sure we get it done this time.
-			c.isEOF = true
-			return el.read(c)
-		}
-		return nil
+		return c.processIO(fd, ev, flags)
 	})
-
-	if err == errors.ErrEngineShutdown {
+	if errors.Is(err, errorx.ErrEngineShutdown) {
 		el.getLogger().Debugf("event-loop(%d) is exiting in terms of the demand from user, %v", el.idx, err)
 		err = nil
 	} else if err != nil {

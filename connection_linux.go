@@ -28,7 +28,7 @@ import (
 func (c *conn) processIO(_ int, ev netpoll.IOEvent, _ netpoll.IOFlags) error {
 	el := c.loop
 	// First check for any unexpected non-IO events.
-	// For these events we just close the corresponding connection directly.
+	// For these events we just close the connection directly.
 	if ev&netpoll.ErrEvents != 0 && ev&unix.EPOLLIN == 0 && ev&unix.EPOLLOUT == 0 {
 		c.outboundBuffer.Release() // don't bother to write to a connection with some unknown error
 		return el.close(c, io.EOF)
@@ -40,9 +40,9 @@ func (c *conn) processIO(_ int, ev netpoll.IOEvent, _ netpoll.IOFlags) error {
 	// offload the incoming traffic by writing all pending data back to the remotes
 	// before continuing to read and handle requests.
 	// 2. When the connection is dead, we need to try writing any pending data back
-	// to the remote and close the connection first.
+	// to the remote first and then close the connection.
 	//
-	// We perform eventloop.write for EPOLLOUT because it will take good care of either case.
+	// We perform eventloop.write for EPOLLOUT because it can take good care of either case.
 	if ev&(unix.EPOLLOUT|unix.EPOLLERR) != 0 {
 		if err := el.write(c); err != nil {
 			return err
@@ -61,8 +61,8 @@ func (c *conn) processIO(_ int, ev netpoll.IOEvent, _ netpoll.IOFlags) error {
 		if ev&unix.EPOLLIN == 0 { // unreadable EPOLLRDHUP, close the connection directly
 			return el.close(c, io.EOF)
 		}
-		// Received the event of EPOLLIN | EPOLLRDHUP, but the previous eventloop.read
-		// failed to drain the socket buffer, so we make sure we get it done this time.
+		// Received the event of EPOLLIN|EPOLLRDHUP, but the previous eventloop.read
+		// failed to drain the socket buffer, so we ensure to get it done this time.
 		c.isEOF = true
 		return el.read(c)
 	}
