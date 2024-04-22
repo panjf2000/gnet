@@ -1,9 +1,22 @@
 package gnet
 
 import (
+	"bufio"
 	tls2 "crypto/tls"
+	"io"
+	"math/rand"
+	"net/http"
+	_ "net/http/pprof"
+	"strings"
+	"sync/atomic"
+	"testing"
+	"time"
 
+	"github.com/panjf2000/gnet/v2/pkg/logging"
+	goPool "github.com/panjf2000/gnet/v2/pkg/pool/goroutine"
 	"github.com/panjf2000/gnet/v2/pkg/tls"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var serverCRT = `-----BEGIN CERTIFICATE-----
@@ -129,4 +142,396 @@ func getGoClientTLSConfig() *tls2.Config {
 		panic(err)
 	}
 	return &tls2.Config{Certificates: []tls2.Certificate{crt}, InsecureSkipVerify: true}
+}
+
+type testTLSServer struct {
+	*testServer
+}
+
+func (s *testTLSServer) OnClose(c Conn, err error) (action Action) {
+	if err != nil {
+		logging.Debugf("error occurred on closed, %v\n", err)
+	}
+	/*if c.LocalAddr().Network() != "udp" {
+		require.IsType(s.tester, (*tlsConn)(nil), c.Context(), "want *tlsConn")
+	}*/
+
+	atomic.AddInt32(&s.disconnected, 1)
+	return
+}
+
+func (s *testTLSServer) OnTick() (delay time.Duration, action Action) {
+	delay = 100 * time.Millisecond
+	if atomic.CompareAndSwapInt32(&s.started, 0, 1) {
+		for _, protoAddr := range s.addrs {
+			proto, addr, err := parseProtoAddr(protoAddr)
+			assert.NoError(s.tester, err)
+			for i := 0; i < s.nclients; i++ {
+				atomic.AddInt32(&s.clientActive, 1)
+				go func() {
+					startTLSClient(s.tester, proto, addr, s.multicore, s.async)
+					atomic.AddInt32(&s.clientActive, -1)
+				}()
+			}
+		}
+	}
+	if atomic.LoadInt32(&s.clientActive) == 0 {
+		var streamAddrs int
+		for _, addr := range s.addrs {
+			if !strings.HasPrefix(addr, "udp") {
+				streamAddrs++
+			}
+		}
+		streamConns := s.nclients * streamAddrs
+		disconnected := atomic.LoadInt32(&s.disconnected)
+		if int(disconnected) == streamConns && disconnected == atomic.LoadInt32(&s.connected) {
+			action = Shutdown
+			s.workerPool.Release()
+			require.EqualValues(s.tester, 0, s.eng.CountConnections())
+		}
+	}
+	return
+}
+
+func TestTLSServer(t *testing.T) {
+	go func() {
+		err := http.ListenAndServe(":7070", nil)
+		if nil != err {
+			t.Logf("listenAndServe http error: %v\n", err)
+		}
+	}()
+
+	t.Run("poll-LT", func(t *testing.T) {
+		t.Run("tcp", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9991"}, false, false, false, false, false, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9992"}, false, false, true, false, false, 10, LeastConnections)
+			})
+		})
+		t.Run("tcp-async", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9991"}, false, false, false, true, false, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9992"}, false, false, true, true, false, 10, LeastConnections)
+			})
+		})
+		t.Run("tcp-async-writev", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9991"}, false, false, false, true, true, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9992"}, false, false, true, true, true, 10, LeastConnections)
+			})
+		})
+	})
+
+	t.Run("poll-ET", func(t *testing.T) {
+		t.Run("tcp", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9991"}, true, false, false, false, false, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9992"}, true, false, true, false, false, 10, LeastConnections)
+			})
+		})
+		t.Run("tcp-async", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9991"}, true, false, false, true, false, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9992"}, true, false, true, true, false, 10, LeastConnections)
+			})
+		})
+		t.Run("tcp-async-writev", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9991"}, true, false, false, true, true, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9992"}, true, false, true, true, true, 10, LeastConnections)
+			})
+		})
+	})
+
+	t.Run("poll-reuseport-LT", func(t *testing.T) {
+		t.Run("tcp", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9991"}, false, true, false, false, false, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9992"}, false, true, true, false, false, 10, LeastConnections)
+			})
+		})
+		t.Run("tcp-async", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9991"}, false, true, false, true, false, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9992"}, false, true, true, true, false, 10, LeastConnections)
+			})
+		})
+		t.Run("tcp-async-writev", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9991"}, false, true, false, true, true, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9992"}, false, true, true, true, true, 10, LeastConnections)
+			})
+		})
+	})
+
+	t.Run("poll-reuseport-ET", func(t *testing.T) {
+		t.Run("tcp", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9991"}, true, true, false, false, false, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9992"}, true, true, true, false, false, 10, LeastConnections)
+			})
+		})
+		t.Run("tcp-async", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9991"}, true, true, false, true, false, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9992"}, true, true, true, true, false, 10, LeastConnections)
+			})
+		})
+		t.Run("tcp-async-writev", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9991"}, true, true, false, true, true, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9992"}, true, true, true, true, true, 10, LeastConnections)
+			})
+		})
+	})
+
+	t.Run("poll-multi-addrs-LT", func(t *testing.T) {
+		t.Run("sync", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9991", "tcp://:9992"}, false, false, false, false, false, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9995", "tcp://:9996"}, false, false, true, false, false, 10, LeastConnections)
+			})
+		})
+		t.Run("sync-writev", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9991", "tcp://:9992"}, false, false, false, false, true, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9995", "tcp://:9996"}, false, false, true, false, true, 10, LeastConnections)
+			})
+		})
+		t.Run("async", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9991", "tcp://:9992"}, false, false, false, true, false, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9995", "tcp://:9996"}, false, false, true, true, false, 10, LeastConnections)
+			})
+		})
+		t.Run("async-writev", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9991", "tcp://:9992"}, false, false, false, true, true, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9995", "tcp://:9996"}, false, false, true, true, true, 10, LeastConnections)
+			})
+		})
+	})
+
+	t.Run("poll-multi-addrs-reuseport-LT", func(t *testing.T) {
+		t.Run("sync", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9991", "tcp://:9992"}, false, true, false, false, false, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9995", "tcp://:9996"}, false, true, true, false, false, 10, LeastConnections)
+			})
+		})
+		t.Run("sync-writev", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9991", "tcp://:9992"}, false, true, false, false, true, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9995", "tcp://:9996"}, false, true, true, false, true, 10, LeastConnections)
+			})
+		})
+		t.Run("async", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9991", "tcp://:9992"}, false, true, false, true, false, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9995", "tcp://:9996"}, false, true, true, true, false, 10, LeastConnections)
+			})
+		})
+		t.Run("async-writev", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9991", "tcp://:9992"}, false, true, false, true, true, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9995", "tcp://:9996"}, false, true, true, true, true, 10, LeastConnections)
+			})
+		})
+	})
+
+	t.Run("poll-multi-addrs-ET", func(t *testing.T) {
+		t.Run("sync", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9991", "tcp://:9992"}, true, false, false, false, false, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9995", "tcp://:9996"}, true, false, true, false, false, 10, LeastConnections)
+			})
+		})
+		t.Run("sync-writev", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9991", "tcp://:9992"}, true, false, false, false, true, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9995", "tcp://:9996"}, true, false, true, false, true, 10, LeastConnections)
+			})
+		})
+		t.Run("async", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9991", "tcp://:9992"}, true, false, false, true, false, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9995", "tcp://:9996"}, true, false, true, true, false, 10, LeastConnections)
+			})
+		})
+		t.Run("async-writev", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9991", "tcp://:9992"}, true, false, false, true, true, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9995", "tcp://:9996"}, true, false, true, true, true, 10, LeastConnections)
+			})
+		})
+	})
+
+	t.Run("poll-multi-addrs-reuseport-ET", func(t *testing.T) {
+		t.Run("sync", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9991", "tcp://:9992"}, true, true, false, false, false, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9995", "tcp://:9996"}, true, true, true, false, false, 10, LeastConnections)
+			})
+		})
+		t.Run("sync-writev", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9991", "tcp://:9992"}, true, true, false, false, true, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9995", "tcp://:9996"}, true, true, true, false, true, 10, LeastConnections)
+			})
+		})
+		t.Run("async", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9991", "tcp://:9992"}, true, true, false, true, false, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9995", "tcp://:9996"}, true, true, true, true, false, 10, LeastConnections)
+			})
+		})
+		t.Run("async-writev", func(t *testing.T) {
+			t.Run("1-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9991", "tcp://:9992"}, true, true, false, true, true, 10, RoundRobin)
+			})
+			t.Run("N-loop", func(t *testing.T) {
+				runTLSServer(t, []string{"tcp://:9995", "tcp://:9996"}, true, true, true, true, true, 10, LeastConnections)
+			})
+		})
+	})
+}
+
+func runTLSServer(t *testing.T, addrs []string, et, reuseport, multicore, async, writev bool, nclients int, lb LoadBalancing) {
+	internal := &testServer{
+		tester:     t,
+		addrs:      addrs,
+		multicore:  multicore,
+		async:      async,
+		writev:     writev,
+		nclients:   nclients,
+		workerPool: goPool.Default(),
+	}
+
+	ts := &testTLSServer{
+		testServer: internal,
+	}
+
+	var err error
+	if len(addrs) > 1 {
+		err = Rotate(ts,
+			addrs,
+			WithEdgeTriggeredIO(et),
+			WithLockOSThread(async),
+			WithMulticore(multicore),
+			WithReusePort(reuseport),
+			WithTicker(true),
+			WithTCPKeepAlive(time.Minute),
+			WithTCPNoDelay(TCPDelay),
+			WithLoadBalancing(lb),
+			WithTLSConfig(getServerConfig()))
+	} else {
+		err = Run(ts,
+			addrs[0],
+			WithEdgeTriggeredIO(et),
+			WithLockOSThread(async),
+			WithMulticore(multicore),
+			WithReusePort(reuseport),
+			WithTicker(true),
+			WithTCPKeepAlive(time.Minute),
+			WithTCPNoDelay(TCPDelay),
+			WithLoadBalancing(lb),
+			WithTLSConfig(getServerConfig()))
+	}
+	assert.NoError(t, err)
+}
+
+func startTLSClient(t *testing.T, network, addr string, multicore, async bool) {
+	rand.Seed(time.Now().UnixNano())
+	c, err := tls2.Dial(network, addr, getGoClientTLSConfig())
+	require.NoError(t, err)
+	defer c.Close()
+	rd := bufio.NewReader(c)
+	if network != "udp" {
+		msg, err := rd.ReadBytes('\n')
+		require.NoError(t, err)
+		require.Equal(t, string(msg), "sweetness\r\n", "bad header")
+	}
+	duration := time.Duration((rand.Float64()*2+1)*float64(time.Second)) / 2
+	logging.Debugf("test duration: %v", duration)
+	start := time.Now()
+	for time.Since(start) < duration {
+		reqData := make([]byte, streamLen)
+		if network == "udp" {
+			reqData = reqData[:datagramLen]
+		}
+		_, err = rand.Read(reqData)
+		require.NoError(t, err)
+		_, err = c.Write(reqData)
+		require.NoError(t, err)
+		respData := make([]byte, len(reqData))
+		_, err = io.ReadFull(rd, respData)
+		require.NoError(t, err)
+		if !async {
+			// require.Equalf(t, reqData, respData, "response mismatch with protocol:%s, multi-core:%t, content of bytes: %d vs %d", network, multicore, string(reqData), string(respData))
+			require.Equalf(
+				t,
+				reqData,
+				respData,
+				"response mismatch with protocol:%s, multi-core:%t, length of bytes: %d vs %d",
+				network,
+				multicore,
+				len(reqData),
+				len(respData),
+			)
+		}
+	}
 }

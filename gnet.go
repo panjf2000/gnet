@@ -423,11 +423,6 @@ var MaxStreamBufferCap = 64 * 1024 // 64KB
 func createListeners(addrs []string, opts ...Option) ([]*listener, *Options, error) {
 	options := loadOptions(opts...)
 
-	// upgrade to TLS EventHandler
-	if options.TLSConfig != nil {
-		eventHandler = &tlsEventHandler{EventHandler: eventHandler, tlsConfig: options.TLSConfig}
-	}
-
 	logger, logFlusher := logging.GetDefaultLogger(), logging.GetDefaultFlusher()
 	if options.Logger == nil {
 		if options.LogPath != "" {
@@ -550,6 +545,12 @@ func Run(eventHandler EventHandler, protoAddr string, opts ...Option) error {
 		}
 		logging.Cleanup()
 	}()
+
+	// upgrade to TLS EventHandler
+	if options.TLSConfig != nil {
+		eventHandler = &tlsEventHandler{EventHandler: eventHandler, tlsConfig: options.TLSConfig}
+	}
+
 	return run(eventHandler, listeners, options, []string{protoAddr})
 }
 
@@ -565,6 +566,12 @@ func Rotate(eventHandler EventHandler, addrs []string, opts ...Option) error {
 		}
 		logging.Cleanup()
 	}()
+
+	// upgrade to TLS EventHandler
+	if options.TLSConfig != nil {
+		eventHandler = &tlsEventHandler{EventHandler: eventHandler, tlsConfig: options.TLSConfig}
+	}
+
 	return run(eventHandler, listeners, options, addrs)
 }
 

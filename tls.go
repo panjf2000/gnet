@@ -173,6 +173,8 @@ func (h *tlsEventHandler) OnOpen(c Conn) (out []byte, action Action) {
 
 func (h *tlsEventHandler) OnTraffic(c Conn) (action Action) {
 	tc := c.Context().(*tlsConn)
+
+	// TLS handshake
 	if !tc.rawTLSConn.HandshakeCompleted() {
 		err := tc.rawTLSConn.Handshake()
 		if err != nil && !errors.Is(err, tls.ErrNotEnough) {
@@ -197,10 +199,12 @@ func (h *tlsEventHandler) OnTraffic(c Conn) (action Action) {
 	bb := bbPool.Get()
 	defer bbPool.Put(bb)
 	n, err := bb.ReadFrom(tc.rawTLSConn)
-	// close when the error is not ErrNotEnough or EOF
-	if err != nil && (!errors.Is(err, tls.ErrNotEnough) && !errors.Is(err, io.EOF)) {
-		logging.Errorf("tls conn OnTraffic err: %v, stack: %s", err, debug.Stack())
-		return Close
+	if err != nil {
+		// close when the error is not ErrNotEnough or EOF
+		if !(errors.Is(err, io.EOF) || errors.Is(err, tls.ErrNotEnough)) {
+			logging.Errorf("tls conn OnTraffic err: %v, stack: %s", err, debug.Stack())
+			return Close
+		}
 	}
 
 	if n > 0 {
