@@ -177,8 +177,6 @@ func (h *tlsEventHandler) OnTraffic(c Conn) (action Action) {
 	// TLS handshake
 	if !tc.rawTLSConn.HandshakeCompleted() {
 		for tc.raw.InboundBuffered() > 0 {
-			l := tc.raw.InboundBuffered()
-			logging.Infof("inbound buffer length: %d", l)
 			err := tc.rawTLSConn.Handshake()
 
 			// data not enough wait for next round
