@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build linux && !poll_opt
-// +build linux,!poll_opt
+//go:build (linux || freebsd || dragonfly || netbsd || openbsd || darwin) && !poll_opt
+// +build linux freebsd dragonfly netbsd openbsd darwin
+// +build !poll_opt
 
 package gnet
 
@@ -53,8 +54,13 @@ func (el *eventloop) orbit() error {
 	err := el.poller.Polling(func(fd int, ev netpoll.IOEvent, flags netpoll.IOFlags) error {
 		c := el.connections.getConn(fd)
 		if c == nil {
-			// Somehow epoll notified with an event for a stale fd that is not in our connection set.
-			// We need to delete it from the epoll set.
+			// For kqueue, this might happen when the connection has already been closed,
+			// the file descriptor will be deleted from kqueue automatically as documented
+			// in the manual pages.
+			// For epoll, it somehow notified with an event for a stale fd that is not in
+			// our connection set. We need to explicitly delete it from the epoll set.
+			// Also print a warning log for this kind of irregularity.
+			el.getLogger().Warnf("received event[fd=%d|ev=%d|flags=%d] of a stale connection from event-loop(%d)", fd, ev, flags, el.idx)
 			return el.poller.Delete(fd)
 		}
 		return c.processIO(fd, ev, flags)
@@ -84,8 +90,13 @@ func (el *eventloop) run() error {
 			if _, ok := el.listeners[fd]; ok {
 				return el.accept(fd, ev, flags)
 			}
-			// Somehow epoll notified with an event for a stale fd that is not in our connection set.
-			// We need to delete it from the epoll set.
+			// For kqueue, this might happen when the connection has already been closed,
+			// the file descriptor will be deleted from kqueue automatically as documented
+			// in the manual pages.
+			// For epoll, it somehow notified with an event for a stale fd that is not in
+			// our connection set. We need to explicitly delete it from the epoll set.
+			// Also print a warning log for this kind of irregularity.
+			el.getLogger().Warnf("received event[fd=%d|ev=%d|flags=%d] of a stale connection from event-loop(%d)", fd, ev, flags, el.idx)
 			return el.poller.Delete(fd)
 		}
 		return c.processIO(fd, ev, flags)
