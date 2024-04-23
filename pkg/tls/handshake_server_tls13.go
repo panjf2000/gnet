@@ -45,47 +45,48 @@ type serverHandshakeStateTLS13 struct {
 func (hs *serverHandshakeStateTLS13) handshake() error {
 	c := hs.c
 
-	if needFIPS() {
-		return errors.New("tls: internal error: TLS 1.3 reached in FIPS mode")
-	}
+	switch c.handshakeState {
+	case 0:
+		if needFIPS() {
+			return errors.New("tls: internal error: TLS 1.3 reached in FIPS mode")
+		}
 
-	// For an overview of the TLS 1.3 handshake, see RFC 8446, Section 2.
-	if err := hs.processClientHello(); err != nil {
-		return err
+		// For an overview of the TLS 1.3 handshake, see RFC 8446, Section 2.
+		if err := hs.processClientHello(); err != nil {
+			return err
+		}
+		if err := hs.checkForResumption(); err != nil {
+			return err
+		}
+		if err := hs.pickCertificate(); err != nil {
+			return err
+		}
+		c.buffering = true
+		if err := hs.sendServerParameters(); err != nil {
+			return err
+		}
+		if err := hs.sendServerCertificate(); err != nil {
+			return err
+		}
+		if err := hs.sendServerFinished(); err != nil {
+			return err
+		}
+		// Note that at this point we could start sending application data without
+		// waiting for the client's second flight, but the application might not
+		// expect the lack of replay protection of the ClientHello parameters.
+		if _, err := c.flush(); err != nil {
+			return err
+		}
+		c.handshakeState = 1
+	case 1:
+		if err := hs.readClientCertificate(); err != nil {
+			return err
+		}
+		if err := hs.readClientFinished(); err != nil {
+			return err
+		}
+		c.isHandshakeComplete.Store(true)
 	}
-	if err := hs.checkForResumption(); err != nil {
-		return err
-	}
-	if err := hs.pickCertificate(); err != nil {
-		return err
-	}
-	c.buffering = true
-	if err := hs.sendServerParameters(); err != nil {
-		return err
-	}
-	if err := hs.sendServerCertificate(); err != nil {
-		return err
-	}
-	if err := hs.sendServerFinished(); err != nil {
-		return err
-	}
-	// Note that at this point we could start sending application data without
-	// waiting for the client's second flight, but the application might not
-	// expect the lack of replay protection of the ClientHello parameters.
-	if _, err := c.flush(); err != nil {
-		return err
-	}
-	if err := hs.readClientCertificate(); err != nil {
-		return err
-	}
-	/*if err := hs.readClientFinished(); err != nil {
-		return err
-	}*/
-
-	c.readClientFinished = hs.readClientFinished
-	c.isWaitClientFinished.Store(true)
-
-	//c.isHandshakeComplete.Store(true)
 
 	return nil
 }

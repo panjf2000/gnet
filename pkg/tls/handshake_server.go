@@ -22,43 +22,47 @@ import (
 // serverHandshakeState contains details of a server handshake in progress.
 // It's discarded once the handshake has completed.
 type serverHandshakeState struct {
-	c            *Conn
-	ctx          context.Context
-	clientHello  *clientHelloMsg
-	hello        *serverHelloMsg
-	suite        *cipherSuite
-	ecdheOk      bool
-	ecSignOk     bool
-	rsaDecryptOk bool
-	rsaSignOk    bool
-	sessionState *SessionState
-	finishedHash finishedHash
-	masterSecret []byte
-	cert         *Certificate
+	c               *Conn
+	ctx             context.Context
+	clientHello     *clientHelloMsg
+	hello           *serverHelloMsg
+	suite           *cipherSuite
+	ecdheOk         bool
+	ecSignOk        bool
+	rsaDecryptOk    bool
+	rsaSignOk       bool
+	sessionState    *SessionState
+	finishedHash    finishedHash
+	masterSecret    []byte
+	cert            *Certificate
+	nextHandshakeFn func() error
 }
 
 // serverHandshake performs a TLS handshake as a server.
 func (c *Conn) serverHandshake(ctx context.Context) error {
-	clientHello, err := c.readClientHello(ctx)
-	if err != nil {
-		return err
-	}
-
-	if c.vers == VersionTLS13 {
-		hs := serverHandshakeStateTLS13{
-			c:           c,
-			ctx:         ctx,
-			clientHello: clientHello,
+	if c.hs == nil {
+		clientHello, err := c.readClientHello(ctx)
+		if err != nil {
+			return err
 		}
-		return hs.handshake()
-	}
 
-	hs := serverHandshakeState{
-		c:           c,
-		ctx:         ctx,
-		clientHello: clientHello,
+		if c.vers == VersionTLS13 {
+			hs := serverHandshakeStateTLS13{
+				c:           c,
+				ctx:         ctx,
+				clientHello: clientHello,
+			}
+			c.hs = &hs
+		} else {
+			hs := serverHandshakeState{
+				c:           c,
+				ctx:         ctx,
+				clientHello: clientHello,
+			}
+			c.hs = &hs
+		}
 	}
-	return hs.handshake()
+	return c.hs.handshake()
 }
 
 func (hs *serverHandshakeState) handshake() error {
@@ -94,16 +98,26 @@ func (hs *serverHandshakeState) handshake() error {
 		if err := hs.readFinished(nil); err != nil {
 			return err
 		}
+
+		c.ekm = ekmFromMasterSecret(c.vers, hs.suite, hs.masterSecret, hs.clientHello.random, hs.hello.random)
+		c.isHandshakeComplete.Store(true)
 	} else {
 		// The client didn't include a session ticket, or it wasn't
 		// valid so we do a full handshake.
-		if err := hs.pickCipherSuite(); err != nil {
-			return err
+		if hs.nextHandshakeFn == nil {
+			if err := hs.pickCipherSuite(); err != nil {
+				return err
+			}
+			if err := hs.doFullHandshake(); err != nil {
+				return err
+			}
+		} else {
+			if err := hs.nextHandshakeFn(); err != nil {
+				return err
+			}
 		}
-		if err := hs.doFullHandshake(); err != nil {
-			return err
-		}
-		if err := hs.establishKeys(); err != nil {
+
+		/*if err := hs.establishKeys(); err != nil {
 			return err
 		}
 		if err := hs.readFinished(c.clientFinished[:]); err != nil {
@@ -119,11 +133,8 @@ func (hs *serverHandshakeState) handshake() error {
 		}
 		if _, err := c.flush(); err != nil {
 			return err
-		}
+		}*/
 	}
-
-	c.ekm = ekmFromMasterSecret(c.vers, hs.suite, hs.masterSecret, hs.clientHello.random, hs.hello.random)
-	c.isHandshakeComplete.Store(true)
 
 	return nil
 }
@@ -625,119 +636,159 @@ func (hs *serverHandshakeState) doFullHandshake() error {
 		return err
 	}
 
-	var pub crypto.PublicKey // public key for client auth, if any
-
-	msg, err := c.readHandshake(&hs.finishedHash)
-	if err != nil {
-		return err
-	}
-
-	// If we requested a client certificate, then the client must send a
-	// certificate message, even if it's empty.
-	if c.config.ClientAuth >= RequestClientCert {
-		certMsg, ok := msg.(*certificateMsg)
-		if !ok {
-			c.sendAlert(alertUnexpectedMessage)
-			return unexpectedMessageError(certMsg, msg)
-		}
-
-		if err := c.processCertsFromClient(Certificate{
-			Certificate: certMsg.certificates,
-		}); err != nil {
-			return err
-		}
-		if len(certMsg.certificates) != 0 {
-			pub = c.peerCertificates[0].PublicKey
-		}
-
-		msg, err = c.readHandshake(&hs.finishedHash)
+	// next read finished hash
+	hs.nextHandshakeFn = func() error {
+		msg, err := c.readHandshake(&hs.finishedHash)
 		if err != nil {
 			return err
 		}
-	}
-	if c.config.VerifyConnection != nil {
-		if err := c.config.VerifyConnection(c.connectionStateLocked()); err != nil {
-			c.sendAlert(alertBadCertificate)
-			return err
-		}
-	}
 
-	// Get client key exchange
-	ckx, ok := msg.(*clientKeyExchangeMsg)
-	if !ok {
-		c.sendAlert(alertUnexpectedMessage)
-		return unexpectedMessageError(ckx, msg)
-	}
+		// next
+		hs.nextHandshakeFn = func() error {
+			var pub crypto.PublicKey // public key for client auth, if any
+			// If we requested a client certificate, then the client must send a
+			// certificate message, even if it's empty.
+			if c.config.ClientAuth >= RequestClientCert {
+				certMsg, ok := msg.(*certificateMsg)
+				if !ok {
+					c.sendAlert(alertUnexpectedMessage)
+					return unexpectedMessageError(certMsg, msg)
+				}
 
-	preMasterSecret, err := keyAgreement.processClientKeyExchange(c.config, hs.cert, ckx, c.vers)
-	if err != nil {
-		c.sendAlert(alertHandshakeFailure)
-		return err
-	}
-	if hs.hello.extendedMasterSecret {
-		c.extMasterSecret = true
-		hs.masterSecret = extMasterFromPreMasterSecret(c.vers, hs.suite, preMasterSecret,
-			hs.finishedHash.Sum())
-	} else {
-		hs.masterSecret = masterFromPreMasterSecret(c.vers, hs.suite, preMasterSecret,
-			hs.clientHello.random, hs.hello.random)
-	}
-	if err := c.config.writeKeyLog(keyLogLabelTLS12, hs.clientHello.random, hs.masterSecret); err != nil {
-		c.sendAlert(alertInternalError)
-		return err
-	}
+				if err := c.processCertsFromClient(Certificate{
+					Certificate: certMsg.certificates,
+				}); err != nil {
+					return err
+				}
+				if len(certMsg.certificates) != 0 {
+					pub = c.peerCertificates[0].PublicKey
+				}
 
-	// If we received a client cert in response to our certificate request message,
-	// the client will send us a certificateVerifyMsg immediately after the
-	// clientKeyExchangeMsg. This message is a digest of all preceding
-	// handshake-layer messages that is signed using the private key corresponding
-	// to the client's certificate. This allows us to verify that the client is in
-	// possession of the private key of the certificate.
-	if len(c.peerCertificates) > 0 {
-		// certificateVerifyMsg is included in the transcript, but not until
-		// after we verify the handshake signature, since the state before
-		// this message was sent is used.
-		msg, err = c.readHandshake(nil)
-		if err != nil {
-			return err
-		}
-		certVerify, ok := msg.(*certificateVerifyMsg)
-		if !ok {
-			c.sendAlert(alertUnexpectedMessage)
-			return unexpectedMessageError(certVerify, msg)
-		}
-
-		var sigType uint8
-		var sigHash crypto.Hash
-		if c.vers >= VersionTLS12 {
-			if !isSupportedSignatureAlgorithm(certVerify.signatureAlgorithm, certReq.supportedSignatureAlgorithms) {
-				c.sendAlert(alertIllegalParameter)
-				return errors.New("tls: client certificate used with invalid signature algorithm")
+				msg, err = c.readHandshake(&hs.finishedHash)
+				if err != nil {
+					return err
+				}
 			}
-			sigType, sigHash, err = typeAndHashFromSignatureScheme(certVerify.signatureAlgorithm)
-			if err != nil {
-				return c.sendAlert(alertInternalError)
+			if c.config.VerifyConnection != nil {
+				if err := c.config.VerifyConnection(c.connectionStateLocked()); err != nil {
+					c.sendAlert(alertBadCertificate)
+					return err
+				}
 			}
-		} else {
-			sigType, sigHash, err = legacyTypeAndHashFromPublicKey(pub)
+
+			// Get client key exchange
+			ckx, ok := msg.(*clientKeyExchangeMsg)
+			if !ok {
+				c.sendAlert(alertUnexpectedMessage)
+				return unexpectedMessageError(ckx, msg)
+			}
+
+			preMasterSecret, err := keyAgreement.processClientKeyExchange(c.config, hs.cert, ckx, c.vers)
 			if err != nil {
-				c.sendAlert(alertIllegalParameter)
+				c.sendAlert(alertHandshakeFailure)
 				return err
 			}
+			if hs.hello.extendedMasterSecret {
+				c.extMasterSecret = true
+				hs.masterSecret = extMasterFromPreMasterSecret(c.vers, hs.suite, preMasterSecret,
+					hs.finishedHash.Sum())
+			} else {
+				hs.masterSecret = masterFromPreMasterSecret(c.vers, hs.suite, preMasterSecret,
+					hs.clientHello.random, hs.hello.random)
+			}
+			if err := c.config.writeKeyLog(keyLogLabelTLS12, hs.clientHello.random, hs.masterSecret); err != nil {
+				c.sendAlert(alertInternalError)
+				return err
+			}
+
+			// If we received a client cert in response to our certificate request message,
+			// the client will send us a certificateVerifyMsg immediately after the
+			// clientKeyExchangeMsg. This message is a digest of all preceding
+			// handshake-layer messages that is signed using the private key corresponding
+			// to the client's certificate. This allows us to verify that the client is in
+			// possession of the private key of the certificate.
+			if len(c.peerCertificates) > 0 {
+				// certificateVerifyMsg is included in the transcript, but not until
+				// after we verify the handshake signature, since the state before
+				// this message was sent is used.
+				msg, err = c.readHandshake(nil)
+				if err != nil {
+					return err
+				}
+				certVerify, ok := msg.(*certificateVerifyMsg)
+				if !ok {
+					c.sendAlert(alertUnexpectedMessage)
+					return unexpectedMessageError(certVerify, msg)
+				}
+
+				var sigType uint8
+				var sigHash crypto.Hash
+				if c.vers >= VersionTLS12 {
+					if !isSupportedSignatureAlgorithm(certVerify.signatureAlgorithm, certReq.supportedSignatureAlgorithms) {
+						c.sendAlert(alertIllegalParameter)
+						return errors.New("tls: client certificate used with invalid signature algorithm")
+					}
+					sigType, sigHash, err = typeAndHashFromSignatureScheme(certVerify.signatureAlgorithm)
+					if err != nil {
+						return c.sendAlert(alertInternalError)
+					}
+				} else {
+					sigType, sigHash, err = legacyTypeAndHashFromPublicKey(pub)
+					if err != nil {
+						c.sendAlert(alertIllegalParameter)
+						return err
+					}
+				}
+
+				signed := hs.finishedHash.hashForClientCertificate(sigType, sigHash)
+				if err := verifyHandshakeSignature(sigType, pub, sigHash, signed, certVerify.signature); err != nil {
+					c.sendAlert(alertDecryptError)
+					return errors.New("tls: invalid signature by the client certificate: " + err.Error())
+				}
+
+				if err := transcriptMsg(certVerify, &hs.finishedHash); err != nil {
+					return err
+				}
+			}
+
+			hs.finishedHash.discardHandshakeBuffer()
+			hs.nextHandshakeFn = func() error {
+				if err := hs.establishKeys(); err != nil {
+					return err
+				}
+
+				if err := c.readChangeCipherSpec(); err != nil {
+					return err
+				}
+
+				hs.nextHandshakeFn = func() error {
+					if err := hs.readFinished(c.clientFinished[:]); err != nil {
+						return err
+					}
+					c.clientFinishedIsFirst = true
+					c.buffering = true
+					if err := hs.sendSessionTicket(); err != nil {
+						return err
+					}
+					if err := hs.sendFinished(nil); err != nil {
+						return err
+					}
+					if _, err := c.flush(); err != nil {
+						return err
+					}
+					c.ekm = ekmFromMasterSecret(c.vers, hs.suite, hs.masterSecret, hs.clientHello.random, hs.hello.random)
+					c.isHandshakeComplete.Store(true)
+					return nil
+				}
+
+				return nil
+			}
+
+			return nil
 		}
 
-		signed := hs.finishedHash.hashForClientCertificate(sigType, sigHash)
-		if err := verifyHandshakeSignature(sigType, pub, sigHash, signed, certVerify.signature); err != nil {
-			c.sendAlert(alertDecryptError)
-			return errors.New("tls: invalid signature by the client certificate: " + err.Error())
-		}
-
-		if err := transcriptMsg(certVerify, &hs.finishedHash); err != nil {
-			return err
-		}
+		return nil
 	}
-
-	hs.finishedHash.discardHandshakeBuffer()
 
 	return nil
 }
@@ -770,10 +821,10 @@ func (hs *serverHandshakeState) establishKeys() error {
 func (hs *serverHandshakeState) readFinished(out []byte) error {
 	c := hs.c
 
-	if err := c.readChangeCipherSpec(); err != nil {
-		return err
-	}
-
+	/*	if err := c.readChangeCipherSpec(); err != nil {
+			return err
+		}
+	*/
 	// finishedMsg is included in the transcript, but not until after we
 	// check the client version, since the state before this message was
 	// sent is used during verification.

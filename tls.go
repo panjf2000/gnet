@@ -176,23 +176,35 @@ func (h *tlsEventHandler) OnTraffic(c Conn) (action Action) {
 
 	// TLS handshake
 	if !tc.rawTLSConn.HandshakeCompleted() {
-		err := tc.rawTLSConn.Handshake()
-		if err != nil && !errors.Is(err, tls.ErrNotEnough) {
-			logging.Error(err)
-			return Close
-		}
+		for tc.raw.InboundBuffered() > 0 {
+			l := tc.raw.InboundBuffered()
+			logging.Infof("inbound buffer length: %d", l)
+			err := tc.rawTLSConn.Handshake()
 
-		if tc.rawTLSConn.HandshakeCompleted() {
-			// fire OnOpen when handshake completed
-			out, act := h.EventHandler.OnOpen(tc)
-			if act != None {
-				return act
+			// data not enough wait for next round
+			if errors.Is(err, tls.ErrNotEnough) {
+				return None
 			}
-			if _, err := tc.Write(out); err != nil {
+
+			if err != nil {
+				logging.Error(err)
 				return Close
 			}
-		}
 
+			if tc.rawTLSConn.HandshakeCompleted() {
+				// fire OnOpen when handshake completed
+				out, act := h.EventHandler.OnOpen(tc)
+				if act != None {
+					return act
+				}
+				if _, err := tc.Write(out); err != nil {
+					return Close
+				}
+			}
+		}
+	}
+
+	if !tc.rawTLSConn.HandshakeCompleted() {
 		return None
 	}
 

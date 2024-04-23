@@ -39,6 +39,8 @@ type Conn struct {
 	// isHandshakeComplete is true implies handshakeErr == nil.
 	isHandshakeComplete  atomic.Bool
 	isWaitClientFinished atomic.Bool
+	handshakeState       int8
+	hs                   interface{ handshake() error }
 	readClientFinished   func() error
 	// constant after handshake; protected by handshakeMutex
 	handshakeMutex sync.Mutex
@@ -1583,13 +1585,13 @@ func (c *Conn) handshakeContext(ctx context.Context) (ret error) {
 		return nil
 	}
 
-	if c.isWaitClientFinished.Load() {
+	/*if c.isWaitClientFinished.Load() {
 		if err := c.readClientFinished(); err != nil {
 			return err
 		}
 		c.isHandshakeComplete.Store(true)
 		return nil
-	}
+	}*/
 
 	/*	if c.isHandshakeComplete.Load() {
 		return nil
@@ -1658,8 +1660,8 @@ func (c *Conn) handshakeContext(ctx context.Context) (ret error) {
 		c.flush()
 	}
 
-	if c.isWaitClientFinished.Load() {
-		return ErrNotEnough
+	if !c.isHandshakeComplete.Load() {
+		return nil
 	}
 
 	/*	if c.handshakeErr == nil && !c.isHandshakeComplete.Load() {
