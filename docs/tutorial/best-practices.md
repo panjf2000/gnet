@@ -20,9 +20,9 @@ It's recommended to use `Conn.Context()` to store necessary resource for each co
 
 ### Either loop read data in OnTraffic() or invoke c.Wake() regularly
 
-Despite the fact that `gnet` leverages `epoll`/`kqueue` with level-triggered mode under the hood, `OnTraffic()` won't be invoked constantly given there is data left in the inbound buffer of a connection, `OnTraffic()` is only invoked when there is new data arriving, which is like edge-triggered mode from the user's point of view.
+`gnet` leverages `epoll`/`kqueue` with level-triggered mode by default under the hood, you're able to switch to edge-triggered mode since v2.5.0. In LT mode, `OnTraffic()` might not be invoked constantly given there is data left in the inbound buffer of a `gnet.Conn`, `OnTraffic()` will be invoked only when there is data left in the socket recv buffer of the kernel. By contrast, in ET mode, `OnTraffic()` will be invoked only when new data arrives at the socket recv buffer of the kernel.
 
-Thus, you should loop call `c.Read()`/`c.Peek()`/`c.Next()` on a connection in `OnTraffic()` to drain the inbound buffer for reading and decoding packets until you reach an incomplete packet, but if you don't, then make sure you call `c.Wake()` periodically, otherwise you may never get a chance to read the leftover data until the peer endpoint sends new data over and there are new arrivals of data on the socket.
+Thus, you should loop call `c.Read()`/`c.Peek()`/`c.Next()` on a connection in `OnTraffic()` to drain the inbound buffer for reading and decoding packets until you reach an incomplete packet, but if you don't, then make sure you call `c.Wake()` periodically, otherwise you may never get a chance to read the leftover data until the remote sends new data over and there are new arrivals of data on the socket recv buffer.
 
 ### Enable poll_opt mode to boost performance
 
