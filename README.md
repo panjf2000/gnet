@@ -38,14 +38,15 @@ English | [中文](README_ZH.md)
 - [x] Efficient, reusable, and elastic memory buffer: (Elastic-)Ring-Buffer, Linked-List-Buffer and Elastic-Mixed-Buffer
 - [x] Multiple protocols/IPC mechanisms: `TCP`, `UDP`, and `Unix Domain Socket`
 - [x] Multiple load-balancing algorithms: `Round-Robin`, `Source-Addr-Hash`, and `Least-Connections`
-- [x] Two event-driven mechanisms: `epoll` on **Linux** and `kqueue` on **FreeBSD/DragonFly/Darwin**
 - [x] Flexible ticker event
-- [x] Implementation of `gnet` Client
-- [x] **Windows** platform support (For compatibility in development only, do not use it in production)
+- [x] `gnet` client
+- [x] Running on `Linux`, `macOS`, `Windows`, and *BSD: `Darwin`/`DragonFlyBSD`/`FreeBSD`/`NetBSD`/`OpenBSD`
 - [x] **Edge-triggered** I/O support
 - [x] Multiple network addresses binding
 - [ ] **TLS** support
 - [ ] [io_uring](https://kernel.dk/io_uring.pdf) support
+
+***Windows version of `gnet` should only be used in development for developing and testing, it shouldn't be used in production.***
 
 # 🎬 Getting started
 
