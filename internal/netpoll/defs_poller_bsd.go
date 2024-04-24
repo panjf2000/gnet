@@ -1,4 +1,4 @@
-// Copyright (c) 2023 The Gnet Authors. All rights reserved.
+// Copyright (c) 2024 The Gnet Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,10 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build (darwin || dragonfly || freebsd || netbsd || openbsd) && (386 || arm || mips || mipsle)
-// +build darwin dragonfly freebsd netbsd openbsd
-// +build 386 arm mips mipsle
+//go:build darwin || dragonfly || freebsd || openbsd
+// +build darwin dragonfly freebsd openbsd
 
 package netpoll
 
-type keventIdent = uint32
+// IOFlags represents the flags of IO events.
+type IOFlags = uint16
+
+// IOEvent is the integer type of I/O events on BSD's.
+type IOEvent = int16

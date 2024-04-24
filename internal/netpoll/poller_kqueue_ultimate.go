@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build (freebsd || dragonfly || netbsd || openbsd || darwin) && poll_opt
-// +build freebsd dragonfly netbsd openbsd darwin
+//go:build (darwin || dragonfly || freebsd || netbsd || openbsd) && poll_opt
+// +build darwin dragonfly freebsd netbsd openbsd
 // +build poll_opt
 
 package netpoll
@@ -48,14 +48,10 @@ func OpenPoller() (poller *Poller, err error) {
 		err = os.NewSyscallError("kqueue", err)
 		return
 	}
-	if _, err = unix.Kevent(poller.fd, []unix.Kevent_t{{
-		Ident:  0,
-		Filter: unix.EVFILT_USER,
-		Flags:  unix.EV_ADD | unix.EV_CLEAR,
-	}}, nil, nil); err != nil {
+	if err = addWakeupEvent(poller.fd); err != nil {
 		_ = poller.Close()
 		poller = nil
-		err = os.NewSyscallError("kevent add|clear", err)
+		err = os.NewSyscallError("kevent | pipe2", err)
 		return
 	}
 	poller.asyncTaskQueue = queue.NewLockFreeQueue()
@@ -68,12 +64,6 @@ func OpenPoller() (poller *Poller, err error) {
 func (p *Poller) Close() error {
 	return os.NewSyscallError("close", unix.Close(p.fd))
 }
-
-var note = []unix.Kevent_t{{
-	Ident:  0,
-	Filter: unix.EVFILT_USER,
-	Fflags: unix.NOTE_TRIGGER,
-}}
 
 // Trigger enqueues task and wakes up the poller to process pending tasks.
 // By default, any incoming task will enqueued into urgentAsyncTaskQueue
@@ -92,11 +82,9 @@ func (p *Poller) Trigger(priority queue.EventPriority, fn queue.TaskFunc, arg in
 		p.urgentAsyncTaskQueue.Enqueue(task)
 	}
 	if atomic.CompareAndSwapInt32(&p.wakeupCall, 0, 1) {
-		if _, err = unix.Kevent(p.fd, note, nil, nil); err == unix.EAGAIN {
-			err = nil
-		}
+		err = wakePoller(p.fd)
 	}
-	return os.NewSyscallError("kevent trigger", err)
+	return os.NewSyscallError("kevent | write", err)
 }
 
 // Polling blocks the current goroutine, waiting for network-events.
@@ -124,8 +112,9 @@ func (p *Poller) Polling() error {
 			ev := &el.events[i]
 			if ev.Ident == 0 { // poller is awakened to run tasks in queues
 				doChores = true
+				drainWakeupEvent(p.fd)
 			} else {
-				pollAttachment := (*PollAttachment)(unsafe.Pointer(ev.Udata))
+				pollAttachment := restorePollAttachment(unsafe.Pointer(&ev.Udata))
 				switch err = pollAttachment.Callback(int(ev.Ident), ev.Filter, ev.Flags); err {
 				case nil:
 				case errors.ErrAcceptSocket, errors.ErrEngineShutdown:
@@ -164,9 +153,7 @@ func (p *Poller) Polling() error {
 			}
 			atomic.StoreInt32(&p.wakeupCall, 0)
 			if (!p.asyncTaskQueue.IsEmpty() || !p.urgentAsyncTaskQueue.IsEmpty()) && atomic.CompareAndSwapInt32(&p.wakeupCall, 0, 1) {
-				switch _, err = unix.Kevent(p.fd, note, nil, nil); err {
-				case nil, unix.EAGAIN:
-				default:
+				if err = wakePoller(p.fd); err != nil {
 					doChores = true
 				}
 			}
@@ -184,12 +171,12 @@ func (p *Poller) Polling() error {
 func (p *Poller) AddReadWrite(pa *PollAttachment, edgeTriggered bool) error {
 	var evs [2]unix.Kevent_t
 	evs[0].Ident = keventIdent(pa.FD)
+	evs[0].Filter = unix.EVFILT_READ
 	evs[0].Flags = unix.EV_ADD
 	if edgeTriggered {
 		evs[0].Flags |= unix.EV_CLEAR
 	}
-	evs[0].Filter = unix.EVFILT_READ
-	evs[0].Udata = (*byte)(unsafe.Pointer(pa))
+	convertPollAttachment(unsafe.Pointer(&evs[0].Udata), pa)
 	evs[1] = evs[0]
 	evs[1].Filter = unix.EVFILT_WRITE
 	_, err := unix.Kevent(p.fd, evs[:], nil, nil)
@@ -200,12 +187,12 @@ func (p *Poller) AddReadWrite(pa *PollAttachment, edgeTriggered bool) error {
 func (p *Poller) AddRead(pa *PollAttachment, edgeTriggered bool) error {
 	var evs [1]unix.Kevent_t
 	evs[0].Ident = keventIdent(pa.FD)
+	evs[0].Filter = unix.EVFILT_READ
 	evs[0].Flags = unix.EV_ADD
 	if edgeTriggered {
 		evs[0].Flags |= unix.EV_CLEAR
 	}
-	evs[0].Filter = unix.EVFILT_READ
-	evs[0].Udata = (*byte)(unsafe.Pointer(pa))
+	convertPollAttachment(unsafe.Pointer(&evs[0].Udata), pa)
 	_, err := unix.Kevent(p.fd, evs[:], nil, nil)
 	return os.NewSyscallError("kevent add", err)
 }
@@ -214,12 +201,12 @@ func (p *Poller) AddRead(pa *PollAttachment, edgeTriggered bool) error {
 func (p *Poller) AddWrite(pa *PollAttachment, edgeTriggered bool) error {
 	var evs [1]unix.Kevent_t
 	evs[0].Ident = keventIdent(pa.FD)
+	evs[0].Filter = unix.EVFILT_WRITE
 	evs[0].Flags = unix.EV_ADD
 	if edgeTriggered {
 		evs[0].Flags |= unix.EV_CLEAR
 	}
-	evs[0].Filter = unix.EVFILT_WRITE
-	evs[0].Udata = (*byte)(unsafe.Pointer(pa))
+	convertPollAttachment(unsafe.Pointer(&evs[0].Udata), pa)
 	_, err := unix.Kevent(p.fd, evs[:], nil, nil)
 	return os.NewSyscallError("kevent add", err)
 }
@@ -228,9 +215,8 @@ func (p *Poller) AddWrite(pa *PollAttachment, edgeTriggered bool) error {
 func (p *Poller) ModRead(pa *PollAttachment, _ bool) error {
 	var evs [1]unix.Kevent_t
 	evs[0].Ident = keventIdent(pa.FD)
-	evs[0].Flags = unix.EV_DELETE
 	evs[0].Filter = unix.EVFILT_WRITE
-	evs[0].Udata = (*byte)(unsafe.Pointer(pa))
+	evs[0].Flags = unix.EV_DELETE
 	_, err := unix.Kevent(p.fd, evs[:], nil, nil)
 	return os.NewSyscallError("kevent delete", err)
 }
@@ -239,12 +225,12 @@ func (p *Poller) ModRead(pa *PollAttachment, _ bool) error {
 func (p *Poller) ModReadWrite(pa *PollAttachment, edgeTriggered bool) error {
 	var evs [1]unix.Kevent_t
 	evs[0].Ident = keventIdent(pa.FD)
+	evs[0].Filter = unix.EVFILT_WRITE
 	evs[0].Flags = unix.EV_ADD
 	if edgeTriggered {
 		evs[0].Flags |= unix.EV_CLEAR
 	}
-	evs[0].Filter = unix.EVFILT_WRITE
-	evs[0].Udata = (*byte)(unsafe.Pointer(pa))
+	convertPollAttachment(unsafe.Pointer(&evs[0].Udata), pa)
 	_, err := unix.Kevent(p.fd, evs[:], nil, nil)
 	return os.NewSyscallError("kevent add", err)
 }

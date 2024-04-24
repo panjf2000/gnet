@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build linux || freebsd || dragonfly || netbsd
-// +build linux freebsd dragonfly netbsd
+//go:build dragonfly || freebsd || linux || netbsd
+// +build dragonfly freebsd linux netbsd
 
 package socket
 

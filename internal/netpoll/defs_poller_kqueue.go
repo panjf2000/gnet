@@ -12,15 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build freebsd || dragonfly || netbsd || openbsd || darwin
-// +build freebsd dragonfly netbsd openbsd darwin
+//go:build darwin || dragonfly || freebsd || netbsd || openbsd
+// +build darwin dragonfly freebsd netbsd openbsd
 
 package netpoll
 
 import "golang.org/x/sys/unix"
-
-// IOEvent is the integer type of I/O events on BSD's.
-type IOEvent = int16
 
 const (
 	// InitPollEventsCap represents the initial capacity of poller event-list.

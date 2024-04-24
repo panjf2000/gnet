@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build (freebsd || dragonfly || netbsd || openbsd || darwin) && !poll_opt
-// +build freebsd dragonfly netbsd openbsd darwin
+//go:build (darwin || dragonfly || freebsd || netbsd || openbsd) && !poll_opt
+// +build darwin dragonfly freebsd netbsd openbsd
 // +build !poll_opt
 
 package netpoll
@@ -47,14 +47,10 @@ func OpenPoller() (poller *Poller, err error) {
 		err = os.NewSyscallError("kqueue", err)
 		return
 	}
-	if _, err = unix.Kevent(poller.fd, []unix.Kevent_t{{
-		Ident:  0,
-		Filter: unix.EVFILT_USER,
-		Flags:  unix.EV_ADD | unix.EV_CLEAR,
-	}}, nil, nil); err != nil {
+	if err = addWakeupEvent(poller.fd); err != nil {
 		_ = poller.Close()
 		poller = nil
-		err = os.NewSyscallError("kevent add|clear", err)
+		err = os.NewSyscallError("kevent | pipe2", err)
 		return
 	}
 	poller.asyncTaskQueue = queue.NewLockFreeQueue()
@@ -67,12 +63,6 @@ func OpenPoller() (poller *Poller, err error) {
 func (p *Poller) Close() error {
 	return os.NewSyscallError("close", unix.Close(p.fd))
 }
-
-var note = []unix.Kevent_t{{
-	Ident:  0,
-	Filter: unix.EVFILT_USER,
-	Fflags: unix.NOTE_TRIGGER,
-}}
 
 // Trigger enqueues task and wakes up the poller to process pending tasks.
 // By default, any incoming task will enqueued into urgentAsyncTaskQueue
@@ -91,11 +81,9 @@ func (p *Poller) Trigger(priority queue.EventPriority, fn queue.TaskFunc, arg in
 		p.urgentAsyncTaskQueue.Enqueue(task)
 	}
 	if atomic.CompareAndSwapInt32(&p.wakeupCall, 0, 1) {
-		if _, err = unix.Kevent(p.fd, note, nil, nil); err == unix.EAGAIN {
-			err = nil
-		}
+		err = wakePoller(p.fd)
 	}
-	return os.NewSyscallError("kevent trigger", err)
+	return os.NewSyscallError("kevent | write", err)
 }
 
 // Polling blocks the current goroutine, waiting for network-events.
@@ -123,6 +111,7 @@ func (p *Poller) Polling(callback PollEventHandler) error {
 			ev := &el.events[i]
 			if fd := int(ev.Ident); fd == 0 { // poller is awakened to run tasks in queues
 				doChores = true
+				drainWakeupEvent(p.fd)
 			} else {
 				switch err = callback(fd, ev.Filter, ev.Flags); err {
 				case nil:
@@ -162,9 +151,7 @@ func (p *Poller) Polling(callback PollEventHandler) error {
 			}
 			atomic.StoreInt32(&p.wakeupCall, 0)
 			if (!p.asyncTaskQueue.IsEmpty() || !p.urgentAsyncTaskQueue.IsEmpty()) && atomic.CompareAndSwapInt32(&p.wakeupCall, 0, 1) {
-				switch _, err = unix.Kevent(p.fd, note, nil, nil); err {
-				case nil, unix.EAGAIN:
-				default:
+				if err = wakePoller(p.fd); err != nil {
 					doChores = true
 				}
 			}
@@ -180,7 +167,7 @@ func (p *Poller) Polling(callback PollEventHandler) error {
 
 // AddReadWrite registers the given file-descriptor with readable and writable events to the poller.
 func (p *Poller) AddReadWrite(pa *PollAttachment, edgeTriggered bool) error {
-	var flags uint16 = unix.EV_ADD
+	var flags IOFlags = unix.EV_ADD
 	if edgeTriggered {
 		flags |= unix.EV_CLEAR
 	}
@@ -193,7 +180,7 @@ func (p *Poller) AddReadWrite(pa *PollAttachment, edgeTriggered bool) error {
 
 // AddRead registers the given file-descriptor with readable event to the poller.
 func (p *Poller) AddRead(pa *PollAttachment, edgeTriggered bool) error {
-	var flags uint16 = unix.EV_ADD
+	var flags IOFlags = unix.EV_ADD
 	if edgeTriggered {
 		flags |= unix.EV_CLEAR
 	}
@@ -205,7 +192,7 @@ func (p *Poller) AddRead(pa *PollAttachment, edgeTriggered bool) error {
 
 // AddWrite registers the given file-descriptor with writable event to the poller.
 func (p *Poller) AddWrite(pa *PollAttachment, edgeTriggered bool) error {
-	var flags uint16 = unix.EV_ADD
+	var flags IOFlags = unix.EV_ADD
 	if edgeTriggered {
 		flags |= unix.EV_CLEAR
 	}
@@ -225,7 +212,7 @@ func (p *Poller) ModRead(pa *PollAttachment, _ bool) error {
 
 // ModReadWrite renews the given file-descriptor with readable and writable events in the poller.
 func (p *Poller) ModReadWrite(pa *PollAttachment, edgeTriggered bool) error {
-	var flags uint16 = unix.EV_ADD
+	var flags IOFlags = unix.EV_ADD
 	if edgeTriggered {
 		flags |= unix.EV_CLEAR
 	}
