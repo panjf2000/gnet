@@ -23,8 +23,8 @@ import (
 	"github.com/panjf2000/gnet/v2/pkg/logging"
 )
 
-func addWakeupEvent(kq int) error {
-	_, err := unix.Kevent(kq, []unix.Kevent_t{{
+func (p *Poller) addWakeupEvent() error {
+	_, err := unix.Kevent(p.fd, []unix.Kevent_t{{
 		Ident:  0,
 		Filter: unix.EVFILT_USER,
 		Flags:  unix.EV_ADD | unix.EV_CLEAR,
@@ -32,15 +32,15 @@ func addWakeupEvent(kq int) error {
 	return err
 }
 
-func wakePoller(kq int) (err error) {
+func (p *Poller) wakePoller() error {
 retry:
-	_, err = unix.Kevent(kq, []unix.Kevent_t{{
+	_, err := unix.Kevent(p.fd, []unix.Kevent_t{{
 		Ident:  0,
 		Filter: unix.EVFILT_USER,
 		Fflags: unix.NOTE_TRIGGER,
 	}}, nil, nil)
 	if err == nil {
-		return
+		return nil
 	}
 	if err == unix.EINTR {
 		// All changes contained in the changelist should have been applied
@@ -49,7 +49,7 @@ retry:
 		goto retry
 	}
 	logging.Warnf("failed to wake up the poller: %v", err)
-	return
+	return err
 }
 
-func drainWakeupEvent(_ int) {}
+func (p *Poller) drainWakeupEvent() {}

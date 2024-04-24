@@ -33,6 +33,7 @@ import (
 // Poller represents a poller which is in charge of monitoring file-descriptors.
 type Poller struct {
 	fd                          int
+	pipe                        []int
 	wakeupCall                  int32
 	asyncTaskQueue              queue.AsyncTaskQueue // queue with low priority
 	urgentAsyncTaskQueue        queue.AsyncTaskQueue // queue with high priority
@@ -47,7 +48,7 @@ func OpenPoller() (poller *Poller, err error) {
 		err = os.NewSyscallError("kqueue", err)
 		return
 	}
-	if err = addWakeupEvent(poller.fd); err != nil {
+	if err = poller.addWakeupEvent(); err != nil {
 		_ = poller.Close()
 		poller = nil
 		err = os.NewSyscallError("kevent | pipe2", err)
@@ -61,6 +62,10 @@ func OpenPoller() (poller *Poller, err error) {
 
 // Close closes the poller.
 func (p *Poller) Close() error {
+	if len(p.pipe) == 2 {
+		_ = unix.Close(p.pipe[0])
+		_ = unix.Close(p.pipe[1])
+	}
 	return os.NewSyscallError("close", unix.Close(p.fd))
 }
 
@@ -81,7 +86,7 @@ func (p *Poller) Trigger(priority queue.EventPriority, fn queue.TaskFunc, arg in
 		p.urgentAsyncTaskQueue.Enqueue(task)
 	}
 	if atomic.CompareAndSwapInt32(&p.wakeupCall, 0, 1) {
-		err = wakePoller(p.fd)
+		err = p.wakePoller()
 	}
 	return os.NewSyscallError("kevent | write", err)
 }
@@ -111,7 +116,7 @@ func (p *Poller) Polling(callback PollEventHandler) error {
 			ev := &el.events[i]
 			if fd := int(ev.Ident); fd == 0 { // poller is awakened to run tasks in queues
 				doChores = true
-				drainWakeupEvent(p.fd)
+				p.drainWakeupEvent()
 			} else {
 				switch err = callback(fd, ev.Filter, ev.Flags); err {
 				case nil:
@@ -151,7 +156,7 @@ func (p *Poller) Polling(callback PollEventHandler) error {
 			}
 			atomic.StoreInt32(&p.wakeupCall, 0)
 			if (!p.asyncTaskQueue.IsEmpty() || !p.urgentAsyncTaskQueue.IsEmpty()) && atomic.CompareAndSwapInt32(&p.wakeupCall, 0, 1) {
-				if err = wakePoller(p.fd); err != nil {
+				if err = p.wakePoller(); err != nil {
 					doChores = true
 				}
 			}

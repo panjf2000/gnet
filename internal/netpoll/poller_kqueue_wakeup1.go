@@ -30,23 +30,22 @@ import (
 // Alternatively, maybe we can use EVFILT_USER on the NetBSD by checking the kernel version
 // via uname(3) and fall back to the pipe if the kernel version is older than 10.0.
 
-var pipes [2]int
-
-func addWakeupEvent(kq int) error {
-	if err := unix.Pipe2(pipes[:], unix.O_NONBLOCK|unix.O_CLOEXEC); err != nil {
+func (p *Poller) addWakeupEvent() error {
+	p.pipe = make([]int, 2)
+	if err := unix.Pipe2(p.pipe[:], unix.O_NONBLOCK|unix.O_CLOEXEC); err != nil {
 		logging.Fatalf("failed to create pipe for wakeup event: %v", err)
 	}
-	_, err := unix.Kevent(kq, []unix.Kevent_t{{
-		Ident:  uint64(pipes[0]),
+	_, err := unix.Kevent(p.fd, []unix.Kevent_t{{
+		Ident:  uint64(p.pipe[0]),
 		Filter: unix.EVFILT_READ,
 		Flags:  unix.EV_ADD,
 	}}, nil, nil)
 	return err
 }
 
-func wakePoller(_ int) (err error) {
+func (p *Poller) wakePoller() error {
 retry:
-	_, err = unix.Write(pipes[1], []byte("x"))
+	_, err := unix.Write(p.pipe[1], []byte("x"))
 	if err == nil || err == unix.EAGAIN {
 		return nil
 	}
@@ -54,10 +53,10 @@ retry:
 		goto retry
 	}
 	logging.Warnf("failed to write to the wakeup pipe: %v", err)
-	return
+	return err
 }
 
-func drainWakeupEvent(_ int) {
+func (p *Poller) drainWakeupEvent() {
 	var buf [8]byte
-	_, _ = unix.Read(pipes[0], buf[:])
+	_, _ = unix.Read(p.pipe[0], buf[:])
 }
