@@ -63,11 +63,23 @@ jobs:
       - name: Cross-compiling for DragonFlyBSD
         run: GOOS=dragonfly GOARCH=amd64 go build
 
+      - name: Cross-compiling for DragonFlyBSD -tags=poll_opt,gc_opt
+        run: GOOS=dragonfly GOARCH=amd64 go build -tags=poll_opt,gc_opt
+
       - name: Cross-compiling for FreeBSD
         run: GOOS=freebsd GOARCH=amd64 go build
+
+      - name: Cross-compiling for FreeBSD -tags=poll_opt,gc_opt
+        run: GOOS=freebsd GOARCH=amd64 go build -tags=poll_opt,gc_opt
 
       - name: Cross-compiling for NetBSD
         run: GOOS=netbsd GOARCH=amd64 go build
 
+      - name: Cross-compiling for NetBSD -tags=poll_opt,gc_opt
+        run: GOOS=netbsd GOARCH=amd64 go build -tags=poll_opt,gc_opt
+
       - name: Cross-compiling for OpenBSD
         run: GOOS=openbsd GOARCH=amd64 go build
+
+      - name: Cross-compiling for OpenBSD -tags=poll_opt,gc_opt
+        run: GOOS=openbsd GOARCH=amd64 go build -tags=poll_opt,gc_opt
