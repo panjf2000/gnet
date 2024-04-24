@@ -1,5 +1,5 @@
-//go:build linux || freebsd || dragonfly || netbsd || openbsd || darwin || windows
-// +build linux freebsd dragonfly netbsd openbsd darwin windows
+//go:build darwin || dragonfly || freebsd || linux || netbsd || openbsd || windows
+// +build darwin dragonfly freebsd linux netbsd openbsd windows
 
 package gnet
 
