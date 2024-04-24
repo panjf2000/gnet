@@ -58,7 +58,6 @@ func (ln *listener) normalize() (err error) {
 		ln.fd, ln.addr, err = socket.UDPSocket(ln.network, ln.address, false, ln.sockOpts...)
 		ln.network = "udp"
 	case "unix":
-		_ = os.RemoveAll(ln.address)
 		ln.fd, ln.addr, err = socket.UnixSocket(ln.network, ln.address, true, ln.sockOpts...)
 	default:
 		err = errors.ErrUnsupportedProtocol
