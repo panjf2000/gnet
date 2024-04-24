@@ -488,8 +488,11 @@ func createListeners(addrs []string, opts ...Option) ([]*listener, *Options, err
 	// with the capability of load balancing, it's the equivalent of Linux's SO_REUSEPORT.
 	// Also note that DragonFlyBSD 3.6.0 extended SO_REUSEPORT to distribute workload to
 	// available sockets, which make it the same as Linux's SO_REUSEPORT.
-	// AF_LOCAL with SO_REUSEPORT enables duplicate address and port bindings without
-	// load balancing on Linux and *BSD. Therefore, disable it for Unix domain sockets.
+	//
+	// Despite the fact that SO_REUSEPORT can be set on a Unix domain socket
+	// via setsockopt() without reporting an error, SO_REUSEPORT is actually
+	// not supported for sockets of AF_UNIX. Thus, we avoid setting it on the
+	// Unix domain sockets.
 	goos := runtime.GOOS
 	if (options.Multicore || options.NumEventLoop > 1) && options.ReusePort &&
 		((goos != "linux" && goos != "dragonfly" && goos != "freebsd") || hasUnix) {
