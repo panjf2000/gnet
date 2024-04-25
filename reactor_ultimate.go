@@ -1,4 +1,4 @@
-// Copyright (c) 2019 The Gnet Authors. All rights reserved.
+// Copyright (c) 2021 The Gnet Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build linux && !poll_opt
-// +build linux,!poll_opt
+//go:build (darwin || dragonfly || freebsd || linux || netbsd || openbsd) && poll_opt
+// +build darwin dragonfly freebsd linux netbsd openbsd
+// +build poll_opt
 
 package gnet
 
@@ -21,7 +22,6 @@ import (
 	"errors"
 	"runtime"
 
-	"github.com/panjf2000/gnet/v2/internal/netpoll"
 	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
 )
 
@@ -31,7 +31,7 @@ func (el *eventloop) rotate() error {
 		defer runtime.UnlockOSThread()
 	}
 
-	err := el.poller.Polling(el.accept0)
+	err := el.poller.Polling()
 	if errors.Is(err, errorx.ErrEngineShutdown) {
 		el.getLogger().Debugf("main reactor is exiting in terms of the demand from user, %v", err)
 		err = nil
@@ -50,15 +50,7 @@ func (el *eventloop) orbit() error {
 		defer runtime.UnlockOSThread()
 	}
 
-	err := el.poller.Polling(func(fd int, ev netpoll.IOEvent, flags netpoll.IOFlags) error {
-		c := el.connections.getConn(fd)
-		if c == nil {
-			// Somehow epoll notified with an event for a stale fd that is not in our connection set.
-			// We need to delete it from the epoll set.
-			return el.poller.Delete(fd)
-		}
-		return c.processIO(fd, ev, flags)
-	})
+	err := el.poller.Polling()
 	if errors.Is(err, errorx.ErrEngineShutdown) {
 		el.getLogger().Debugf("event-loop(%d) is exiting in terms of the demand from user, %v", el.idx, err)
 		err = nil
@@ -78,18 +70,7 @@ func (el *eventloop) run() error {
 		defer runtime.UnlockOSThread()
 	}
 
-	err := el.poller.Polling(func(fd int, ev netpoll.IOEvent, flags netpoll.IOFlags) error {
-		c := el.connections.getConn(fd)
-		if c == nil {
-			if _, ok := el.listeners[fd]; ok {
-				return el.accept(fd, ev, flags)
-			}
-			// Somehow epoll notified with an event for a stale fd that is not in our connection set.
-			// We need to delete it from the epoll set.
-			return el.poller.Delete(fd)
-		}
-		return c.processIO(fd, ev, flags)
-	})
+	err := el.poller.Polling()
 	if errors.Is(err, errorx.ErrEngineShutdown) {
 		el.getLogger().Debugf("event-loop(%d) is exiting in terms of the demand from user, %v", el.idx, err)
 		err = nil

@@ -70,10 +70,8 @@ func OpenPoller() (poller *Poller, err error) {
 
 // Close closes the poller.
 func (p *Poller) Close() error {
-	if err := os.NewSyscallError("close", unix.Close(p.fd)); err != nil {
-		return err
-	}
-	return os.NewSyscallError("close", unix.Close(p.efd))
+	_ = unix.Close(p.efd)
+	return os.NewSyscallError("close", unix.Close(p.fd))
 }
 
 // Make the endianness of bytes compatible with more linux OSs under different processor-architectures,

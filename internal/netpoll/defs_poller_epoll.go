@@ -19,6 +19,9 @@ package netpoll
 
 import "golang.org/x/sys/unix"
 
+// IOFlags represents the flags of IO events.
+type IOFlags = uint16
+
 // IOEvent is the integer type of I/O events on Linux.
 type IOEvent = uint32
 

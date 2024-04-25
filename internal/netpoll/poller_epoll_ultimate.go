@@ -71,10 +71,8 @@ func OpenPoller() (poller *Poller, err error) {
 
 // Close closes the poller.
 func (p *Poller) Close() error {
-	if err := os.NewSyscallError("close", unix.Close(p.fd)); err != nil {
-		return err
-	}
-	return os.NewSyscallError("close", unix.Close(p.epa.FD))
+	_ = unix.Close(p.epa.FD)
+	return os.NewSyscallError("close", unix.Close(p.fd))
 }
 
 // Make the endianness of bytes compatible with more linux OSs under different processor-architectures,
@@ -133,7 +131,7 @@ func (p *Poller) Polling() error {
 
 		for i := 0; i < n; i++ {
 			ev := &el.events[i]
-			pollAttachment := *(**PollAttachment)(unsafe.Pointer(&ev.data))
+			pollAttachment := restorePollAttachment(unsafe.Pointer(&ev.data))
 			if pollAttachment.FD == p.epa.FD { // poller is awakened to run tasks in queues.
 				doChores = true
 			} else {
@@ -210,7 +208,7 @@ func (p *Poller) AddReadWrite(pa *PollAttachment, edgeTriggered bool) error {
 	if edgeTriggered {
 		ev.events |= unix.EPOLLET
 	}
-	*(**PollAttachment)(unsafe.Pointer(&ev.data)) = pa
+	convertPollAttachment(unsafe.Pointer(&ev.data), pa)
 	return os.NewSyscallError("epoll_ctl add", epollCtl(p.fd, unix.EPOLL_CTL_ADD, pa.FD, &ev))
 }
 
@@ -221,7 +219,7 @@ func (p *Poller) AddRead(pa *PollAttachment, edgeTriggered bool) error {
 	if edgeTriggered {
 		ev.events |= unix.EPOLLET
 	}
-	*(**PollAttachment)(unsafe.Pointer(&ev.data)) = pa
+	convertPollAttachment(unsafe.Pointer(&ev.data), pa)
 	return os.NewSyscallError("epoll_ctl add", epollCtl(p.fd, unix.EPOLL_CTL_ADD, pa.FD, &ev))
 }
 
@@ -232,7 +230,7 @@ func (p *Poller) AddWrite(pa *PollAttachment, edgeTriggered bool) error {
 	if edgeTriggered {
 		ev.events |= unix.EPOLLET
 	}
-	*(**PollAttachment)(unsafe.Pointer(&ev.data)) = pa
+	convertPollAttachment(unsafe.Pointer(&ev.data), pa)
 	return os.NewSyscallError("epoll_ctl add", epollCtl(p.fd, unix.EPOLL_CTL_ADD, pa.FD, &ev))
 }
 
@@ -243,7 +241,7 @@ func (p *Poller) ModRead(pa *PollAttachment, edgeTriggered bool) error {
 	if edgeTriggered {
 		ev.events |= unix.EPOLLET
 	}
-	*(**PollAttachment)(unsafe.Pointer(&ev.data)) = pa
+	convertPollAttachment(unsafe.Pointer(&ev.data), pa)
 	return os.NewSyscallError("epoll_ctl mod", epollCtl(p.fd, unix.EPOLL_CTL_MOD, pa.FD, &ev))
 }
 
@@ -254,7 +252,7 @@ func (p *Poller) ModReadWrite(pa *PollAttachment, edgeTriggered bool) error {
 	if edgeTriggered {
 		ev.events |= unix.EPOLLET
 	}
-	*(**PollAttachment)(unsafe.Pointer(&ev.data)) = pa
+	convertPollAttachment(unsafe.Pointer(&ev.data), pa)
 	return os.NewSyscallError("epoll_ctl mod", epollCtl(p.fd, unix.EPOLL_CTL_MOD, pa.FD, &ev))
 }
 

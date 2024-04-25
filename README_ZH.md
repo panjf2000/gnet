@@ -38,14 +38,15 @@
 - [x] 高效、可重用而且自动伸缩的内存 buffer：(Elastic-)Ring-Buffer, Linked-List-Buffer and Elastic-Mixed-Buffer
 - [x] 多种网络协议/IPC 机制：`TCP`、`UDP` 和 `Unix Domain Socket`
 - [x] 多种负载均衡算法：`Round-Robin(轮询)`、`Source-Addr-Hash(源地址哈希)` 和 `Least-Connections(最少连接数)`
-- [x] 两种事件驱动机制：**Linux** 里的 `epoll` 以及 **FreeBSD/DragonFly/Darwin** 里的 `kqueue`
 - [x] 灵活的事件定时器
-- [x] 实现 `gnet` 客户端
-- [x] 支持 **Windows** 平台 (仅用于开发环境的兼容性，不要在生产环境中使用)
+- [x] `gnet` 客户端支持
+- [x] 支持 `Linux`, `macOS`, `Windows` 和 *BSD 操作系统: `Darwin`/`DragonFlyBSD`/`FreeBSD`/`NetBSD`/`OpenBSD`
 - [x] **Edge-triggered** I/O 支持
 - [x] 多网络地址绑定
 - [ ] **TLS** 支持
 - [ ] [io_uring](https://kernel.dk/io_uring.pdf) 支持
+
+***`gnet` 的 Windows 版本应该仅用于开发阶段的开发和测试，切勿用于生产环境***。
 
 # 🎬 开始
 
