@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build linux || freebsd || dragonfly || netbsd || openbsd || darwin
-// +build linux freebsd dragonfly netbsd openbsd darwin
+//go:build darwin || dragonfly || freebsd || linux || netbsd || openbsd
+// +build darwin dragonfly freebsd linux netbsd openbsd
 
 package socket
 
@@ -46,11 +46,6 @@ func SetRecvBuffer(fd, size int) error {
 // transmit buffer associated with the connection.
 func SetSendBuffer(fd, size int) error {
 	return unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_SNDBUF, size)
-}
-
-// SetReuseport enables SO_REUSEPORT option on socket.
-func SetReuseport(fd, reusePort int) error {
-	return os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_REUSEPORT, reusePort))
 }
 
 // SetReuseAddr enables SO_REUSEADDR option on socket.

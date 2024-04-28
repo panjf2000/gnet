@@ -17,12 +17,13 @@ package gnet
 import (
 	"bytes"
 	"context"
+	"errors"
 	"runtime"
 	"strings"
 	"sync/atomic"
 	"time"
 
-	"github.com/panjf2000/gnet/v2/pkg/errors"
+	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
 )
 
@@ -67,7 +68,7 @@ func (el *eventloop) run() (err error) {
 			err = v
 		case *netErr:
 			err = el.close(v.c, v.err)
-		case *conn:
+		case *openConn:
 			err = el.open(v)
 		case *tcpConn:
 			unpackTCPConn(v)
@@ -79,7 +80,7 @@ func (el *eventloop) run() (err error) {
 			err = v()
 		}
 
-		if err == errors.ErrEngineShutdown {
+		if errors.Is(err, errorx.ErrEngineShutdown) {
 			el.getLogger().Debugf("event-loop(%d) is exiting in terms of the demand from user, %v", el.idx, err)
 			break
 		} else if err != nil {
@@ -90,9 +91,16 @@ func (el *eventloop) run() (err error) {
 	return nil
 }
 
-func (el *eventloop) open(c *conn) error {
-	el.connections[c] = struct{}{}
-	el.incConn(1)
+func (el *eventloop) open(oc *openConn) error {
+	if oc.cb != nil {
+		defer oc.cb()
+	}
+
+	c := oc.c
+	if !oc.isDatagram {
+		el.connections[c] = struct{}{}
+		el.incConn(1)
+	}
 
 	out, action := el.eventHandler.OnOpen(c)
 	if out != nil {
@@ -114,7 +122,7 @@ func (el *eventloop) read(c *conn) error {
 	case Close:
 		return el.close(c, nil)
 	case Shutdown:
-		return errors.ErrEngineShutdown
+		return errorx.ErrEngineShutdown
 	}
 	_, _ = c.inboundBuffer.Write(c.buffer.B)
 	c.buffer.Reset()
@@ -125,7 +133,7 @@ func (el *eventloop) read(c *conn) error {
 func (el *eventloop) readUDP(c *conn) error {
 	action := el.eventHandler.OnTraffic(c)
 	if action == Shutdown {
-		return errors.ErrEngineShutdown
+		return errorx.ErrEngineShutdown
 	}
 	c.release()
 	return nil
@@ -153,7 +161,7 @@ func (el *eventloop) ticker(ctx context.Context) {
 		case Shutdown:
 			if !shutdown {
 				shutdown = true
-				el.ch <- errors.ErrEngineShutdown
+				el.ch <- errorx.ErrEngineShutdown
 				el.getLogger().Debugf("stopping ticker in event-loop(%d) from Tick()", el.idx)
 			}
 		}
@@ -213,7 +221,7 @@ func (el *eventloop) handleAction(c *conn, action Action) error {
 	case Close:
 		return el.close(c, nil)
 	case Shutdown:
-		return errors.ErrEngineShutdown
+		return errorx.ErrEngineShutdown
 	default:
 		return nil
 	}

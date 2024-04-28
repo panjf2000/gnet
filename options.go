@@ -69,7 +69,7 @@ type Options struct {
 
 	// ============================= Options for both server-side and client-side =============================
 
-	// ReadBufferCap is the maximum number of bytes that can be read from the peer when the readable event comes.
+	// ReadBufferCap is the maximum number of bytes that can be read from the remote when the readable event comes.
 	// The default value is 64KB, it can either be reduced to avoid starving the subsequent connections or increased
 	// to read more data from a socket.
 	//
@@ -126,6 +126,11 @@ type Options struct {
 	// Logger is the customized logger for logging info, if it is not set,
 	// then gnet will use the default logger powered by go.uber.org/zap.
 	Logger logging.Logger
+
+	// EdgeTriggeredIO enables the edge-triggered I/O for the underlying epoll/kqueue event-loop.
+	// Don't enable it unless you are 100% sure what you are doing.
+	// Note that this option is only available for stream-oriented protocol.
+	EdgeTriggeredIO bool
 }
 
 // WithOptions sets up all options.
@@ -258,5 +263,12 @@ func WithMulticastInterfaceIndex(idx int) Option {
 func WithTLS(tlsconfig *tls.Config) Option {
 	return func(opts *Options) {
 		opts.TLSconfig = tlsconfig
+	}
+}
+
+// WithEdgeTriggeredIO enables the edge-triggered I/O for the underlying epoll/kqueue event-loop.
+func WithEdgeTriggeredIO(et bool) Option {
+	return func(opts *Options) {
+		opts.EdgeTriggeredIO = et
 	}
 }

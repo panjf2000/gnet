@@ -1,0 +1,85 @@
+name: Cross-compile for *BSD
+
+on:
+  push:
+    branches:
+      - master
+      - dev
+      - 1.x
+    paths-ignore:
+      - '**.md'
+      - '**.yml'
+      - '**.yaml'
+      - '!.github/workflows/cross-compile-bsd.yml'
+  pull_request:
+    branches:
+      - master
+      - dev
+      - 1.x
+    paths-ignore:
+      - '**.md'
+      - '**.yml'
+      - '**.yaml'
+      - '!.github/workflows/cross-compile-bsd.yml'
+
+env:
+  GO111MODULE: on
+  GOPROXY: "https://proxy.golang.org"
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        go: ['1.17', '1.21']
+        os:
+          - ubuntu-latest
+    name: Go ${{ matrix.go }} @ ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go }}
+
+      - name: Print Go environment
+        id: go-env
+        run: |
+          printf "Using go at: $(which go)\n"
+          printf "Go version: $(go version)\n"
+          printf "\n\nGo environment:\n\n"
+          go env
+          printf "\n\nSystem environment:\n\n"
+          env
+          # Calculate the short SHA1 hash of the git commit
+          echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "GO_CACHE=$(go env GOCACHE)" >> $GITHUB_OUTPUT
+
+      - name: Cross-compiling for DragonFlyBSD
+        run: GOOS=dragonfly GOARCH=amd64 go build
+
+      - name: Cross-compiling for DragonFlyBSD -tags=poll_opt,gc_opt
+        run: GOOS=dragonfly GOARCH=amd64 go build -tags=poll_opt,gc_opt
+
+      - name: Cross-compiling for FreeBSD
+        run: GOOS=freebsd GOARCH=amd64 go build
+
+      - name: Cross-compiling for FreeBSD -tags=poll_opt,gc_opt
+        run: GOOS=freebsd GOARCH=amd64 go build -tags=poll_opt,gc_opt
+
+      - name: Cross-compiling for NetBSD
+        run: GOOS=netbsd GOARCH=amd64 go build
+
+      - name: Cross-compiling for NetBSD -tags=poll_opt,gc_opt
+        run: GOOS=netbsd GOARCH=amd64 go build -tags=poll_opt,gc_opt
+
+      - name: Cross-compiling for OpenBSD
+        run: GOOS=openbsd GOARCH=amd64 go build
+
+      - name: Cross-compiling for OpenBSD -tags=poll_opt,gc_opt
+        run: GOOS=openbsd GOARCH=amd64 go build -tags=poll_opt,gc_opt

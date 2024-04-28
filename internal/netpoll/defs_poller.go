@@ -1,4 +1,4 @@
-// Copyright (c) 2023 The Gnet Authors. All rights reserved.
+// Copyright (c) 2021 The Gnet Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,10 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build (darwin || dragonfly || freebsd || netbsd || openbsd) && (386 || arm || mips || mipsle)
-// +build darwin dragonfly freebsd netbsd openbsd
-// +build 386 arm mips mipsle
+//go:build darwin || dragonfly || freebsd || linux || netbsd || openbsd
+// +build darwin dragonfly freebsd linux netbsd openbsd
 
 package netpoll
 
-type keventIdent = uint32
+// PollEventHandler is the callback for I/O events notified by the poller.
+type PollEventHandler func(int, IOEvent, IOFlags) error
+
+// PollAttachment is the user data which is about to be stored in "void *ptr" of epoll_data or "void *udata" of kevent.
+type PollAttachment struct {
+	FD       int
+	Callback PollEventHandler
+}

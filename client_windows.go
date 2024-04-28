@@ -50,8 +50,8 @@ func NewClient(eh EventHandler, opts ...Option) (cli *Client, err error) {
 
 	shutdownCtx, shutdown := context.WithCancel(context.Background())
 	eng := &engine{
-		ln:   &listener{},
-		opts: options,
+		listeners: []*listener{},
+		opts:      options,
 		workerPool: struct {
 			*errgroup.Group
 			shutdownCtx context.Context
@@ -70,7 +70,7 @@ func NewClient(eh EventHandler, opts ...Option) (cli *Client, err error) {
 }
 
 func (cli *Client) Start() error {
-	cli.el.eventHandler.OnBoot(Engine{})
+	cli.el.eventHandler.OnBoot(Engine{cli.el.eng})
 	cli.el.eng.workerPool.Go(cli.el.run)
 	if cli.opts.Ticker {
 		cli.el.eng.ticker.ctx, cli.el.eng.ticker.cancel = context.WithCancel(context.Background())
@@ -89,7 +89,7 @@ func (cli *Client) Stop() (err error) {
 		cli.el.eng.ticker.cancel()
 	}
 	_ = cli.el.eng.workerPool.Wait()
-	cli.el.eventHandler.OnShutdown(Engine{})
+	cli.el.eventHandler.OnShutdown(Engine{cli.el.eng})
 	logging.Cleanup()
 	return
 }
@@ -118,6 +118,10 @@ func unixAddr(addr string) string {
 }
 
 func (cli *Client) Dial(network, addr string) (Conn, error) {
+	return cli.DialContext(network, addr, nil)
+}
+
+func (cli *Client) DialContext(network, addr string, ctx interface{}) (Conn, error) {
 	var (
 		c   net.Conn
 		err error
@@ -135,10 +139,15 @@ func (cli *Client) Dial(network, addr string) (Conn, error) {
 			return nil, err
 		}
 	}
-	return cli.Enroll(c)
+	return cli.EnrollContext(c, ctx)
 }
 
 func (cli *Client) Enroll(nc net.Conn) (gc Conn, err error) {
+	return cli.EnrollContext(nc, nil)
+}
+
+func (cli *Client) EnrollContext(nc net.Conn, ctx interface{}) (gc Conn, err error) {
+	connOpened := make(chan struct{})
 	switch v := nc.(type) {
 	case *net.TCPConn:
 		if cli.opts.TCPNoDelay == TCPNoDelay {
@@ -156,7 +165,8 @@ func (cli *Client) Enroll(nc net.Conn) (gc Conn, err error) {
 		}
 
 		c := newTCPConn(nc, cli.el)
-		cli.el.ch <- c
+		c.SetContext(ctx)
+		cli.el.ch <- &openConn{c: c, cb: func() { close(connOpened) }}
 		go func(c *conn, tc net.Conn, el *eventloop) {
 			var buffer [0x10000]byte
 			for {
@@ -171,7 +181,8 @@ func (cli *Client) Enroll(nc net.Conn) (gc Conn, err error) {
 		gc = c
 	case *net.UnixConn:
 		c := newTCPConn(nc, cli.el)
-		cli.el.ch <- c
+		c.SetContext(ctx)
+		cli.el.ch <- &openConn{c: c, cb: func() { close(connOpened) }}
 		go func(c *conn, uc net.Conn, el *eventloop) {
 			var buffer [0x10000]byte
 			for {
@@ -191,8 +202,10 @@ func (cli *Client) Enroll(nc net.Conn) (gc Conn, err error) {
 		}(c, nc, cli.el)
 		gc = c
 	case *net.UDPConn:
-		c := newUDPConn(cli.el, nc.LocalAddr(), nc.RemoteAddr())
+		c := newUDPConn(cli.el, nil, nc.LocalAddr(), nc.RemoteAddr())
+		c.SetContext(ctx)
 		c.rawConn = nc
+		cli.el.ch <- &openConn{c: c, isDatagram: true, cb: func() { close(connOpened) }}
 		go func(uc net.Conn, el *eventloop) {
 			var buffer [0x10000]byte
 			for {
@@ -200,7 +213,8 @@ func (cli *Client) Enroll(nc net.Conn) (gc Conn, err error) {
 				if err != nil {
 					return
 				}
-				c := newUDPConn(cli.el, uc.LocalAddr(), uc.RemoteAddr())
+				c := newUDPConn(cli.el, nil, uc.LocalAddr(), uc.RemoteAddr())
+				c.SetContext(ctx)
 				c.rawConn = uc
 				el.ch <- packUDPConn(c, buffer[:n])
 			}
@@ -210,5 +224,6 @@ func (cli *Client) Enroll(nc net.Conn) (gc Conn, err error) {
 		return nil, errorx.ErrUnsupportedProtocol
 	}
 
+	<-connOpened
 	return
 }

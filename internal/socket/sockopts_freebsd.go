@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 The Gnet Authors. All rights reserved.
+ * Copyright (c) 2024 The Gnet Authors. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,14 +15,15 @@
  *
  */
 
-package gnet
+package socket
 
-import "github.com/panjf2000/gnet/v2/internal/netpoll"
+import (
+	"os"
 
-func (eng *engine) accept(fd int, ev netpoll.IOEvent) error {
-	return eng.accept1(fd, ev, 0)
-}
+	"golang.org/x/sys/unix"
+)
 
-func (el *eventloop) accept(fd int, ev netpoll.IOEvent) error {
-	return el.accept1(fd, ev, 0)
+// SetReuseport enables SO_REUSEPORT_LB option on socket.
+func SetReuseport(fd, reusePort int) error {
+	return os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_REUSEPORT_LB, reusePort))
 }

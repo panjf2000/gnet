@@ -13,8 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build freebsd || dragonfly || netbsd || openbsd || darwin
-// +build freebsd dragonfly netbsd openbsd darwin
+//go:build darwin || dragonfly || freebsd || netbsd || openbsd
+// +build darwin dragonfly freebsd netbsd openbsd
 
 package socket
 

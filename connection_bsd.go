@@ -12,37 +12,47 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build freebsd || dragonfly || netbsd || openbsd || darwin
-// +build freebsd dragonfly netbsd openbsd darwin
+//go:build darwin || dragonfly || freebsd || netbsd || openbsd
+// +build darwin dragonfly freebsd netbsd openbsd
 
 package gnet
 
 import (
 	"io"
 
+	"golang.org/x/sys/unix"
+
 	"github.com/panjf2000/gnet/v2/internal/netpoll"
 )
 
-func (c *conn) handleEvents(_ int, filter int16, flags uint16) (err error) {
-	switch {
-	case flags&netpoll.EVFlagsDelete != 0:
-	case flags&netpoll.EVFlagsEOF != 0:
-		switch {
-		case filter == netpoll.EVFilterRead: // read the remaining data after the peer wrote and closed immediately
-			err = c.loop.read(c)
-		case filter == netpoll.EVFilterWrite && !c.outboundBuffer.IsEmpty():
-			err = c.loop.write(c)
+func (c *conn) processIO(_ int, filter netpoll.IOEvent, flags netpoll.IOFlags) (err error) {
+	el := c.loop
+	switch filter {
+	case unix.EVFILT_READ:
+		err = el.read(c)
+	case unix.EVFILT_WRITE:
+		err = el.write(c)
+	}
+	// EV_EOF indicates that the remote has closed the connection.
+	// We check for EV_EOF after processing the read/write event
+	// to ensure that nothing is left out on this event filter.
+	if flags&unix.EV_EOF != 0 && c.opened && err == nil {
+		switch filter {
+		case unix.EVFILT_READ:
+			// Received the event of EVFILT_READ|EV_EOF, but the previous eventloop.read
+			// failed to drain the socket buffer, so we make sure we get it done this time.
+			c.isEOF = true
+			err = el.read(c)
+		case unix.EVFILT_WRITE:
+			// On macOS, the kqueue in either LT or ET mode will notify with one event for the
+			// EOF of the TCP remote: EVFILT_READ|EV_ADD|EV_CLEAR|EV_EOF. But for some reason,
+			// two events will be issued in ET mode for the EOF of the Unix remote in this order:
+			// 1) EVFILT_WRITE|EV_ADD|EV_CLEAR|EV_EOF, 2) EVFILT_READ|EV_ADD|EV_CLEAR|EV_EOF.
+			err = el.write(c)
 		default:
-			err = c.loop.close(c, io.EOF)
+			c.outboundBuffer.Release() // don't bother to write to a connection with some unknown error
+			err = el.close(c, io.EOF)
 		}
-	case filter == netpoll.EVFilterRead:
-		err = c.loop.read(c)
-	case filter == netpoll.EVFilterWrite && !c.outboundBuffer.IsEmpty():
-		err = c.loop.write(c)
 	}
 	return
-}
-
-func (el *eventloop) readUDP(fd int, filter netpoll.IOEvent, flags netpoll.IOFlags) error {
-	return el.readUDP1(fd, filter, flags)
 }

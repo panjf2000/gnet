@@ -32,12 +32,13 @@ import (
 
 // Poller represents a poller which is in charge of monitoring file-descriptors.
 type Poller struct {
-	fd                   int             // epoll fd
-	epa                  *PollAttachment // PollAttachment for waking events
-	efdBuf               []byte          // efd buffer to read an 8-byte integer
-	wakeupCall           int32
-	asyncTaskQueue       queue.AsyncTaskQueue // queue with low priority
-	urgentAsyncTaskQueue queue.AsyncTaskQueue // queue with high priority
+	fd                          int             // epoll fd
+	epa                         *PollAttachment // PollAttachment for waking events
+	efdBuf                      []byte          // efd buffer to read an 8-byte integer
+	wakeupCall                  int32
+	asyncTaskQueue              queue.AsyncTaskQueue // queue with low priority
+	urgentAsyncTaskQueue        queue.AsyncTaskQueue // queue with high priority
+	highPriorityEventsThreshold int32                // threshold of high-priority events
 }
 
 // OpenPoller instantiates a poller.
@@ -57,22 +58,21 @@ func OpenPoller() (poller *Poller, err error) {
 	}
 	poller.efdBuf = make([]byte, 8)
 	poller.epa = &PollAttachment{FD: efd}
-	if err = poller.AddRead(poller.epa); err != nil {
+	if err = poller.AddRead(poller.epa, true); err != nil {
 		_ = poller.Close()
 		poller = nil
 		return
 	}
 	poller.asyncTaskQueue = queue.NewLockFreeQueue()
 	poller.urgentAsyncTaskQueue = queue.NewLockFreeQueue()
+	poller.highPriorityEventsThreshold = MaxPollEventsCap
 	return
 }
 
 // Close closes the poller.
 func (p *Poller) Close() error {
-	if err := os.NewSyscallError("close", unix.Close(p.fd)); err != nil {
-		return err
-	}
-	return os.NewSyscallError("close", unix.Close(p.epa.FD))
+	_ = unix.Close(p.epa.FD)
+	return os.NewSyscallError("close", unix.Close(p.fd))
 }
 
 // Make the endianness of bytes compatible with more linux OSs under different processor-architectures,
@@ -82,34 +82,30 @@ var (
 	b        = (*(*[8]byte)(unsafe.Pointer(&u)))[:]
 )
 
-// UrgentTrigger puts task into urgentAsyncTaskQueue and wakes up the poller which is waiting for network-events,
-// then the poller will get tasks from urgentAsyncTaskQueue and run them.
+// Trigger enqueues task and wakes up the poller to process pending tasks.
+// By default, any incoming task will enqueued into urgentAsyncTaskQueue
+// before the threshold of high-priority events is reached. When it happens,
+// any asks other than high-priority tasks will be shunted to asyncTaskQueue.
 //
-// Note that urgentAsyncTaskQueue is a queue with high-priority and its size is expected to be small,
-// so only those urgent tasks should be put into this queue.
-func (p *Poller) UrgentTrigger(fn queue.TaskFunc, arg interface{}) (err error) {
+// Note that asyncTaskQueue is a queue of low-priority whose size may grow large and tasks in it may backlog.
+func (p *Poller) Trigger(priority queue.EventPriority, fn queue.TaskFunc, arg interface{}) (err error) {
 	task := queue.GetTask()
 	task.Run, task.Arg = fn, arg
-	p.urgentAsyncTaskQueue.Enqueue(task)
-	if atomic.CompareAndSwapInt32(&p.wakeupCall, 0, 1) {
-		if _, err = unix.Write(p.epa.FD, b); err == unix.EAGAIN {
-			err = nil
-		}
+	if priority > queue.HighPriority && p.urgentAsyncTaskQueue.Length() >= p.highPriorityEventsThreshold {
+		p.asyncTaskQueue.Enqueue(task)
+	} else {
+		// There might be some low-priority tasks overflowing into urgentAsyncTaskQueue in a flash,
+		// but that's tolerable because it ought to be a rare case.
+		p.urgentAsyncTaskQueue.Enqueue(task)
 	}
-	return os.NewSyscallError("write", err)
-}
-
-// Trigger is like UrgentTrigger but it puts task into asyncTaskQueue,
-// call this method when the task is not so urgent, for instance writing data back to the peer.
-//
-// Note that asyncTaskQueue is a queue with low-priority whose size may grow large and tasks in it may backlog.
-func (p *Poller) Trigger(fn queue.TaskFunc, arg interface{}) (err error) {
-	task := queue.GetTask()
-	task.Run, task.Arg = fn, arg
-	p.asyncTaskQueue.Enqueue(task)
 	if atomic.CompareAndSwapInt32(&p.wakeupCall, 0, 1) {
-		if _, err = unix.Write(p.epa.FD, b); err == unix.EAGAIN {
-			err = nil
+		for {
+			_, err = unix.Write(p.epa.FD, b)
+			if err == unix.EAGAIN {
+				_, _ = unix.Read(p.epa.FD, p.efdBuf)
+				continue
+			}
+			break
 		}
 	}
 	return os.NewSyscallError("write", err)
@@ -135,12 +131,11 @@ func (p *Poller) Polling() error {
 
 		for i := 0; i < n; i++ {
 			ev := &el.events[i]
-			pollAttachment := *(**PollAttachment)(unsafe.Pointer(&ev.data))
+			pollAttachment := restorePollAttachment(unsafe.Pointer(&ev.data))
 			if pollAttachment.FD == p.epa.FD { // poller is awakened to run tasks in queues.
 				doChores = true
-				_, _ = unix.Read(p.epa.FD, p.efdBuf)
 			} else {
-				switch err = pollAttachment.Callback(pollAttachment.FD, ev.events); err {
+				switch err = pollAttachment.Callback(pollAttachment.FD, ev.events, 0); err {
 				case nil:
 				case errors.ErrAcceptSocket, errors.ErrEngineShutdown:
 					return err
@@ -178,10 +173,16 @@ func (p *Poller) Polling() error {
 			}
 			atomic.StoreInt32(&p.wakeupCall, 0)
 			if (!p.asyncTaskQueue.IsEmpty() || !p.urgentAsyncTaskQueue.IsEmpty()) && atomic.CompareAndSwapInt32(&p.wakeupCall, 0, 1) {
-				switch _, err = unix.Write(p.epa.FD, b); err {
-				case nil, unix.EAGAIN:
-				default:
-					doChores = true
+				for {
+					_, err = unix.Write(p.epa.FD, b)
+					if err == unix.EAGAIN {
+						_, _ = unix.Read(p.epa.FD, p.efdBuf)
+						continue
+					}
+					if err != nil {
+						logging.Errorf("failed to notify next round of event-loop for leftover tasks, %v", os.NewSyscallError("write", err))
+					}
+					break
 				}
 			}
 		}
@@ -195,48 +196,63 @@ func (p *Poller) Polling() error {
 }
 
 const (
-	readEvents      = unix.EPOLLPRI | unix.EPOLLIN
-	writeEvents     = unix.EPOLLOUT
+	readEvents      = unix.EPOLLIN | unix.EPOLLPRI | unix.EPOLLRDHUP
+	writeEvents     = unix.EPOLLOUT | unix.EPOLLRDHUP
 	readWriteEvents = readEvents | writeEvents
 )
 
 // AddReadWrite registers the given file-descriptor with readable and writable events to the poller.
-func (p *Poller) AddReadWrite(pa *PollAttachment) error {
+func (p *Poller) AddReadWrite(pa *PollAttachment, edgeTriggered bool) error {
 	var ev epollevent
 	ev.events = readWriteEvents
-	*(**PollAttachment)(unsafe.Pointer(&ev.data)) = pa
+	if edgeTriggered {
+		ev.events |= unix.EPOLLET
+	}
+	convertPollAttachment(unsafe.Pointer(&ev.data), pa)
 	return os.NewSyscallError("epoll_ctl add", epollCtl(p.fd, unix.EPOLL_CTL_ADD, pa.FD, &ev))
 }
 
 // AddRead registers the given file-descriptor with readable event to the poller.
-func (p *Poller) AddRead(pa *PollAttachment) error {
+func (p *Poller) AddRead(pa *PollAttachment, edgeTriggered bool) error {
 	var ev epollevent
 	ev.events = readEvents
-	*(**PollAttachment)(unsafe.Pointer(&ev.data)) = pa
+	if edgeTriggered {
+		ev.events |= unix.EPOLLET
+	}
+	convertPollAttachment(unsafe.Pointer(&ev.data), pa)
 	return os.NewSyscallError("epoll_ctl add", epollCtl(p.fd, unix.EPOLL_CTL_ADD, pa.FD, &ev))
 }
 
 // AddWrite registers the given file-descriptor with writable event to the poller.
-func (p *Poller) AddWrite(pa *PollAttachment) error {
+func (p *Poller) AddWrite(pa *PollAttachment, edgeTriggered bool) error {
 	var ev epollevent
 	ev.events = writeEvents
-	*(**PollAttachment)(unsafe.Pointer(&ev.data)) = pa
+	if edgeTriggered {
+		ev.events |= unix.EPOLLET
+	}
+	convertPollAttachment(unsafe.Pointer(&ev.data), pa)
 	return os.NewSyscallError("epoll_ctl add", epollCtl(p.fd, unix.EPOLL_CTL_ADD, pa.FD, &ev))
 }
 
 // ModRead renews the given file-descriptor with readable event in the poller.
-func (p *Poller) ModRead(pa *PollAttachment) error {
+func (p *Poller) ModRead(pa *PollAttachment, edgeTriggered bool) error {
 	var ev epollevent
 	ev.events = readEvents
-	*(**PollAttachment)(unsafe.Pointer(&ev.data)) = pa
+	if edgeTriggered {
+		ev.events |= unix.EPOLLET
+	}
+	convertPollAttachment(unsafe.Pointer(&ev.data), pa)
 	return os.NewSyscallError("epoll_ctl mod", epollCtl(p.fd, unix.EPOLL_CTL_MOD, pa.FD, &ev))
 }
 
 // ModReadWrite renews the given file-descriptor with readable and writable events in the poller.
-func (p *Poller) ModReadWrite(pa *PollAttachment) error {
+func (p *Poller) ModReadWrite(pa *PollAttachment, edgeTriggered bool) error {
 	var ev epollevent
 	ev.events = readWriteEvents
-	*(**PollAttachment)(unsafe.Pointer(&ev.data)) = pa
+	if edgeTriggered {
+		ev.events |= unix.EPOLLET
+	}
+	convertPollAttachment(unsafe.Pointer(&ev.data), pa)
 	return os.NewSyscallError("epoll_ctl mod", epollCtl(p.fd, unix.EPOLL_CTL_MOD, pa.FD, &ev))
 }
 

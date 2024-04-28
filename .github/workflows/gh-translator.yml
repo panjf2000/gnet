@@ -1,0 +1,23 @@
+name: 'gh-translator'
+
+on:
+  issues:
+    types: [opened]
+  pull_request:
+    types: [opened]
+  issue_comment:
+    types: [created, edited]
+  discussion:
+    types: [created, edited, answered]
+  discussion_comment:
+    types: [created, edited]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: usthe/issues-translate-action@v2.7
+        with:
+          BOT_GITHUB_TOKEN: ${{ secrets.GH_TRANSLATOR_TOKEN }}
+          IS_MODIFY_TITLE: true
+          CUSTOM_BOT_NOTE: 🤖 Non-English text detected, translating...

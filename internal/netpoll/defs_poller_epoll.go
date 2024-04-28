@@ -19,6 +19,9 @@ package netpoll
 
 import "golang.org/x/sys/unix"
 
+// IOFlags represents the flags of IO events.
+type IOFlags = uint16
+
 // IOEvent is the integer type of I/O events on Linux.
 type IOEvent = uint32
 
@@ -34,10 +37,6 @@ const (
 	// ErrEvents represents exceptional events that are not read/write, like socket being closed,
 	// reading/writing from/to a closed socket, etc.
 	ErrEvents = unix.EPOLLERR | unix.EPOLLHUP | unix.EPOLLRDHUP
-	// OutEvents combines EPOLLOUT event and some exceptional events.
-	OutEvents = ErrEvents | unix.EPOLLOUT
-	// InEvents combines EPOLLIN/EPOLLPRI events and some exceptional events.
-	InEvents = ErrEvents | unix.EPOLLIN | unix.EPOLLPRI
 )
 
 type eventList struct {

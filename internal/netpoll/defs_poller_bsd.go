@@ -1,4 +1,4 @@
-// Copyright (c) 2021 The Gnet Authors. All rights reserved.
+// Copyright (c) 2024 The Gnet Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,10 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build freebsd || dragonfly || netbsd || openbsd || darwin
-// +build freebsd dragonfly netbsd openbsd darwin
+//go:build darwin || dragonfly || freebsd || openbsd
+// +build darwin dragonfly freebsd openbsd
 
 package netpoll
 
-// PollEventHandler is the callback for I/O events notified by the poller.
-type PollEventHandler func(int, int16, uint16) error
+// IOFlags represents the flags of IO events.
+type IOFlags = uint16
+
+// IOEvent is the integer type of I/O events on BSD's.
+type IOEvent = int16

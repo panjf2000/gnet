@@ -12,15 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build freebsd || dragonfly || netbsd || openbsd || darwin
-// +build freebsd dragonfly netbsd openbsd darwin
+//go:build darwin || dragonfly || freebsd || netbsd || openbsd
+// +build darwin dragonfly freebsd netbsd openbsd
 
 package netpoll
 
 import "golang.org/x/sys/unix"
-
-// IOEvent is the integer type of I/O events on BSD's.
-type IOEvent = int16
 
 const (
 	// InitPollEventsCap represents the initial capacity of poller event-list.
@@ -31,14 +28,6 @@ const (
 	MinPollEventsCap = 16
 	// MaxAsyncTasksAtOneTime is the maximum amount of asynchronous tasks that the event-loop will process at one time.
 	MaxAsyncTasksAtOneTime = 128
-	// EVFilterWrite represents writeable events from sockets.
-	EVFilterWrite = unix.EVFILT_WRITE
-	// EVFilterRead represents readable events from sockets.
-	EVFilterRead = unix.EVFILT_READ
-	// EVFlagsDelete indicates an event has been removed from the kqueue.
-	EVFlagsDelete = unix.EV_DELETE
-	// EVFlagsEOF indicates filter-specific EOF condition.
-	EVFlagsEOF = unix.EV_EOF
 )
 
 type eventList struct {

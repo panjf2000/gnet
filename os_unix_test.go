@@ -1,5 +1,5 @@
-//go:build linux || freebsd || dragonfly || netbsd || openbsd || darwin
-// +build linux freebsd dragonfly netbsd openbsd darwin
+//go:build darwin || dragonfly || freebsd || linux || netbsd || openbsd
+// +build darwin dragonfly freebsd linux netbsd openbsd
 
 package gnet
 
@@ -17,6 +17,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/unix"
+
+	"github.com/panjf2000/gnet/v2/pkg/logging"
 )
 
 var (
@@ -111,7 +113,7 @@ func (s *testMcastServer) startMcastClient() {
 	ch := make(chan []byte, 10000)
 	s.mcast.Store(c.LocalAddr().String(), ch)
 	duration := time.Duration((rand.Float64()*2+1)*float64(time.Second)) / 2
-	s.t.Logf("test duration: %dms", duration/time.Millisecond)
+	logging.Debugf("test duration: %v", duration)
 	start := time.Now()
 	for time.Since(start) < duration {
 		reqData := make([]byte, 1024)

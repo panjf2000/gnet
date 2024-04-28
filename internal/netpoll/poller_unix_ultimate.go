@@ -1,4 +1,4 @@
-// Copyright (c) 2021 The Gnet Authors. All rights reserved.
+// Copyright (c) 2024 The Gnet Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,16 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build linux || freebsd || dragonfly || netbsd || openbsd || darwin
-// +build linux freebsd dragonfly netbsd openbsd darwin
+//go:build (darwin || dragonfly || freebsd || linux || netbsd || openbsd) && poll_opt
+// +build darwin dragonfly freebsd linux netbsd openbsd
+// +build poll_opt
 
 package netpoll
 
-// IOFlags represents the flags of IO events.
-type IOFlags = uint16
+import "unsafe"
 
-// PollAttachment is the user data which is about to be stored in "void *ptr" of epoll_data or "void *udata" of kevent.
-type PollAttachment struct {
-	FD       int
-	Callback PollEventHandler
+func convertPollAttachment(ptr unsafe.Pointer, attachment *PollAttachment) {
+	*(**PollAttachment)(ptr) = attachment
+}
+
+func restorePollAttachment(ptr unsafe.Pointer) *PollAttachment {
+	return *(**PollAttachment)(ptr)
 }

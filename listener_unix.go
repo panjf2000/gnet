@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build linux || freebsd || dragonfly || netbsd || openbsd || darwin
-// +build linux freebsd dragonfly netbsd openbsd darwin
+//go:build darwin || dragonfly || freebsd || linux || netbsd || openbsd
+// +build darwin dragonfly freebsd linux netbsd openbsd
 
 package gnet
 
@@ -45,8 +45,8 @@ func (ln *listener) packPollAttachment(handler netpoll.PollEventHandler) *netpol
 	return ln.pollAttachment
 }
 
-func (ln *listener) dup() (int, string, error) {
-	return netpoll.Dup(ln.fd)
+func (ln *listener) dup() (int, error) {
+	return socket.Dup(ln.fd)
 }
 
 func (ln *listener) normalize() (err error) {
