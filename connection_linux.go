@@ -29,8 +29,8 @@ func (c *conn) processIO(_ int, ev netpoll.IOEvent, _ netpoll.IOFlags) error {
 	el := c.loop
 	// First check for any unexpected non-IO events.
 	// For these events we just close the connection directly.
-	if ev&netpoll.ErrEvents != 0 && ev&unix.EPOLLIN == 0 && ev&unix.EPOLLOUT == 0 {
-		c.outboundBuffer.Release() // don't bother to write to a connection with some unknown error
+	if ev&(netpoll.ErrEvents|unix.EPOLLRDHUP) != 0 && ev&netpoll.ReadWriteEvents == 0 {
+		c.outboundBuffer.Release() // don't bother to write to a connection that is already broken
 		return el.close(c, io.EOF)
 	}
 	// Secondly, check for EPOLLOUT before EPOLLIN, the former has a higher priority
@@ -43,14 +43,14 @@ func (c *conn) processIO(_ int, ev netpoll.IOEvent, _ netpoll.IOFlags) error {
 	// to the remote first and then close the connection.
 	//
 	// We perform eventloop.write for EPOLLOUT because it can take good care of either case.
-	if ev&(unix.EPOLLOUT|unix.EPOLLERR) != 0 {
+	if ev&(netpoll.WriteEvents|netpoll.ErrEvents) != 0 {
 		if err := el.write(c); err != nil {
 			return err
 		}
 	}
 	// Check for EPOLLIN before EPOLLRDHUP in case that there are pending data in
 	// the socket buffer.
-	if ev&(unix.EPOLLIN|unix.EPOLLERR) != 0 {
+	if ev&(netpoll.ReadEvents|netpoll.ErrEvents) != 0 {
 		if err := el.read(c); err != nil {
 			return err
 		}

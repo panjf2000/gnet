@@ -34,9 +34,14 @@ const (
 	MinPollEventsCap = 32
 	// MaxAsyncTasksAtOneTime is the maximum amount of asynchronous tasks that the event-loop will process at one time.
 	MaxAsyncTasksAtOneTime = 256
-	// ErrEvents represents exceptional events that are not read/write, like socket being closed,
-	// reading/writing from/to a closed socket, etc.
-	ErrEvents = unix.EPOLLERR | unix.EPOLLHUP | unix.EPOLLRDHUP
+	// ReadEvents represents readable events that are polled by epoll.
+	ReadEvents = unix.EPOLLIN | unix.EPOLLPRI
+	// WriteEvents represents writeable events that are polled by epoll.
+	WriteEvents = unix.EPOLLOUT
+	// ReadWriteEvents represents both readable and writeable events.
+	ReadWriteEvents = ReadEvents | WriteEvents
+	// ErrEvents represents exceptional events that occurred on the local side.
+	ErrEvents = unix.EPOLLERR | unix.EPOLLHUP
 )
 
 type eventList struct {
