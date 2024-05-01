@@ -114,11 +114,18 @@ func (el *eventloop) open(c *conn) error {
 	return el.handleAction(c, action)
 }
 
+func (el *eventloop) read0(itf interface{}) error {
+	return el.read(itf.(*conn))
+}
+
+const maxBytesTransferET = 1 << 22
+
 func (el *eventloop) read(c *conn) error {
 	if !c.opened {
 		return nil
 	}
 
+	var recv int
 	isET := el.engine.opts.EdgeTriggeredIO
 loop:
 	n, err := unix.Read(c.fd, el.buffer)
@@ -131,6 +138,7 @@ loop:
 		}
 		return el.close(c, os.NewSyscallError("read", err))
 	}
+	recv += n
 
 	c.buffer = el.buffer[:n]
 	action := el.eventHandler.OnTraffic(c)
@@ -144,11 +152,23 @@ loop:
 	_, _ = c.inboundBuffer.Write(c.buffer)
 	c.buffer = c.buffer[:0]
 
-	if isET || c.isEOF {
+	if c.isEOF || (isET && recv < maxBytesTransferET) {
 		goto loop
 	}
 
+	// To prevent infinite reading in ET mode and starving other events,
+	// we need to set up threshold for the maximum read bytes per connection
+	// on each event-loop. If the threshold is reached and there are still
+	// unread data in the socket buffer, we must issue another read event manually.
+	if isET && n == len(el.buffer) {
+		return el.poller.Trigger(queue.LowPriority, el.read0, c)
+	}
+
 	return nil
+}
+
+func (el *eventloop) write0(itf interface{}) error {
+	return el.write(itf.(*conn))
 }
 
 // The default value of UIO_MAXIOV/IOV_MAX is 1024 on Linux and most BSD-like OSs.
@@ -161,8 +181,9 @@ func (el *eventloop) write(c *conn) error {
 
 	isET := el.engine.opts.EdgeTriggeredIO
 	var (
-		n   int
-		err error
+		n    int
+		sent int
+		err  error
 	)
 loop:
 	iov, _ := c.outboundBuffer.Peek(-1)
@@ -182,14 +203,24 @@ loop:
 	default:
 		return el.close(c, os.NewSyscallError("write", err))
 	}
-	if isET && !c.outboundBuffer.IsEmpty() {
+	sent += n
+
+	if isET && !c.outboundBuffer.IsEmpty() && sent < maxBytesTransferET {
 		goto loop
 	}
 
 	// All data have been sent, it's no need to monitor the writable events for LT mode,
 	// remove the writable event from poller to help the future event-loops if necessary.
 	if !isET && c.outboundBuffer.IsEmpty() {
-		_ = el.poller.ModRead(&c.pollAttachment, false)
+		return el.poller.ModRead(&c.pollAttachment, false)
+	}
+
+	// To prevent infinite writing in ET mode and starving other events,
+	// we need to set up threshold for the maximum write bytes per connection
+	// on each event-loop. If the threshold is reached and there are still
+	// pending data to write, we must issue another write event manually.
+	if isET && !c.outboundBuffer.IsEmpty() {
+		return el.poller.Trigger(queue.HighPriority, el.write0, c)
 	}
 
 	return nil
