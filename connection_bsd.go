@@ -27,9 +27,11 @@ import (
 
 func (c *conn) processIO(_ int, filter netpoll.IOEvent, flags netpoll.IOFlags) (err error) {
 	el := c.loop
+	haveRead := false
 	switch filter {
 	case unix.EVFILT_READ:
 		err = el.read(c)
+		haveRead = true
 	case unix.EVFILT_WRITE:
 		err = el.write(c)
 	}
@@ -43,6 +45,7 @@ func (c *conn) processIO(_ int, filter netpoll.IOEvent, flags netpoll.IOFlags) (
 			// failed to drain the socket buffer, so we make sure we get it done this time.
 			c.isEOF = true
 			err = el.read(c)
+			haveRead = true
 		case unix.EVFILT_WRITE:
 			// On macOS, the kqueue in either LT or ET mode will notify with one event for the
 			// EOF of the TCP remote: EVFILT_READ|EV_ADD|EV_CLEAR|EV_EOF. But for some reason,
@@ -54,5 +57,13 @@ func (c *conn) processIO(_ int, filter netpoll.IOEvent, flags netpoll.IOFlags) (
 			err = el.close(c, io.EOF)
 		}
 	}
+
+	// When data reading occurs, there is a high probability of data writeback generated in the `OnTraffic`.
+	// At this time, it is not necessary to wait for the registration write event callback to immediately perform the write operation,
+	// which can improve the performance of sending data.
+	if haveRead && nil == err && c.OutboundBuffered() > 0 {
+		err = el.write(c)
+	}
+
 	return
 }

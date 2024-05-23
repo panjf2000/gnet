@@ -54,6 +54,15 @@ func (c *conn) processIO(_ int, ev netpoll.IOEvent, _ netpoll.IOFlags) error {
 		if err := el.read(c); err != nil {
 			return err
 		}
+
+		// When data reading occurs, there is a high probability of data writeback generated in the `OnTraffic`.
+		// At this time, it is not necessary to wait for the registration write event callback to immediately perform the write operation,
+		// which can improve the performance of sending data.
+		if c.OutboundBuffered() > 0 {
+			if err := el.write(c); err != nil {
+				return err
+			}
+		}
 	}
 	// Ultimately, check for EPOLLRDHUP, this event indicates that the remote has
 	// either closed connection or shut down the writing half of the connection.
