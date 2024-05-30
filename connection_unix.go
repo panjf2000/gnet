@@ -143,9 +143,6 @@ func (c *conn) write(data []byte) (n int, err error) {
 	// of network packets.
 	if !c.outboundBuffer.IsEmpty() {
 		_, _ = c.outboundBuffer.Write(data)
-		if isET {
-			err = c.loop.write(c)
-		}
 		return
 	}
 
@@ -193,9 +190,6 @@ func (c *conn) writev(bs [][]byte) (n int, err error) {
 	// of network packets.
 	if !c.outboundBuffer.IsEmpty() {
 		_, _ = c.outboundBuffer.Writev(bs)
-		if isET {
-			err = c.loop.write(c)
-		}
 		return
 	}
 
