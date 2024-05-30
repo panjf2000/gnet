@@ -118,7 +118,7 @@ func (el *eventloop) read0(itf interface{}) error {
 	return el.read(itf.(*conn))
 }
 
-const maxBytesTransferET = 1 << 22
+const maxBytesTransferET = 1 << 20
 
 func (el *eventloop) read(c *conn) error {
 	if !c.opened {
