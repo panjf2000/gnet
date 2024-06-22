@@ -52,7 +52,7 @@
 
 `gnet` 是一个 Go module，而且我们也强烈推荐通过 [Go Modules](https://go.dev/blog/using-go-modules) 来使用 `gnet`，在开启 Go Modules 支持（Go 1.11+）之后可以通过简单地在代码中写 `import "github.com/panjf2000/gnet/v2"` 来引入 `gnet`，然后执行 `go mod download/go mod tidy` 或者 `go [build|run|test]` 这些命令来自动下载所依赖的包。
 
-## 使用 v2 
+## 使用 v2
 
 ```bash
 go get -u github.com/panjf2000/gnet/v2
@@ -68,7 +68,44 @@ go get -u github.com/panjf2000/gnet
 
 以下公司/组织在生产环境上使用了 `gnet` 作为底层网络服务。
 
-<a href="https://www.tencent.com"><img src="https://res.strikefreedom.top/static_res/logos/tencent_logo.png" width="250" align="middle"/></a>&nbsp;&nbsp;<a href="https://www.iqiyi.com" target="_blank"><img src="https://res.strikefreedom.top/static_res/logos/iqiyi-logo.png" width="200" align="middle"/></a>&nbsp;&nbsp;<a href="https://www.mi.com" target="_blank"><img src="https://res.strikefreedom.top/static_res/logos/mi-logo.png" width="150" align="middle"/></a>&nbsp;&nbsp;<a href="https://www.360.com" target="_blank"><img src="https://res.strikefreedom.top/static_res/logos/360-logo.png" width="200" align="middle"/></a>&nbsp;&nbsp;<a href="https://tieba.baidu.com/" target="_blank"><img src="https://res.strikefreedom.top/static_res/logos/baidu-tieba-logo.png" width="200" align="middle"/></a>&nbsp;&nbsp;<a href="https://game.qq.com/" target="_blank"><img src="https://res.strikefreedom.top/static_res/logos/tencent-games-logo.jpeg" width="200" align="middle"/></a>
+<table>
+  <tbody>
+    <tr>
+      <td align="center" valign="middle">
+        <a href="https://www.tencent.com">
+          <img src="https://res.strikefreedom.top/static_res/logos/tencent_logo.png" width="250" />
+        </a>
+      </td>
+      <td align="center" valign="middle">
+        <a href="https://www.iqiyi.com" target="_blank">
+          <img src="https://res.strikefreedom.top/static_res/logos/iqiyi-logo.png" width="200" />
+        </a>
+      </td>
+      <td align="center" valign="middle">
+        <a href="https://www.mi.com" target="_blank">
+          <img src="https://res.strikefreedom.top/static_res/logos/mi-logo.png" width="150" />
+        </a>
+      </td>
+    </tr>
+    <tr>
+      <td align="center" valign="middle">
+        <a href="https://www.360.com" target="_blank">
+          <img src="https://res.strikefreedom.top/static_res/logos/360-logo.png" width="200" />
+        </a>
+      </td>
+      <td align="center" valign="middle">
+        <a href="https://tieba.baidu.com/" target="_blank">
+          <img src="https://res.strikefreedom.top/static_res/logos/baidu-tieba-logo.png" width="200" />
+        </a>
+      </td>
+      <td align="center" valign="middle">
+        <a href="https://game.qq.com/" target="_blank">
+          <img src="https://res.strikefreedom.top/static_res/logos/tencent-games-logo.jpeg" width="200" />
+        </a>
+      </td>
+    </tr>
+  </tbody>
+</table>
 
 如果你的项目也在使用 `gnet`，欢迎给我提 Pull Request 来更新这份列表。
 
@@ -160,7 +197,7 @@ Test duration   : 15s
 请在提 PR 之前仔细阅读 [Contributing Guidelines](CONTRIBUTING.md)，感谢那些为 `gnet` 贡献过代码的开发者！
 
 <a href="https://github.com/panjf2000/gnet/graphs/contributors">
-	<img src="https://contrib.rocks/image?repo=panjf2000/gnet" />
+  <img src="https://contrib.rocks/image?repo=panjf2000/gnet" />
 </a>
 
 # ⚓ 相关文章
@@ -193,7 +230,47 @@ Test duration   : 15s
 
 # 💴 资助者
 
-<a target="_blank" href="https://github.com/patrick-othmer"><img src="https://avatars1.githubusercontent.com/u/8964313" width="100" alt="Patrick Othmer" /></a>&nbsp;<a target="_blank" href="https://github.com/panjf2000/gnet"><img src="https://avatars2.githubusercontent.com/u/50285334" width="100" alt="Jimmy" /></a>&nbsp;<a target="_blank" href="https://github.com/cafra"><img src="https://avatars0.githubusercontent.com/u/13758306" width="100" alt="ChenZhen" /></a>&nbsp;<a target="_blank" href="https://github.com/yangwenmai"><img src="https://avatars0.githubusercontent.com/u/1710912" width="100" alt="Mai Yang" /></a>&nbsp;<a target="_blank" href="https://github.com/BeijingWks"><img src="https://avatars3.githubusercontent.com/u/33656339" width="100" alt="王开帅" /></a>&nbsp;<a target="_blank" href="https://github.com/refs"><img src="https://avatars3.githubusercontent.com/u/6905948" width="100" alt="Unger Alejandro" /></a>&nbsp;<a target="_blank" href="https://github.com/Swaggadan"><img src="https://avatars.githubusercontent.com/u/137142" width="100" alt="Swaggadan" /></a>&nbsp;<a target="_blank" href="https://github.com/Wuvist"><img src="https://avatars.githubusercontent.com/u/657796" width="100" alt="Weng Wei" /></a>
+<table>
+  <tbody>
+    <tr>
+      <td align="center" valign="middle">
+        <a target="_blank" href="https://github.com/patrick-othmer">
+          <img src="https://avatars1.githubusercontent.com/u/8964313" width="100" alt="Patrick Othmer" />
+        </a>
+      </td>
+      <td align="center" valign="middle">
+        <a target="_blank" href="https://github.com/panjf2000/ants">
+          <img src="https://avatars2.githubusercontent.com/u/50285334" width="100" alt="Jimmy" />
+        </a>
+      </td>
+      <td align="center" valign="middle">
+        <a target="_blank" href="https://github.com/cafra">
+          <img src="https://avatars0.githubusercontent.com/u/13758306" width="100" alt="ChenZhen" />
+        </a>
+      </td>
+      <td align="center" valign="middle">
+        <a target="_blank" href="https://github.com/yangwenmai">
+          <img src="https://avatars0.githubusercontent.com/u/1710912" width="100" alt="Mai Yang" />
+        </a>
+      </td>
+      <td align="center" valign="middle">
+        <a target="_blank" href="https://github.com/BeijingWks">
+          <img src="https://avatars3.githubusercontent.com/u/33656339" width="100" alt="王开帅" />
+        </a>
+      </td>
+      <td align="center" valign="middle">
+        <a target="_blank" href="https://github.com/refs">
+          <img src="https://avatars3.githubusercontent.com/u/6905948" width="100" alt="Unger Alejandro" />
+        </a>
+      </td>
+      <td align="center" valign="middle">
+        <a target="_blank" href="https://github.com/Wuvist">
+          <img src="https://avatars.githubusercontent.com/u/657796" width="100" alt="Weng Wei" />
+        </a>
+      </td>
+    </tr>
+  </tbody>
+</table>
 
 # 🔑 JetBrains 开源证书支持
 
@@ -204,7 +281,7 @@ Test duration   : 15s
 # 🔋 赞助商
 
 <p>
-	<h3>本项目由以下机构赞助：</h3>
-	<a href="https://www.digitalocean.com/"><img src="https://opensource.nyc3.cdn.digitaloceanspaces.com/attribution/assets/SVG/DO_Logo_horizontal_blue.svg" width="201px" />
-	</a>
+  <h3>本项目由以下机构赞助：</h3>
+  <a href="https://www.digitalocean.com/"><img src="https://opensource.nyc3.cdn.digitaloceanspaces.com/attribution/assets/SVG/DO_Logo_horizontal_blue.svg" width="201px" />
+  </a>
 </p>

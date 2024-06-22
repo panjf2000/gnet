@@ -325,13 +325,13 @@ func (c *conn) Next(n int) (buf []byte, err error) {
 	}
 	head, tail := c.inboundBuffer.Peek(n)
 	defer c.inboundBuffer.Discard(n) //nolint:errcheck
-	if len(head) == n {
+	if len(head) >= n {
 		return head[:n], err
 	}
 	c.loop.cache.Reset()
 	c.loop.cache.Write(head)
 	c.loop.cache.Write(tail)
-	if inBufferLen == n {
+	if inBufferLen >= n {
 		return c.loop.cache.Bytes(), err
 	}
 
@@ -352,13 +352,13 @@ func (c *conn) Peek(n int) (buf []byte, err error) {
 		return c.buffer[:n], err
 	}
 	head, tail := c.inboundBuffer.Peek(n)
-	if len(head) == n {
+	if len(head) >= n {
 		return head[:n], err
 	}
 	c.loop.cache.Reset()
 	c.loop.cache.Write(head)
 	c.loop.cache.Write(tail)
-	if inBufferLen == n {
+	if inBufferLen >= n {
 		return c.loop.cache.Bytes(), err
 	}
 
