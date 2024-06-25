@@ -439,6 +439,7 @@ func runClient(t *testing.T, network, addr string, et, reuseport, multicore, asy
 	clientEV := &clientEvents{tester: t, packetLen: streamLen, svr: ts}
 	ts.client, err = NewClient(
 		clientEV,
+		WithTCPNoDelay(TCPNoDelay),
 		WithLockOSThread(true),
 		WithTicker(true),
 	)
@@ -456,7 +457,6 @@ func runClient(t *testing.T, network, addr string, et, reuseport, multicore, asy
 		WithReusePort(reuseport),
 		WithTicker(true),
 		WithTCPKeepAlive(time.Minute*1),
-		WithTCPNoDelay(TCPDelay),
 		WithLoadBalancing(lb))
 	assert.NoError(t, err)
 }
@@ -657,7 +657,6 @@ func TestClientReadOnEOF(t *testing.T) {
 	cli, err := NewClient(ev,
 		WithSocketRecvBuffer(4*1024),
 		WithSocketSendBuffer(4*1024),
-		WithTCPNoDelay(TCPDelay),
 		WithTCPKeepAlive(time.Minute),
 		WithLogger(zap.NewExample().Sugar()),
 		WithReadBufferCap(32*1024),

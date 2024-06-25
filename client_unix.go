@@ -208,8 +208,8 @@ func (cli *Client) EnrollContext(c net.Conn, ctx interface{}) (Conn, error) {
 		ua.Name = c.RemoteAddr().String() + "." + strconv.Itoa(dupFD)
 		gc = newTCPConn(dupFD, cli.el, sockAddr, c.LocalAddr(), c.RemoteAddr())
 	case *net.TCPConn:
-		if cli.opts.TCPNoDelay == TCPDelay {
-			if err = socket.SetNoDelay(dupFD, 0); err != nil {
+		if cli.opts.TCPNoDelay == TCPNoDelay {
+			if err = socket.SetNoDelay(dupFD, 1); err != nil {
 				return nil, err
 			}
 		}

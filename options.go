@@ -98,9 +98,12 @@ type Options struct {
 
 	// TCPNoDelay controls whether the operating system should delay
 	// packet transmission in hopes of sending fewer packets (Nagle's algorithm).
+	// When this option is assign to TCPNoDelay, TCP_NODELAY socket option will
+	// be turned on, on the contrary, if it is assigned to TCPDelay, the socket
+	// option will be turned off.
 	//
-	// The default is true (no delay), meaning that data is sent
-	// as soon as possible after a write operation.
+	// The default is TCPNoDelay, meaning that TCP_NODELAY is turned on and data
+	// will not be buffered but sent as soon as possible after a write operation.
 	TCPNoDelay TCPSocketOpt
 
 	// SocketRecvBuffer sets the maximum socket receive buffer in bytes.

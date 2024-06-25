@@ -643,7 +643,7 @@ func runServer(t *testing.T, addrs []string, et, reuseport, multicore, async, wr
 			WithReusePort(reuseport),
 			WithTicker(true),
 			WithTCPKeepAlive(time.Minute),
-			WithTCPNoDelay(TCPDelay),
+			WithTCPNoDelay(TCPNoDelay),
 			WithLoadBalancing(lb))
 	} else {
 		err = Run(ts,
