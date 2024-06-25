@@ -8,6 +8,7 @@ import (
 	"io"
 	"math/rand"
 	"net"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 
 	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
@@ -437,7 +439,7 @@ func runClient(t *testing.T, network, addr string, et, reuseport, multicore, asy
 	clientEV := &clientEvents{tester: t, packetLen: streamLen, svr: ts}
 	ts.client, err = NewClient(
 		clientEV,
-		WithLogLevel(logging.DebugLevel),
+		WithTCPNoDelay(TCPNoDelay),
 		WithLockOSThread(true),
 		WithTicker(true),
 	)
@@ -455,7 +457,6 @@ func runClient(t *testing.T, network, addr string, et, reuseport, multicore, asy
 		WithReusePort(reuseport),
 		WithTicker(true),
 		WithTCPKeepAlive(time.Minute*1),
-		WithTCPNoDelay(TCPDelay),
 		WithLoadBalancing(lb))
 	assert.NoError(t, err)
 }
@@ -599,9 +600,22 @@ func testConnWakeImmediately(t *testing.T, client *Client, clientEV *clientEvent
 }
 
 func TestWakeConnImmediately(t *testing.T) {
+	currentLogger, currentFlusher := logging.GetDefaultLogger(), logging.GetDefaultFlusher()
+	t.Cleanup(func() {
+		logging.SetDefaultLoggerAndFlusher(currentLogger, currentFlusher) // restore
+	})
+
 	clientEV := &clientEventsForWake{tester: t}
-	client, err := NewClient(clientEV, WithLogLevel(logging.DebugLevel))
+	logPath := filepath.Join(t.TempDir(), "gnet-test-wake-conn-immediately.log")
+	client, err := NewClient(clientEV,
+		WithSocketRecvBuffer(4*1024),
+		WithSocketSendBuffer(4*1024),
+		WithLogPath(logPath),
+		WithLogLevel(logging.WarnLevel),
+		WithReadBufferCap(512),
+		WithWriteBufferCap(512))
 	assert.NoError(t, err)
+	logging.Cleanup()
 
 	err = client.Start()
 	assert.NoError(t, err)
@@ -614,6 +628,11 @@ func TestWakeConnImmediately(t *testing.T) {
 }
 
 func TestClientReadOnEOF(t *testing.T) {
+	currentLogger, currentFlusher := logging.GetDefaultLogger(), logging.GetDefaultFlusher()
+	t.Cleanup(func() {
+		logging.SetDefaultLoggerAndFlusher(currentLogger, currentFlusher) // restore
+	})
+
 	ln, err := net.Listen("tcp", "127.0.0.1:9999")
 	assert.NoError(t, err)
 	defer ln.Close()
@@ -635,7 +654,13 @@ func TestClientReadOnEOF(t *testing.T) {
 		}, 1),
 		data: []byte("test"),
 	}
-	cli, err := NewClient(ev)
+	cli, err := NewClient(ev,
+		WithSocketRecvBuffer(4*1024),
+		WithSocketSendBuffer(4*1024),
+		WithTCPKeepAlive(time.Minute),
+		WithLogger(zap.NewExample().Sugar()),
+		WithReadBufferCap(32*1024),
+		WithWriteBufferCap(32*1024))
 	assert.NoError(t, err)
 	defer cli.Stop() //nolint:errcheck
 

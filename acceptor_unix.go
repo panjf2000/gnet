@@ -31,19 +31,18 @@ import (
 func (el *eventloop) accept0(fd int, _ netpoll.IOEvent, _ netpoll.IOFlags) error {
 	for {
 		nfd, sa, err := socket.Accept(fd)
-		if err != nil {
-			switch err {
-			case unix.EAGAIN: // the Accept queue has been drained out, we can return now
-				return nil
-			case unix.EINTR, unix.ECONNRESET, unix.ECONNABORTED:
-				// ECONNRESET or ECONNABORTED could indicate that a socket
-				// in the Accept queue was closed before we Accept()ed it.
-				// It's a silly error, let's retry it.
-				continue
-			default:
-				el.getLogger().Errorf("Accept() failed due to error: %v", err)
-				return errors.ErrAcceptSocket
-			}
+		switch err {
+		case nil:
+		case unix.EAGAIN: // the Accept queue has been drained out, we can return now
+			return nil
+		case unix.EINTR, unix.ECONNRESET, unix.ECONNABORTED:
+			// ECONNRESET or ECONNABORTED could indicate that a socket
+			// in the Accept queue was closed before we Accept()ed it.
+			// It's a silly error, let's retry it.
+			continue
+		default:
+			el.getLogger().Errorf("Accept() failed due to error: %v", err)
+			return errors.ErrAcceptSocket
 		}
 
 		remoteAddr := socket.SockaddrToTCPOrUnixAddr(sa)
@@ -71,17 +70,16 @@ func (el *eventloop) accept(fd int, ev netpoll.IOEvent, flags netpoll.IOFlags) e
 	}
 
 	nfd, sa, err := socket.Accept(fd)
-	if err != nil {
-		switch err {
-		case unix.EINTR, unix.EAGAIN, unix.ECONNRESET, unix.ECONNABORTED:
-			// ECONNRESET or ECONNABORTED could indicate that a socket
-			// in the Accept queue was closed before we Accept()ed it.
-			// It's a silly error, let's retry it.
-			return nil
-		default:
-			el.getLogger().Errorf("Accept() failed due to error: %v", err)
-			return errors.ErrAcceptSocket
-		}
+	switch err {
+	case nil:
+	case unix.EINTR, unix.EAGAIN, unix.ECONNRESET, unix.ECONNABORTED:
+		// ECONNRESET or ECONNABORTED could indicate that a socket
+		// in the Accept queue was closed before we Accept()ed it.
+		// It's a silly error, let's retry it.
+		return nil
+	default:
+		el.getLogger().Errorf("Accept() failed due to error: %v", err)
+		return errors.ErrAcceptSocket
 	}
 
 	remoteAddr := socket.SockaddrToTCPOrUnixAddr(sa)
