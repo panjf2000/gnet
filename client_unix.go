@@ -200,7 +200,8 @@ func (cli *Client) EnrollContext(c net.Conn, ctx interface{}) (Conn, error) {
 	)
 	switch c.(type) {
 	case *net.UnixConn:
-		if sockAddr, _, _, err = socket.GetUnixSockAddr(c.RemoteAddr().Network(), c.RemoteAddr().String()); err != nil {
+		sockAddr, _, _, err = socket.GetUnixSockAddr(c.RemoteAddr().Network(), c.RemoteAddr().String())
+		if err != nil {
 			return nil, err
 		}
 		ua := c.LocalAddr().(*net.UnixAddr)
@@ -217,12 +218,14 @@ func (cli *Client) EnrollContext(c net.Conn, ctx interface{}) (Conn, error) {
 				return nil, err
 			}
 		}
-		if sockAddr, _, _, _, err = socket.GetTCPSockAddr(c.RemoteAddr().Network(), c.RemoteAddr().String()); err != nil {
+		sockAddr, _, _, _, err = socket.GetTCPSockAddr(c.RemoteAddr().Network(), c.RemoteAddr().String())
+		if err != nil {
 			return nil, err
 		}
 		gc = newTCPConn(dupFD, cli.el, sockAddr, c.LocalAddr(), c.RemoteAddr())
 	case *net.UDPConn:
-		if sockAddr, _, _, _, err = socket.GetUDPSockAddr(c.RemoteAddr().Network(), c.RemoteAddr().String()); err != nil {
+		sockAddr, _, _, _, err = socket.GetUDPSockAddr(c.RemoteAddr().Network(), c.RemoteAddr().String())
+		if err != nil {
 			return nil, err
 		}
 		gc = newUDPConn(dupFD, cli.el, c.LocalAddr(), sockAddr, true)
