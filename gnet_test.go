@@ -9,6 +9,7 @@ import (
 	"io"
 	"math/rand"
 	"net"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync/atomic"
@@ -883,8 +884,19 @@ func (t *testShutdownServer) OnTick() (delay time.Duration, action Action) {
 }
 
 func testShutdown(t *testing.T, network, addr string) {
+	currentLogger, currentFlusher := logging.GetDefaultLogger(), logging.GetDefaultFlusher()
+	t.Cleanup(func() {
+		logging.SetDefaultLoggerAndFlusher(currentLogger, currentFlusher) // restore
+	})
+
 	events := &testShutdownServer{tester: t, network: network, addr: addr, N: 100}
-	err := Run(events, network+"://"+addr, WithTicker(true), WithReadBufferCap(512), WithWriteBufferCap(512))
+	logPath := filepath.Join(t.TempDir(), "gnet-test-shutdown.log")
+	err := Run(events, network+"://"+addr,
+		WithLogPath(logPath),
+		WithLogLevel(logging.WarnLevel),
+		WithTicker(true),
+		WithReadBufferCap(512),
+		WithWriteBufferCap(512))
 	assert.NoError(t, err)
 	require.Equal(t, 0, int(events.clients), "did not close all clients")
 }
