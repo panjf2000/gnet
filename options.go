@@ -46,21 +46,23 @@ type Options struct {
 
 	// Multicore indicates whether the engine will be effectively created with multi-cores, if so,
 	// then you must take care with synchronizing memory between all event callbacks, otherwise,
-	// it will run the engine with single thread. The number of threads in the engine will be automatically
-	// assigned to the value of logical CPUs usable by the current process.
+	// it will run the engine with single thread. The number of threads in the engine will be
+	// automatically assigned to the number of usable logical CPUs that can be leveraged by the
+	// current process.
 	Multicore bool
 
-	// NumEventLoop is set up to start the given number of event-loop goroutine.
-	// Note: Setting up NumEventLoop will override Multicore.
+	// NumEventLoop is set up to start the given number of event-loop goroutines.
+	// Note that a non-negative NumEventLoop will override Multicore.
 	NumEventLoop int
 
-	// LB represents the load-balancing algorithm used when assigning new connections.
+	// LB represents the load-balancing algorithm used when assigning new connections
+	// to event loops.
 	LB LoadBalancing
 
-	// ReuseAddr indicates whether to set up the SO_REUSEADDR socket option.
+	// ReuseAddr indicates whether to set the SO_REUSEADDR socket option.
 	ReuseAddr bool
 
-	// ReusePort indicates whether to set up the SO_REUSEPORT socket option.
+	// ReusePort indicates whether to set the SO_REUSEPORT socket option.
 	ReusePort bool
 
 	// MulticastInterfaceIndex is the index of the interface name where the multicast UDP addresses will be bound to.
@@ -77,28 +79,29 @@ type Options struct {
 	ReadBufferCap int
 
 	// WriteBufferCap is the maximum number of bytes that a static outbound buffer can hold,
-	// if the data exceeds this value, the overflow will be stored in the elastic linked list buffer.
+	// if the data exceeds this value, the overflow bytes will be stored in the elastic linked list buffer.
 	// The default value is 64KB.
 	//
 	// Note that WriteBufferCap will always be converted to the least power of two integer value greater than
 	// or equal to its real amount.
 	WriteBufferCap int
 
-	// LockOSThread is used to determine whether each I/O event-loop is associated to an OS thread, it is useful when you
-	// need some kind of mechanisms like thread local storage, or invoke certain C libraries (such as graphics lib: GLib)
-	// that require thread-level manipulation via cgo, or want all I/O event-loops to actually run in parallel for a
-	// potential higher performance.
+	// LockOSThread is used to determine whether each I/O event-loop should be associated to an OS thread,
+	// it is useful when you need some kind of mechanisms like thread local storage, or invoke certain C
+	// libraries (such as graphics lib: GLib) that require thread-level manipulation via cgo, or want all I/O
+	// event-loops to actually run in parallel for a potential higher performance.
 	LockOSThread bool
 
 	// Ticker indicates whether the ticker has been set up.
 	Ticker bool
 
-	// TCPKeepAlive sets up a duration for (SO_KEEPALIVE) socket option.
+	// TCPKeepAlive enable the TCP keep-alive mechanism (SO_KEEPALIVE) and set its value
+	// on TCP_KEEPIDLE, 1/5 of its value on TCP_KEEPINTVL, and 5 on TCP_KEEPCNT.
 	TCPKeepAlive time.Duration
 
 	// TCPNoDelay controls whether the operating system should delay
 	// packet transmission in hopes of sending fewer packets (Nagle's algorithm).
-	// When this option is assign to TCPNoDelay, TCP_NODELAY socket option will
+	// When this option is assigned to TCPNoDelay, TCP_NODELAY socket option will
 	// be turned on, on the contrary, if it is assigned to TCPDelay, the socket
 	// option will be turned off.
 	//
@@ -106,20 +109,21 @@ type Options struct {
 	// will not be buffered but sent as soon as possible after a write operation.
 	TCPNoDelay TCPSocketOpt
 
-	// SocketRecvBuffer sets the maximum socket receive buffer in bytes.
+	// SocketRecvBuffer sets the maximum socket receive buffer of kernel in bytes.
 	SocketRecvBuffer int
 
-	// SocketSendBuffer sets the maximum socket send buffer in bytes.
+	// SocketSendBuffer sets the maximum socket send buffer of kernel in bytes.
 	SocketSendBuffer int
 
-	// LogPath the local path where logs will be written, this is the easiest way to set up logging,
-	// gnet instantiates a default uber-go/zap logger with this given log path, you are also allowed to employ
-	// you own logger during the lifetime by implementing the following log.Logger interface.
+	// LogPath specifies a local path where logs will be written, this is the easiest
+	// way to set up logging, gnet instantiates a default uber-go/zap logger with this
+	// given log path, you are also allowed to employ your own logger during the lifetime
+	// by implementing the following logging.Logger interface.
 	//
-	// Note that this option can be overridden by the option Logger.
+	// Note that this option can be overridden by a non-nil option Logger.
 	LogPath string
 
-	// LogLevel indicates the logging level, it should be used along with LogPath.
+	// LogLevel specifies the logging level, it should be used along with LogPath.
 	LogLevel logging.Level
 
 	// Logger is the customized logger for logging info, if it is not set,
@@ -139,63 +143,63 @@ func WithOptions(options Options) Option {
 	}
 }
 
-// WithMulticore sets up multi-cores in gnet engine.
+// WithMulticore enables multi-cores mode for gnet engine.
 func WithMulticore(multicore bool) Option {
 	return func(opts *Options) {
 		opts.Multicore = multicore
 	}
 }
 
-// WithLockOSThread sets up LockOSThread mode for I/O event-loops.
+// WithLockOSThread enables LockOSThread mode for I/O event-loops.
 func WithLockOSThread(lockOSThread bool) Option {
 	return func(opts *Options) {
 		opts.LockOSThread = lockOSThread
 	}
 }
 
-// WithReadBufferCap sets up ReadBufferCap for reading bytes.
+// WithReadBufferCap sets ReadBufferCap for reading bytes.
 func WithReadBufferCap(readBufferCap int) Option {
 	return func(opts *Options) {
 		opts.ReadBufferCap = readBufferCap
 	}
 }
 
-// WithWriteBufferCap sets up WriteBufferCap for pending bytes.
+// WithWriteBufferCap sets WriteBufferCap for pending bytes.
 func WithWriteBufferCap(writeBufferCap int) Option {
 	return func(opts *Options) {
 		opts.WriteBufferCap = writeBufferCap
 	}
 }
 
-// WithLoadBalancing sets up the load-balancing algorithm in gnet engine.
+// WithLoadBalancing picks the load-balancing algorithm for gnet engine.
 func WithLoadBalancing(lb LoadBalancing) Option {
 	return func(opts *Options) {
 		opts.LB = lb
 	}
 }
 
-// WithNumEventLoop sets up NumEventLoop in gnet engine.
+// WithNumEventLoop sets the number of event loops for gnet engine.
 func WithNumEventLoop(numEventLoop int) Option {
 	return func(opts *Options) {
 		opts.NumEventLoop = numEventLoop
 	}
 }
 
-// WithReusePort sets up SO_REUSEPORT socket option.
+// WithReusePort sets SO_REUSEPORT socket option.
 func WithReusePort(reusePort bool) Option {
 	return func(opts *Options) {
 		opts.ReusePort = reusePort
 	}
 }
 
-// WithReuseAddr sets up SO_REUSEADDR socket option.
+// WithReuseAddr sets SO_REUSEADDR socket option.
 func WithReuseAddr(reuseAddr bool) Option {
 	return func(opts *Options) {
 		opts.ReuseAddr = reuseAddr
 	}
 }
 
-// WithTCPKeepAlive sets up the SO_KEEPALIVE socket option with duration.
+// WithTCPKeepAlive enables the TCP keep-alive mechanism and sets its values.
 func WithTCPKeepAlive(tcpKeepAlive time.Duration) Option {
 	return func(opts *Options) {
 		opts.TCPKeepAlive = tcpKeepAlive
@@ -209,42 +213,42 @@ func WithTCPNoDelay(tcpNoDelay TCPSocketOpt) Option {
 	}
 }
 
-// WithSocketRecvBuffer sets the maximum socket receive buffer in bytes.
+// WithSocketRecvBuffer sets the maximum socket receive buffer of kernel in bytes.
 func WithSocketRecvBuffer(recvBuf int) Option {
 	return func(opts *Options) {
 		opts.SocketRecvBuffer = recvBuf
 	}
 }
 
-// WithSocketSendBuffer sets the maximum socket send buffer in bytes.
+// WithSocketSendBuffer sets the maximum socket send buffer of kernel in bytes.
 func WithSocketSendBuffer(sendBuf int) Option {
 	return func(opts *Options) {
 		opts.SocketSendBuffer = sendBuf
 	}
 }
 
-// WithTicker indicates that a ticker is set.
+// WithTicker indicates whether a ticker is currently set.
 func WithTicker(ticker bool) Option {
 	return func(opts *Options) {
 		opts.Ticker = ticker
 	}
 }
 
-// WithLogPath is an option to set up the local path of log file.
+// WithLogPath specifies a local path for logging file.
 func WithLogPath(fileName string) Option {
 	return func(opts *Options) {
 		opts.LogPath = fileName
 	}
 }
 
-// WithLogLevel is an option to set up the logging level.
+// WithLogLevel specifies the logging level for the local logging file.
 func WithLogLevel(lvl logging.Level) Option {
 	return func(opts *Options) {
 		opts.LogLevel = lvl
 	}
 }
 
-// WithLogger sets up a customized logger.
+// WithLogger specifies a customized logger.
 func WithLogger(logger logging.Logger) Option {
 	return func(opts *Options) {
 		opts.Logger = logger
