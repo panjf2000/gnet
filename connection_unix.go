@@ -35,6 +35,7 @@ import (
 	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
 	bsPool "github.com/panjf2000/gnet/v2/pkg/pool/byteslice"
+	"github.com/panjf2000/gnet/v2/pkg/tls"
 )
 
 type conn struct {
@@ -51,6 +52,7 @@ type conn struct {
 	buffer         []byte                 // buffer for the latest bytes
 	isDatagram     bool                   // UDP protocol
 	opened         bool                   // connection opened event fired
+	tlsconn        *tls.Conn              // tls connection
 	isEOF          bool                   // whether the connection has reached EOF
 }
 
@@ -134,6 +136,15 @@ func (c *conn) open(buf []byte) error {
 	return nil
 }
 
+func (c *conn) writeTLS(data []byte) (n int, err error) {
+	// use tls to encrypt the data before sending it.
+	// tlsconn will call gnet.WriteTCP() to sent the data directly.
+	// If gnetConn.outboundBuffer is not empty, data will be
+	// buffered in gnetConn.outboundBuffer.
+	n, err = c.tlsconn.Write(data)
+	return
+}
+
 func (c *conn) write(data []byte) (n int, err error) {
 	isET := c.loop.engine.opts.EdgeTriggeredIO
 	n = len(data)
@@ -174,6 +185,28 @@ loop:
 		err = c.loop.poller.ModReadWrite(&c.pollAttachment, false)
 	}
 
+	return
+}
+
+func (c *conn) writevTLS(bs [][]byte) (n int, err error) {
+	for _, b := range bs {
+		n += len(b)
+	}
+
+	// use tls to encrypt the data before sending it.
+	// tlsconn will call gnet.WriteTCP() to sent the data directly.
+	// If gnetConn.outboundBuffer is not empty, data will be
+	// buffered in gnetConn.outboundBuffer.
+	sent := 0
+	var sentN int
+	for _, b := range bs {
+		sentN, err = c.tlsconn.Write(b)
+		if sentN < 0 {
+			// the connection is closed (c.loop.closeConn() is called).
+			return sent, err
+		}
+		sent += sentN
+	}
 	return
 }
 
@@ -255,7 +288,11 @@ func (c *conn) asyncWrite(itf interface{}) (err error) {
 		return net.ErrClosed
 	}
 
-	_, err = c.write(hook.data)
+	if c.tlsconn != nil {
+		_, err = c.writeTLS(hook.data)
+	} else {
+		_, err = c.write(hook.data)
+	}
 	return
 }
 
@@ -276,7 +313,11 @@ func (c *conn) asyncWritev(itf interface{}) (err error) {
 		return net.ErrClosed
 	}
 
-	_, err = c.writev(hook.data)
+	if c.tlsconn != nil {
+		_, err = c.writevTLS(hook.data)
+	} else {
+		_, err = c.writev(hook.data)
+	}
 	return
 }
 
@@ -396,12 +437,24 @@ func (c *conn) Write(p []byte) (int, error) {
 		}
 		return len(p), nil
 	}
+	if c.tlsconn != nil {
+		return c.writeTLS(p)
+	}
+	return c.write(p)
+}
+
+// Expose the plaintext write API which should only be used
+// by tlsconn.Write().
+func (c *conn) WriteTCP(p []byte) (int, error) {
 	return c.write(p)
 }
 
 func (c *conn) Writev(bs [][]byte) (int, error) {
 	if c.isDatagram {
 		return 0, errorx.ErrUnsupportedOp
+	}
+	if c.tlsconn != nil {
+		return c.writevTLS(bs)
 	}
 	return c.writev(bs)
 }
@@ -521,4 +574,29 @@ func (*conn) SetReadDeadline(_ time.Time) error {
 
 func (*conn) SetWriteDeadline(_ time.Time) error {
 	return errorx.ErrUnsupportedOp
+}
+
+func (c *conn) UpgradeTLS(config *tls.Config) (err error) {
+	// TODO: create a sync.pool to manage the TLS connection
+	c.tlsconn = tls.Server(c, config.Clone())
+
+	// It is very likely that the handshake packet was sent before UpgradeTls.
+	// So, the remaining data in the inboundBuffer is treated as handshake data here
+	if c.inboundBuffer.Len() > 0 {
+		head, tail := c.inboundBuffer.Peek(-1)
+		c.tlsconn.RawInputSet(head) //nolint:errcheck
+		c.tlsconn.RawInputSet(tail) //nolint:errcheck
+		c.inboundBuffer.Reset()
+		if err := c.tlsconn.Handshake(); err != nil {
+			return err
+		}
+	}
+
+	// handshake is failed
+	time.AfterFunc(time.Second*5, func() {
+		if c.opened && (c.tlsconn == nil || !c.tlsconn.HandshakeComplete()) {
+			c.Close()
+		}
+	})
+	return err
 }
