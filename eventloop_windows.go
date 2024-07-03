@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"runtime"
 	"sync/atomic"
 	"time"
@@ -195,7 +196,7 @@ func (el *eventloop) close(c *conn, err error) error {
 	err = c.rawConn.Close()
 	c.release()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to close connection=%s in event-loop(%d): %v", c.remoteAddr, el.idx, err)
 	}
 
 	return el.handleAction(c, action)
