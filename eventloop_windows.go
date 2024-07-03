@@ -18,8 +18,8 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"net"
 	"runtime"
-	"strings"
 	"sync/atomic"
 	"time"
 
@@ -188,28 +188,31 @@ func (el *eventloop) wake(c *conn) error {
 }
 
 func (el *eventloop) close(c *conn, err error) error {
-	if addr := c.localAddr; addr != nil && strings.HasPrefix(addr.Network(), "udp") {
-		action := el.eventHandler.OnClose(c, err)
-		if c.rawConn != nil {
-			if err := c.rawConn.Close(); err != nil {
-				el.getLogger().Errorf("failed to close connection(%s), error:%v", c.remoteAddr.String(), err)
-			}
-		}
-		c.release()
-		return el.handleAction(c, action)
+	if _, ok := el.connections[c]; c.localAddr == nil || !ok {
+		return nil // ignore stale wakes.
 	}
 
-	if _, ok := el.connections[c]; !ok {
-		return nil // ignore stale wakes.
+	action := el.eventHandler.OnClose(c, err)
+	err = nil
+
+	if _, ok := c.localAddr.(*net.UDPAddr); ok {
+		if c.rawConn != nil {
+			err = c.rawConn.Close()
+		}
+		c.release()
+		if err != nil {
+			return err
+		}
+		return el.handleAction(c, action)
 	}
 
 	delete(el.connections, c)
 	el.incConn(-1)
-	action := el.eventHandler.OnClose(c, err)
-	if err := c.rawConn.Close(); err != nil {
-		el.getLogger().Errorf("failed to close connection(%s), error:%v", c.remoteAddr.String(), err)
-	}
+	err = c.rawConn.Close()
 	c.release()
+	if err != nil {
+		return err
+	}
 
 	return el.handleAction(c, action)
 }
