@@ -185,7 +185,7 @@ func (el *eventloop) wake(c *conn) error {
 }
 
 func (el *eventloop) close(c *conn, err error) error {
-	if _, ok := el.connections[c]; c.localAddr == nil || !ok {
+	if _, ok := el.connections[c]; c.rawConn == nil || !ok {
 		return nil // ignore stale wakes.
 	}
 
@@ -194,9 +194,7 @@ func (el *eventloop) close(c *conn, err error) error {
 	action := el.eventHandler.OnClose(c, err)
 	err = nil
 
-	if c.rawConn != nil {
-		err = c.rawConn.Close()
-	}
+	err = c.rawConn.Close()
 	c.release()
 	if err != nil {
 		return err
