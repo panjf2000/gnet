@@ -23,7 +23,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"os"
 	"strings"
 	"time"
@@ -232,33 +231,8 @@ func (el *eventloop) close(c *conn, err error) error {
 		return nil // ignore stale connections
 	}
 
-	action := el.eventHandler.OnClose(c, err)
-
-	var errStr strings.Builder
-
-	if _, ok := c.localAddr.(*net.UDPAddr); ok {
-		if err := el.poller.Delete(c.fd); err != nil {
-			err = fmt.Errorf("failed to delete fd=%d from poller in event-loop(%d): %v",
-				c.fd, el.idx, os.NewSyscallError("delete", err))
-			errStr.WriteString(err.Error())
-			errStr.WriteString(" | ")
-		}
-		if _, ok := el.listeners[c.fd]; !ok {
-			if err := unix.Close(c.fd); err != nil {
-				err = fmt.Errorf("failed to close fd=%d in event-loop(%d): %v",
-					c.fd, el.idx, os.NewSyscallError("close", err))
-				errStr.WriteString(err.Error())
-			}
-			el.connections.delConn(c)
-		}
-		c.release()
-		if errStr.Len() > 0 {
-			return errors.New(strings.TrimSuffix(errStr.String(), " | "))
-		}
-		return el.handleAction(c, action)
-	}
-
 	el.connections.delConn(c)
+	action := el.eventHandler.OnClose(c, err)
 
 	// Send residual data in buffer back to the remote before actually closing the connection.
 	for !c.outboundBuffer.IsEmpty() {
@@ -275,6 +249,7 @@ func (el *eventloop) close(c *conn, err error) error {
 
 	c.release()
 
+	var errStr strings.Builder
 	err0, err1 := el.poller.Delete(c.fd), unix.Close(c.fd)
 	if err0 != nil {
 		err0 = fmt.Errorf("failed to delete fd=%d from poller in event-loop(%d): %v",

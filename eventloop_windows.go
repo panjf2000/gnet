@@ -18,7 +18,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"net"
 	"runtime"
 	"sync/atomic"
 	"time"
@@ -97,10 +96,8 @@ func (el *eventloop) open(oc *openConn) error {
 	}
 
 	c := oc.c
-	if !oc.isDatagram {
-		el.connections[c] = struct{}{}
-		el.incConn(1)
-	}
+	el.connections[c] = struct{}{}
+	el.incConn(1)
 
 	out, action := el.eventHandler.OnOpen(c)
 	if out != nil {
@@ -192,23 +189,14 @@ func (el *eventloop) close(c *conn, err error) error {
 		return nil // ignore stale wakes.
 	}
 
+	delete(el.connections, c)
+	el.incConn(-1)
 	action := el.eventHandler.OnClose(c, err)
 	err = nil
 
-	if _, ok := c.localAddr.(*net.UDPAddr); ok {
-		if c.rawConn != nil {
-			err = c.rawConn.Close()
-		}
-		c.release()
-		if err != nil {
-			return err
-		}
-		return el.handleAction(c, action)
+	if c.rawConn != nil {
+		err = c.rawConn.Close()
 	}
-
-	delete(el.connections, c)
-	el.incConn(-1)
-	err = c.rawConn.Close()
 	c.release()
 	if err != nil {
 		return err
