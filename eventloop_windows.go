@@ -192,8 +192,6 @@ func (el *eventloop) close(c *conn, err error) error {
 	delete(el.connections, c)
 	el.incConn(-1)
 	action := el.eventHandler.OnClose(c, err)
-	err = nil
-
 	err = c.rawConn.Close()
 	c.release()
 	if err != nil {
