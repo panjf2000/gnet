@@ -45,7 +45,6 @@ type udpConn struct {
 type openConn struct {
 	c          *conn
 	cb         func()
-	isDatagram bool
 }
 
 type conn struct {
