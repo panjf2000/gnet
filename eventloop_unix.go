@@ -244,6 +244,11 @@ func (el *eventloop) close(c *conn, err error) (rerr error) {
 		return // ignore stale connections
 	}
 
+	el.connections.delConn(c)
+	if el.eventHandler.OnClose(c, err) == Shutdown {
+		rerr = errorx.ErrEngineShutdown
+	}
+
 	// Send residual data in buffer back to the remote before actually closing the connection.
 	for !c.outboundBuffer.IsEmpty() {
 		iov, _ := c.outboundBuffer.Peek(0)
@@ -258,22 +263,26 @@ func (el *eventloop) close(c *conn, err error) (rerr error) {
 	}
 
 	err0, err1 := el.poller.Delete(c.fd), unix.Close(c.fd)
+	var errStr strings.Builder
 	if err0 != nil {
-		rerr = fmt.Errorf("failed to delete fd=%d from poller in event-loop(%d): %v", c.fd, el.idx, err0)
+		err0 = fmt.Errorf("failed to delete fd=%d from poller in event-loop(%d): %v",
+			c.fd, el.idx, os.NewSyscallError("delete", err0))
+		errStr.WriteString(err0.Error())
+		errStr.WriteString(" | ")
 	}
 	if err1 != nil {
-		err1 = fmt.Errorf("failed to close fd=%d in event-loop(%d): %v", c.fd, el.idx, os.NewSyscallError("close", err1))
+		err1 = fmt.Errorf("failed to close fd=%d in event-loop(%d): %v",
+			c.fd, el.idx, os.NewSyscallError("close", err1))
+		errStr.WriteString(err1.Error())
+	}
+	if errStr.Len() > 0 {
 		if rerr != nil {
-			rerr = errors.New(rerr.Error() + " & " + err1.Error())
+			el.getLogger().Errorf(strings.TrimSuffix(errStr.String(), " | "))
 		} else {
-			rerr = err1
+			rerr = errors.New(strings.TrimSuffix(errStr.String(), " | "))
 		}
 	}
 
-	el.connections.delConn(c)
-	if el.eventHandler.OnClose(c, err) == Shutdown {
-		rerr = errorx.ErrEngineShutdown
-	}
 	c.release()
 
 	return
