@@ -226,28 +226,13 @@ loop:
 	return nil
 }
 
-func (el *eventloop) close(c *conn, err error) (rerr error) {
-	if addr := c.localAddr; addr != nil && strings.HasPrefix(c.localAddr.Network(), "udp") {
-		rerr = el.poller.Delete(c.fd)
-		if _, ok := el.listeners[c.fd]; !ok {
-			rerr = unix.Close(c.fd)
-			el.connections.delConn(c)
-		}
-		if el.eventHandler.OnClose(c, err) == Shutdown {
-			return errorx.ErrEngineShutdown
-		}
-		c.release()
-		return
-	}
-
+func (el *eventloop) close(c *conn, err error) error {
 	if !c.opened || el.connections.getConn(c.fd) == nil {
-		return // ignore stale connections
+		return nil // ignore stale connections
 	}
 
 	el.connections.delConn(c)
-	if el.eventHandler.OnClose(c, err) == Shutdown {
-		rerr = errorx.ErrEngineShutdown
-	}
+	action := el.eventHandler.OnClose(c, err)
 
 	// Send residual data in buffer back to the remote before actually closing the connection.
 	for !c.outboundBuffer.IsEmpty() {
@@ -262,8 +247,10 @@ func (el *eventloop) close(c *conn, err error) (rerr error) {
 		}
 	}
 
-	err0, err1 := el.poller.Delete(c.fd), unix.Close(c.fd)
+	c.release()
+
 	var errStr strings.Builder
+	err0, err1 := el.poller.Delete(c.fd), unix.Close(c.fd)
 	if err0 != nil {
 		err0 = fmt.Errorf("failed to delete fd=%d from poller in event-loop(%d): %v",
 			c.fd, el.idx, os.NewSyscallError("delete", err0))
@@ -276,16 +263,10 @@ func (el *eventloop) close(c *conn, err error) (rerr error) {
 		errStr.WriteString(err1.Error())
 	}
 	if errStr.Len() > 0 {
-		if rerr != nil {
-			el.getLogger().Errorf(strings.TrimSuffix(errStr.String(), " | "))
-		} else {
-			rerr = errors.New(strings.TrimSuffix(errStr.String(), " | "))
-		}
+		return errors.New(strings.TrimSuffix(errStr.String(), " | "))
 	}
 
-	c.release()
-
-	return
+	return el.handleAction(c, action)
 }
 
 func (el *eventloop) wake(c *conn) error {
@@ -333,19 +314,6 @@ func (el *eventloop) ticker(ctx context.Context) {
 	}
 }
 
-func (el *eventloop) handleAction(c *conn, action Action) error {
-	switch action {
-	case None:
-		return nil
-	case Close:
-		return el.close(c, nil)
-	case Shutdown:
-		return errorx.ErrEngineShutdown
-	default:
-		return nil
-	}
-}
-
 func (el *eventloop) readUDP(fd int, _ netpoll.IOEvent, _ netpoll.IOFlags) error {
 	n, sa, err := unix.Recvfrom(fd, el.buffer, 0)
 	if err != nil {
@@ -370,6 +338,19 @@ func (el *eventloop) readUDP(fd int, _ netpoll.IOEvent, _ netpoll.IOFlags) error
 		return errorx.ErrEngineShutdown
 	}
 	return nil
+}
+
+func (el *eventloop) handleAction(c *conn, action Action) error {
+	switch action {
+	case None:
+		return nil
+	case Close:
+		return el.close(c, nil)
+	case Shutdown:
+		return errorx.ErrEngineShutdown
+	default:
+		return nil
+	}
 }
 
 /*
