@@ -31,6 +31,8 @@ English | [中文](README_ZH.md)
 
 # 🚀 Features
 
+## 🦖 Milestone
+
 - [x] [High-performance](#-performance) event-driven looping based on a networking model of multiple threads/goroutines
 - [x] Built-in goroutine pool powered by the library [ants](https://github.com/panjf2000/ants)
 - [x] Lock-free during the entire runtime
@@ -43,8 +45,12 @@ English | [中文](README_ZH.md)
 - [x] Running on `Linux`, `macOS`, `Windows`, and *BSD: `Darwin`/`DragonFlyBSD`/`FreeBSD`/`NetBSD`/`OpenBSD`
 - [x] **Edge-triggered** I/O support
 - [x] Multiple network addresses binding
+
+## 🕊 Roadmap
+
 - [ ] **TLS** support
-- [ ] [io_uring](https://kernel.dk/io_uring.pdf) support
+- [ ] [io_uring](https://github.com/axboe/liburing/wiki/io_uring-and-networking-in-2023) support
+- [ ] **KCP** support
 
 ***Windows version of `gnet` should only be used in development for developing and testing, it shouldn't be used in production.***
 
