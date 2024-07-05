@@ -78,27 +78,27 @@ go get -u github.com/panjf2000/gnet
   <tbody>
     <tr>
       <td align="center" valign="middle">
-        <a href="https://www.tencent.com">
-          <img src="https://res.strikefreedom.top/static_res/logos/tencent_logo.png" width="250" />
+        <a href="https://www.tencent.com/">
+          <img src="https://res.strikefreedom.top/static_res/logos/tencent_logo.png" width="200" />
         </a>
       </td>
       <td align="center" valign="middle">
-        <a href="https://www.iqiyi.com" target="_blank">
+        <a href="https://www.iqiyi.com/" target="_blank">
           <img src="https://res.strikefreedom.top/static_res/logos/iqiyi-logo.png" width="200" />
         </a>
       </td>
       <td align="center" valign="middle">
-        <a href="https://www.mi.com" target="_blank">
-          <img src="https://res.strikefreedom.top/static_res/logos/mi-logo.png" width="150" />
+        <a href="https://www.mi.com/" target="_blank">
+          <img src="https://res.strikefreedom.top/static_res/logos/mi-logo.png" width="200" />
+        </a>
+      </td>
+      <td align="center" valign="middle">
+        <a href="https://www.360.com/" target="_blank">
+          <img src="https://res.strikefreedom.top/static_res/logos/360-logo.png" width="200" />
         </a>
       </td>
     </tr>
     <tr>
-      <td align="center" valign="middle">
-        <a href="https://www.360.com" target="_blank">
-          <img src="https://res.strikefreedom.top/static_res/logos/360-logo.png" width="200" />
-        </a>
-      </td>
       <td align="center" valign="middle">
         <a href="https://tieba.baidu.com/" target="_blank">
           <img src="https://res.strikefreedom.top/static_res/logos/baidu-tieba-logo.png" width="200" />
@@ -109,11 +109,16 @@ go get -u github.com/panjf2000/gnet
           <img src="https://res.strikefreedom.top/static_res/logos/tencent-games-logo.jpeg" width="200" />
         </a>
       </td>
+      <td align="center" valign="middle">
+        <a href="https://www.jd.com/" target="_blank">
+          <img src="https://res.strikefreedom.top/static_res/logos/jd.png" width="200" />
+        </a>
+      </td>
     </tr>
   </tbody>
 </table>
 
-如果你的项目也在使用 `gnet`，欢迎给我提 Pull Request 来更新这份列表。
+如果你的公司也在生产环境上使用 `gnet`，欢迎提 Pull Request 来丰富这份列表。
 
 # 📊 性能测试
 
