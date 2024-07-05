@@ -18,8 +18,8 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"runtime"
-	"strings"
 	"sync/atomic"
 	"time"
 
@@ -97,10 +97,8 @@ func (el *eventloop) open(oc *openConn) error {
 	}
 
 	c := oc.c
-	if !oc.isDatagram {
-		el.connections[c] = struct{}{}
-		el.incConn(1)
-	}
+	el.connections[c] = struct{}{}
+	el.incConn(1)
 
 	out, action := el.eventHandler.OnOpen(c)
 	if out != nil {
@@ -188,28 +186,18 @@ func (el *eventloop) wake(c *conn) error {
 }
 
 func (el *eventloop) close(c *conn, err error) error {
-	if addr := c.localAddr; addr != nil && strings.HasPrefix(addr.Network(), "udp") {
-		action := el.eventHandler.OnClose(c, err)
-		if c.rawConn != nil {
-			if err := c.rawConn.Close(); err != nil {
-				el.getLogger().Errorf("failed to close connection(%s), error:%v", c.remoteAddr.String(), err)
-			}
-		}
-		c.release()
-		return el.handleAction(c, action)
-	}
-
-	if _, ok := el.connections[c]; !ok {
+	if _, ok := el.connections[c]; c.rawConn == nil || !ok {
 		return nil // ignore stale wakes.
 	}
 
 	delete(el.connections, c)
 	el.incConn(-1)
 	action := el.eventHandler.OnClose(c, err)
-	if err := c.rawConn.Close(); err != nil {
-		el.getLogger().Errorf("failed to close connection(%s), error:%v", c.remoteAddr.String(), err)
-	}
+	err = c.rawConn.Close()
 	c.release()
+	if err != nil {
+		return fmt.Errorf("failed to close connection=%s in event-loop(%d): %v", c.remoteAddr, el.idx, err)
+	}
 
 	return el.handleAction(c, action)
 }

@@ -205,7 +205,7 @@ func (cli *Client) EnrollContext(nc net.Conn, ctx interface{}) (gc Conn, err err
 		c := newUDPConn(cli.el, nil, nc.LocalAddr(), nc.RemoteAddr())
 		c.SetContext(ctx)
 		c.rawConn = nc
-		cli.el.ch <- &openConn{c: c, isDatagram: true, cb: func() { close(connOpened) }}
+		cli.el.ch <- &openConn{c: c, cb: func() { close(connOpened) }}
 		go func(uc net.Conn, el *eventloop) {
 			var buffer [0x10000]byte
 			for {
