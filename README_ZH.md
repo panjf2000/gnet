@@ -111,7 +111,7 @@ go get -u github.com/panjf2000/gnet
       </td>
       <td align="center" valign="middle">
         <a href="https://www.jd.com/" target="_blank">
-          <img src="https://res.strikefreedom.top/static_res/logos/jd.png" width="200" />
+          <img src="https://res.strikefreedom.top/static_res/logos/jd-logo.png" width="200" />
         </a>
       </td>
     </tr>
