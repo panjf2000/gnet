@@ -239,12 +239,49 @@ function UseCases() {
       <div className="container">
         <AnchoredH2 id="usecases">Use cases</AnchoredH2>
         <div className="sub-title">The following companies/organizations use <code>gnet</code> as the underlying network service in production.</div>
-        <a href="https://www.tencent.com"><img src="https://res.strikefreedom.top/static_res/logos/tencent_logo.png" width="300" align="middle"/></a>
-        <a href="https://www.iqiyi.com" target="_blank"><img src="https://res.strikefreedom.top/static_res/logos/iqiyi-logo.png" width="300" align="middle"/></a>
-        <a href="https://www.mi.com" target="_blank"><img src="https://res.strikefreedom.top/static_res/logos/mi-logo.png" width="300" align="middle"/></a>
-        <a href="https://www.360.com" target="_blank"><img src="https://res.strikefreedom.top/static_res/logos/360-logo.png" width="300" align="middle"/></a>
-        <a href="https://tieba.baidu.com" target="_blank"><img src="https://res.strikefreedom.top/static_res/logos/baidu-tieba-logo.png" width="300" align="middle"/></a>
-        <a href="https://game.qq.com" target="_blank"><img src="https://res.strikefreedom.top/static_res/logos/tencent-games-logo.png" width="300" align="middle"/></a>
+        <table>
+          <tbody>
+            <tr>
+              <td align="center" valign="middle">
+                <a href="https://www.tencent.com/">
+                  <img src="https://res.strikefreedom.top/static_res/logos/tencent_logo.png" width="200" />
+                </a>
+              </td>
+              <td align="center" valign="middle">
+                <a href="https://www.iqiyi.com/" target="_blank">
+                  <img src="https://res.strikefreedom.top/static_res/logos/iqiyi-logo.png" width="200" />
+                </a>
+              </td>
+              <td align="center" valign="middle">
+                <a href="https://www.mi.com/global/" target="_blank">
+                  <img src="https://res.strikefreedom.top/static_res/logos/mi-logo.png" width="200" />
+                </a>
+              </td>
+              <td align="center" valign="middle">
+                <a href="https://www.360.com/" target="_blank">
+                  <img src="https://res.strikefreedom.top/static_res/logos/360-logo.png" width="200" />
+                </a>
+              </td>
+            </tr>
+            <tr>
+              <td align="center" valign="middle">
+                <a href="https://tieba.baidu.com/" target="_blank">
+                  <img src="https://res.strikefreedom.top/static_res/logos/baidu-tieba-logo.png" width="200" />
+                </a>
+              </td>
+              <td align="center" valign="middle">
+                <a href="https://game.qq.com/" target="_blank">
+                  <img src="https://res.strikefreedom.top/static_res/logos/tencent-games-logo.jpeg" width="200" />
+                </a>
+              </td>
+              <td align="center" valign="middle">
+                <a href="https://www.jd.com/" target="_blank">
+                  <img src="https://res.strikefreedom.top/static_res/logos/jd.png" width="200" />
+                </a>
+              </td>
+            </tr>
+          </tbody>
+        </table>
         <br />
         <p className="hero--subtitle">If your projects are also using <code>gnet</code>, feel free to open a <Link to="https://github.com/panjf2000/gnet/pulls">pull request</Link> refreshing this list.</p>
       </div>
