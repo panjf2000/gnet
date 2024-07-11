@@ -114,6 +114,11 @@ go get -u github.com/panjf2000/gnet
           <img src="https://res.strikefreedom.top/static_res/logos/jd-logo.png" width="200" />
         </a>
       </td>
+      <td align="center" valign="middle">
+        <a href="https://www.zuoyebang.com" target="_blank">
+          <img src="https://res.strikefreedom.top/static_res/logos/zuoyebang-logo.jpeg" width="200" />
+        </a>
+      </td>
     </tr>
   </tbody>
 </table>
