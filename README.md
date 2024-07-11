@@ -78,27 +78,27 @@ The following companies/organizations use `gnet` as the underlying network servi
   <tbody>
     <tr>
       <td align="center" valign="middle">
-        <a href="https://www.tencent.com">
-          <img src="https://res.strikefreedom.top/static_res/logos/tencent_logo.png" width="250" />
+        <a href="https://www.tencent.com/">
+          <img src="https://res.strikefreedom.top/static_res/logos/tencent_logo.png" width="200" />
         </a>
       </td>
       <td align="center" valign="middle">
-        <a href="https://www.iqiyi.com" target="_blank">
+        <a href="https://www.iqiyi.com/" target="_blank">
           <img src="https://res.strikefreedom.top/static_res/logos/iqiyi-logo.png" width="200" />
         </a>
       </td>
       <td align="center" valign="middle">
-        <a href="https://www.mi.com" target="_blank">
-          <img src="https://res.strikefreedom.top/static_res/logos/mi-logo.png" width="150" />
+        <a href="https://www.mi.com/global/" target="_blank">
+          <img src="https://res.strikefreedom.top/static_res/logos/mi-logo.png" width="200" />
+        </a>
+      </td>
+      <td align="center" valign="middle">
+        <a href="https://www.360.com/" target="_blank">
+          <img src="https://res.strikefreedom.top/static_res/logos/360-logo.png" width="200" />
         </a>
       </td>
     </tr>
     <tr>
-      <td align="center" valign="middle">
-        <a href="https://www.360.com" target="_blank">
-          <img src="https://res.strikefreedom.top/static_res/logos/360-logo.png" width="200" />
-        </a>
-      </td>
       <td align="center" valign="middle">
         <a href="https://tieba.baidu.com/" target="_blank">
           <img src="https://res.strikefreedom.top/static_res/logos/baidu-tieba-logo.png" width="200" />
@@ -109,11 +109,21 @@ The following companies/organizations use `gnet` as the underlying network servi
           <img src="https://res.strikefreedom.top/static_res/logos/tencent-games-logo.jpeg" width="200" />
         </a>
       </td>
+      <td align="center" valign="middle">
+        <a href="https://www.jd.com/" target="_blank">
+          <img src="https://res.strikefreedom.top/static_res/logos/jd-logo.png" width="200" />
+        </a>
+      </td>
+      <td align="center" valign="middle">
+        <a href="https://www.zuoyebang.com" target="_blank">
+          <img src="https://res.strikefreedom.top/static_res/logos/zuoyebang-logo.jpeg" width="200" />
+        </a>
+      </td>
     </tr>
   </tbody>
 </table>
 
-If you have `gnet` integrated into projects, feel free to open a pull request refreshing this list.
+If your company is also using `gnet` in production, please help us enrich this list by opening a pull request.
 
 # 📊 Performance
 
