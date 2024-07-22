@@ -72,7 +72,7 @@ go get -u github.com/panjf2000/gnet
 
 # 🎡 Use cases
 
-The following companies/organizations use `gnet` as the underlying network service in production.
+The following corporations/organizations use `gnet` as the underlying network service in production.
 
 <table>
   <tbody>
@@ -123,7 +123,7 @@ The following companies/organizations use `gnet` as the underlying network servi
   </tbody>
 </table>
 
-If your company is also using `gnet` in production, please help us enrich this list by opening a pull request.
+If you're also using `gnet` in production, please help us enrich this list by opening a pull request.
 
 # 📊 Performance
 

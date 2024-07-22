@@ -123,7 +123,7 @@ go get -u github.com/panjf2000/gnet
   </tbody>
 </table>
 
-如果你的公司也在生产环境上使用 `gnet`，欢迎提 Pull Request 来丰富这份列表。
+如果你也正在生产环境上使用 `gnet`，欢迎提 Pull Request 来丰富这份列表。
 
 # 📊 性能测试
 
