@@ -83,6 +83,11 @@ go get -u github.com/panjf2000/gnet
         </a>
       </td>
       <td align="center" valign="middle">
+        <a href="https://www.tencentgames.com/" target="_blank">
+          <img src="https://res.strikefreedom.top/static_res/logos/tencent-games-logo.jpeg" width="200" />
+        </a>
+      </td>
+      <td align="center" valign="middle">
         <a href="https://www.iqiyi.com/" target="_blank">
           <img src="https://res.strikefreedom.top/static_res/logos/iqiyi-logo.png" width="200" />
         </a>
@@ -92,21 +97,16 @@ go get -u github.com/panjf2000/gnet
           <img src="https://res.strikefreedom.top/static_res/logos/mi-logo.png" width="200" />
         </a>
       </td>
+    </tr>
+    <tr>
       <td align="center" valign="middle">
         <a href="https://www.360.com/" target="_blank">
           <img src="https://res.strikefreedom.top/static_res/logos/360-logo.png" width="200" />
         </a>
       </td>
-    </tr>
-    <tr>
       <td align="center" valign="middle">
         <a href="https://tieba.baidu.com/" target="_blank">
           <img src="https://res.strikefreedom.top/static_res/logos/baidu-tieba-logo.png" width="200" />
-        </a>
-      </td>
-      <td align="center" valign="middle">
-        <a href="https://game.qq.com/" target="_blank">
-          <img src="https://res.strikefreedom.top/static_res/logos/tencent-games-logo.jpeg" width="200" />
         </a>
       </td>
       <td align="center" valign="middle">
@@ -115,7 +115,7 @@ go get -u github.com/panjf2000/gnet
         </a>
       </td>
       <td align="center" valign="middle">
-        <a href="https://www.zuoyebang.com" target="_blank">
+        <a href="https://www.zuoyebang.com/" target="_blank">
           <img src="https://res.strikefreedom.top/static_res/logos/zuoyebang-logo.jpeg" width="200" />
         </a>
       </td>
@@ -123,7 +123,7 @@ go get -u github.com/panjf2000/gnet
   </tbody>
 </table>
 
-如果你的公司也在生产环境上使用 `gnet`，欢迎提 Pull Request 来丰富这份列表。
+如果你也正在生产环境上使用 `gnet`，欢迎提 Pull Request 来丰富这份列表。
 
 # 📊 性能测试
 
