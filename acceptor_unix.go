@@ -55,6 +55,13 @@ func (el *eventloop) accept0(fd int, _ netpoll.IOEvent, _ netpoll.IOFlags) error
 
 		el := el.engine.eventLoops.next(remoteAddr)
 		c := newTCPConn(nfd, el, sa, el.listeners[fd].addr, remoteAddr)
+
+		if el.engine.opts.TLSconfig != nil {
+			if err = c.UpgradeTLS(el.engine.opts.TLSconfig); err != nil {
+				return err
+			}
+		}
+
 		err = el.poller.Trigger(queue.HighPriority, el.register, c)
 		if err != nil {
 			el.getLogger().Errorf("failed to enqueue the accepted socket fd=%d to poller: %v", c.fd, err)
@@ -91,5 +98,12 @@ func (el *eventloop) accept(fd int, ev netpoll.IOEvent, flags netpoll.IOFlags) e
 	}
 
 	c := newTCPConn(nfd, el, sa, el.listeners[fd].addr, remoteAddr)
+
+	if el.engine.opts.TLSconfig != nil {
+		if err = c.UpgradeTLS(el.engine.opts.TLSconfig); err != nil {
+			return err
+		}
+	}
+
 	return el.register0(c)
 }
