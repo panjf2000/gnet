@@ -52,6 +52,7 @@ type conn struct {
 	isDatagram     bool                   // UDP protocol
 	opened         bool                   // connection opened event fired
 	isEOF          bool                   // whether the connection has reached EOF
+	closeStatus    int32                  // concurrency-safe close this connection
 }
 
 func newTCPConn(fd int, el *eventloop, sa unix.Sockaddr, localAddr, remoteAddr net.Addr) (c *conn) {

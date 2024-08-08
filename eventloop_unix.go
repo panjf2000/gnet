@@ -25,6 +25,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/sys/unix"
@@ -227,11 +228,16 @@ loop:
 }
 
 func (el *eventloop) close(c *conn, err error) error {
+	if !atomic.CompareAndSwapInt32(&c.closeStatus, 0, 1) {
+		return nil // already in closing
+	}
 	if !c.opened || el.connections.getConn(c.fd) == nil {
+		atomic.StoreInt32(&c.closeStatus, 0)
 		return nil // ignore stale connections
 	}
 
 	el.connections.delConn(c)
+	atomic.StoreInt32(&c.closeStatus, 0)
 	action := el.eventHandler.OnClose(c, err)
 
 	// Send residual data in buffer back to the remote before actually closing the connection.
