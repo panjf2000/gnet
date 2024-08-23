@@ -501,9 +501,8 @@ func (s *testServer) OnClose(c Conn, err error) (action Action) {
 	if err != nil {
 		logging.Debugf("error occurred on closed, %v\n", err)
 	}
-	if c.LocalAddr().Network() != "udp" {
-		require.Equal(s.tester, c.Context(), c, "invalid context")
-	}
+
+	require.Equal(s.tester, c.Context(), c, "invalid context")
 
 	atomic.AddInt32(&s.disconnected, 1)
 	return
