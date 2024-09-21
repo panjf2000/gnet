@@ -1206,7 +1206,13 @@ type testStopServer struct {
 	*BuiltinEventEngine
 	tester                   *testing.T
 	network, addr, protoAddr string
+	eng                      Engine
 	action                   bool
+}
+
+func (t *testStopServer) OnBoot(eng Engine) (action Action) {
+	t.eng = eng
+	return
 }
 
 func (t *testStopServer) OnClose(Conn, error) (action Action) {
@@ -1237,7 +1243,7 @@ func (t *testStopServer) OnTick() (delay time.Duration, action Action) {
 			go func() {
 				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 				defer cancel()
-				logging.Debugf("stop engine...", Stop(ctx, t.protoAddr))
+				logging.Debugf("stop engine...", t.eng.Stop(ctx))
 			}()
 
 			// waiting the engine shutdown.
@@ -1365,7 +1371,7 @@ type testClosedWakeUpServer struct {
 	clientClosed chan struct{}
 }
 
-func (s *testClosedWakeUpServer) OnBoot(_ Engine) (action Action) {
+func (s *testClosedWakeUpServer) OnBoot(eng Engine) (action Action) {
 	go func() {
 		c, err := net.Dial(s.network, s.addr)
 		require.NoError(s.tester, err)
@@ -1380,7 +1386,7 @@ func (s *testClosedWakeUpServer) OnBoot(_ Engine) (action Action) {
 		close(s.clientClosed)
 		<-s.serverClosed
 
-		logging.Debugf("stop engine...", Stop(context.TODO(), s.protoAddr))
+		logging.Debugf("stop engine...", eng.Stop(context.TODO()))
 	}()
 
 	return None
