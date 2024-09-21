@@ -19,6 +19,10 @@ import (
 	"unsafe"
 )
 
+// TODO(panjf2000): rework the implementation of BytesToString and StringToBytes by
+// using unsafe.String/unsafe.StringData and unsafe.Slice/unsafe.SliceData when we
+// bump up the minimum required Go version to 1.20.
+
 // BytesToString converts byte slice to a string without memory allocation.
 //
 // Note it may break if the implementation of string or slice header changes in the future go versions.
@@ -32,9 +36,9 @@ func BytesToString(b []byte) string {
 // Note it may break if the implementation of string or slice header changes in the future go versions.
 func StringToBytes(s string) (b []byte) {
 	/* #nosec G103 */
-	sh := (*reflect.StringHeader)(unsafe.Pointer(&s))
+	sh := (*reflect.StringHeader)(unsafe.Pointer(&s)) //nolint:staticcheck
 	/* #nosec G103 */
-	bh := (*reflect.SliceHeader)(unsafe.Pointer(&b))
+	bh := (*reflect.SliceHeader)(unsafe.Pointer(&b)) //nolint:staticcheck
 
 	bh.Data, bh.Len, bh.Cap = sh.Data, sh.Len, sh.Len
 	return b
