@@ -64,7 +64,8 @@ func (p *Pool) Put(buf []byte) {
 	if size != 1<<idx { // this byte slice is not from Pool.Get(), put it into the previous interval of idx
 		idx--
 	}
-	// array pointer
+	// Store the pointer to the underlying array instead of the pointer to the slice itself,
+	// which circumvents the escape of buf from the stack to the heap.
 	p.pools[idx].Put(unsafe.SliceData(buf))
 }
 
