@@ -2,9 +2,9 @@ package linkedlist
 
 import (
 	"bytes"
+	crand "crypto/rand"
 	"math/rand"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -16,12 +16,12 @@ func TestLinkedListBuffer_Basic(t *testing.T) {
 		cum int
 		buf bytes.Buffer
 	)
-	rand.Seed(time.Now().Unix())
 	for i := 0; i < maxBlocks; i++ {
 		n := rand.Intn(1024) + 128
 		cum += n
 		data := make([]byte, n)
-		rand.Read(data)
+		_, err := crand.Read(data)
+		require.NoError(t, err)
 		llb.PushBack(data)
 		buf.Write(data)
 	}
@@ -39,8 +39,10 @@ func TestLinkedListBuffer_Basic(t *testing.T) {
 	require.EqualValues(t, buf.Bytes()[:pn], p)
 	tmpA := make([]byte, cum/16)
 	tmpB := make([]byte, cum/16)
-	rand.Read(tmpA)
-	rand.Read(tmpB)
+	_, err = crand.Read(tmpA)
+	require.NoError(t, err)
+	_, err = crand.Read(tmpB)
+	require.NoError(t, err)
 	bs, err = llb.PeekWithBytes(cum/4, tmpA, tmpB)
 	require.NoError(t, err)
 	p = p[:0]
@@ -69,8 +71,8 @@ func TestLinkedListBuffer_ReadFrom(t *testing.T) {
 	var llb Buffer
 	const dataLen = 4 * 1024
 	data := make([]byte, dataLen)
-	rand.Seed(time.Now().Unix())
-	rand.Read(data)
+	_, err := crand.Read(data)
+	require.NoError(t, err)
 	r := bytes.NewReader(data)
 	n, err := llb.ReadFrom(r)
 	require.NoError(t, err)
@@ -80,9 +82,11 @@ func TestLinkedListBuffer_ReadFrom(t *testing.T) {
 	llb.Reset()
 	const headLen = 256
 	head := make([]byte, headLen)
-	rand.Read(head)
+	_, err = crand.Read(head)
+	require.NoError(t, err)
 	llb.PushBack(head)
-	rand.Read(data)
+	_, err = crand.Read(data)
+	require.NoError(t, err)
 	r.Reset(data)
 	n, err = llb.ReadFrom(r)
 	require.NoError(t, err)
@@ -104,12 +108,12 @@ func TestLinkedListBuffer_WriteTo(t *testing.T) {
 		cum int
 		buf bytes.Buffer
 	)
-	rand.Seed(time.Now().Unix())
 	for i := 0; i < maxBlocks; i++ {
 		n := rand.Intn(1024) + 128
 		cum += n
 		data := make([]byte, n)
-		rand.Read(data)
+		_, err := crand.Read(data)
+		require.NoError(t, err)
 		llb.PushBack(data)
 		buf.Write(data)
 	}
@@ -130,7 +134,8 @@ func TestLinkedListBuffer_WriteTo(t *testing.T) {
 		n := rand.Intn(1024) + 128
 		cum += n
 		data := make([]byte, n)
-		rand.Read(data)
+		_, err := crand.Read(data)
+		require.NoError(t, err)
 		llb.PushBack(data)
 		buf.Write(data)
 	}

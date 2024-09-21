@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	crand "crypto/rand"
 	"encoding/binary"
 	"errors"
 	"io"
@@ -660,7 +661,6 @@ func runServer(t *testing.T, addrs []string, et, reuseport, multicore, async, wr
 }
 
 func startClient(t *testing.T, network, addr string, multicore, async bool) {
-	rand.Seed(time.Now().UnixNano())
 	c, err := net.Dial(network, addr)
 	require.NoError(t, err)
 	defer c.Close()
@@ -678,7 +678,7 @@ func startClient(t *testing.T, network, addr string, multicore, async bool) {
 		if network == "udp" {
 			reqData = reqData[:datagramLen]
 		}
-		_, err = rand.Read(reqData)
+		_, err = crand.Read(reqData)
 		require.NoError(t, err)
 		_, err = c.Write(reqData)
 		require.NoError(t, err)
@@ -1659,7 +1659,6 @@ func runSimServer(t *testing.T, addr string, et bool, nclients, packetSize, pack
 }
 
 func runSimClient(t *testing.T, network, addr string, packetSize, batch int) {
-	rand.Seed(time.Now().UnixNano())
 	c, err := net.Dial(network, addr)
 	require.NoError(t, err)
 	defer c.Close()
@@ -1695,7 +1694,7 @@ func batchSendAndRecv(t *testing.T, c net.Conn, rd *bufio.Reader, packetSize, ba
 	)
 	for i := 0; i < batch; i++ {
 		req := make([]byte, packetSize)
-		_, err := rand.Read(req)
+		_, err := crand.Read(req)
 		require.NoError(t, err)
 		requests = append(requests, req)
 		packet, _ := codec.Encode(req)

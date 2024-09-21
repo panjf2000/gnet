@@ -47,9 +47,9 @@ jobs:
           cache: false
 
       - name: Setup and run golangci-lint
-        uses: golangci/golangci-lint-action@v4
+        uses: golangci/golangci-lint-action@v6
         with:
-          version: v1.56.2
+          version: v1.61.0
           args: -v -E gofumpt -E gocritic -E misspell -E revive -E godot --timeout 5m
   test:
     needs: lint

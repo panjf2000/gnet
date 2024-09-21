@@ -5,6 +5,7 @@ package gnet
 
 import (
 	"context"
+	crand "crypto/rand"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -104,7 +105,6 @@ type testMcastServer struct {
 }
 
 func (s *testMcastServer) startMcastClient() {
-	rand.Seed(time.Now().UnixNano())
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	c, err := net.Dial("udp", s.addr)
@@ -117,7 +117,7 @@ func (s *testMcastServer) startMcastClient() {
 	start := time.Now()
 	for time.Since(start) < duration {
 		reqData := make([]byte, 1024)
-		_, err = rand.Read(reqData)
+		_, err = crand.Read(reqData)
 		require.NoError(s.t, err)
 		_, err = c.Write(reqData)
 		require.NoError(s.t, err)
