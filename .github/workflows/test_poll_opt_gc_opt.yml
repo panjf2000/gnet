@@ -42,7 +42,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '^1.17'
+          go-version: '^1.20'
           cache: false
 
       - name: Setup and run golangci-lint
@@ -55,7 +55,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: ['1.17', '1.22']
+        go: ['1.20', '1.23']
         os: [ubuntu-latest, macos-latest]
     name: Go ${{ matrix.go }} @ ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -68,7 +68,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '^1.17'
+          go-version: '^1.20'
 
       - name: Print Go environment
         id: go-env

@@ -5,8 +5,8 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/valyala/bytebufferpool v1.0.0
 	go.uber.org/zap v1.21.0 // don't upgrade this one
-	golang.org/x/sync v0.7.0
-	golang.org/x/sys v0.21.0
+	golang.org/x/sync v0.8.0
+	golang.org/x/sys v0.25.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
 
@@ -18,4 +18,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-go 1.17
+go 1.20
