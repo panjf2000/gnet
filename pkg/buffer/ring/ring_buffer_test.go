@@ -2,10 +2,9 @@ package ring
 
 import (
 	"bytes"
-	"math/rand"
+	crand "crypto/rand"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -125,7 +124,7 @@ func TestRingBufferGrow(t *testing.T) {
 	assert.Empty(t, head, "head should be empty")
 	assert.Empty(t, tail, "tail should be empty")
 	data := make([]byte, DefaultBufferSize+1)
-	n, err := rand.Read(data)
+	n, err := crand.Read(data)
 	assert.NoError(t, err, "failed to generate random data")
 	assert.EqualValuesf(t, DefaultBufferSize+1, n, "expect random data length is %d but got %d", DefaultBufferSize+1, n)
 	n, err = rb.Write(data)
@@ -139,7 +138,7 @@ func TestRingBufferGrow(t *testing.T) {
 
 	rb = New(DefaultBufferSize)
 	newData := make([]byte, 3*512)
-	n, err = rand.Read(newData)
+	n, err = crand.Read(newData)
 	assert.NoError(t, err, "failed to generate random data")
 	assert.EqualValuesf(t, 3*512, n, "expect random data length is %d but got %d", 3*512, n)
 	n, err = rb.Write(newData)
@@ -153,7 +152,7 @@ func TestRingBufferGrow(t *testing.T) {
 
 	rb.Reset()
 	data = make([]byte, bufferGrowThreshold)
-	n, err = rand.Read(data)
+	n, err = crand.Read(data)
 	assert.NoError(t, err, "failed to generate random data")
 	assert.EqualValuesf(t, bufferGrowThreshold, n, "expect random data length is %d but got %d", bufferGrowThreshold, n)
 	n, err = rb.Write(data)
@@ -165,7 +164,7 @@ func TestRingBufferGrow(t *testing.T) {
 	assert.EqualValues(t, 0, rb.Available())
 	assert.EqualValues(t, data, rb.Bytes())
 	newData = make([]byte, bufferGrowThreshold/2+1)
-	n, err = rand.Read(newData)
+	n, err = crand.Read(newData)
 	assert.NoError(t, err, "failed to generate random data")
 	assert.EqualValuesf(t, bufferGrowThreshold/2+1, n, "expect random data length is %d but got %d", bufferGrowThreshold, n)
 	n, err = rb.Write(newData)
@@ -307,8 +306,8 @@ func TestRingBuffer_ReadFrom(t *testing.T) {
 	rb := New(0)
 	const dataLen = 4 * 1024
 	data := make([]byte, dataLen)
-	rand.Seed(time.Now().Unix())
-	rand.Read(data)
+	_, err := crand.Read(data)
+	require.NoError(t, err)
 	r := bytes.NewReader(data)
 	n, err := rb.ReadFrom(r)
 	require.NoError(t, err)
@@ -329,8 +328,10 @@ func TestRingBuffer_ReadFrom(t *testing.T) {
 	rb = New(0)
 	const prefixLen = 2 * 1024
 	prefix := make([]byte, prefixLen)
-	rand.Read(prefix)
-	rand.Read(data)
+	_, err = crand.Read(prefix)
+	require.NoError(t, err)
+	_, err = crand.Read(data)
+	require.NoError(t, err)
 	r.Reset(data)
 	m, err = rb.Write(prefix)
 	require.NoError(t, err)
@@ -354,8 +355,10 @@ func TestRingBuffer_ReadFrom(t *testing.T) {
 
 	const initLen = 5 * 1024
 	rb = New(initLen)
-	rand.Read(prefix)
-	rand.Read(data)
+	_, err = crand.Read(prefix)
+	require.NoError(t, err)
+	_, err = crand.Read(data)
+	require.NoError(t, err)
 	r.Reset(data)
 	m, err = rb.Write(prefix)
 	require.NoError(t, err)
@@ -380,8 +383,8 @@ func TestRingBuffer_WriteTo(t *testing.T) {
 	rb := New(5 * 1024)
 	const dataLen = 4 * 1024
 	data := make([]byte, dataLen)
-	rand.Seed(time.Now().Unix())
-	rand.Read(data)
+	_, err := crand.Read(data)
+	require.NoError(t, err)
 	n, err := rb.Write(data)
 	require.NoError(t, err)
 	require.EqualValuesf(t, dataLen, n, "ringbuffer should write %d bytes, but got %d", dataLen, n)
@@ -394,7 +397,8 @@ func TestRingBuffer_WriteTo(t *testing.T) {
 	require.EqualValues(t, data, buf.Bytes())
 
 	buf.Reset()
-	rand.Read(data)
+	_, err = crand.Read(data)
+	require.NoError(t, err)
 	rb = New(dataLen)
 	n, err = rb.Write(data)
 	require.NoError(t, err)
@@ -408,7 +412,8 @@ func TestRingBuffer_WriteTo(t *testing.T) {
 
 	buf.Reset()
 	rb.Reset()
-	rand.Read(data)
+	_, err = crand.Read(data)
+	require.NoError(t, err)
 	n, err = rb.Write(data)
 	require.NoError(t, err)
 	require.EqualValuesf(t, dataLen, n, "ringbuffer should write %d bytes, but got %d", dataLen, n)
@@ -419,7 +424,8 @@ func TestRingBuffer_WriteTo(t *testing.T) {
 	require.EqualValues(t, data[:partLen], head)
 	_, _ = rb.Discard(partLen)
 	partData := make([]byte, partLen/2)
-	rand.Read(partData)
+	_, err = crand.Read(partData)
+	require.NoError(t, err)
 	n, err = rb.Write(partData)
 	require.NoError(t, err)
 	require.EqualValuesf(t, partLen/2, n, "ringbuffer should write %d bytes, but got %d", dataLen, n)

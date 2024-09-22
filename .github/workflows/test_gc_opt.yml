@@ -43,20 +43,20 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '^1.17'
+          go-version: '^1.20'
           cache: false
 
       - name: Setup and run golangci-lint
-        uses: golangci/golangci-lint-action@v4
+        uses: golangci/golangci-lint-action@v6
         with:
-          version: v1.56.2
+          version: v1.61.0
           args: -v -E gofumpt -E gocritic -E misspell -E revive -E godot --timeout 5m
   test:
     needs: lint
     strategy:
       fail-fast: false
       matrix:
-        go: ['1.17', '1.22']
+        go: ['1.20', '1.23']
         os:
           - ubuntu-latest
           - macos-latest

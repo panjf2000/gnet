@@ -275,7 +275,7 @@ func (s *testServerGC) GC(secs int) {
 		runtime.GC()
 		gcTime := time.Since(now)
 		gcAllTime += gcTime
-		s.tester.Log(s.tester.Name(), s.network, " server gc:", gcTime, ", average gc time:", gcAllTime/gcAllCount)
+		s.tester.Log(s.tester.Name(), s.network, "server gc:", gcTime, "average gc time:", gcAllTime/gcAllCount)
 		if time.Since(gcStart) >= time.Second*time.Duration(secs) {
 			break
 		}

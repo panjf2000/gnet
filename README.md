@@ -4,7 +4,7 @@
 <a title="Build Status" target="_blank" href="https://github.com/panjf2000/gnet/actions?query=workflow%3ATests"><img src="https://img.shields.io/github/actions/workflow/status/panjf2000/gnet/test.yml?branch=dev&style=flat-square&logo=github-actions" /></a>
 <a title="Codecov" target="_blank" href="https://codecov.io/gh/panjf2000/gnet"><img src="https://img.shields.io/codecov/c/github/panjf2000/gnet?style=flat-square&logo=codecov" /></a>
 <a title="Supported Platforms" target="_blank" href="https://github.com/panjf2000/gnet"><img src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20*BSD%20%7C%20Windows-549688?style=flat-square&logo=launchpad" /></a>
-<a title="Require Go Version" target="_blank" href="https://github.com/panjf2000/gnet"><img src="https://img.shields.io/badge/go-%3E%3D1.17-30dff3?style=flat-square&logo=go" /></a>
+<a title="Minimum Go Version" target="_blank" href="https://github.com/panjf2000/gnet"><img src="https://img.shields.io/badge/go-%3E%3D1.20-30dff3?style=flat-square&logo=go" /></a>
 <br />
 <a title="Go Report Card" target="_blank" href="https://goreportcard.com/report/github.com/panjf2000/gnet"><img src="https://goreportcard.com/badge/github.com/panjf2000/gnet?style=flat-square" /></a>
 <a title="Doc for gnet" target="_blank" href="https://pkg.go.dev/github.com/panjf2000/gnet/v2#section-documentation"><img src="https://img.shields.io/badge/go.dev-doc-007d9c?style=flat-square&logo=read-the-docs" /></a>
@@ -31,6 +31,8 @@ English | [中文](README_ZH.md)
 
 # 🚀 Features
 
+## 🦖 Milestone
+
 - [x] [High-performance](#-performance) event-driven looping based on a networking model of multiple threads/goroutines
 - [x] Built-in goroutine pool powered by the library [ants](https://github.com/panjf2000/ants)
 - [x] Lock-free during the entire runtime
@@ -43,8 +45,12 @@ English | [中文](README_ZH.md)
 - [x] Running on `Linux`, `macOS`, `Windows`, and *BSD: `Darwin`/`DragonFlyBSD`/`FreeBSD`/`NetBSD`/`OpenBSD`
 - [x] **Edge-triggered** I/O support
 - [x] Multiple network addresses binding
+
+## 🕊 Roadmap
+
 - [ ] **TLS** support
-- [ ] [io_uring](https://kernel.dk/io_uring.pdf) support
+- [ ] [io_uring](https://github.com/axboe/liburing/wiki/io_uring-and-networking-in-2023) support
+- [ ] **KCP** support
 
 ***Windows version of `gnet` should only be used in development for developing and testing, it shouldn't be used in production.***
 
@@ -66,30 +72,35 @@ go get -u github.com/panjf2000/gnet
 
 # 🎡 Use cases
 
-The following companies/organizations use `gnet` as the underlying network service in production.
+The following corporations/organizations use `gnet` as the underlying network service in production.
 
 <table>
   <tbody>
     <tr>
       <td align="center" valign="middle">
-        <a href="https://www.tencent.com">
-          <img src="https://res.strikefreedom.top/static_res/logos/tencent_logo.png" width="250" />
+        <a href="https://www.tencent.com/">
+          <img src="https://res.strikefreedom.top/static_res/logos/tencent_logo.png" width="200" />
         </a>
       </td>
       <td align="center" valign="middle">
-        <a href="https://www.iqiyi.com" target="_blank">
+        <a href="https://www.tencentgames.com/" target="_blank">
+          <img src="https://res.strikefreedom.top/static_res/logos/tencent-games-logo.jpeg" width="200" />
+        </a>
+      </td>
+      <td align="center" valign="middle">
+        <a href="https://www.iqiyi.com/" target="_blank">
           <img src="https://res.strikefreedom.top/static_res/logos/iqiyi-logo.png" width="200" />
         </a>
       </td>
       <td align="center" valign="middle">
-        <a href="https://www.mi.com" target="_blank">
-          <img src="https://res.strikefreedom.top/static_res/logos/mi-logo.png" width="150" />
+        <a href="https://www.mi.com/global/" target="_blank">
+          <img src="https://res.strikefreedom.top/static_res/logos/mi-logo.png" width="200" />
         </a>
       </td>
     </tr>
     <tr>
       <td align="center" valign="middle">
-        <a href="https://www.360.com" target="_blank">
+        <a href="https://www.360.com/" target="_blank">
           <img src="https://res.strikefreedom.top/static_res/logos/360-logo.png" width="200" />
         </a>
       </td>
@@ -99,15 +110,20 @@ The following companies/organizations use `gnet` as the underlying network servi
         </a>
       </td>
       <td align="center" valign="middle">
-        <a href="https://game.qq.com/" target="_blank">
-          <img src="https://res.strikefreedom.top/static_res/logos/tencent-games-logo.jpeg" width="200" />
+        <a href="https://www.jd.com/" target="_blank">
+          <img src="https://res.strikefreedom.top/static_res/logos/jd-logo.png" width="200" />
+        </a>
+      </td>
+      <td align="center" valign="middle">
+        <a href="https://www.zuoyebang.com/" target="_blank">
+          <img src="https://res.strikefreedom.top/static_res/logos/zuoyebang-logo.jpeg" width="200" />
         </a>
       </td>
     </tr>
   </tbody>
 </table>
 
-If you have `gnet` integrated into projects, feel free to open a pull request refreshing this list.
+If you're also using `gnet` in production, please help us enrich this list by opening a pull request.
 
 # 📊 Performance
 
@@ -227,50 +243,6 @@ Become a bronze sponsor with a monthly donation of $10 and get your logo on our 
 <img src="https://raw.githubusercontent.com/panjf2000/illustrations/master/payments/WeChatPay.JPG" width="250" align="middle"/>&nbsp;&nbsp;
 <img src="https://raw.githubusercontent.com/panjf2000/illustrations/master/payments/AliPay.JPG" width="250" align="middle"/>&nbsp;&nbsp;
 <a href="https://www.paypal.me/R136a1X" target="_blank"><img src="https://raw.githubusercontent.com/panjf2000/illustrations/master/payments/PayPal.JPG" width="250" align="middle"/></a>&nbsp;&nbsp;
-
-# 💴 Patrons
-
-<table>
-  <tbody>
-    <tr>
-      <td align="center" valign="middle">
-        <a target="_blank" href="https://github.com/patrick-othmer">
-          <img src="https://avatars1.githubusercontent.com/u/8964313" width="100" alt="Patrick Othmer" />
-        </a>
-      </td>
-      <td align="center" valign="middle">
-        <a target="_blank" href="https://github.com/panjf2000/ants">
-          <img src="https://avatars2.githubusercontent.com/u/50285334" width="100" alt="Jimmy" />
-        </a>
-      </td>
-      <td align="center" valign="middle">
-        <a target="_blank" href="https://github.com/cafra">
-          <img src="https://avatars0.githubusercontent.com/u/13758306" width="100" alt="ChenZhen" />
-        </a>
-      </td>
-      <td align="center" valign="middle">
-        <a target="_blank" href="https://github.com/yangwenmai">
-          <img src="https://avatars0.githubusercontent.com/u/1710912" width="100" alt="Mai Yang" />
-        </a>
-      </td>
-      <td align="center" valign="middle">
-        <a target="_blank" href="https://github.com/BeijingWks">
-          <img src="https://avatars3.githubusercontent.com/u/33656339" width="100" alt="王开帅" />
-        </a>
-      </td>
-      <td align="center" valign="middle">
-        <a target="_blank" href="https://github.com/refs">
-          <img src="https://avatars3.githubusercontent.com/u/6905948" width="100" alt="Unger Alejandro" />
-        </a>
-      </td>
-      <td align="center" valign="middle">
-        <a target="_blank" href="https://github.com/Wuvist">
-          <img src="https://avatars.githubusercontent.com/u/657796" width="100" alt="Weng Wei" />
-        </a>
-      </td>
-    </tr>
-  </tbody>
-</table>
 
 # 🔑 JetBrains OS licenses
 
