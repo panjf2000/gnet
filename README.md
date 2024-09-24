@@ -246,9 +246,9 @@ Become a bronze sponsor with a monthly donation of $10 and get your logo on our 
 
 # 🔑 JetBrains OS licenses
 
-`gnet` had been being developed with `GoLand` IDE under the **free JetBrains Open Source license(s)** granted by JetBrains s.r.o., hence I would like to express my thanks here.
+`gnet` has been being developed with `GoLand` IDE under the ***free JetBrains Open Source license(s)*** granted by JetBrains s.r.o., hence I would like to express my thanks here.
 
-<a href="https://www.jetbrains.com/?from=gnet" target="_blank"><img src="https://raw.githubusercontent.com/panjf2000/illustrations/master/jetbrains/jetbrains-variant-4.png" width="250" align="middle"/></a>
+<a href="https://www.jetbrains.com/?from=gnet" target="_blank"><img src="https://resources.jetbrains.com/storage/products/company/brand/logos/jetbrains.svg" alt="JetBrains logo."></a>
 
 # 🔋 Sponsorship
 
