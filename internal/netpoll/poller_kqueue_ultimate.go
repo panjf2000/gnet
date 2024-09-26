@@ -19,6 +19,7 @@
 package netpoll
 
 import (
+	"errors"
 	"os"
 	"runtime"
 	"sync/atomic"
@@ -27,7 +28,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/panjf2000/gnet/v2/internal/queue"
-	"github.com/panjf2000/gnet/v2/pkg/errors"
+	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
 )
 
@@ -120,12 +121,9 @@ func (p *Poller) Polling() error {
 				p.drainWakeupEvent()
 			} else {
 				pollAttachment := restorePollAttachment(unsafe.Pointer(&ev.Udata))
-				switch err = pollAttachment.Callback(int(ev.Ident), ev.Filter, ev.Flags); err {
-				case nil:
-				case errors.ErrAcceptSocket, errors.ErrEngineShutdown:
+				err = pollAttachment.Callback(int(ev.Ident), ev.Filter, ev.Flags)
+				if errors.Is(err, errorx.ErrAcceptSocket) || errors.Is(err, errorx.ErrEngineShutdown) {
 					return err
-				default:
-					logging.Warnf("error occurs in event-loop: %v", err)
 				}
 			}
 		}
@@ -134,12 +132,9 @@ func (p *Poller) Polling() error {
 			doChores = false
 			task := p.urgentAsyncTaskQueue.Dequeue()
 			for ; task != nil; task = p.urgentAsyncTaskQueue.Dequeue() {
-				switch err = task.Run(task.Arg); err {
-				case nil:
-				case errors.ErrEngineShutdown:
+				err = task.Run(task.Arg)
+				if errors.Is(err, errorx.ErrEngineShutdown) {
 					return err
-				default:
-					logging.Warnf("error occurs in user-defined function, %v", err)
 				}
 				queue.PutTask(task)
 			}
@@ -147,12 +142,9 @@ func (p *Poller) Polling() error {
 				if task = p.asyncTaskQueue.Dequeue(); task == nil {
 					break
 				}
-				switch err = task.Run(task.Arg); err {
-				case nil:
-				case errors.ErrEngineShutdown:
+				err = task.Run(task.Arg)
+				if errors.Is(err, errorx.ErrEngineShutdown) {
 					return err
-				default:
-					logging.Warnf("error occurs in user-defined function, %v", err)
 				}
 				queue.PutTask(task)
 			}
