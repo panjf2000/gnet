@@ -19,6 +19,7 @@ package gnet
 
 import (
 	"context"
+	"errors"
 	"runtime"
 	"strings"
 	"sync"
@@ -29,7 +30,7 @@ import (
 	"github.com/panjf2000/gnet/v2/internal/gfd"
 	"github.com/panjf2000/gnet/v2/internal/netpoll"
 	"github.com/panjf2000/gnet/v2/internal/queue"
-	"github.com/panjf2000/gnet/v2/pkg/errors"
+	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
 )
 
@@ -59,7 +60,7 @@ func (eng *engine) isInShutdown() bool {
 
 // shutdown signals the engine to shut down.
 func (eng *engine) shutdown(err error) {
-	if err != nil && err != errors.ErrEngineShutdown {
+	if err != nil && !errors.Is(err, errorx.ErrEngineShutdown) {
 		eng.opts.Logger.Errorf("engine is being shutdown with error: %v", err)
 	}
 
@@ -211,14 +212,14 @@ func (eng *engine) stop(s Engine) {
 
 	// Notify all event-loops to exit.
 	eng.eventLoops.iterate(func(i int, el *eventloop) bool {
-		err := el.poller.Trigger(queue.HighPriority, func(_ interface{}) error { return errors.ErrEngineShutdown }, nil)
+		err := el.poller.Trigger(queue.HighPriority, func(_ interface{}) error { return errorx.ErrEngineShutdown }, nil)
 		if err != nil {
 			eng.opts.Logger.Errorf("failed to enqueue shutdown signal of high-priority for event-loop(%d): %v", i, err)
 		}
 		return true
 	})
 	if eng.ingress != nil {
-		err := eng.ingress.poller.Trigger(queue.HighPriority, func(_ interface{}) error { return errors.ErrEngineShutdown }, nil)
+		err := eng.ingress.poller.Trigger(queue.HighPriority, func(_ interface{}) error { return errorx.ErrEngineShutdown }, nil)
 		if err != nil {
 			eng.opts.Logger.Errorf("failed to enqueue shutdown signal of high-priority for main event-loop: %v", err)
 		}
