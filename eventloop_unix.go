@@ -293,7 +293,7 @@ func (el *eventloop) ticker(ctx context.Context) {
 	for {
 		delay, action = el.eventHandler.OnTick()
 		switch action {
-		case None:
+		case None, Close:
 		case Shutdown:
 			// It seems reasonable to mark this as low-priority, waiting for some tasks like asynchronous writes
 			// to finish up before shutting down the service.

@@ -155,7 +155,7 @@ func (el *eventloop) ticker(ctx context.Context) {
 	for {
 		delay, action = el.eventHandler.OnTick()
 		switch action {
-		case None:
+		case None, Close:
 		case Shutdown:
 			if !shutdown {
 				shutdown = true
