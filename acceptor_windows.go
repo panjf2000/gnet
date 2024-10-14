@@ -39,11 +39,7 @@ func (eng *engine) listenStream(ln net.Listener) (err error) {
 			if atomic.LoadInt32(&eng.beingShutdown) == 0 {
 				eng.opts.Logger.Errorf("Accept() fails due to error: %v", err)
 			} else if errors.Is(err, net.ErrClosed) {
-				err = errorx.ErrEngineShutdown
-				// TODO: errors.Join() is not supported until Go 1.20,
-				// 	we will uncomment this line after we bump up the
-				// 	minimal supported go version to 1.20.
-				// err = errors.Join(err, errorx.ErrEngineShutdown)
+				err = errors.Join(err, errorx.ErrEngineShutdown)
 			}
 			return
 		}
@@ -81,9 +77,7 @@ func (eng *engine) ListenUDP(pc net.PacketConn) (err error) {
 			if atomic.LoadInt32(&eng.beingShutdown) == 0 {
 				eng.opts.Logger.Errorf("failed to receive data from UDP fd due to error:%v", err)
 			} else if errors.Is(err, net.ErrClosed) {
-				err = errorx.ErrEngineShutdown
-				// TODO: ditto.
-				// err = errors.Join(err, errorx.ErrEngineShutdown)
+				err = errors.Join(err, errorx.ErrEngineShutdown)
 			}
 			return
 		}

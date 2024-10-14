@@ -293,8 +293,6 @@ type Socket interface {
 	// algorithm).
 	// The default is true (no delay), meaning that data is sent as soon as possible after a Write.
 	SetNoDelay(noDelay bool) error
-	// CloseRead() error
-	// CloseWrite() error
 }
 
 // Conn is an interface of underlying connection.

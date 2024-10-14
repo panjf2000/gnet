@@ -5,6 +5,7 @@ package gnet
 
 import (
 	"bytes"
+	crand "crypto/rand"
 	"io"
 	"math/rand"
 	"net"
@@ -462,7 +463,6 @@ func runClient(t *testing.T, network, addr string, et, reuseport, multicore, asy
 }
 
 func startGnetClient(t *testing.T, cli *Client, network, addr string, multicore, async, netDial bool) {
-	rand.Seed(time.Now().UnixNano())
 	var (
 		c   Conn
 		err error
@@ -492,7 +492,7 @@ func startGnetClient(t *testing.T, cli *Client, network, addr string, multicore,
 		if network == "udp" {
 			reqData = reqData[:datagramLen]
 		}
-		_, err = rand.Read(reqData)
+		_, err = crand.Read(reqData)
 		require.NoError(t, err)
 		err = c.AsyncWrite(reqData, nil)
 		require.NoError(t, err)

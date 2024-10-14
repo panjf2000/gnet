@@ -2,10 +2,10 @@ package elastic
 
 import (
 	"bytes"
+	crand "crypto/rand"
 	"math/rand"
 	"runtime"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -15,8 +15,8 @@ func TestMixedBuffer_Basic(t *testing.T) {
 	mb, _ := New(maxStaticSize)
 	const dataLen = 5 * 1024
 	data := make([]byte, dataLen)
-	rand.Seed(time.Now().Unix())
-	rand.Read(data)
+	_, err := crand.Read(data)
+	require.NoError(t, err)
 	n, err := mb.Write(data)
 	require.NoError(t, err)
 	require.EqualValues(t, dataLen, n)
@@ -27,7 +27,8 @@ func TestMixedBuffer_Basic(t *testing.T) {
 	mb.Reset(-1)
 	newDataLen := rbn + 2*1024
 	data = make([]byte, newDataLen)
-	rand.Read(data)
+	_, err = crand.Read(data)
+	require.NoError(t, err)
 	n, err = mb.Write(data)
 	require.NoError(t, err)
 	require.EqualValues(t, newDataLen, n)
@@ -71,7 +72,8 @@ func TestMixedBuffer_Basic(t *testing.T) {
 		n := rand.Intn(512) + 128
 		cum += n
 		data := make([]byte, n)
-		rand.Read(data)
+		_, err := crand.Read(data)
+		require.NoError(t, err)
 		buf.Write(data)
 		if i < 3 {
 			headCum += n
@@ -107,15 +109,16 @@ func TestMixedBuffer_ReadFrom(t *testing.T) {
 	mb, _ := New(maxStaticSize)
 	const dataLen = 2 * 1024
 	data := make([]byte, dataLen)
-	rand.Seed(time.Now().Unix())
-	rand.Read(data)
+	_, err := crand.Read(data)
+	require.NoError(t, err)
 	r := bytes.NewReader(data)
 	n, err := mb.ReadFrom(r)
 	require.NoError(t, err)
 	require.EqualValues(t, dataLen, n)
 	require.EqualValues(t, dataLen, mb.Buffered())
 	newData := make([]byte, dataLen)
-	rand.Read(newData)
+	_, err = crand.Read(newData)
+	require.NoError(t, err)
 	r.Reset(newData)
 	n, err = mb.ReadFrom(r)
 	require.NoError(t, err)
@@ -155,12 +158,12 @@ func TestMixedBuffer_WriteTo(t *testing.T) {
 		buf     bytes.Buffer
 	)
 
-	rand.Seed(time.Now().Unix())
 	for i := 0; i < maxBlocks; i++ {
 		n := rand.Intn(512) + 128
 		cum += n
 		data := make([]byte, n)
-		rand.Read(data)
+		_, err := crand.Read(data)
+		require.NoError(t, err)
 		buf.Write(data)
 		if i < 3 {
 			headCum += n
