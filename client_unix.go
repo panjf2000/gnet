@@ -106,6 +106,11 @@ func NewClient(eh EventHandler, opts ...Option) (cli *Client, err error) {
 		options.WriteBufferCap = math.CeilToPowerOfTwo(wbc)
 	}
 
+	if options.EdgeTriggeredIOSpace <= 0 {
+		options.EdgeTriggeredIOSpace = DefaultEdgeTriggeredIOSpace
+	}
+	options.EdgeTriggeredIOSpace = math.CeilToPowerOfTwo(options.EdgeTriggeredIOSpace)
+
 	el.buffer = make([]byte, options.ReadBufferCap)
 	el.connections.init()
 	el.eventHandler = eh

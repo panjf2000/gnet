@@ -134,6 +134,10 @@ type Options struct {
 	// Don't enable it unless you are 100% sure what you are doing.
 	// Note that this option is only available for stream-oriented protocol.
 	EdgeTriggeredIO bool
+
+	// EdgeTriggeredIOSpace specifies the number of bytes that `gnet` can
+	// read/write up to in one event loop of ET. The default is 1MB.
+	EdgeTriggeredIOSpace int
 }
 
 // WithOptions sets up all options.
@@ -266,5 +270,12 @@ func WithMulticastInterfaceIndex(idx int) Option {
 func WithEdgeTriggeredIO(et bool) Option {
 	return func(opts *Options) {
 		opts.EdgeTriggeredIO = et
+	}
+}
+
+// WithEdgeTriggeredIOSpace set number of bytes that gnet can read/write up to in one event loop of ET.
+func WithEdgeTriggeredIOSpace(edgeTriggeredIOSpace int) Option {
+	return func(opts *Options) {
+		opts.EdgeTriggeredIOSpace = edgeTriggeredIOSpace
 	}
 }

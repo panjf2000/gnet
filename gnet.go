@@ -418,6 +418,8 @@ func (*BuiltinEventEngine) OnTick() (delay time.Duration, action Action) {
 // MaxStreamBufferCap is the default buffer size for each stream-oriented connection(TCP/Unix).
 var MaxStreamBufferCap = 64 * 1024 // 64KB
 
+var DefaultEdgeTriggeredIOSpace = 1 << 20
+
 func createListeners(addrs []string, opts ...Option) ([]*listener, *Options, error) {
 	options := loadOptions(opts...)
 
@@ -461,6 +463,11 @@ func createListeners(addrs []string, opts ...Option) ([]*listener, *Options, err
 	default:
 		options.WriteBufferCap = math.CeilToPowerOfTwo(wbc)
 	}
+
+	if options.EdgeTriggeredIOSpace <= 0 {
+		options.EdgeTriggeredIOSpace = DefaultEdgeTriggeredIOSpace
+	}
+	options.EdgeTriggeredIOSpace = math.CeilToPowerOfTwo(options.EdgeTriggeredIOSpace)
 
 	var hasUDP, hasUnix bool
 	for _, addr := range addrs {
