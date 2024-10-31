@@ -125,6 +125,7 @@ func (el *eventloop) read(c *conn) error {
 
 	var recv int
 	isET := el.engine.opts.EdgeTriggeredIO
+	edgeTriggeredIOSpace := el.engine.opts.EdgeTriggeredIOSpace
 loop:
 	n, err := unix.Read(c.fd, el.buffer)
 	if err != nil || n == 0 {
@@ -150,7 +151,7 @@ loop:
 	_, _ = c.inboundBuffer.Write(c.buffer)
 	c.buffer = c.buffer[:0]
 
-	if c.isEOF || (isET && recv < el.engine.opts.EdgeTriggeredIOSpace) {
+	if c.isEOF || (isET && recv < edgeTriggeredIOSpace) {
 		goto loop
 	}
 
@@ -178,6 +179,7 @@ func (el *eventloop) write(c *conn) error {
 	}
 
 	isET := el.engine.opts.EdgeTriggeredIO
+	edgeTriggeredIOSpace := el.engine.opts.EdgeTriggeredIOSpace
 	var (
 		n    int
 		sent int
@@ -203,7 +205,7 @@ loop:
 	}
 	sent += n
 
-	if isET && !c.outboundBuffer.IsEmpty() && sent < el.engine.opts.EdgeTriggeredIOSpace {
+	if isET && !c.outboundBuffer.IsEmpty() && sent < edgeTriggeredIOSpace {
 		goto loop
 	}
 

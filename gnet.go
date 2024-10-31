@@ -418,7 +418,8 @@ func (*BuiltinEventEngine) OnTick() (delay time.Duration, action Action) {
 // MaxStreamBufferCap is the default buffer size for each stream-oriented connection(TCP/Unix).
 var MaxStreamBufferCap = 64 * 1024 // 64KB
 
-var DefaultEdgeTriggeredIOSpace = 1 << 20
+// DefaultEdgeTriggeredIOSpace is the default number of bytes that gnet can read/write up to in one event loop of ET.
+var DefaultEdgeTriggeredIOSpace = 1 << 20 // 1MB
 
 func createListeners(addrs []string, opts ...Option) ([]*listener, *Options, error) {
 	options := loadOptions(opts...)

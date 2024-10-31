@@ -273,7 +273,7 @@ func WithEdgeTriggeredIO(et bool) Option {
 	}
 }
 
-// WithEdgeTriggeredIOSpace set number of bytes that gnet can read/write up to in one event loop of ET.
+// WithEdgeTriggeredIOSpace sets the number of bytes that gnet can read/write up to in one event loop of ET.
 func WithEdgeTriggeredIOSpace(edgeTriggeredIOSpace int) Option {
 	return func(opts *Options) {
 		opts.EdgeTriggeredIOSpace = edgeTriggeredIOSpace
