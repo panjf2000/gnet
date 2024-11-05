@@ -118,8 +118,6 @@ func (el *eventloop) read0(itf interface{}) error {
 	return el.read(itf.(*conn))
 }
 
-const maxBytesTransferET = 1 << 20
-
 func (el *eventloop) read(c *conn) error {
 	if !c.opened {
 		return nil
@@ -127,6 +125,7 @@ func (el *eventloop) read(c *conn) error {
 
 	var recv int
 	isET := el.engine.opts.EdgeTriggeredIO
+	chunk := el.engine.opts.EdgeTriggeredIOChunk
 loop:
 	n, err := unix.Read(c.fd, el.buffer)
 	if err != nil || n == 0 {
@@ -152,7 +151,7 @@ loop:
 	_, _ = c.inboundBuffer.Write(c.buffer)
 	c.buffer = c.buffer[:0]
 
-	if c.isEOF || (isET && recv < maxBytesTransferET) {
+	if c.isEOF || (isET && recv < chunk) {
 		goto loop
 	}
 
@@ -180,6 +179,7 @@ func (el *eventloop) write(c *conn) error {
 	}
 
 	isET := el.engine.opts.EdgeTriggeredIO
+	chunk := el.engine.opts.EdgeTriggeredIOChunk
 	var (
 		n    int
 		sent int
@@ -205,7 +205,7 @@ loop:
 	}
 	sent += n
 
-	if isET && !c.outboundBuffer.IsEmpty() && sent < maxBytesTransferET {
+	if isET && !c.outboundBuffer.IsEmpty() && sent < chunk {
 		goto loop
 	}
 

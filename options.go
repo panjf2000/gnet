@@ -134,6 +134,14 @@ type Options struct {
 	// Don't enable it unless you are 100% sure what you are doing.
 	// Note that this option is only available for stream-oriented protocol.
 	EdgeTriggeredIO bool
+
+	// EdgeTriggeredIOChunk specifies the number of bytes that `gnet` can
+	// read/write up to in one event loop of ET. This option implies
+	// EdgeTriggeredIO when it is set to a value greater than 0.
+	// If EdgeTriggeredIO is set to true and EdgeTriggeredIOChunk is not set,
+	// 1MB is used. The value of EdgeTriggeredIOChunk must be a power of 2,
+	// otherwise, it will be rounded up to the nearest power of 2.
+	EdgeTriggeredIOChunk int
 }
 
 // WithOptions sets up all options.
@@ -266,5 +274,13 @@ func WithMulticastInterfaceIndex(idx int) Option {
 func WithEdgeTriggeredIO(et bool) Option {
 	return func(opts *Options) {
 		opts.EdgeTriggeredIO = et
+	}
+}
+
+// WithEdgeTriggeredIOChunk sets the number of bytes that `gnet` can
+// read/write up to in one event loop of ET.
+func WithEdgeTriggeredIOChunk(chunk int) Option {
+	return func(opts *Options) {
+		opts.EdgeTriggeredIOChunk = chunk
 	}
 }
