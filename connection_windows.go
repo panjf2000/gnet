@@ -43,8 +43,8 @@ type udpConn struct {
 }
 
 type openConn struct {
-	c          *conn
-	cb         func()
+	c  *conn
+	cb func()
 }
 
 type conn struct {
