@@ -491,6 +491,8 @@ func runClient(t *testing.T, network, addr string, conf *testConf) {
 	clientEV := &clientEvents{tester: t, packetLen: streamLen, svr: ts}
 	ts.client, err = NewClient(
 		clientEV,
+		WithEdgeTriggeredIO(conf.et),
+		WithEdgeTriggeredIOChunk(conf.etChunk),
 		WithTCPNoDelay(TCPNoDelay),
 		WithLockOSThread(true),
 		WithTicker(true),
