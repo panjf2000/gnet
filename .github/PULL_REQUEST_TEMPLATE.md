@@ -6,7 +6,7 @@ Was this change discussed in an issue first? That can help save time in case the
 It is not uncommon for pull requests to go through several, iterative reviews. Please be patient with us! Every reviewer is a volunteer, and each has their own style.
 -->
 
-## 1. Are you opening this pull request for bug-fixes, optimizations or new feature?
+## 1. Are you opening this pull request for bug-fix, optimization or new feature?
 
 
 
@@ -20,7 +20,7 @@ It is not uncommon for pull requests to go through several, iterative reviews. P
 
 
 
-## 4. Which documentation changes (if any) need to be made/updated because of this PR?
+## 4. What documentation changes (if any) need to be made/updated because of this PR?
 <!-- Reviewers will often reference this first in order to know what to expect from the change. Please be specific enough so that they can paste your wording into the documentation directly. -->
 
 
