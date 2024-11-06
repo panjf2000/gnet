@@ -326,11 +326,10 @@ func (c *conn) Next(n int) (buf []byte, err error) {
 	head, tail := c.inboundBuffer.Peek(n)
 	defer c.inboundBuffer.Discard(n) //nolint:errcheck
 	c.loop.cache.Reset()
+	c.loop.cache.Write(head)
 	if len(head) >= n {
-		c.loop.cache.Write(head)
 		return c.loop.cache.Bytes(), err
 	}
-	c.loop.cache.Write(head)
 	c.loop.cache.Write(tail)
 	if inBufferLen >= n {
 		return c.loop.cache.Bytes(), err
