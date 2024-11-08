@@ -12,13 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build dragonfly || freebsd || netbsd || openbsd
+// +build dragonfly freebsd netbsd openbsd
+
 package socket
 
 import errorx "github.com/panjf2000/gnet/v2/pkg/errors"
 
-// SetKeepAlivePeriod sets whether the operating system should send
-// keep-alive messages on the connection and sets period between TCP keep-alive probes.
-func SetKeepAlivePeriod(_, _ int) error {
-	// OpenBSD has no user-settable per-socket TCP keepalive options.
+// SetBindToDevice is not implemented on *BSD because there is
+// no equivalent of Linux's SO_BINDTODEVICE.
+func SetBindToDevice(_ int, _ string) error {
 	return errorx.ErrUnsupportedOp
 }
