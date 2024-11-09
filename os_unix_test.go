@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"regexp"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -193,6 +194,29 @@ func TestMulticastBindIPv6(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func detectLinuxEthernetInterfaceName() (string, error) {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return "", err
+	}
+	// Traditionally, network interfaces were named as eth0, eth1, etc., for Ethernet interfaces.
+	// However, with the introduction of predictable network interface names. Meanwhile, modern
+	// convention commonly uses patterns like eno[1-N], ens[1-N], enp<PCI slot>s<card index no>, etc.,
+	// for Ethernet interfaces.
+	// Check out https://www.thomas-krenn.com/en/wiki/Predictable_Network_Interface_Names and
+	// https://en.wikipedia.org/wiki/Consistent_Network_Device_Naming for more details.
+	regex := regexp.MustCompile(`e(no|ns|np|th)\d+s*\d*$`)
+	for _, iface := range ifaces {
+		if iface.Flags&net.FlagLoopback != 0 || iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagRunning == 0 {
+			continue
+		}
+		if regex.MatchString(iface.Name) {
+			return iface.Name, nil
+		}
+	}
+	return "", errors.New("no Ethernet interface found")
+}
+
 func getInterfaceIP(ifname string, ipv4 bool) (net.IP, error) {
 	iface, err := net.InterfaceByName(ifname)
 	if err != nil {
@@ -244,7 +268,7 @@ func (s *testBindToDeviceServer) OnTraffic(c Conn) (action Action) {
 }
 
 func (s *testBindToDeviceServer) OnShutdown(_ Engine) {
-	assert.EqualValues(s.tester, s.packets.Load(), s.expectedPackets)
+	assert.EqualValues(s.tester, s.expectedPackets, s.packets.Load())
 }
 
 func (s *testBindToDeviceServer) OnTick() (delay time.Duration, action Action) {
@@ -258,6 +282,13 @@ func (s *testBindToDeviceServer) OnTick() (delay time.Duration, action Action) {
 	_, err = c.Write(s.data)
 	assert.NoError(s.tester, err)
 
+	// Send a packet to the broadcast address, it should reach the server.
+	c6, err := net.DialUDP(s.network, nil, &net.UDPAddr{IP: s.broadcastIP, Port: 9999, Zone: s.zone})
+	assert.NoError(s.tester, err)
+	defer c6.Close()
+	_, err = c6.Write(s.data)
+	assert.NoError(s.tester, err)
+
 	// Send a packet to the eth0 interface, it should reach the server.
 	c4, err := net.DialUDP(s.network, nil, &net.UDPAddr{IP: s.eth0IP, Port: 9999, Zone: s.zone})
 	assert.NoError(s.tester, err)
@@ -269,13 +300,6 @@ func (s *testBindToDeviceServer) OnTick() (delay time.Duration, action Action) {
 	assert.NoError(s.tester, err)
 	assert.EqualValues(s.tester, s.data, buf, len(s.data), len(buf))
 
-	// Send a packet to the broadcast address, it should reach the server.
-	c6, err := net.DialUDP(s.network, nil, &net.UDPAddr{IP: s.broadcastIP, Port: 9999, Zone: s.zone})
-	assert.NoError(s.tester, err)
-	defer c6.Close()
-	_, err = c6.Write(s.data)
-	assert.NoError(s.tester, err)
-
 	return time.Second, Shutdown
 }
 
@@ -283,10 +307,12 @@ func TestBindToDevice(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		err := Run(&testBindToDeviceServer{}, "udp://:9999", WithBindToDevice("eth0"))
 		assert.ErrorIs(t, err, errorx.ErrUnsupportedOp)
-		t.Skip("skipping the subsequent tests on non-linux OS")
+		return
 	}
 
-	dev := "eth0"
+	dev, err := detectLinuxEthernetInterfaceName()
+	assert.NoErrorf(t, err, "no testable Ethernet interface found")
+	t.Logf("detected Ethernet interface: %s", dev)
 	data := []byte("hello")
 	t.Run("IPv4", func(t *testing.T) {
 		t.Run("UDP", func(t *testing.T) {
