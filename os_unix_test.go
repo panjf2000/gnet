@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"regexp"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -19,6 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/unix"
 
+	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
 )
 
@@ -27,7 +30,7 @@ var (
 	NetDial  = net.Dial
 )
 
-// NOTE: TestServeMulticast can fail with "write: no buffer space available" on wifi interface.
+// NOTE: TestServeMulticast can fail with "write: no buffer space available" on Wi-Fi interface.
 func TestServeMulticast(t *testing.T) {
 	t.Run("IPv4", func(t *testing.T) {
 		// 224.0.0.169 is an unassigned address from the Local Network Control Block
@@ -189,6 +192,170 @@ func TestMulticastBindIPv6(t *testing.T) {
 		WithMulticastInterfaceIndex(iface.Index),
 		WithTicker(true))
 	assert.NoError(t, err)
+}
+
+func detectLinuxEthernetInterfaceName() (string, error) {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return "", err
+	}
+	// Traditionally, network interfaces were named as eth0, eth1, etc., for Ethernet interfaces.
+	// However, with the introduction of predictable network interface names. Meanwhile, modern
+	// convention commonly uses patterns like eno[1-N], ens[1-N], enp<PCI slot>s<card index no>, etc.,
+	// for Ethernet interfaces.
+	// Check out https://www.thomas-krenn.com/en/wiki/Predictable_Network_Interface_Names and
+	// https://en.wikipedia.org/wiki/Consistent_Network_Device_Naming for more details.
+	regex := regexp.MustCompile(`e(no|ns|np|th)\d+s*\d*$`)
+	for _, iface := range ifaces {
+		if iface.Flags&net.FlagLoopback != 0 || iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagRunning == 0 {
+			continue
+		}
+		if regex.MatchString(iface.Name) {
+			return iface.Name, nil
+		}
+	}
+	return "", errors.New("no Ethernet interface found")
+}
+
+func getInterfaceIP(ifname string, ipv4 bool) (net.IP, error) {
+	iface, err := net.InterfaceByName(ifname)
+	if err != nil {
+		return nil, err
+	}
+	// Get all unicast addresses for this interface
+	addrs, err := iface.Addrs()
+	if err != nil {
+		return nil, err
+	}
+	// Loop through the addresses and find the first IPv4 address
+	for _, addr := range addrs {
+		var ip net.IP
+		switch v := addr.(type) {
+		case *net.IPNet:
+			ip = v.IP
+		case *net.IPAddr:
+			ip = v.IP
+		}
+		// Check if the IP is IPv4.
+		if ip != nil && (ip.To4() != nil) == ipv4 {
+			return ip, nil
+		}
+	}
+	return nil, errors.New("no valid IP address found")
+}
+
+type testBindToDeviceServer struct {
+	BuiltinEventEngine
+	tester          *testing.T
+	data            []byte
+	packets         atomic.Int32
+	expectedPackets int32
+	network         string
+	loopBackIP      net.IP
+	eth0IP          net.IP
+	broadcastIP     net.IP
+	zone            string
+}
+
+func (s *testBindToDeviceServer) OnTraffic(c Conn) (action Action) {
+	b, err := c.Next(-1)
+	assert.NoError(s.tester, err)
+	assert.EqualValues(s.tester, s.data, b)
+	_, err = c.Write(b)
+	assert.NoError(s.tester, err)
+	s.packets.Add(1)
+	return
+}
+
+func (s *testBindToDeviceServer) OnShutdown(_ Engine) {
+	assert.EqualValues(s.tester, s.expectedPackets, s.packets.Load())
+}
+
+func (s *testBindToDeviceServer) OnTick() (delay time.Duration, action Action) {
+	// Send a packet to the loopback interface, it should never make its way to the server
+	// because we've bound the server to eth0.
+	lp, err := findLoopbackInterface()
+	assert.NoError(s.tester, err)
+	c, err := net.DialUDP(s.network, nil, &net.UDPAddr{IP: s.loopBackIP, Port: 9999, Zone: lp.Name})
+	assert.NoError(s.tester, err)
+	defer c.Close()
+	_, err = c.Write(s.data)
+	assert.NoError(s.tester, err)
+
+	// Send a packet to the broadcast address, it should reach the server.
+	c6, err := net.DialUDP(s.network, nil, &net.UDPAddr{IP: s.broadcastIP, Port: 9999, Zone: s.zone})
+	assert.NoError(s.tester, err)
+	defer c6.Close()
+	_, err = c6.Write(s.data)
+	assert.NoError(s.tester, err)
+
+	// Send a packet to the eth0 interface, it should reach the server.
+	c4, err := net.DialUDP(s.network, nil, &net.UDPAddr{IP: s.eth0IP, Port: 9999, Zone: s.zone})
+	assert.NoError(s.tester, err)
+	defer c4.Close()
+	_, err = c4.Write(s.data)
+	assert.NoError(s.tester, err)
+	buf := make([]byte, len(s.data))
+	_, err = c4.Read(buf)
+	assert.NoError(s.tester, err)
+	assert.EqualValues(s.tester, s.data, buf, len(s.data), len(buf))
+
+	return time.Second, Shutdown
+}
+
+func TestBindToDevice(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		err := Run(&testBindToDeviceServer{}, "udp://:9999", WithBindToDevice("eth0"))
+		assert.ErrorIs(t, err, errorx.ErrUnsupportedOp)
+		return
+	}
+
+	dev, err := detectLinuxEthernetInterfaceName()
+	assert.NoErrorf(t, err, "no testable Ethernet interface found")
+	t.Logf("detected Ethernet interface: %s", dev)
+	data := []byte("hello")
+	t.Run("IPv4", func(t *testing.T) {
+		t.Run("UDP", func(t *testing.T) {
+			ip, err := getInterfaceIP(dev, true)
+			assert.NoError(t, err)
+			ts := &testBindToDeviceServer{
+				tester:          t,
+				data:            data,
+				expectedPackets: 2,
+				network:         "udp",
+				loopBackIP:      net.IPv4(127, 0, 0, 1),
+				eth0IP:          ip,
+				broadcastIP:     net.IPv4bcast,
+				zone:            dev,
+			}
+			require.NoError(t, err)
+			err = Run(ts, "udp://0.0.0.0:9999",
+				WithTicker(true),
+				WithBindToDevice(dev))
+			assert.NoError(t, err)
+		})
+	})
+	t.Run("IPv6", func(t *testing.T) {
+		t.Run("UDP", func(t *testing.T) {
+			ip, err := getInterfaceIP(dev, false)
+			assert.NoError(t, err)
+			ts := &testBindToDeviceServer{
+				tester:          t,
+				data:            data,
+				expectedPackets: 2,
+				network:         "udp6",
+				loopBackIP:      net.IPv6loopback,
+				eth0IP:          ip,
+				broadcastIP:     net.IPv6linklocalallnodes,
+				zone:            dev,
+			}
+			require.NoError(t, err)
+			err = Run(ts, "udp6://[::]:9999",
+				WithTicker(true),
+				WithBindToDevice(dev))
+			assert.NoError(t, err)
+		})
+	})
 }
 
 /*

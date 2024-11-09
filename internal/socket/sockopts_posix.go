@@ -39,13 +39,13 @@ func SetNoDelay(fd, noDelay int) error {
 // SetRecvBuffer sets the size of the operating system's
 // receive buffer associated with the connection.
 func SetRecvBuffer(fd, size int) error {
-	return unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_RCVBUF, size)
+	return os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_RCVBUF, size))
 }
 
 // SetSendBuffer sets the size of the operating system's
 // transmit buffer associated with the connection.
 func SetSendBuffer(fd, size int) error {
-	return unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_SNDBUF, size)
+	return os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_SNDBUF, size))
 }
 
 // SetReuseAddr enables SO_REUSEADDR option on socket.
@@ -55,7 +55,7 @@ func SetReuseAddr(fd, reuseAddr int) error {
 
 // SetIPv6Only restricts a IPv6 socket to only process IPv6 requests or both IPv4 and IPv6 requests.
 func SetIPv6Only(fd, ipv6only int) error {
-	return unix.SetsockoptInt(fd, unix.IPPROTO_IPV6, unix.IPV6_V6ONLY, ipv6only)
+	return os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.IPPROTO_IPV6, unix.IPV6_V6ONLY, ipv6only))
 }
 
 // SetLinger sets the behavior of Close on a connection which still
@@ -79,7 +79,7 @@ func SetLinger(fd, sec int) error {
 		l.Onoff = 0
 		l.Linger = 0
 	}
-	return unix.SetsockoptLinger(fd, syscall.SOL_SOCKET, syscall.SO_LINGER, &l)
+	return os.NewSyscallError("setsockopt", unix.SetsockoptLinger(fd, syscall.SOL_SOCKET, syscall.SO_LINGER, &l))
 }
 
 // SetMulticastMembership returns with a socket option function based on the IP

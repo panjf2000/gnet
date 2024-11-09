@@ -14,11 +14,17 @@
 
 package socket
 
-import errorx "github.com/panjf2000/gnet/v2/pkg/errors"
+import (
+	"os"
 
-// SetKeepAlivePeriod sets whether the operating system should send
-// keep-alive messages on the connection and sets period between TCP keep-alive probes.
-func SetKeepAlivePeriod(_, _ int) error {
-	// OpenBSD has no user-settable per-socket TCP keepalive options.
-	return errorx.ErrUnsupportedOp
+	"golang.org/x/sys/unix"
+)
+
+// SetBindToDevice binds the socket to a specific network interface.
+//
+// SO_BINDTODEVICE on Linux works in both directions: only process packets
+// received from the particular interface along with sending them through
+// that interface, instead of following the default route.
+func SetBindToDevice(fd int, ifname string) error {
+	return os.NewSyscallError("setsockopt", unix.BindToDevice(fd, ifname))
 }

@@ -68,6 +68,12 @@ type Options struct {
 	// MulticastInterfaceIndex is the index of the interface name where the multicast UDP addresses will be bound to.
 	MulticastInterfaceIndex int
 
+	// BindToDevice is the name of the interface to which the listening socket will be bound.
+	//
+	// It is only available on Linux at the moment, an error will therefore be returned when
+	// setting this option on non-linux platforms.
+	BindToDevice string
+
 	// ============================= Options for both server-side and client-side =============================
 
 	// ReadBufferCap is the maximum number of bytes that can be read from the remote when the readable event comes.
@@ -95,7 +101,7 @@ type Options struct {
 	// Ticker indicates whether the ticker has been set up.
 	Ticker bool
 
-	// TCPKeepAlive enable the TCP keep-alive mechanism (SO_KEEPALIVE) and set its value
+	// TCPKeepAlive enables the TCP keep-alive mechanism (SO_KEEPALIVE) and set its value
 	// on TCP_KEEPIDLE, 1/5 of its value on TCP_KEEPINTVL, and 5 on TCP_KEEPCNT.
 	TCPKeepAlive time.Duration
 
@@ -267,6 +273,16 @@ func WithLogger(logger logging.Logger) Option {
 func WithMulticastInterfaceIndex(idx int) Option {
 	return func(opts *Options) {
 		opts.MulticastInterfaceIndex = idx
+	}
+}
+
+// WithBindToDevice sets the name of the interface to which the listening socket will be bound.
+//
+// It is only available on Linux at the moment, an error will therefore be returned when
+// setting this option on non-linux platforms.
+func WithBindToDevice(iface string) Option {
+	return func(opts *Options) {
+		opts.BindToDevice = iface
 	}
 }
 
