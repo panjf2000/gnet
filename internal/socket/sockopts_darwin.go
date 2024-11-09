@@ -19,6 +19,8 @@ import (
 	"os"
 
 	"golang.org/x/sys/unix"
+
+	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
 )
 
 // SetKeepAlivePeriod sets whether the operating system should send
@@ -51,4 +53,10 @@ func SetKeepAlivePeriod(fd, secs int) error {
 	}
 
 	return os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.IPPROTO_TCP, unix.TCP_KEEPCNT, 5))
+}
+
+// SetBindToDevice is not implemented on macOS because there is
+// no equivalent of Linux's SO_BINDTODEVICE.
+func SetBindToDevice(_ int, _ string) error {
+	return errorx.ErrUnsupportedOp
 }

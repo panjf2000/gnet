@@ -68,6 +68,12 @@ type Options struct {
 	// MulticastInterfaceIndex is the index of the interface name where the multicast UDP addresses will be bound to.
 	MulticastInterfaceIndex int
 
+	// BindToDevice is the name of the interface to which the listening socket will be bound.
+	//
+	// It is only available on Linux at the moment, an error will therefore be returned when
+	// setting this option on non-linux platforms.
+	BindToDevice string
+
 	// ============================= Options for both server-side and client-side =============================
 
 	// ReadBufferCap is the maximum number of bytes that can be read from the remote when the readable event comes.
@@ -95,7 +101,7 @@ type Options struct {
 	// Ticker indicates whether the ticker has been set up.
 	Ticker bool
 
-	// TCPKeepAlive enable the TCP keep-alive mechanism (SO_KEEPALIVE) and set its value
+	// TCPKeepAlive enables the TCP keep-alive mechanism (SO_KEEPALIVE) and set its value
 	// on TCP_KEEPIDLE, 1/5 of its value on TCP_KEEPINTVL, and 5 on TCP_KEEPCNT.
 	TCPKeepAlive time.Duration
 
@@ -134,6 +140,14 @@ type Options struct {
 	// Don't enable it unless you are 100% sure what you are doing.
 	// Note that this option is only available for stream-oriented protocol.
 	EdgeTriggeredIO bool
+
+	// EdgeTriggeredIOChunk specifies the number of bytes that `gnet` can
+	// read/write up to in one event loop of ET. This option implies
+	// EdgeTriggeredIO when it is set to a value greater than 0.
+	// If EdgeTriggeredIO is set to true and EdgeTriggeredIOChunk is not set,
+	// 1MB is used. The value of EdgeTriggeredIOChunk must be a power of 2,
+	// otherwise, it will be rounded up to the nearest power of 2.
+	EdgeTriggeredIOChunk int
 }
 
 // WithOptions sets up all options.
@@ -262,9 +276,27 @@ func WithMulticastInterfaceIndex(idx int) Option {
 	}
 }
 
+// WithBindToDevice sets the name of the interface to which the listening socket will be bound.
+//
+// It is only available on Linux at the moment, an error will therefore be returned when
+// setting this option on non-linux platforms.
+func WithBindToDevice(iface string) Option {
+	return func(opts *Options) {
+		opts.BindToDevice = iface
+	}
+}
+
 // WithEdgeTriggeredIO enables the edge-triggered I/O for the underlying epoll/kqueue event-loop.
 func WithEdgeTriggeredIO(et bool) Option {
 	return func(opts *Options) {
 		opts.EdgeTriggeredIO = et
+	}
+}
+
+// WithEdgeTriggeredIOChunk sets the number of bytes that `gnet` can
+// read/write up to in one event loop of ET.
+func WithEdgeTriggeredIOChunk(chunk int) Option {
+	return func(opts *Options) {
+		opts.EdgeTriggeredIOChunk = chunk
 	}
 }

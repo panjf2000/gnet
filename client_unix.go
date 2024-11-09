@@ -87,6 +87,13 @@ func NewClient(eh EventHandler, opts ...Option) (cli *Client, err error) {
 		poller:    p,
 	}
 
+	if options.EdgeTriggeredIOChunk > 0 {
+		options.EdgeTriggeredIO = true
+		options.EdgeTriggeredIOChunk = math.CeilToPowerOfTwo(options.EdgeTriggeredIOChunk)
+	} else if options.EdgeTriggeredIO {
+		options.EdgeTriggeredIOChunk = 1 << 20 // 1MB
+	}
+
 	rbc := options.ReadBufferCap
 	switch {
 	case rbc <= 0:

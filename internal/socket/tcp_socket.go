@@ -83,7 +83,7 @@ func determineTCPProto(proto string, addr *net.TCPAddr) (string, error) {
 
 // tcpSocket creates an endpoint for communication and returns a file descriptor that refers to that endpoint.
 // Argument `reusePort` indicates whether the SO_REUSEPORT flag will be assigned.
-func tcpSocket(proto, addr string, passive bool, sockOpts ...Option) (fd int, netAddr net.Addr, err error) {
+func tcpSocket(proto, addr string, passive bool, sockOptInts []Option[int], sockOptStrs []Option[string]) (fd int, netAddr net.Addr, err error) {
 	var (
 		family   int
 		ipv6only bool
@@ -114,10 +114,11 @@ func tcpSocket(proto, addr string, passive bool, sockOpts ...Option) (fd int, ne
 		}
 	}
 
-	for _, sockOpt := range sockOpts {
-		if err = sockOpt.SetSockOpt(fd, sockOpt.Opt); err != nil {
-			return
-		}
+	if err = execSockOpts(fd, sockOptInts); err != nil {
+		return
+	}
+	if err = execSockOpts(fd, sockOptStrs); err != nil {
+		return
 	}
 
 	if passive {
