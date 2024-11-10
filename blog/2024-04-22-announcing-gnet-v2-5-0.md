@@ -19,4 +19,6 @@ Another useful new feature is [#578](https://github.com/panjf2000/gnet/pull/578)
 
 In addition to these two major features, we've also made a good deal of code optimizations: refactoring and streamlining the core code, as well as optimising the structure.
 
+Visit the [release notes](https://github.com/panjf2000/gnet/releases/tag/v2.5.0) for more details.
+
 P.S. Follow me on Twitter [@panjf2000](https://twitter.com/panjf2000) to get the latest updates about gnet!
