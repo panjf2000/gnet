@@ -17,6 +17,8 @@ In `gnet` v2.5.0, we implemented edge-triggered I/O where the default chunk to r
 
 Along with this new release comes another highlight: the support for `SO_BINDTODEVICE` on Linux. This feature allows developers to bind a `gnet` server to a specific network interface on a multi-homed host, which enables them to receive unicast packets only from that particular network interface and ignore packets from other interfaces. It is particularly useful for UDP servers that only want to process unicast packets from one interface while receiving broadcast packets.
 
-Moreover, some critical bug fixes are included in this release, which further enhances the stability and reliability of `gnet`. Thus, we recommend all users to upgrade to the latest version to enjoy the new features and improvements. For more details, please refer to the [release notes](https://github.com/panjf2000/gnet/releases/tag/v2.6.0).
+Moreover, some critical bug fixes are included in this release, which further enhances the stability and reliability of `gnet`. Thus, we recommend all users to upgrade to the latest version to enjoy the new features and improvements. It should be noted that starting from this release, `gnet` will only support Go 1.20 or later versions.
+
+For more details, please refer to the [release notes](https://github.com/panjf2000/gnet/releases/tag/v2.6.0).
 
 P.S. Follow me on Twitter [@panjf2000](https://twitter.com/panjf2000) to get the latest updates about gnet!
