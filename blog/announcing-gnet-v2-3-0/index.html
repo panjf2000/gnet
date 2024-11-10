@@ -19,21 +19,21 @@
 <link rel="stylesheet" href="/styles.2ae13ac2.css">
 
 
-<link rel="preload" href="/styles.786ecc31.js" as="script">
+<link rel="preload" href="/styles.a8e65251.js" as="script">
 
-<link rel="preload" href="/runtime~main.fbc233b6.js" as="script">
+<link rel="preload" href="/runtime~main.302da3f5.js" as="script">
 
-<link rel="preload" href="/main.b2b8e81c.js" as="script">
+<link rel="preload" href="/main.08114c31.js" as="script">
 
 <link rel="preload" href="/1.e16e7350.js" as="script">
 
-<link rel="preload" href="/2.7ca37cf9.js" as="script">
+<link rel="preload" href="/2.e30239ec.js" as="script">
 
 <link rel="preload" href="/3.a02ed35e.js" as="script">
 
-<link rel="preload" href="/ccc49370.983c6395.js" as="script">
+<link rel="preload" href="/ccc49370.c6c0b76f.js" as="script">
 
-<link rel="preload" href="/16ce05ff.0f239ae0.js" as="script">
+<link rel="preload" href="/16ce05ff.55039d79.js" as="script">
 
 </head>
 <body>
@@ -44,21 +44,21 @@
 </span></div><div class="token-line" style="color:#393A34"><span class="token plain">                                    │     old      │                 new                 │</span></div><div class="token-line" style="color:#393A34"><span class="token plain">                                    │  allocs/op   │ allocs/op   vs base                 │</span></div><div class="token-line" style="color:#393A34"><span class="token plain">GC4El100k/Run-4-eventloop-100000-10   </span><span class="token number" style="color:#36acaa">0.000</span><span class="token plain"> ± </span><span class="token number" style="color:#36acaa">0</span><span class="token plain">%     </span><span class="token number" style="color:#36acaa">0.000</span><span class="token plain"> ± </span><span class="token number" style="color:#36acaa">0</span><span class="token plain">%       ~ </span><span class="token punctuation" style="color:#393A34">(</span><span class="token plain">p</span><span class="token operator" style="color:#393A34">=</span><span class="token number" style="color:#36acaa">1.000</span><span class="token plain"> </span><span class="token assign-left variable" style="color:#36acaa">n</span><span class="token operator" style="color:#393A34">=</span><span class="token number" style="color:#36acaa">10</span><span class="token punctuation" style="color:#393A34">)</span><span class="token plain"> ¹</span></div><div class="token-line" style="color:#393A34"><span class="token plain">GC4El200k/Run-4-eventloop-200000-10   </span><span class="token number" style="color:#36acaa">0.000</span><span class="token plain"> ± </span><span class="token number" style="color:#36acaa">0</span><span class="token plain">%     </span><span class="token number" style="color:#36acaa">0.000</span><span class="token plain"> ± </span><span class="token number" style="color:#36acaa">0</span><span class="token plain">%       ~ </span><span class="token punctuation" style="color:#393A34">(</span><span class="token plain">p</span><span class="token operator" style="color:#393A34">=</span><span class="token number" style="color:#36acaa">1.000</span><span class="token plain"> </span><span class="token assign-left variable" style="color:#36acaa">n</span><span class="token operator" style="color:#393A34">=</span><span class="token number" style="color:#36acaa">10</span><span class="token punctuation" style="color:#393A34">)</span><span class="token plain"> ¹</span></div><div class="token-line" style="color:#393A34"><span class="token plain">GC4El500k/Run-4-eventloop-500000-10   </span><span class="token number" style="color:#36acaa">0.000</span><span class="token plain"> ± </span><span class="token number" style="color:#36acaa">0</span><span class="token plain">%     </span><span class="token number" style="color:#36acaa">0.000</span><span class="token plain"> ± </span><span class="token number" style="color:#36acaa">0</span><span class="token plain">%       ~ </span><span class="token punctuation" style="color:#393A34">(</span><span class="token plain">p</span><span class="token operator" style="color:#393A34">=</span><span class="token number" style="color:#36acaa">1.000</span><span class="token plain"> </span><span class="token assign-left variable" style="color:#36acaa">n</span><span class="token operator" style="color:#393A34">=</span><span class="token number" style="color:#36acaa">10</span><span class="token punctuation" style="color:#393A34">)</span><span class="token plain"> ¹</span></div><div class="token-line" style="color:#393A34"><span class="token plain">geomean                                          ²               +0.00%                ²</span></div><div class="token-line" style="color:#393A34"><span class="token plain">¹ all samples are equal</span></div><div class="token-line" style="color:#393A34"><span class="token plain">² summaries must be </span><span class="token operator" style="color:#393A34">&gt;</span><span class="token number" style="color:#36acaa">0</span><span class="token plain"> to compute geomean</span></div></div></pre></div></div><p><strong>The more connections there are, the more pronounced the effect.</strong></p><p>While we have performed sufficient testing on <code>matrix</code>, we are still using <code>map</code> as the default connection storage in this RC version for the sake of caution, but you can enable the new data structure by specifying build tags: -tags=gc_opt. This can be considered as a precautionary measure so that in case <code>matrix</code> has any unexpected bugs, you can quickly fall back to the default <code>map</code>. We will consider promoting <code>matrix</code> to be the default storage for connections in a subsequent official release.</p><p>Another significant leap is <a href="https://github.com/panjf2000/gnet/pull/461">#461</a>, you can now run <code>gnet</code> on Windows, it should be noted that the Windows version of <code>gnet</code> is intended for development purposes and is not recommended for use in production.</p><p>Visit the <a href="https://github.com/panjf2000/gnet/releases/tag/v2.3.0">release notes</a> for more details.</p></section><section><h2>Like What You See?</h2><div class="row row--squished"><div class="col"><a href="https://twitter.com/panjf2000" target="_blank" class="panel panel--button panel--undefined panel--undefined"><div class="panel--icon"><i class="feather icon-twitter" title="Twitter"></i></div><div><div class="panel--title">Follow @panjf2000</div><div class="panel--description">Get real-time updates!</div></div></a></div><div class="col"><a href="https://github.com/panjf2000/gnet" target="_blank" class="panel panel--button panel--undefined panel--undefined"><div class="panel--icon"><i class="feather icon-github"></i></div><div><div class="panel--title">Star panjf2000/gnet</div><div class="panel--description">Star the repo to support us.</div></div></a></div></div></section><div class="margin-vert--xl"><nav class="pagination-nav"><div class="pagination-nav__item"><a class="pagination-nav__link" href="/blog/announcing-gnet-v2-5-0"><div class="pagination-nav__link--sublabel">Previous Post</div><div class="pagination-nav__link--label">« Announcing gnet v2.5.0</div></a></div><div class="pagination-nav__item pagination-nav__item--next"><a class="pagination-nav__link" href="/blog/announcing-gnet-v2"><div class="pagination-nav__link--sublabel">Next Post</div><div class="pagination-nav__link--label">Announcing gnet v2.0.0 »</div></a></div></nav></div></div></article></div><footer class="footer"><div class="container"><div class="row footer__links"><div class="col col--5 footer__col"><div class="margin-bottom--md"></div><div class="margin-bottom--md"><div class="mailing-list"><form action="https://app.getvero.com/forms/a748ded7ce0da69e6042fa1e21042506" method="post" class="mailing-list--form"><input type="email" class="input input--undefined" name="email" placeholder="you@email.com" style="width:150px"><button class="button button--primary button--undefined" type="submit">Subscribe</button></form></div></div><div><a href="https://twitter.com/panjf2000" target="_blank"><i class="feather icon-twitter" alt="gnet&#x27;s Twitter"></i></a>    <a href="https://github.com/panjf2000/gnet" target="_blank"><i class="feather icon-github" alt="gnet&#x27;s Github Repo"></i></a>    <a href="https://strikefreedom.top/rss.xml" target="_blank"><i class="feather icon-rss" alt="gnet&#x27;s RSS feed"></i></a></div></div><div class="col footer__col"><h4 class="footer__title">About</h4><ul class="footer__items"><li class="footer__item"><a class="footer__link-item" href="/docs/about/overview/">What is gnet?</a></li><li class="footer__item"><a class="footer__link-item" href="/community/#team">The Team</a></li><li class="footer__item"><a class="footer__link-item" href="/contact/">Contact Me</a></li></ul></div><div class="col footer__col"><h4 class="footer__title">Community</h4><ul class="footer__items"><li class="footer__item"><a class="footer__link-item" to="https://discord.gg/UyKD7NZcfH" href="https://discord.gg/UyKD7NZcfH">Chat</a></li><li class="footer__item"><a class="footer__link-item" to="https://github.com/panjf2000/gnet" href="https://github.com/panjf2000/gnet">Github</a></li><li class="footer__item"><a class="footer__link-item" to="https://github.com/gnet-io" href="https://github.com/gnet-io">Github Organization</a></li><li class="footer__item"><a class="footer__link-item" to="https://twitter.com/panjf2000" href="https://twitter.com/panjf2000">Twitter</a></li><li class="footer__item"><a class="footer__link-item" href="/blog/">Blog</a></li></ul></div></div><div class="text--center"><div class="margin-bottom--sm"><a href="https://github.com/panjf2000/gnet/" target="_blank" rel="noopener noreferrer" class="footerLogoLink_3L_r"></a><br><a href="https://www.digitalocean.com/" target="_blank" rel="noopener noreferrer" class="footerLogoLink_3L_r"><img alt="DigitalOcean" src="https://opensource.nyc3.cdn.digitaloceanspaces.com/attribution/assets/PoweredByDO/DO_Powered_by_Badge_blue.svg" width="201px"></a></div>Copyright © 2024 Andy Pan<br><small><a href="https://github.com/panjf2000/gnet/security/policy">Security Policy</a> • <a href="https://github.com/panjf2000/gnet/blob/master/PRIVACY.md">Privacy Policy</a></small></div></div></footer>
 </div>
 
-<script src="/styles.786ecc31.js"></script>
+<script src="/styles.a8e65251.js"></script>
 
-<script src="/runtime~main.fbc233b6.js"></script>
+<script src="/runtime~main.302da3f5.js"></script>
 
-<script src="/main.b2b8e81c.js"></script>
+<script src="/main.08114c31.js"></script>
 
 <script src="/1.e16e7350.js"></script>
 
-<script src="/2.7ca37cf9.js"></script>
+<script src="/2.e30239ec.js"></script>
 
 <script src="/3.a02ed35e.js"></script>
 
-<script src="/ccc49370.983c6395.js"></script>
+<script src="/ccc49370.c6c0b76f.js"></script>
 
-<script src="/16ce05ff.0f239ae0.js"></script>
+<script src="/16ce05ff.55039d79.js"></script>
 
 
 </body>
