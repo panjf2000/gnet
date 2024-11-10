@@ -9,7 +9,7 @@ module.exports = {
           label: 'About',
           items: [
               "about/overview",
-              "about/overview-cn",
+              "about/overview-zh",
           ],
         },
       ],
@@ -46,7 +46,7 @@ module.exports = {
           label: 'v1.x',
           items: [
               "v1.x/doc-for-gnet-v1",
-              "v1.x/doc-for-gnet-v1-cn",
+              "v1.x/doc-for-gnet-v1-zh",
           ],
         },
       ],

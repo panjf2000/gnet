@@ -1,5 +1,5 @@
 ---
-id: doc-for-gnet-v1-cn
+id: doc-for-gnet-v1-zh
 last_modified_on: "2020-03-14"
 title: "gnet v1 文档"
 description: "最快的 Go 网络框架 gnet 来啦！"

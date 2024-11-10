@@ -1,5 +1,5 @@
 ---
-id: overview-cn
+id: overview-zh
 last_modified_on: "2024-03-04"
 title: "预览"
 description: "宏观角度陈述 gnet 框架。"

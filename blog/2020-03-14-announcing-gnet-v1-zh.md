@@ -1,6 +1,6 @@
 ---
 last_modified_on: "2020-03-14"
-id: announcing-gnet-v1-cn
+id: announcing-gnet-v1-zh
 title: "官宣 gnet v1.0.0"
 description: "最快的 Go 网络框架 gnet 来啦！"
 author_github: https://github.com/panjf2000
