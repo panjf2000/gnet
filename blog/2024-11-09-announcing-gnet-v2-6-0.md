@@ -7,6 +7,8 @@ author_github: https://github.com/panjf2000
 tags: ["type: announcement", "domain: presentation"]
 ---
 
+![](/img/gnet-v2-6-0.webp)
+
 The `gnet` v2.6.0 is officially released!
 
 The two major updates in this release are [feat: support configurable I/O chunk to drain at a time in edge-triggered mode](https://github.com/panjf2000/gnet/pull/646) and [feat: support SO_BINDTODEVICE on Linux](https://github.com/panjf2000/gnet/pull/650).

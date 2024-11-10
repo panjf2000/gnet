@@ -7,6 +7,8 @@ author_github: https://github.com/panjf2000
 tags: ["type: announcement", "domain: presentation"]
 ---
 
+![](/img/gnet-v1-0-0.jpg)
+
 ## Today, we are release gnet v1.0.0, enjoy this ultra-fast framework of networking!
 
 <p align="center">

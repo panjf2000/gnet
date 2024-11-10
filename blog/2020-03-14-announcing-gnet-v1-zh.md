@@ -7,6 +7,8 @@ author_github: https://github.com/panjf2000
 tags: ["type: 官宣", "domain: 展示"]
 ---
 
+![](/img/gnet-v1-0-0.jpg)
+
 ## 今天，gnet v1.0.0 正式版本发布，享受这个高性能的网络框架吧！
 
 <p align="center">

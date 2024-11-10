@@ -7,6 +7,8 @@ author_github: https://github.com/panjf2000
 tags: ["type: announcement", "domain: presentation"]
 ---
 
+![](/img/gnet-v2-0-0.jpg)
+
 Today, I'm thrilled to announce the release of [gnet v2.0.0](https://github.com/panjf2000/gnet/releases/tag/v2.0.0), in which we've made plenty of significant improvements and optimizations: added and removed some APIs, redesigned and reimplemented the buffer, optimized the memory pool, etc.
 
 In this blog post, we'll go through the most notable changes to gnet 2.0.

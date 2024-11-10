@@ -7,6 +7,8 @@ author_github: https://github.com/panjf2000
 tags: ["type: announcement", "domain: presentation"]
 ---
 
+![](/img/gnet-v2-5-0.jpg)
+
 The v2.5.0 for `gnet` is officially released!
 
 The two major updates in this release are [feat: support edge-triggered I/O](https://github.com/panjf2000/gnet/pull/576) and [feat: support multiple network addresses binding](https://github.com/panjf2000/gnet/pull/578).

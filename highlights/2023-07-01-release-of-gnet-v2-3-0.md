@@ -10,6 +10,8 @@ hide_on_release_notes: false
 tags: ["type: tag", "domain: v2.3.0"]
 ---
 
+![](/img/gnet-v2-3-0.jpg)
+
 ## Intro
 
 The two major updates in this official release are [#460](https://github.com/panjf2000/gnet/pull/460) and [#461](https://github.com/panjf2000/gnet/pull/461).
