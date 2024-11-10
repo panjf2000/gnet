@@ -10,6 +10,8 @@ hide_on_release_notes: false
 tags: ["type: tag", "domain: v2.0.0"]
 ---
 
+![](/img/gnet-v2-0-0.jpg)
+
 Today, I'm thrilled to announce the release of [gnet v2.0.0](https://github.com/panjf2000/gnet/releases/tag/v2.0.0), in which we've made plenty of significant improvements and optimizations: added and removed some APIs, redesigned and reimplemented the buffer, optimized the memory pool, etc.
 
 Please visit [Announcing gnet v2.0.0 blog post](https://gnet.host/blog/announcing-gnet-v2/)

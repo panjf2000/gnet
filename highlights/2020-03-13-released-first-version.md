@@ -10,6 +10,8 @@ hide_on_release_notes: false
 tags: ["type: release", "domain: v1.0.0"]
 ---
 
+![](/img/gnet-v1-0-0.jpg)
+
 # Features
 
 - [x] [High-performance](https://github.com/panjf2000/gnet/blob/v1.0.0/README.md#-performance) event-loop under networking model of multiple threads/goroutines

@@ -1,20 +1,18 @@
 ---
-last_modified_on: "2023-05-19"
+last_modified_on: "2023-07-01"
 $schema: "/.meta/.schemas/highlights.json"
-title: "Release candidate for gnet v2.3.0"
-description: "The first release candidate for gnet v2.3.0"
+title: "Release of gnet v2.3.0"
+description: "Release of the official stable version of v2.3.0"
 author_github: "https://github.com/panjf2000"
-pr_numbers: [b493107]
-release: "2.3.0-rc.1"
+pr_numbers: [59a3c61]
+release: "2.3.0"
 hide_on_release_notes: false
-tags: ["type: tag", "domain: v2.3.0-rc.1"]
+tags: ["type: tag", "domain: v2.3.0"]
 ---
-
-![](/img/gnet-v2-3-0-rc1.jpg)
 
 ## Intro
 
-The two major updates in this release candidate are [#460](https://github.com/panjf2000/gnet/pull/460) and [#461](https://github.com/panjf2000/gnet/pull/461).
+The two major updates in this official release are [#460](https://github.com/panjf2000/gnet/pull/460) and [#461](https://github.com/panjf2000/gnet/pull/461).
 
 We introduced a new data structure `matrix` in [#460](https://github.com/panjf2000/gnet/pull/460) to displace the default `map` for managing connections internally, with the help of this new data structure, we can eliminate the pointers in `map` and store connections in the form of a matrix (an array of slices), which will significantly reduce GC (Garbage Collection) latency:
 
@@ -52,4 +50,4 @@ While we have performed sufficient testing on `matrix`, we are still using `map`
 
 Another significant leap is [#461](https://github.com/panjf2000/gnet/pull/461), you can now run `gnet` on Windows, it should be noted that the Windows version of `gnet` is intended for development purposes and is not recommended for use in production.
 
-Visit the [release notes](https://github.com/panjf2000/gnet/releases/tag/v2.3.0-rc.1) for more details.
+Visit the [release notes](https://github.com/panjf2000/gnet/releases/tag/v2.3.0) for more details.
