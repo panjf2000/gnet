@@ -31,7 +31,7 @@ function BlogPostItem(props) {
       <article>
         <h2>{title}</h2>
         <div className="subtitle">{description}</div>
-        <Avatar github={author_github} size="sm" subTitle={<><time pubdate="pubdate" dateTime={date.toISOString()}>{dateFormat(date, "mmm dS")}</time> / {readingStats.text}</>} rel="author" />
+        <Avatar github={author_github} size="sm" subTitle={<><time pubdate="pubdate" dateTime={date.toISOString()}>{dateFormat(date, "mmm dS, yyyy")}</time> / {readingStats.text}</>} rel="author" />
         <Tags colorProfile="blog" tags={tags} />
       </article>
     </Link>

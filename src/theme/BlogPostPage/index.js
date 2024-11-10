@@ -40,7 +40,7 @@ function BlogPostPage(props) {
               <Avatar
                 github={author_github}
                 size="lg"
-                nameSuffix={<> / <time pubdate="pubdate" dateTime={date.toISOString()}>{dateFormat(date, "mmm dS")}</time> / {readingStats.text}</>}
+                nameSuffix={<> / <time pubdate="pubdate" dateTime={date.toISOString()}>{dateFormat(date, "mmm dS, yyyy")}</time> / {readingStats.text}</>}
                 rel="author"
                 subTitle={false}
                 vertical={true} />
