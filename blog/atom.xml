@@ -38,8 +38,8 @@
     </entry>
     <entry>
         <title type="html"><![CDATA[官宣 gnet v1.0.0]]></title>
-        <id>announcing-gnet-v1-cn</id>
-        <link href="https://gnet.host/blog/announcing-gnet-v1-cn"/>
+        <id>announcing-gnet-v1-zh</id>
+        <link href="https://gnet.host/blog/announcing-gnet-v1-zh"/>
         <updated>2020-03-14T00:00:00.000Z</updated>
         <summary type="html"><![CDATA[最快的 Go 网络框架 gnet 来啦！]]></summary>
     </entry>

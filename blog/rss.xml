@@ -38,8 +38,8 @@
         </item>
         <item>
             <title><![CDATA[官宣 gnet v1.0.0]]></title>
-            <link>https://gnet.host/blog/announcing-gnet-v1-cn</link>
-            <guid>announcing-gnet-v1-cn</guid>
+            <link>https://gnet.host/blog/announcing-gnet-v1-zh</link>
+            <guid>announcing-gnet-v1-zh</guid>
             <pubDate>Sat, 14 Mar 2020 00:00:00 GMT</pubDate>
             <description><![CDATA[最快的 Go 网络框架 gnet 来啦！]]></description>
         </item>
