@@ -19,27 +19,27 @@
 <link rel="stylesheet" href="/styles.2ae13ac2.css">
 
 
-<link rel="preload" href="/styles.284f6636.js" as="script">
+<link rel="preload" href="/styles.051432d4.js" as="script">
 
-<link rel="preload" href="/runtime~main.c0377fe3.js" as="script">
+<link rel="preload" href="/runtime~main.7f82d6db.js" as="script">
 
-<link rel="preload" href="/main.5ffd576e.js" as="script">
+<link rel="preload" href="/main.a9f677a8.js" as="script">
 
-<link rel="preload" href="/1.b8d77322.js" as="script">
+<link rel="preload" href="/1.8e0f3365.js" as="script">
 
-<link rel="preload" href="/2.d0859f7c.js" as="script">
+<link rel="preload" href="/2.2bacd832.js" as="script">
 
-<link rel="preload" href="/3.11af8555.js" as="script">
+<link rel="preload" href="/3.0549a7de.js" as="script">
 
-<link rel="preload" href="/1be78505.f1900642.js" as="script">
+<link rel="preload" href="/1be78505.65af0cf6.js" as="script">
 
-<link rel="preload" href="/20ac7829.77c8a956.js" as="script">
+<link rel="preload" href="/20ac7829.c05d33e4.js" as="script">
 
-<link rel="preload" href="/4.42fa62ca.js" as="script">
+<link rel="preload" href="/4.3d16f8f6.js" as="script">
 
-<link rel="preload" href="/17896441.dd8bb5cd.js" as="script">
+<link rel="preload" href="/17896441.78b36808.js" as="script">
 
-<link rel="preload" href="/8070e160.94d76e08.js" as="script">
+<link rel="preload" href="/8070e160.c84f44cf.js" as="script">
 
 </head>
 <body>
@@ -56,27 +56,27 @@
 </span></div><div class="token-line" style="color:#393A34"><span class="token plain">    </span><span class="token comment" style="color:#999988;font-style:italic">// Example command: go run echo.go --port 9000 --multicore=true</span><span class="token plain"></span></div><div class="token-line" style="color:#393A34"><span class="token plain">    flag</span><span class="token punctuation" style="color:#393A34">.</span><span class="token function" style="color:#d73a49">IntVar</span><span class="token punctuation" style="color:#393A34">(</span><span class="token operator" style="color:#393A34">&amp;</span><span class="token plain">port</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"> </span><span class="token string" style="color:#e3116c">&quot;port&quot;</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"> </span><span class="token number" style="color:#36acaa">9000</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"> </span><span class="token string" style="color:#e3116c">&quot;--port 9000&quot;</span><span class="token punctuation" style="color:#393A34">)</span><span class="token plain"></span></div><div class="token-line" style="color:#393A34"><span class="token plain">    flag</span><span class="token punctuation" style="color:#393A34">.</span><span class="token function" style="color:#d73a49">BoolVar</span><span class="token punctuation" style="color:#393A34">(</span><span class="token operator" style="color:#393A34">&amp;</span><span class="token plain">multicore</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"> </span><span class="token string" style="color:#e3116c">&quot;multicore&quot;</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"> </span><span class="token boolean" style="color:#36acaa">false</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"> </span><span class="token string" style="color:#e3116c">&quot;--multicore true&quot;</span><span class="token punctuation" style="color:#393A34">)</span><span class="token plain"></span></div><div class="token-line" style="color:#393A34"><span class="token plain">    flag</span><span class="token punctuation" style="color:#393A34">.</span><span class="token function" style="color:#d73a49">Parse</span><span class="token punctuation" style="color:#393A34">(</span><span class="token punctuation" style="color:#393A34">)</span><span class="token plain"></span></div><div class="token-line" style="color:#393A34"><span class="token plain">    echo </span><span class="token operator" style="color:#393A34">:=</span><span class="token plain"> </span><span class="token operator" style="color:#393A34">&amp;</span><span class="token plain">echoServer</span><span class="token punctuation" style="color:#393A34">{</span><span class="token plain">addr</span><span class="token punctuation" style="color:#393A34">:</span><span class="token plain"> fmt</span><span class="token punctuation" style="color:#393A34">.</span><span class="token function" style="color:#d73a49">Sprintf</span><span class="token punctuation" style="color:#393A34">(</span><span class="token string" style="color:#e3116c">&quot;tcp://:%d&quot;</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"> port</span><span class="token punctuation" style="color:#393A34">)</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"> multicore</span><span class="token punctuation" style="color:#393A34">:</span><span class="token plain"> multicore</span><span class="token punctuation" style="color:#393A34">}</span><span class="token plain"></span></div><div class="token-line" style="color:#393A34"><span class="token plain">    log</span><span class="token punctuation" style="color:#393A34">.</span><span class="token function" style="color:#d73a49">Fatal</span><span class="token punctuation" style="color:#393A34">(</span><span class="token plain">gnet</span><span class="token punctuation" style="color:#393A34">.</span><span class="token function" style="color:#d73a49">Run</span><span class="token punctuation" style="color:#393A34">(</span><span class="token plain">echo</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"> echo</span><span class="token punctuation" style="color:#393A34">.</span><span class="token plain">addr</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"> gnet</span><span class="token punctuation" style="color:#393A34">.</span><span class="token function" style="color:#d73a49">WithMulticore</span><span class="token punctuation" style="color:#393A34">(</span><span class="token plain">multicore</span><span class="token punctuation" style="color:#393A34">)</span><span class="token punctuation" style="color:#393A34">)</span><span class="token punctuation" style="color:#393A34">)</span><span class="token plain"></span></div><div class="token-line" style="color:#393A34"><span class="token plain"></span><span class="token punctuation" style="color:#393A34">}</span></div></div></pre></div></div><p>As you can see, this example of echo server only sets up the <code>EventHandler.OnTraffic(Conn)</code> handler where you commonly write your main business code and this callback will be called as soon as the server receives network data from its peer, we call <code>Conn.Next(-1)</code> inside <code>OnTraffic()</code> to retrieve all data from a connection and then call <code>Conn.Write([]byte)</code> to send the data back to the peer via TCP socket, which make this an echo example, and finally we return a <code>gnet.None</code> under normal circumstances. If there is any unexpected error occuring, return either <code>gnet.Close</code> to close this connection or <code>gnet.Shutdown</code> to shut the whole server down.</p><p>There are two ways for users to retrieve data in <code>OnTraffic()</code>, one is to call <code>Conn.Peek(int)</code> and <code>Conn.Discard(int)</code>，the other is to call <code>Conn.Next(int)</code> , the former returns the next n bytes without advancing underlying connection buffer while the latter returns a slice containing the next n bytes from the buffer, advancing the buffer as if the bytes had been returned by <code>Conn.Read([]byte)</code>.</p><p>For more API&#x27;s of <code>gnet.Conn</code> see <a href="https://pkg.go.dev/github.com/panjf2000/gnet">gnet API Docs</a> and for more examples see <a href="https://github.com/gnet-io/gnet-examples">gnet examples</a>.</p></div></article></div><div class="paginator_3VDt"><nav class="pagination-nav"><div class="pagination-nav__item"><a class="pagination-nav__link" href="/docs/about/overview-cn"><h5 class="pagination-nav__link--sublabel">Previous</h5><h4 class="pagination-nav__link--label">« 预览</h4></a></div><div class="pagination-nav__item pagination-nav__item--next"><a class="pagination-nav__link" href="/docs/tutorial/best-practices"><h5 class="pagination-nav__link--sublabel">Next</h5><h4 class="pagination-nav__link--label">Best practices »</h4></a></div></nav></div></div><div class="rightCol_38kP"><div class="table-of-contents tableOfContents_tVyB"><div class="section"><div class="title">Contents</div><ul class="contents"><li><a href="#installation" class="contents__link">Installation</a><ul><li><a href="#v1" class="contents__link">V1</a></li><li><a href="#v2" class="contents__link">V2</a></li></ul></li><li><a href="#example" class="contents__link">Example</a></li></ul></div><div class="section"><div class="title">Resources</div><ul class="contents"><li><a href="https://github.com/panjf2000/gnet/edit/master/website/docs/quickstart.md" class="contents__link" target="_blank"><i class="feather icon-edit-1"></i> Edit this page</a></li></ul></div></div></div></div></div></main></div></div><footer class="footer"><div class="container"><div class="row footer__links"><div class="col col--5 footer__col"><div class="margin-bottom--md"></div><div class="margin-bottom--md"><div class="mailing-list"><form action="https://app.getvero.com/forms/a748ded7ce0da69e6042fa1e21042506" method="post" class="mailing-list--form"><input type="email" class="input input--undefined" name="email" placeholder="you@email.com" style="width:150px"><button class="button button--primary button--undefined" type="submit">Subscribe</button></form></div></div><div><a href="https://twitter.com/panjf2000" target="_blank"><i class="feather icon-twitter" alt="gnet&#x27;s Twitter"></i></a>    <a href="https://github.com/panjf2000/gnet" target="_blank"><i class="feather icon-github" alt="gnet&#x27;s Github Repo"></i></a>    <a href="https://strikefreedom.top/rss.xml" target="_blank"><i class="feather icon-rss" alt="gnet&#x27;s RSS feed"></i></a></div></div><div class="col footer__col"><h4 class="footer__title">About</h4><ul class="footer__items"><li class="footer__item"><a class="footer__link-item" href="/docs/about/overview/">What is gnet?</a></li><li class="footer__item"><a class="footer__link-item" href="/community/#team">The Team</a></li><li class="footer__item"><a class="footer__link-item" href="/contact/">Contact Me</a></li></ul></div><div class="col footer__col"><h4 class="footer__title">Community</h4><ul class="footer__items"><li class="footer__item"><a class="footer__link-item" to="https://discord.gg/UyKD7NZcfH" href="https://discord.gg/UyKD7NZcfH">Chat</a></li><li class="footer__item"><a class="footer__link-item" to="https://github.com/panjf2000/gnet" href="https://github.com/panjf2000/gnet">Github</a></li><li class="footer__item"><a class="footer__link-item" to="https://github.com/gnet-io" href="https://github.com/gnet-io">Github Organization</a></li><li class="footer__item"><a class="footer__link-item" to="https://twitter.com/panjf2000" href="https://twitter.com/panjf2000">Twitter</a></li><li class="footer__item"><a class="footer__link-item" href="/blog/">Blog</a></li></ul></div></div><div class="text--center"><div class="margin-bottom--sm"><a href="https://github.com/panjf2000/gnet/" target="_blank" rel="noopener noreferrer" class="footerLogoLink_3L_r"></a><br><a href="https://www.digitalocean.com/" target="_blank" rel="noopener noreferrer" class="footerLogoLink_3L_r"><img alt="DigitalOcean" src="https://opensource.nyc3.cdn.digitaloceanspaces.com/attribution/assets/PoweredByDO/DO_Powered_by_Badge_blue.svg" width="201px"></a></div>Copyright © 2024 Andy Pan<br><small><a href="https://github.com/panjf2000/gnet/security/policy">Security Policy</a> • <a href="https://github.com/panjf2000/gnet/blob/master/PRIVACY.md">Privacy Policy</a></small></div></div></footer>
 </div>
 
-<script src="/styles.284f6636.js"></script>
+<script src="/styles.051432d4.js"></script>
 
-<script src="/runtime~main.c0377fe3.js"></script>
+<script src="/runtime~main.7f82d6db.js"></script>
 
-<script src="/main.5ffd576e.js"></script>
+<script src="/main.a9f677a8.js"></script>
 
-<script src="/1.b8d77322.js"></script>
+<script src="/1.8e0f3365.js"></script>
 
-<script src="/2.d0859f7c.js"></script>
+<script src="/2.2bacd832.js"></script>
 
-<script src="/3.11af8555.js"></script>
+<script src="/3.0549a7de.js"></script>
 
-<script src="/1be78505.f1900642.js"></script>
+<script src="/1be78505.65af0cf6.js"></script>
 
-<script src="/20ac7829.77c8a956.js"></script>
+<script src="/20ac7829.c05d33e4.js"></script>
 
-<script src="/4.42fa62ca.js"></script>
+<script src="/4.3d16f8f6.js"></script>
 
-<script src="/17896441.dd8bb5cd.js"></script>
+<script src="/17896441.78b36808.js"></script>
 
-<script src="/8070e160.94d76e08.js"></script>
+<script src="/8070e160.c84f44cf.js"></script>
 
 
 </body>

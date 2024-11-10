@@ -1,0 +1,1 @@
+(window.webpackJsonp=window.webpackJsonp||[]).push([[96],{240:function(a){a.exports=JSON.parse('{"allTagsPath":"/highlights/tags","slug":"platform-arm-64","name":"platform: arm64","count":2,"permalink":"/highlights/tags/platform-arm-64"}')}}]);
