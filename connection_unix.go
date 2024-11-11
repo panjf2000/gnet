@@ -318,16 +318,18 @@ func (c *conn) Next(n int) (buf []byte, err error) {
 	} else if n <= 0 {
 		n = totalLen
 	}
+
 	if c.inboundBuffer.IsEmpty() {
 		buf = c.buffer[:n]
 		c.buffer = c.buffer[n:]
 		return
 	}
+
 	head, tail := c.inboundBuffer.Peek(n)
 	defer c.inboundBuffer.Discard(n) //nolint:errcheck
 	c.loop.cache.Reset()
 	c.loop.cache.Write(head)
-	if len(head) >= n {
+	if len(head) == n {
 		return c.loop.cache.Bytes(), err
 	}
 	c.loop.cache.Write(tail)
@@ -348,12 +350,14 @@ func (c *conn) Peek(n int) (buf []byte, err error) {
 	} else if n <= 0 {
 		n = totalLen
 	}
+
 	if c.inboundBuffer.IsEmpty() {
 		return c.buffer[:n], err
 	}
+
 	head, tail := c.inboundBuffer.Peek(n)
-	if len(head) >= n {
-		return head[:n], err
+	if len(head) == n {
+		return head, err
 	}
 	c.loop.cache.Reset()
 	c.loop.cache.Write(head)
