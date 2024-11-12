@@ -18,6 +18,7 @@
 package gnet
 
 import (
+	"bytes"
 	"io"
 	"net"
 	"os"
@@ -329,13 +330,13 @@ func (c *conn) Next(n int) (buf []byte, err error) {
 	c.loop.cache.Write(head)
 	if len(head) >= n {
 		buf = c.loop.cache.Bytes()
-		c.loop.cache.Reset()
+		c.loop.cache = *bytes.NewBuffer([]byte{})
 		return
 	}
 	c.loop.cache.Write(tail)
 	if inBufferLen >= n {
 		buf = c.loop.cache.Bytes()
-		c.loop.cache.Reset()
+		c.loop.cache = *bytes.NewBuffer([]byte{})
 		return
 	}
 
@@ -343,7 +344,7 @@ func (c *conn) Next(n int) (buf []byte, err error) {
 	c.loop.cache.Write(c.buffer[:remaining])
 	c.buffer = c.buffer[remaining:]
 	buf = c.loop.cache.Bytes()
-	c.loop.cache.Reset()
+	c.loop.cache = *bytes.NewBuffer([]byte{})
 	return
 }
 
@@ -366,14 +367,14 @@ func (c *conn) Peek(n int) (buf []byte, err error) {
 	c.loop.cache.Write(tail)
 	if inBufferLen >= n {
 		buf = c.loop.cache.Bytes()
-		c.loop.cache.Reset()
+		c.loop.cache = *bytes.NewBuffer([]byte{})
 		return
 	}
 
 	remaining := n - inBufferLen
 	c.loop.cache.Write(c.buffer[:remaining])
 	buf = c.loop.cache.Bytes()
-	c.loop.cache.Reset()
+	c.loop.cache = *bytes.NewBuffer([]byte{})
 	return
 }
 
