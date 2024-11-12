@@ -328,17 +328,23 @@ func (c *conn) Next(n int) (buf []byte, err error) {
 	c.loop.cache.Reset()
 	c.loop.cache.Write(head)
 	if len(head) >= n {
-		return c.loop.cache.Bytes(), err
+		buf = c.loop.cache.Bytes()
+		c.loop.cache.Reset()
+		return
 	}
 	c.loop.cache.Write(tail)
 	if inBufferLen >= n {
-		return c.loop.cache.Bytes(), err
+		buf = c.loop.cache.Bytes()
+		c.loop.cache.Reset()
+		return
 	}
 
 	remaining := n - inBufferLen
 	c.loop.cache.Write(c.buffer[:remaining])
 	c.buffer = c.buffer[remaining:]
-	return c.loop.cache.Bytes(), err
+	buf = c.loop.cache.Bytes()
+	c.loop.cache.Reset()
+	return
 }
 
 func (c *conn) Peek(n int) (buf []byte, err error) {
@@ -359,12 +365,16 @@ func (c *conn) Peek(n int) (buf []byte, err error) {
 	c.loop.cache.Write(head)
 	c.loop.cache.Write(tail)
 	if inBufferLen >= n {
-		return c.loop.cache.Bytes(), err
+		buf = c.loop.cache.Bytes()
+		c.loop.cache.Reset()
+		return
 	}
 
 	remaining := n - inBufferLen
 	c.loop.cache.Write(c.buffer[:remaining])
-	return c.loop.cache.Bytes(), err
+	buf = c.loop.cache.Bytes()
+	c.loop.cache.Reset()
+	return
 }
 
 func (c *conn) Discard(n int) (int, error) {
