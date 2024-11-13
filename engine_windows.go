@@ -74,7 +74,7 @@ func (eng *engine) closeEventLoops() {
 func (eng *engine) start(numEventLoop int) error {
 	for i := 0; i < numEventLoop; i++ {
 		el := eventloop{
-			ch:           make(chan interface{}, 1024),
+			ch:           make(chan any, 1024),
 			idx:          i,
 			eng:          eng,
 			connections:  make(map[*conn]struct{}),

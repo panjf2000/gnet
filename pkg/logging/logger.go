@@ -244,35 +244,35 @@ func Error(err error) {
 }
 
 // Debugf logs messages at DEBUG level.
-func Debugf(format string, args ...interface{}) {
+func Debugf(format string, args ...any) {
 	mu.RLock()
 	defaultLogger.Debugf(format, args...)
 	mu.RUnlock()
 }
 
 // Infof logs messages at INFO level.
-func Infof(format string, args ...interface{}) {
+func Infof(format string, args ...any) {
 	mu.RLock()
 	defaultLogger.Infof(format, args...)
 	mu.RUnlock()
 }
 
 // Warnf logs messages at WARN level.
-func Warnf(format string, args ...interface{}) {
+func Warnf(format string, args ...any) {
 	mu.RLock()
 	defaultLogger.Warnf(format, args...)
 	mu.RUnlock()
 }
 
 // Errorf logs messages at ERROR level.
-func Errorf(format string, args ...interface{}) {
+func Errorf(format string, args ...any) {
 	mu.RLock()
 	defaultLogger.Errorf(format, args...)
 	mu.RUnlock()
 }
 
 // Fatalf logs messages at FATAL level.
-func Fatalf(format string, args ...interface{}) {
+func Fatalf(format string, args ...any) {
 	mu.RLock()
 	defaultLogger.Fatalf(format, args...)
 	mu.RUnlock()
@@ -281,13 +281,13 @@ func Fatalf(format string, args ...interface{}) {
 // Logger is used for logging formatted messages.
 type Logger interface {
 	// Debugf logs messages at DEBUG level.
-	Debugf(format string, args ...interface{})
+	Debugf(format string, args ...any)
 	// Infof logs messages at INFO level.
-	Infof(format string, args ...interface{})
+	Infof(format string, args ...any)
 	// Warnf logs messages at WARN level.
-	Warnf(format string, args ...interface{})
+	Warnf(format string, args ...any)
 	// Errorf logs messages at ERROR level.
-	Errorf(format string, args ...interface{})
+	Errorf(format string, args ...any)
 	// Fatalf logs messages at FATAL level.
-	Fatalf(format string, args ...interface{})
+	Fatalf(format string, args ...any)
 }
