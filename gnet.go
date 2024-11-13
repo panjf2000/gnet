@@ -241,7 +241,8 @@ type Writer interface {
 //
 // Note that the parameter gnet.Conn might have been already released when it's UDP protocol,
 // thus it shouldn't be accessed.
-// This callback must not block, otherwise, it blocks the event-loop.
+// This callback will be executed in event-loop, thus it must not block, otherwise,
+// it blocks the event-loop.
 type AsyncCallback func(c Conn, err error) error
 
 // Socket is a set of functions which manipulate the underlying file descriptor of a connection.
