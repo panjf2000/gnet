@@ -28,7 +28,7 @@ import (
 )
 
 type eventloop struct {
-	ch           chan interface{}   // channel for event-loop
+	ch           chan any           // channel for event-loop
 	idx          int                // index of event-loop in event-loops
 	eng          *engine            // engine in loop
 	cache        bytes.Buffer       // temporary buffer for scattered bytes
@@ -71,9 +71,7 @@ func (el *eventloop) run() (err error) {
 		case *openConn:
 			err = el.open(v)
 		case *tcpConn:
-			unpackTCPConn(v)
-			err = el.read(v.c)
-			resetTCPConn(v)
+			err = el.read(unpackTCPConn(v))
 		case *udpConn:
 			err = el.readUDP(v.c)
 		case func() error:

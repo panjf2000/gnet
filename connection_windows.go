@@ -21,11 +21,13 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/panjf2000/ants/v2"
 	"golang.org/x/sys/windows"
 
 	"github.com/panjf2000/gnet/v2/pkg/buffer/elastic"
 	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
 	bbPool "github.com/panjf2000/gnet/v2/pkg/pool/bytebuffer"
+	goPool "github.com/panjf2000/gnet/v2/pkg/pool/goroutine"
 )
 
 type netErr struct {
@@ -34,8 +36,8 @@ type netErr struct {
 }
 
 type tcpConn struct {
-	c   *conn
-	buf *bbPool.ByteBuffer
+	c *conn
+	b *bbPool.ByteBuffer
 }
 
 type udpConn struct {
@@ -49,7 +51,7 @@ type openConn struct {
 
 type conn struct {
 	pc            net.PacketConn
-	ctx           interface{}        // user-defined context
+	ctx           any                // user-defined context
 	loop          *eventloop         // owner event-loop
 	buffer        *bbPool.ByteBuffer // reuse memory of inbound data as a temporary buffer
 	rawConn       net.Conn           // original connection
@@ -59,35 +61,34 @@ type conn struct {
 }
 
 func packTCPConn(c *conn, buf []byte) *tcpConn {
-	tc := &tcpConn{c: c, buf: bbPool.Get()}
-	_, _ = tc.buf.Write(buf)
-	return tc
+	b := bbPool.Get()
+	_, _ = b.Write(buf)
+	return &tcpConn{c: c, b: b}
 }
 
-func unpackTCPConn(tc *tcpConn) {
-	tc.c.buffer = tc.buf
-	tc.buf = nil
-}
-
-func resetTCPConn(tc *tcpConn) {
-	bbPool.Put(tc.c.buffer)
-	tc.c.buffer = nil
+func unpackTCPConn(tc *tcpConn) *conn {
+	if tc.c.buffer == nil { // the connection has been closed
+		return nil
+	}
+	_, _ = tc.c.buffer.Write(tc.b.B)
+	bbPool.Put(tc.b)
+	tc.b = nil
+	return tc.c
 }
 
 func packUDPConn(c *conn, buf []byte) *udpConn {
-	uc := &udpConn{c}
-	_, _ = uc.c.buffer.Write(buf)
-	return uc
+	_, _ = c.buffer.Write(buf)
+	return &udpConn{c}
 }
 
 func newTCPConn(nc net.Conn, el *eventloop) (c *conn) {
-	c = &conn{
-		loop:    el,
-		rawConn: nc,
+	return &conn{
+		loop:       el,
+		buffer:     bbPool.Get(),
+		rawConn:    nc,
+		localAddr:  nc.LocalAddr(),
+		remoteAddr: nc.RemoteAddr(),
 	}
-	c.localAddr = c.rawConn.LocalAddr()
-	c.remoteAddr = c.rawConn.RemoteAddr()
-	return
 }
 
 func (c *conn) release() {
@@ -118,18 +119,11 @@ func (c *conn) resetBuffer() {
 }
 
 func (c *conn) Read(p []byte) (n int, err error) {
-	if c.buffer == nil {
-		if len(p) == 0 {
-			return 0, nil
-		}
-		return 0, io.ErrShortBuffer
-	}
-
 	if c.inboundBuffer.IsEmpty() {
 		n = copy(p, c.buffer.B)
 		c.buffer.B = c.buffer.B[n:]
 		if n == 0 && len(p) > 0 {
-			err = io.EOF
+			err = io.ErrShortBuffer
 		}
 		return
 	}
@@ -144,13 +138,6 @@ func (c *conn) Read(p []byte) (n int, err error) {
 }
 
 func (c *conn) Next(n int) (buf []byte, err error) {
-	if c.buffer == nil {
-		if n <= 0 {
-			return nil, nil
-		}
-		return nil, io.ErrShortBuffer
-	}
-
 	inBufferLen := c.inboundBuffer.Buffered()
 	if totalLen := inBufferLen + c.buffer.Len(); n > totalLen {
 		return nil, io.ErrShortBuffer
@@ -166,7 +153,7 @@ func (c *conn) Next(n int) (buf []byte, err error) {
 	defer c.inboundBuffer.Discard(n) //nolint:errcheck
 	c.loop.cache.Reset()
 	c.loop.cache.Write(head)
-	if len(head) >= n {
+	if len(head) == n {
 		return c.loop.cache.Bytes(), err
 	}
 	c.loop.cache.Write(tail)
@@ -181,13 +168,6 @@ func (c *conn) Next(n int) (buf []byte, err error) {
 }
 
 func (c *conn) Peek(n int) (buf []byte, err error) {
-	if c.buffer == nil {
-		if n <= 0 {
-			return nil, nil
-		}
-		return nil, io.ErrShortBuffer
-	}
-
 	inBufferLen := c.inboundBuffer.Buffered()
 	if totalLen := inBufferLen + c.buffer.Len(); n > totalLen {
 		return nil, io.ErrShortBuffer
@@ -198,8 +178,8 @@ func (c *conn) Peek(n int) (buf []byte, err error) {
 		return c.buffer.B[:n], err
 	}
 	head, tail := c.inboundBuffer.Peek(n)
-	if len(head) >= n {
-		return head[:n], err
+	if len(head) == n {
+		return head, err
 	}
 	c.loop.cache.Reset()
 	c.loop.cache.Write(head)
@@ -214,10 +194,6 @@ func (c *conn) Peek(n int) (buf []byte, err error) {
 }
 
 func (c *conn) Discard(n int) (int, error) {
-	if c.buffer == nil {
-		return 0, nil
-	}
-
 	inBufferLen := c.inboundBuffer.Buffered()
 	tempBufferLen := c.buffer.Len()
 	if inBufferLen+tempBufferLen < n || n <= 0 {
@@ -297,10 +273,10 @@ func (c *conn) OutboundBuffered() int {
 	return 0
 }
 
-func (c *conn) Context() interface{}       { return c.ctx }
-func (c *conn) SetContext(ctx interface{}) { c.ctx = ctx }
-func (c *conn) LocalAddr() net.Addr        { return c.localAddr }
-func (c *conn) RemoteAddr() net.Addr       { return c.remoteAddr }
+func (c *conn) Context() any         { return c.ctx }
+func (c *conn) SetContext(ctx any)   { c.ctx = ctx }
+func (c *conn) LocalAddr() net.Addr  { return c.localAddr }
+func (c *conn) RemoteAddr() net.Addr { return c.remoteAddr }
 
 func (c *conn) Fd() (fd int) {
 	if c.rawConn == nil {
@@ -430,19 +406,43 @@ func (c *conn) SetKeepAlivePeriod(d time.Duration) error {
 	return nil
 }
 
+type nonBlockingPool struct {
+	*goPool.Pool
+}
+
+func (np *nonBlockingPool) Go(task func()) (err error) {
+	if err = np.Submit(task); err == ants.ErrPoolOverload {
+		go task()
+	}
+	return
+}
+
+var workerPool = nonBlockingPool{Pool: goPool.Default()}
+
 // Gfd return an uninitialized GFD which is not valid,
 // this method is only implemented for compatibility, don't use it on Windows.
 // func (c *conn) Gfd() gfd.GFD { return gfd.GFD{} }
 
 func (c *conn) AsyncWrite(buf []byte, cb AsyncCallback) error {
-	if cb == nil {
-		cb = func(c Conn, err error) error { return nil }
-	}
 	_, err := c.Write(buf)
-	c.loop.ch <- func() error {
-		return cb(c, err)
+
+	callback := func() error {
+		if cb != nil {
+			_ = cb(c, err)
+		}
+		return err
 	}
-	return nil
+
+	select {
+	case c.loop.ch <- callback:
+	default:
+		// If the event-loop channel is full, asynchronize this operation to avoid blocking the eventloop.
+		err = workerPool.Go(func() {
+			c.loop.ch <- callback
+		})
+	}
+
+	return err
 }
 
 func (c *conn) AsyncWritev(bs [][]byte, cb AsyncCallback) error {
@@ -459,48 +459,63 @@ func (c *conn) AsyncWritev(bs [][]byte, cb AsyncCallback) error {
 	})
 }
 
-func (c *conn) Wake(cb AsyncCallback) error {
-	if cb == nil {
-		cb = func(c Conn, err error) error { return nil }
-	}
-	c.loop.ch <- func() (err error) {
-		defer func() {
-			defer func() {
-				if err == nil {
-					err = cb(c, nil)
-					return
-				}
-				_ = cb(c, err)
-			}()
-		}()
-		return c.loop.wake(c)
-	}
-	return nil
-}
-
-func (c *conn) Close() error {
-	c.loop.ch <- func() error {
-		err := c.loop.close(c, nil)
-		return err
-	}
-	return nil
-}
-
-func (c *conn) CloseWithCallback(cb AsyncCallback) error {
-	if cb == nil {
-		cb = func(c Conn, err error) error { return nil }
-	}
-	c.loop.ch <- func() (err error) {
-		defer func() {
-			if err == nil {
-				err = cb(c, nil)
-				return
-			}
+func (c *conn) Wake(cb AsyncCallback) (err error) {
+	wakeFn := func() (err error) {
+		err = c.loop.wake(c)
+		if cb != nil {
 			_ = cb(c, err)
-		}()
+		}
+		return
+	}
+
+	select {
+	case c.loop.ch <- wakeFn:
+	default:
+		// If the event-loop channel is full, asynchronize this operation to avoid blocking the eventloop.
+		err = workerPool.Go(func() {
+			c.loop.ch <- wakeFn
+		})
+	}
+
+	return
+}
+
+func (c *conn) Close() (err error) {
+	closeFn := func() error {
 		return c.loop.close(c, nil)
 	}
-	return nil
+
+	select {
+	case c.loop.ch <- closeFn:
+	default:
+		// If the event-loop channel is full, asynchronize this operation to avoid blocking the eventloop.
+		err = workerPool.Go(func() {
+			c.loop.ch <- closeFn
+		})
+	}
+
+	return
+}
+
+func (c *conn) CloseWithCallback(cb AsyncCallback) (err error) {
+	closeFn := func() (err error) {
+		err = c.loop.close(c, nil)
+		if cb != nil {
+			_ = cb(c, err)
+		}
+		return
+	}
+
+	select {
+	case c.loop.ch <- closeFn:
+	default:
+		// If the event-loop channel is full, asynchronize this operation to avoid blocking the eventloop.
+		err = workerPool.Go(func() {
+			c.loop.ch <- closeFn
+		})
+	}
+
+	return
 }
 
 func (*conn) SetDeadline(_ time.Time) error {

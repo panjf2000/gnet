@@ -16,16 +16,16 @@ package queue
 
 import "sync"
 
-// TaskFunc is the callback function executed by poller.
-type TaskFunc func(interface{}) error
+// Func is the callback function executed by poller.
+type Func func(any) error
 
 // Task is a wrapper that contains function and its argument.
 type Task struct {
-	Run TaskFunc
-	Arg interface{}
+	Exec  Func
+	Param any
 }
 
-var taskPool = sync.Pool{New: func() interface{} { return new(Task) }}
+var taskPool = sync.Pool{New: func() any { return new(Task) }}
 
 // GetTask gets a cached Task from pool.
 func GetTask() *Task {
@@ -34,7 +34,7 @@ func GetTask() *Task {
 
 // PutTask puts the trashy Task back in pool.
 func PutTask(task *Task) {
-	task.Run, task.Arg = nil, nil
+	task.Exec, task.Param = nil, nil
 	taskPool.Put(task)
 }
 

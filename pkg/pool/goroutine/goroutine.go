@@ -47,7 +47,7 @@ type antsLogger struct {
 }
 
 // Printf implements the ants.Logger interface.
-func (l antsLogger) Printf(format string, args ...interface{}) {
+func (l antsLogger) Printf(format string, args ...any) {
 	l.Infof(format, args...)
 }
 
@@ -57,8 +57,8 @@ func Default() *Pool {
 		ExpiryDuration: ExpiryDuration,
 		Nonblocking:    Nonblocking,
 		Logger:         &antsLogger{logging.GetDefaultLogger()},
-		PanicHandler: func(i interface{}) {
-			logging.Errorf("goroutine pool panic: %v", i)
+		PanicHandler: func(a any) {
+			logging.Errorf("goroutine pool panic: %v", a)
 		},
 	}
 	defaultAntsPool, _ := ants.NewPool(DefaultAntsPoolSize, ants.WithOptions(options))
