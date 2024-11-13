@@ -49,7 +49,7 @@ type openConn struct {
 
 type conn struct {
 	pc            net.PacketConn
-	ctx           interface{}        // user-defined context
+	ctx           any                // user-defined context
 	loop          *eventloop         // owner event-loop
 	buffer        *bbPool.ByteBuffer // reuse memory of inbound data as a temporary buffer
 	rawConn       net.Conn           // original connection
@@ -271,10 +271,10 @@ func (c *conn) OutboundBuffered() int {
 	return 0
 }
 
-func (c *conn) Context() interface{}       { return c.ctx }
-func (c *conn) SetContext(ctx interface{}) { c.ctx = ctx }
-func (c *conn) LocalAddr() net.Addr        { return c.localAddr }
-func (c *conn) RemoteAddr() net.Addr       { return c.remoteAddr }
+func (c *conn) Context() any         { return c.ctx }
+func (c *conn) SetContext(ctx any)   { c.ctx = ctx }
+func (c *conn) LocalAddr() net.Addr  { return c.localAddr }
+func (c *conn) RemoteAddr() net.Addr { return c.remoteAddr }
 
 func (c *conn) Fd() (fd int) {
 	if c.rawConn == nil {

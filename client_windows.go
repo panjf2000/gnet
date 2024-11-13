@@ -61,7 +61,7 @@ func NewClient(eh EventHandler, opts ...Option) (cli *Client, err error) {
 		eventHandler: eh,
 	}
 	cli.el = &eventloop{
-		ch:           make(chan interface{}, 1024),
+		ch:           make(chan any, 1024),
 		eng:          eng,
 		connections:  make(map[*conn]struct{}),
 		eventHandler: eh,
@@ -121,7 +121,7 @@ func (cli *Client) Dial(network, addr string) (Conn, error) {
 	return cli.DialContext(network, addr, nil)
 }
 
-func (cli *Client) DialContext(network, addr string, ctx interface{}) (Conn, error) {
+func (cli *Client) DialContext(network, addr string, ctx any) (Conn, error) {
 	var (
 		c   net.Conn
 		err error
@@ -146,7 +146,7 @@ func (cli *Client) Enroll(nc net.Conn) (gc Conn, err error) {
 	return cli.EnrollContext(nc, nil)
 }
 
-func (cli *Client) EnrollContext(nc net.Conn, ctx interface{}) (gc Conn, err error) {
+func (cli *Client) EnrollContext(nc net.Conn, ctx any) (gc Conn, err error) {
 	connOpened := make(chan struct{})
 	switch v := nc.(type) {
 	case *net.TCPConn:

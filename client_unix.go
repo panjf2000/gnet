@@ -135,7 +135,7 @@ func (cli *Client) Start() error {
 
 // Stop stops the client event-loop.
 func (cli *Client) Stop() (err error) {
-	logging.Error(cli.el.poller.Trigger(queue.HighPriority, func(_ interface{}) error { return errorx.ErrEngineShutdown }, nil))
+	logging.Error(cli.el.poller.Trigger(queue.HighPriority, func(_ any) error { return errorx.ErrEngineShutdown }, nil))
 	// Stop the ticker.
 	if cli.opts.Ticker {
 		cli.el.engine.ticker.cancel()
@@ -153,7 +153,7 @@ func (cli *Client) Dial(network, address string) (Conn, error) {
 }
 
 // DialContext is like Dial but also accepts an empty interface ctx that can be obtained later via Conn.Context.
-func (cli *Client) DialContext(network, address string, ctx interface{}) (Conn, error) {
+func (cli *Client) DialContext(network, address string, ctx any) (Conn, error) {
 	c, err := net.Dial(network, address)
 	if err != nil {
 		return nil, err
@@ -167,7 +167,7 @@ func (cli *Client) Enroll(c net.Conn) (Conn, error) {
 }
 
 // EnrollContext is like Enroll but also accepts an empty interface ctx that can be obtained later via Conn.Context.
-func (cli *Client) EnrollContext(c net.Conn, ctx interface{}) (Conn, error) {
+func (cli *Client) EnrollContext(c net.Conn, ctx any) (Conn, error) {
 	defer c.Close()
 
 	sc, ok := c.(syscall.Conn)

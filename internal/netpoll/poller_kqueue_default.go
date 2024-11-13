@@ -76,9 +76,9 @@ func (p *Poller) Close() error {
 // any asks other than high-priority tasks will be shunted to asyncTaskQueue.
 //
 // Note that asyncTaskQueue is a queue of low-priority whose size may grow large and tasks in it may backlog.
-func (p *Poller) Trigger(priority queue.EventPriority, fn queue.TaskFunc, arg interface{}) (err error) {
+func (p *Poller) Trigger(priority queue.EventPriority, fn queue.Func, param any) (err error) {
 	task := queue.GetTask()
-	task.Run, task.Arg = fn, arg
+	task.Exec, task.Param = fn, param
 	if priority > queue.HighPriority && p.urgentAsyncTaskQueue.Length() >= p.highPriorityEventsThreshold {
 		p.asyncTaskQueue.Enqueue(task)
 	} else {
@@ -130,7 +130,7 @@ func (p *Poller) Polling(callback PollEventHandler) error {
 			doChores = false
 			task := p.urgentAsyncTaskQueue.Dequeue()
 			for ; task != nil; task = p.urgentAsyncTaskQueue.Dequeue() {
-				err = task.Run(task.Arg)
+				err = task.Exec(task.Param)
 				if errors.Is(err, errorx.ErrEngineShutdown) {
 					return err
 				}
@@ -140,7 +140,7 @@ func (p *Poller) Polling(callback PollEventHandler) error {
 				if task = p.asyncTaskQueue.Dequeue(); task == nil {
 					break
 				}
-				err = task.Run(task.Arg)
+				err = task.Exec(task.Param)
 				if errors.Is(err, errorx.ErrEngineShutdown) {
 					return err
 				}

@@ -212,14 +212,14 @@ func (eng *engine) stop(s Engine) {
 
 	// Notify all event-loops to exit.
 	eng.eventLoops.iterate(func(i int, el *eventloop) bool {
-		err := el.poller.Trigger(queue.HighPriority, func(_ interface{}) error { return errorx.ErrEngineShutdown }, nil)
+		err := el.poller.Trigger(queue.HighPriority, func(_ any) error { return errorx.ErrEngineShutdown }, nil)
 		if err != nil {
 			eng.opts.Logger.Errorf("failed to enqueue shutdown signal of high-priority for event-loop(%d): %v", i, err)
 		}
 		return true
 	})
 	if eng.ingress != nil {
-		err := eng.ingress.poller.Trigger(queue.HighPriority, func(_ interface{}) error { return errorx.ErrEngineShutdown }, nil)
+		err := eng.ingress.poller.Trigger(queue.HighPriority, func(_ any) error { return errorx.ErrEngineShutdown }, nil)
 		if err != nil {
 			eng.opts.Logger.Errorf("failed to enqueue shutdown signal of high-priority for main event-loop: %v", err)
 		}

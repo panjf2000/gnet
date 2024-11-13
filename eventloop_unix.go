@@ -68,10 +68,10 @@ type connWithCallback struct {
 	cb func()
 }
 
-func (el *eventloop) register(itf interface{}) error {
-	c, ok := itf.(*conn)
+func (el *eventloop) register(a any) error {
+	c, ok := a.(*conn)
 	if !ok {
-		ccb := itf.(*connWithCallback)
+		ccb := a.(*connWithCallback)
 		c = ccb.c
 		defer ccb.cb()
 	}
@@ -114,8 +114,8 @@ func (el *eventloop) open(c *conn) error {
 	return el.handleAction(c, action)
 }
 
-func (el *eventloop) read0(itf interface{}) error {
-	return el.read(itf.(*conn))
+func (el *eventloop) read0(a any) error {
+	return el.read(a.(*conn))
 }
 
 func (el *eventloop) read(c *conn) error {
@@ -166,8 +166,8 @@ loop:
 	return nil
 }
 
-func (el *eventloop) write0(itf interface{}) error {
-	return el.write(itf.(*conn))
+func (el *eventloop) write0(a any) error {
+	return el.write(a.(*conn))
 }
 
 // The default value of UIO_MAXIOV/IOV_MAX is 1024 on Linux and most BSD-like OSs.
@@ -297,7 +297,7 @@ func (el *eventloop) ticker(ctx context.Context) {
 		case Shutdown:
 			// It seems reasonable to mark this as low-priority, waiting for some tasks like asynchronous writes
 			// to finish up before shutting down the service.
-			err := el.poller.Trigger(queue.LowPriority, func(_ interface{}) error { return errorx.ErrEngineShutdown }, nil)
+			err := el.poller.Trigger(queue.LowPriority, func(_ any) error { return errorx.ErrEngineShutdown }, nil)
 			el.getLogger().Debugf("failed to enqueue shutdown signal of high-priority for event-loop(%d): %v", el.idx, err)
 		}
 		if timer == nil {
@@ -354,8 +354,8 @@ func (el *eventloop) handleAction(c *conn, action Action) error {
 }
 
 /*
-func (el *eventloop) execCmd(itf interface{}) (err error) {
-	cmd := itf.(*asyncCmd)
+func (el *eventloop) execCmd(a any) (err error) {
+	cmd := a.(*asyncCmd)
 	c := el.connections.getConnByGFD(cmd.fd)
 	if c == nil || c.gfd != cmd.fd {
 		return errorx.ErrInvalidConn
@@ -373,9 +373,9 @@ func (el *eventloop) execCmd(itf interface{}) (err error) {
 	case asyncCmdWake:
 		return el.wake(c)
 	case asyncCmdWrite:
-		_, err = c.Write(cmd.arg.([]byte))
+		_, err = c.Write(cmd.param.([]byte))
 	case asyncCmdWritev:
-		_, err = c.Writev(cmd.arg.([][]byte))
+		_, err = c.Writev(cmd.param.([][]byte))
 	default:
 		return errorx.ErrUnsupportedOp
 	}
