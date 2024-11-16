@@ -18,7 +18,6 @@
 package gnet
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -39,7 +38,6 @@ import (
 type eventloop struct {
 	listeners    map[int]*listener // listeners
 	idx          int               // loop index in the engine loops list
-	cache        bytes.Buffer      // temporary buffer for scattered bytes
 	engine       *engine           // engine in loop
 	poller       *netpoll.Poller   // epoll or kqueue
 	buffer       []byte            // read packet buffer whose capacity is set by user, default value is 64KB
