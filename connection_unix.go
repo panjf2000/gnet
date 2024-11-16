@@ -291,6 +291,7 @@ func (c *conn) sendTo(buf []byte) error {
 func (c *conn) resetBuffer() {
 	c.buffer = c.buffer[:0]
 	c.inboundBuffer.Reset()
+	c.inboundBuffer.Done()
 }
 
 func (c *conn) Read(p []byte) (n int, err error) {
@@ -361,16 +362,16 @@ func (c *conn) Peek(n int) (buf []byte, err error) {
 }
 
 func (c *conn) Discard(n int) (int, error) {
+	if len(c.cache) > 0 {
+		bsPool.Put(c.cache)
+		c.cache = nil
+	}
+
 	inBufferLen := c.inboundBuffer.Buffered()
 	tempBufferLen := len(c.buffer)
 	if inBufferLen+tempBufferLen < n || n <= 0 {
 		c.resetBuffer()
 		return inBufferLen + tempBufferLen, nil
-	}
-
-	if len(c.cache) > 0 {
-		bsPool.Put(c.cache)
-		c.cache = nil
 	}
 
 	if c.inboundBuffer.IsEmpty() {

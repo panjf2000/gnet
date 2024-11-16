@@ -118,6 +118,7 @@ func newUDPConn(el *eventloop, pc net.PacketConn, localAddr, remoteAddr net.Addr
 func (c *conn) resetBuffer() {
 	c.buffer.Reset()
 	c.inboundBuffer.Reset()
+	c.inboundBuffer.Done()
 }
 
 func (c *conn) Read(p []byte) (n int, err error) {
