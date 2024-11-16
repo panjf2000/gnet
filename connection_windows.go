@@ -186,16 +186,15 @@ func (c *conn) Peek(n int) (buf []byte, err error) {
 }
 
 func (c *conn) Discard(n int) (int, error) {
-	inBufferLen := c.inboundBuffer.Buffered()
-	tempBufferLen := c.buffer.Len()
-	if inBufferLen+tempBufferLen < n || n <= 0 {
-		c.resetBuffer()
-		return inBufferLen + tempBufferLen, nil
-	}
-
 	if len(c.cache) > 0 {
 		bsPool.Put(c.cache)
 		c.cache = nil
+	}
+
+	inBufferLen := c.inboundBuffer.Buffered()
+	if totalLen := inBufferLen + c.buffer.Len(); n >= totalLen || n <= 0 {
+		c.resetBuffer()
+		return totalLen, nil
 	}
 
 	if c.inboundBuffer.IsEmpty() {

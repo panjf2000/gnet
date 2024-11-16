@@ -368,10 +368,9 @@ func (c *conn) Discard(n int) (int, error) {
 	}
 
 	inBufferLen := c.inboundBuffer.Buffered()
-	tempBufferLen := len(c.buffer)
-	if inBufferLen+tempBufferLen < n || n <= 0 {
+	if totalLen := inBufferLen + len(c.buffer); n >= totalLen || n <= 0 {
 		c.resetBuffer()
-		return inBufferLen + tempBufferLen, nil
+		return totalLen, nil
 	}
 
 	if c.inboundBuffer.IsEmpty() {
