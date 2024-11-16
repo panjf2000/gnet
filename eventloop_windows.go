@@ -15,7 +15,6 @@
 package gnet
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -31,7 +30,6 @@ type eventloop struct {
 	ch           chan any           // channel for event-loop
 	idx          int                // index of event-loop in event-loops
 	eng          *engine            // engine in loop
-	cache        bytes.Buffer       // temporary buffer for scattered bytes
 	connCount    int32              // number of active connections in event-loop
 	connections  map[*conn]struct{} // TCP connection map: fd -> conn
 	eventHandler EventHandler       // user eventHandler

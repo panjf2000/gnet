@@ -49,6 +49,7 @@ type conn struct {
 	pollAttachment netpoll.PollAttachment // connection attachment for poller
 	inboundBuffer  elastic.RingBuffer     // buffer for leftover data from the remote
 	buffer         []byte                 // buffer for the latest bytes
+	cache          []byte                 // temporary cache for the inbound data
 	isDatagram     bool                   // UDP protocol
 	opened         bool                   // connection opened event fired
 	isEOF          bool                   // whether the connection has reached EOF
@@ -325,22 +326,9 @@ func (c *conn) Next(n int) (buf []byte, err error) {
 		return
 	}
 
-	head, tail := c.inboundBuffer.Peek(n)
-	defer c.inboundBuffer.Discard(n) //nolint:errcheck
-	c.loop.cache.Reset()
-	c.loop.cache.Write(head)
-	if len(head) == n {
-		return c.loop.cache.Bytes(), err
-	}
-	c.loop.cache.Write(tail)
-	if inBufferLen >= n {
-		return c.loop.cache.Bytes(), err
-	}
-
-	remaining := n - inBufferLen
-	c.loop.cache.Write(c.buffer[:remaining])
-	c.buffer = c.buffer[remaining:]
-	return c.loop.cache.Bytes(), err
+	buf = bsPool.Get(n)
+	_, err = c.Read(buf)
+	return
 }
 
 func (c *conn) Peek(n int) (buf []byte, err error) {
@@ -359,16 +347,17 @@ func (c *conn) Peek(n int) (buf []byte, err error) {
 	if len(head) == n {
 		return head, err
 	}
-	c.loop.cache.Reset()
-	c.loop.cache.Write(head)
-	c.loop.cache.Write(tail)
+	buf = bsPool.Get(n)[:0]
+	buf = append(buf, head...)
+	buf = append(buf, tail...)
 	if inBufferLen >= n {
-		return c.loop.cache.Bytes(), err
+		return
 	}
 
 	remaining := n - inBufferLen
-	c.loop.cache.Write(c.buffer[:remaining])
-	return c.loop.cache.Bytes(), err
+	buf = append(buf, c.buffer[:remaining]...)
+	c.cache = buf
+	return
 }
 
 func (c *conn) Discard(n int) (int, error) {
@@ -378,6 +367,12 @@ func (c *conn) Discard(n int) (int, error) {
 		c.resetBuffer()
 		return inBufferLen + tempBufferLen, nil
 	}
+
+	if len(c.cache) > 0 {
+		bsPool.Put(c.cache)
+		c.cache = nil
+	}
+
 	if c.inboundBuffer.IsEmpty() {
 		c.buffer = c.buffer[n:]
 		return n, nil
