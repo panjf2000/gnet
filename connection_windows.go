@@ -27,6 +27,7 @@ import (
 	"github.com/panjf2000/gnet/v2/pkg/buffer/elastic"
 	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
 	bbPool "github.com/panjf2000/gnet/v2/pkg/pool/bytebuffer"
+	bsPool "github.com/panjf2000/gnet/v2/pkg/pool/byteslice"
 	goPool "github.com/panjf2000/gnet/v2/pkg/pool/goroutine"
 )
 
@@ -54,6 +55,7 @@ type conn struct {
 	ctx           any                // user-defined context
 	loop          *eventloop         // owner event-loop
 	buffer        *bbPool.ByteBuffer // reuse memory of inbound data as a temporary buffer
+	cache         []byte             // temporary cache for the inbound data
 	rawConn       net.Conn           // original connection
 	localAddr     net.Addr           // local server addr
 	remoteAddr    net.Addr           // remote addr
@@ -116,6 +118,7 @@ func newUDPConn(el *eventloop, pc net.PacketConn, localAddr, remoteAddr net.Addr
 func (c *conn) resetBuffer() {
 	c.buffer.Reset()
 	c.inboundBuffer.Reset()
+	c.inboundBuffer.Done()
 }
 
 func (c *conn) Read(p []byte) (n int, err error) {
@@ -149,22 +152,10 @@ func (c *conn) Next(n int) (buf []byte, err error) {
 		c.buffer.B = c.buffer.B[n:]
 		return
 	}
-	head, tail := c.inboundBuffer.Peek(n)
-	defer c.inboundBuffer.Discard(n) //nolint:errcheck
-	c.loop.cache.Reset()
-	c.loop.cache.Write(head)
-	if len(head) == n {
-		return c.loop.cache.Bytes(), err
-	}
-	c.loop.cache.Write(tail)
-	if inBufferLen >= n {
-		return c.loop.cache.Bytes(), err
-	}
 
-	remaining := n - inBufferLen
-	c.loop.cache.Write(c.buffer.B[:remaining])
-	c.buffer.B = c.buffer.B[remaining:]
-	return c.loop.cache.Bytes(), err
+	buf = bsPool.Get(n)
+	_, err = c.Read(buf)
+	return
 }
 
 func (c *conn) Peek(n int) (buf []byte, err error) {
@@ -181,25 +172,31 @@ func (c *conn) Peek(n int) (buf []byte, err error) {
 	if len(head) == n {
 		return head, err
 	}
-	c.loop.cache.Reset()
-	c.loop.cache.Write(head)
-	c.loop.cache.Write(tail)
+	buf = bsPool.Get(n)[:0]
+	buf = append(buf, head...)
+	buf = append(buf, tail...)
 	if inBufferLen >= n {
-		return c.loop.cache.Bytes(), err
+		return
 	}
 
 	remaining := n - inBufferLen
-	c.loop.cache.Write(c.buffer.B[:remaining])
-	return c.loop.cache.Bytes(), err
+	buf = append(buf, c.buffer.B[:remaining]...)
+	c.cache = buf
+	return
 }
 
 func (c *conn) Discard(n int) (int, error) {
-	inBufferLen := c.inboundBuffer.Buffered()
-	tempBufferLen := c.buffer.Len()
-	if inBufferLen+tempBufferLen < n || n <= 0 {
-		c.resetBuffer()
-		return inBufferLen + tempBufferLen, nil
+	if len(c.cache) > 0 {
+		bsPool.Put(c.cache)
+		c.cache = nil
 	}
+
+	inBufferLen := c.inboundBuffer.Buffered()
+	if totalLen := inBufferLen + c.buffer.Len(); n >= totalLen || n <= 0 {
+		c.resetBuffer()
+		return totalLen, nil
+	}
+
 	if c.inboundBuffer.IsEmpty() {
 		c.buffer.B = c.buffer.B[n:]
 		return n, nil

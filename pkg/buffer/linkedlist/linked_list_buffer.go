@@ -32,7 +32,6 @@ func (b *node) len() int {
 
 // Buffer is a linked list of node.
 type Buffer struct {
-	bs    [][]byte
 	head  *node
 	tail  *node
 	size  int
@@ -123,19 +122,19 @@ func (llb *Buffer) Peek(maxBytes int) ([][]byte, error) {
 	} else if maxBytes > llb.Buffered() {
 		return nil, io.ErrShortBuffer
 	}
-	llb.bs = llb.bs[:0]
+	var bs [][]byte
 	var cum int
 	for iter := llb.head; iter != nil; iter = iter.next {
 		offset := iter.len()
 		if cum+offset > maxBytes {
 			offset = maxBytes - cum
 		}
-		llb.bs = append(llb.bs, iter.buf[:offset])
+		bs = append(bs, iter.buf[:offset])
 		if cum += offset; cum == maxBytes {
 			break
 		}
 	}
-	return llb.bs, nil
+	return bs, nil
 }
 
 // PeekWithBytes is like Peek but accepts [][]byte and puts them onto head.
@@ -145,7 +144,7 @@ func (llb *Buffer) PeekWithBytes(maxBytes int, bs ...[]byte) ([][]byte, error) {
 	} else if maxBytes > llb.Buffered() {
 		return nil, io.ErrShortBuffer
 	}
-	llb.bs = llb.bs[:0]
+	var bss [][]byte
 	var cum int
 	for _, b := range bs {
 		if n := len(b); n > 0 {
@@ -153,9 +152,9 @@ func (llb *Buffer) PeekWithBytes(maxBytes int, bs ...[]byte) ([][]byte, error) {
 			if cum+offset > maxBytes {
 				offset = maxBytes - cum
 			}
-			llb.bs = append(llb.bs, b[:offset])
+			bss = append(bss, b[:offset])
 			if cum += offset; cum == maxBytes {
-				return llb.bs, nil
+				return bss, nil
 			}
 		}
 	}
@@ -164,12 +163,12 @@ func (llb *Buffer) PeekWithBytes(maxBytes int, bs ...[]byte) ([][]byte, error) {
 		if cum+offset > maxBytes {
 			offset = maxBytes - cum
 		}
-		llb.bs = append(llb.bs, iter.buf[:offset])
+		bss = append(bss, iter.buf[:offset])
 		if cum += offset; cum == maxBytes {
 			break
 		}
 	}
-	return llb.bs, nil
+	return bss, nil
 }
 
 // Discard removes some nodes based on n bytes.
@@ -266,7 +265,6 @@ func (llb *Buffer) Reset() {
 	llb.tail = nil
 	llb.size = 0
 	llb.bytes = 0
-	llb.bs = nil
 }
 
 // pop returns and removes the head of l. If l is empty, it returns nil.
