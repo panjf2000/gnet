@@ -54,7 +54,7 @@ func (e Engine) Validate() error {
 	if e.eng == nil || len(e.eng.listeners) == 0 {
 		return errors.ErrEmptyEngine
 	}
-	if e.eng.isInShutdown() {
+	if e.eng.isShutdown() {
 		return errors.ErrEngineInShutdown
 	}
 	return nil
@@ -101,7 +101,7 @@ func (e Engine) Stop(ctx context.Context) error {
 	ticker := time.NewTicker(shutdownPollInterval)
 	defer ticker.Stop()
 	for {
-		if e.eng.isInShutdown() {
+		if e.eng.isShutdown() {
 			return nil
 		}
 		select {
@@ -599,14 +599,14 @@ func Stop(ctx context.Context, protoAddr string) error {
 		return errors.ErrEngineInShutdown
 	}
 
-	if eng.isInShutdown() {
+	if eng.isShutdown() {
 		return errors.ErrEngineInShutdown
 	}
 
 	ticker := time.NewTicker(shutdownPollInterval)
 	defer ticker.Stop()
 	for {
-		if eng.isInShutdown() {
+		if eng.isShutdown() {
 			return nil
 		}
 		select {

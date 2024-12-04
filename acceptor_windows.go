@@ -18,7 +18,6 @@ import (
 	"errors"
 	"net"
 	"runtime"
-	"sync/atomic"
 
 	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
 )
@@ -36,7 +35,7 @@ func (eng *engine) listenStream(ln net.Listener) (err error) {
 		tc, e := ln.Accept()
 		if e != nil {
 			err = e
-			if atomic.LoadInt32(&eng.beingShutdown) == 0 {
+			if !eng.beingShutdown.Load() {
 				eng.opts.Logger.Errorf("Accept() fails due to error: %v", err)
 			} else if errors.Is(err, net.ErrClosed) {
 				err = errors.Join(err, errorx.ErrEngineShutdown)
@@ -74,7 +73,7 @@ func (eng *engine) ListenUDP(pc net.PacketConn) (err error) {
 		n, addr, e := pc.ReadFrom(buffer[:])
 		if e != nil {
 			err = e
-			if atomic.LoadInt32(&eng.beingShutdown) == 0 {
+			if !eng.beingShutdown.Load() {
 				eng.opts.Logger.Errorf("failed to receive data from UDP fd due to error:%v", err)
 			} else if errors.Is(err, net.ErrClosed) {
 				err = errors.Join(err, errorx.ErrEngineShutdown)
