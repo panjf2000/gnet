@@ -48,17 +48,17 @@ func NewClient(eh EventHandler, opts ...Option) (cli *Client, err error) {
 	}
 	logging.SetDefaultLoggerAndFlusher(logger, logFlusher)
 
-	shutdownCtx, shutdown := context.WithCancel(context.Background())
+	rootCtx, shutdown := context.WithCancel(context.Background())
+	eg, ctx := errgroup.WithContext(rootCtx)
 	eng := &engine{
-		listeners: []*listener{},
-		opts:      options,
-		workerPool: struct {
-			*errgroup.Group
-			shutdownCtx context.Context
-			shutdown    context.CancelFunc
-			once        sync.Once
-		}{&errgroup.Group{}, shutdownCtx, shutdown, sync.Once{}},
+		listeners:    []*listener{},
+		opts:         options,
+		turnOff:      shutdown,
 		eventHandler: eh,
+		concurrency: struct {
+			*errgroup.Group
+			ctx context.Context
+		}{eg, ctx},
 	}
 	cli.el = &eventloop{
 		ch:           make(chan any, 1024),
@@ -71,11 +71,11 @@ func NewClient(eh EventHandler, opts ...Option) (cli *Client, err error) {
 
 func (cli *Client) Start() error {
 	cli.el.eventHandler.OnBoot(Engine{cli.el.eng})
-	cli.el.eng.workerPool.Go(cli.el.run)
+	cli.el.eng.concurrency.Go(cli.el.run)
 	if cli.opts.Ticker {
-		cli.el.eng.ticker.ctx, cli.el.eng.ticker.cancel = context.WithCancel(context.Background())
-		cli.el.eng.workerPool.Go(func() error {
-			cli.el.ticker(cli.el.eng.ticker.ctx)
+		ctx := cli.el.eng.concurrency.ctx
+		cli.el.eng.concurrency.Go(func() error {
+			cli.el.ticker(ctx)
 			return nil
 		})
 	}
@@ -85,10 +85,7 @@ func (cli *Client) Start() error {
 
 func (cli *Client) Stop() (err error) {
 	cli.el.ch <- errorx.ErrEngineShutdown
-	if cli.opts.Ticker {
-		cli.el.eng.ticker.cancel()
-	}
-	_ = cli.el.eng.workerPool.Wait()
+	err = cli.el.eng.concurrency.Wait()
 	cli.el.eventHandler.OnShutdown(Engine{cli.el.eng})
 	logging.Cleanup()
 	return

@@ -22,7 +22,6 @@ import (
 	"errors"
 	"net"
 	"strconv"
-	"sync"
 	"syscall"
 
 	"golang.org/x/sync/errgroup"
@@ -66,20 +65,17 @@ func NewClient(eh EventHandler, opts ...Option) (cli *Client, err error) {
 		return
 	}
 
-	shutdownCtx, shutdown := context.WithCancel(context.Background())
+	rootCtx, shutdown := context.WithCancel(context.Background())
+	eg, ctx := errgroup.WithContext(rootCtx)
 	eng := engine{
 		listeners:    make(map[int]*listener),
 		opts:         options,
+		turnOff:      shutdown,
 		eventHandler: eh,
-		workerPool: struct {
+		concurrency: struct {
 			*errgroup.Group
-			shutdownCtx context.Context
-			shutdown    context.CancelFunc
-			once        sync.Once
-		}{&errgroup.Group{}, shutdownCtx, shutdown, sync.Once{}},
-	}
-	if options.Ticker {
-		eng.ticker.ctx, eng.ticker.cancel = context.WithCancel(context.Background())
+			ctx context.Context
+		}{eg, ctx},
 	}
 	el := eventloop{
 		listeners: eng.listeners,
@@ -124,10 +120,14 @@ func NewClient(eh EventHandler, opts ...Option) (cli *Client, err error) {
 func (cli *Client) Start() error {
 	logging.Infof("Starting gnet client with 1 event-loop")
 	cli.el.eventHandler.OnBoot(Engine{cli.el.engine})
-	cli.el.engine.workerPool.Go(cli.el.run)
+	cli.el.engine.concurrency.Go(cli.el.run)
 	// Start the ticker.
 	if cli.opts.Ticker {
-		go cli.el.ticker(cli.el.engine.ticker.ctx)
+		ctx := cli.el.engine.concurrency.ctx
+		cli.el.engine.concurrency.Go(func() error {
+			cli.el.ticker(ctx)
+			return nil
+		})
 	}
 	logging.Debugf("default logging level is %s", logging.LogLevel())
 	return nil
@@ -136,11 +136,7 @@ func (cli *Client) Start() error {
 // Stop stops the client event-loop.
 func (cli *Client) Stop() (err error) {
 	logging.Error(cli.el.poller.Trigger(queue.HighPriority, func(_ any) error { return errorx.ErrEngineShutdown }, nil))
-	// Stop the ticker.
-	if cli.opts.Ticker {
-		cli.el.engine.ticker.cancel()
-	}
-	_ = cli.el.engine.workerPool.Wait()
+	err = cli.el.engine.concurrency.Wait()
 	logging.Error(cli.el.poller.Close())
 	cli.el.eventHandler.OnShutdown(Engine{cli.el.engine})
 	logging.Cleanup()
