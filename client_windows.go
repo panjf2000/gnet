@@ -20,6 +20,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"golang.org/x/sync/errgroup"
 
@@ -118,6 +119,10 @@ func (cli *Client) Dial(network, addr string) (Conn, error) {
 	return cli.DialContext(network, addr, nil)
 }
 
+func (cli *Client) DialTimeout(network, addr string, timeout time.Duration) (Conn, error) {
+	return cli.DialContextTimeout(network, addr, nil, timeout)
+}
+
 func (cli *Client) DialContext(network, addr string, ctx any) (Conn, error) {
 	var (
 		c   net.Conn
@@ -132,6 +137,27 @@ func (cli *Client) DialContext(network, addr string, ctx any) (Conn, error) {
 		}
 	} else {
 		c, err = net.Dial(network, addr)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return cli.EnrollContext(c, ctx)
+}
+
+func (cli *Client) DialContextTimeout(network, addr string, ctx any, timeout time.Duration) (Conn, error) {
+	var (
+		c   net.Conn
+		err error
+	)
+	if network == "unix" {
+		laddr, _ := net.ResolveUnixAddr(network, unixAddr(addr))
+		raddr, _ := net.ResolveUnixAddr(network, addr)
+		c, err = net.DialUnix(network, laddr, raddr)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		c, err = net.DialTimeout(network, addr, timeout)
 		if err != nil {
 			return nil, err
 		}
