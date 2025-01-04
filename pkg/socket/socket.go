@@ -16,8 +16,7 @@
 //go:build darwin || dragonfly || freebsd || linux || netbsd || openbsd
 // +build darwin dragonfly freebsd linux netbsd openbsd
 
-// Package socket provides functions that return fd and net.Addr based on
-// given the protocol and address with a SO_REUSEPORT option set to the socket.
+// Package socket provides some handy socket-related functions.
 package socket
 
 import (

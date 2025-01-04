@@ -27,9 +27,9 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"github.com/panjf2000/gnet/v2/internal/queue"
 	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
+	"github.com/panjf2000/gnet/v2/pkg/queue"
 )
 
 // Poller represents a poller which is in charge of monitoring file-descriptors.
@@ -164,7 +164,7 @@ func (p *Poller) Polling() error {
 	}
 }
 
-// AddReadWrite registers the given file-descriptor with readable and writable events to the poller.
+// AddReadWrite registers the given file descriptor with readable and writable events to the poller.
 func (p *Poller) AddReadWrite(pa *PollAttachment, edgeTriggered bool) error {
 	var evs [2]unix.Kevent_t
 	evs[0].Ident = keventIdent(pa.FD)
@@ -180,7 +180,7 @@ func (p *Poller) AddReadWrite(pa *PollAttachment, edgeTriggered bool) error {
 	return os.NewSyscallError("kevent add", err)
 }
 
-// AddRead registers the given file-descriptor with readable event to the poller.
+// AddRead registers the given file descriptor with readable event to the poller.
 func (p *Poller) AddRead(pa *PollAttachment, edgeTriggered bool) error {
 	var evs [1]unix.Kevent_t
 	evs[0].Ident = keventIdent(pa.FD)
@@ -194,7 +194,7 @@ func (p *Poller) AddRead(pa *PollAttachment, edgeTriggered bool) error {
 	return os.NewSyscallError("kevent add", err)
 }
 
-// AddWrite registers the given file-descriptor with writable event to the poller.
+// AddWrite registers the given file descriptor with writable event to the poller.
 func (p *Poller) AddWrite(pa *PollAttachment, edgeTriggered bool) error {
 	var evs [1]unix.Kevent_t
 	evs[0].Ident = keventIdent(pa.FD)
@@ -208,7 +208,7 @@ func (p *Poller) AddWrite(pa *PollAttachment, edgeTriggered bool) error {
 	return os.NewSyscallError("kevent add", err)
 }
 
-// ModRead renews the given file-descriptor with readable event in the poller.
+// ModRead renews the given file descriptor with readable event in the poller.
 func (p *Poller) ModRead(pa *PollAttachment, _ bool) error {
 	var evs [1]unix.Kevent_t
 	evs[0].Ident = keventIdent(pa.FD)
@@ -218,7 +218,7 @@ func (p *Poller) ModRead(pa *PollAttachment, _ bool) error {
 	return os.NewSyscallError("kevent delete", err)
 }
 
-// ModReadWrite renews the given file-descriptor with readable and writable events in the poller.
+// ModReadWrite renews the given file descriptor with readable and writable events in the poller.
 func (p *Poller) ModReadWrite(pa *PollAttachment, edgeTriggered bool) error {
 	var evs [1]unix.Kevent_t
 	evs[0].Ident = keventIdent(pa.FD)
@@ -232,7 +232,7 @@ func (p *Poller) ModReadWrite(pa *PollAttachment, edgeTriggered bool) error {
 	return os.NewSyscallError("kevent add", err)
 }
 
-// Delete removes the given file-descriptor from the poller.
+// Delete removes the given file descriptor from the poller.
 func (p *Poller) Delete(_ int) error {
 	return nil
 }

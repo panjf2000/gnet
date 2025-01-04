@@ -27,9 +27,9 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"github.com/panjf2000/gnet/v2/internal/queue"
 	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
+	"github.com/panjf2000/gnet/v2/pkg/queue"
 )
 
 // Poller represents a poller which is in charge of monitoring file-descriptors.
@@ -185,7 +185,7 @@ func (p *Poller) Polling(callback PollEventHandler) error {
 	}
 }
 
-// AddReadWrite registers the given file-descriptor with readable and writable events to the poller.
+// AddReadWrite registers the given file descriptor with readable and writable events to the poller.
 func (p *Poller) AddReadWrite(pa *PollAttachment, edgeTriggered bool) error {
 	var ev uint32 = ReadWriteEvents
 	if edgeTriggered {
@@ -195,7 +195,7 @@ func (p *Poller) AddReadWrite(pa *PollAttachment, edgeTriggered bool) error {
 		unix.EpollCtl(p.fd, unix.EPOLL_CTL_ADD, pa.FD, &unix.EpollEvent{Fd: int32(pa.FD), Events: ev}))
 }
 
-// AddRead registers the given file-descriptor with readable event to the poller.
+// AddRead registers the given file descriptor with readable event to the poller.
 func (p *Poller) AddRead(pa *PollAttachment, edgeTriggered bool) error {
 	var ev uint32 = ReadEvents
 	if edgeTriggered {
@@ -205,7 +205,7 @@ func (p *Poller) AddRead(pa *PollAttachment, edgeTriggered bool) error {
 		unix.EpollCtl(p.fd, unix.EPOLL_CTL_ADD, pa.FD, &unix.EpollEvent{Fd: int32(pa.FD), Events: ev}))
 }
 
-// AddWrite registers the given file-descriptor with writable event to the poller.
+// AddWrite registers the given file descriptor with writable event to the poller.
 func (p *Poller) AddWrite(pa *PollAttachment, edgeTriggered bool) error {
 	var ev uint32 = WriteEvents
 	if edgeTriggered {
@@ -215,7 +215,7 @@ func (p *Poller) AddWrite(pa *PollAttachment, edgeTriggered bool) error {
 		unix.EpollCtl(p.fd, unix.EPOLL_CTL_ADD, pa.FD, &unix.EpollEvent{Fd: int32(pa.FD), Events: ev}))
 }
 
-// ModRead renews the given file-descriptor with readable event in the poller.
+// ModRead renews the given file descriptor with readable event in the poller.
 func (p *Poller) ModRead(pa *PollAttachment, edgeTriggered bool) error {
 	var ev uint32 = ReadEvents
 	if edgeTriggered {
@@ -225,7 +225,7 @@ func (p *Poller) ModRead(pa *PollAttachment, edgeTriggered bool) error {
 		unix.EpollCtl(p.fd, unix.EPOLL_CTL_MOD, pa.FD, &unix.EpollEvent{Fd: int32(pa.FD), Events: ev}))
 }
 
-// ModReadWrite renews the given file-descriptor with readable and writable events in the poller.
+// ModReadWrite renews the given file descriptor with readable and writable events in the poller.
 func (p *Poller) ModReadWrite(pa *PollAttachment, edgeTriggered bool) error {
 	var ev uint32 = ReadWriteEvents
 	if edgeTriggered {
@@ -235,7 +235,7 @@ func (p *Poller) ModReadWrite(pa *PollAttachment, edgeTriggered bool) error {
 		unix.EpollCtl(p.fd, unix.EPOLL_CTL_MOD, pa.FD, &unix.EpollEvent{Fd: int32(pa.FD), Events: ev}))
 }
 
-// Delete removes the given file-descriptor from the poller.
+// Delete removes the given file descriptor from the poller.
 func (p *Poller) Delete(fd int) error {
 	return os.NewSyscallError("epoll_ctl del", unix.EpollCtl(p.fd, unix.EPOLL_CTL_DEL, fd, nil))
 }

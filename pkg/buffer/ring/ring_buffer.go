@@ -18,14 +18,15 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 
+// Package ring implements a memory-efficient circular buffer.
 package ring
 
 import (
 	"errors"
 	"io"
 
-	"github.com/panjf2000/gnet/v2/internal/bs"
-	"github.com/panjf2000/gnet/v2/internal/math"
+	"github.com/panjf2000/gnet/v2/pkg/bs"
+	"github.com/panjf2000/gnet/v2/pkg/math"
 	bsPool "github.com/panjf2000/gnet/v2/pkg/pool/byteslice"
 )
 

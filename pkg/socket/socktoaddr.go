@@ -22,7 +22,7 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"github.com/panjf2000/gnet/v2/internal/bs"
+	"github.com/panjf2000/gnet/v2/pkg/bs"
 	bsPool "github.com/panjf2000/gnet/v2/pkg/pool/byteslice"
 )
 

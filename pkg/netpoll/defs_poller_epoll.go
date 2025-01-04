@@ -44,6 +44,21 @@ const (
 	ErrEvents = unix.EPOLLERR | unix.EPOLLHUP
 )
 
+// IsReadEvent checks if the event is a read event.
+func IsReadEvent(event IOEvent) bool {
+	return event&ReadEvents != 0
+}
+
+// IsWriteEvent checks if the event is a write event.
+func IsWriteEvent(event IOEvent) bool {
+	return event&WriteEvents != 0
+}
+
+// IsErrorEvent checks if the event is an error event.
+func IsErrorEvent(event IOEvent, _ IOFlags) bool {
+	return event&ErrEvents != 0
+}
+
 type eventList struct {
 	size   int
 	events []epollevent

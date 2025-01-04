@@ -19,12 +19,13 @@
 package socket
 
 import (
+	"errors"
 	"net"
 	"os"
 
 	"golang.org/x/sys/unix"
 
-	"github.com/panjf2000/gnet/v2/pkg/errors"
+	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
 )
 
 var listenerBacklogMaxSize = maxListenerBacklog()
@@ -54,7 +55,7 @@ func GetTCPSockAddr(proto, addr string) (sa unix.Sockaddr, family int, tcpAddr *
 		family = unix.AF_INET6
 		sa, err = ipToSockaddr(family, tcpAddr.IP, tcpAddr.Port, tcpAddr.Zone)
 	default:
-		err = errors.ErrUnsupportedProtocol
+		err = errorx.ErrUnsupportedProtocol
 	}
 
 	return
@@ -78,7 +79,7 @@ func determineTCPProto(proto string, addr *net.TCPAddr) (string, error) {
 		return proto, nil
 	}
 
-	return "", errors.ErrUnsupportedTCPProtocol
+	return "", errorx.ErrUnsupportedTCPProtocol
 }
 
 // tcpSocket creates an endpoint for communication and returns a file descriptor that refers to that endpoint.
@@ -99,9 +100,9 @@ func tcpSocket(proto, addr string, passive bool, sockOptInts []Option[int], sock
 		return
 	}
 	defer func() {
-		// ignore EINPROGRESS for non-blocking socket connect, should be processed by caller
 		if err != nil {
-			if err, ok := err.(*os.SyscallError); ok && err.Err == unix.EINPROGRESS {
+			// Ignore EINPROGRESS for non-blocking socket connect, should be processed by caller
+			if errors.Is(err, unix.EINPROGRESS) {
 				return
 			}
 			_ = unix.Close(fd)
