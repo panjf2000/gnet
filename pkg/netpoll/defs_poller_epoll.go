@@ -40,7 +40,7 @@ const (
 	WriteEvents = unix.EPOLLOUT
 	// ReadWriteEvents represents both readable and writeable events.
 	ReadWriteEvents = ReadEvents | WriteEvents
-	// ErrEvents represents exceptional events that occurred on the local side.
+	// ErrEvents represents exceptional events that occurred.
 	ErrEvents = unix.EPOLLERR | unix.EPOLLHUP
 )
 

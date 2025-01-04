@@ -34,7 +34,7 @@ const (
 	WriteEvents = unix.EVFILT_WRITE
 	// ReadWriteEvents represents both readable and writeable events.
 	ReadWriteEvents = ReadEvents | WriteEvents
-	// ErrEvents represents exceptional events that occurred on the local side.
+	// ErrEvents represents exceptional events that occurred.
 	ErrEvents = unix.EV_EOF | unix.EV_ERROR
 )
 
