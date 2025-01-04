@@ -238,11 +238,11 @@ func (el *eventloop) close(c *conn, err error) error {
 		if len(iov) > iovMax {
 			iov = iov[:iovMax]
 		}
-		if n, e := gio.Writev(c.fd, iov); e != nil {
+		n, err := gio.Writev(c.fd, iov)
+		if err != nil {
 			break
-		} else { //nolint:revive
-			_, _ = c.outboundBuffer.Discard(n)
 		}
+		_, _ = c.outboundBuffer.Discard(n)
 	}
 
 	c.release()

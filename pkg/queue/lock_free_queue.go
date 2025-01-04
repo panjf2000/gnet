@@ -165,6 +165,6 @@ func load(p *unsafe.Pointer) (n *node) {
 	return (*node)(atomic.LoadPointer(p))
 }
 
-func cas(p *unsafe.Pointer, old, new *node) bool {
-	return atomic.CompareAndSwapPointer(p, unsafe.Pointer(old), unsafe.Pointer(new))
+func cas(p *unsafe.Pointer, oldNode, newNode *node) bool {
+	return atomic.CompareAndSwapPointer(p, unsafe.Pointer(oldNode), unsafe.Pointer(newNode))
 }
