@@ -1,4 +1,4 @@
-// Copyright (c) 2020 The Gnet Authors. All rights reserved.
+// Copyright (c) 2024 The Gnet Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,18 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package bs
+package socket
 
-import (
-	"unsafe"
-)
+import errorx "github.com/panjf2000/gnet/v2/pkg/errors"
 
-// BytesToString converts byte slice to a string without any memory allocation.
-func BytesToString(b []byte) string {
-	return unsafe.String(unsafe.SliceData(b), len(b))
-}
-
-// StringToBytes converts string to a byte slice without any memory allocation.
-func StringToBytes(s string) []byte {
-	return unsafe.Slice(unsafe.StringData(s), len(s))
+// SetKeepAlivePeriod is not implemented on OpenBSD because there are
+// no equivalents of Linux's TCP_KEEPIDLE, TCP_KEEPINTVL, and TCP_KEEPCNT.
+func SetKeepAlivePeriod(_, _ int) error {
+	// OpenBSD has no user-settable per-socket TCP keepalive options.
+	return errorx.ErrUnsupportedOp
 }

@@ -22,8 +22,8 @@ import (
 	"errors"
 	"runtime"
 
-	"github.com/panjf2000/gnet/v2/internal/netpoll"
 	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
+	"github.com/panjf2000/gnet/v2/pkg/netpoll"
 )
 
 func (el *eventloop) rotate() error {

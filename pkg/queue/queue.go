@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package queue implements a lock-free queue for asynchronous tasks.
 package queue
 
 import "sync"

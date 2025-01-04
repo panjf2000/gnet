@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package linkedlist implements a memory-reusable linked list of byte slices.
 package linkedlist
 
 import (

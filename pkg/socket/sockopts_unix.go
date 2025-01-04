@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build dragonfly || freebsd || linux || netbsd
+// +build dragonfly freebsd linux netbsd
+
 package socket
 
 import (
@@ -19,12 +22,11 @@ import (
 	"os"
 
 	"golang.org/x/sys/unix"
-
-	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
 )
 
-// SetKeepAlivePeriod sets whether the operating system should send
-// keep-alive messages on the connection and sets period between keep-alive's.
+// SetKeepAlivePeriod enables the SO_KEEPALIVE option on the socket and sets
+// TCP_KEEPIDLE/TCP_KEEPALIVE to the specified duration in seconds, TCP_KEEPCNT
+// to 5, and TCP_KEEPINTVL to secs/5.
 func SetKeepAlivePeriod(fd, secs int) error {
 	if secs <= 0 {
 		return errors.New("invalid time duration")
@@ -34,7 +36,7 @@ func SetKeepAlivePeriod(fd, secs int) error {
 		return os.NewSyscallError("setsockopt", err)
 	}
 
-	if err := unix.SetsockoptInt(fd, unix.IPPROTO_TCP, unix.TCP_KEEPALIVE, secs); err != nil {
+	if err := unix.SetsockoptInt(fd, unix.IPPROTO_TCP, unix.TCP_KEEPIDLE, secs); err != nil {
 		return os.NewSyscallError("setsockopt", err)
 	}
 
@@ -43,20 +45,8 @@ func SetKeepAlivePeriod(fd, secs int) error {
 		interval = 1
 	}
 	if err := unix.SetsockoptInt(fd, unix.IPPROTO_TCP, unix.TCP_KEEPINTVL, interval); err != nil {
-		// In earlier versions, macOS only supported setting TCP_KEEPALIVE (the equivalent of TCP_KEEPIDLE on other platforms),
-		// but since macOS 10.8 it has supported TCP_KEEPINTVL and TCP_KEEPCNT.
-		// If the current OS is macOS and the error is ENOPROTOOPT, ignore it.
-		if err == unix.ENOPROTOOPT {
-			err = nil
-		}
 		return os.NewSyscallError("setsockopt", err)
 	}
 
 	return os.NewSyscallError("setsockopt", unix.SetsockoptInt(fd, unix.IPPROTO_TCP, unix.TCP_KEEPCNT, 5))
-}
-
-// SetBindToDevice is not implemented on macOS because there is
-// no equivalent of Linux's SO_BINDTODEVICE.
-func SetBindToDevice(_ int, _ string) error {
-	return errorx.ErrUnsupportedOp
 }

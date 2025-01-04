@@ -16,6 +16,7 @@
 // Use of this source code is governed by a MIT license that can be found
 // at https://github.com/valyala/bytebufferpool/blob/master/LICENSE
 
+// Package ringbuffer implements a GC-friendly pool of ring buffers.
 package ringbuffer
 
 import (

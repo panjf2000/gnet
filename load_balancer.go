@@ -18,7 +18,7 @@ import (
 	"hash/crc32"
 	"net"
 
-	"github.com/panjf2000/gnet/v2/internal/bs"
+	"github.com/panjf2000/gnet/v2/pkg/bs"
 )
 
 // LoadBalancing represents the type of load-balancing algorithm.

@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package byteslice implements a pool of byte slices consisting of sync.Pool's
+// that collect byte slices with different length sizes from 0 to 32 in powers of 2.
 package byteslice
 
 import (
