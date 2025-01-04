@@ -19,12 +19,13 @@
 package socket
 
 import (
+	"errors"
 	"net"
 	"os"
 
 	"golang.org/x/sys/unix"
 
-	"github.com/panjf2000/gnet/v2/pkg/errors"
+	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
 )
 
 // GetUDPSockAddr the structured addresses based on the protocol and raw address.
@@ -52,7 +53,7 @@ func GetUDPSockAddr(proto, addr string) (sa unix.Sockaddr, family int, udpAddr *
 		family = unix.AF_INET6
 		sa, err = ipToSockaddr(family, udpAddr.IP, udpAddr.Port, udpAddr.Zone)
 	default:
-		err = errors.ErrUnsupportedProtocol
+		err = errorx.ErrUnsupportedProtocol
 	}
 
 	return
@@ -76,11 +77,10 @@ func determineUDPProto(proto string, addr *net.UDPAddr) (string, error) {
 		return proto, nil
 	}
 
-	return "", errors.ErrUnsupportedUDPProtocol
+	return "", errorx.ErrUnsupportedUDPProtocol
 }
 
 // udpSocket creates an endpoint for communication and returns a file descriptor that refers to that endpoint.
-// Argument `reusePort` indicates whether the SO_REUSEPORT flag will be assigned.
 func udpSocket(proto, addr string, connect bool, sockOptInts []Option[int], sockOptStrs []Option[string]) (fd int, netAddr net.Addr, err error) {
 	var (
 		family   int
@@ -97,9 +97,9 @@ func udpSocket(proto, addr string, connect bool, sockOptInts []Option[int], sock
 		return
 	}
 	defer func() {
-		// ignore EINPROGRESS for non-blocking socket connect, should be processed by caller
 		if err != nil {
-			if err, ok := err.(*os.SyscallError); ok && err.Err == unix.EINPROGRESS {
+			// Ignore EINPROGRESS for non-blocking socket connect, should be processed by caller
+			if errors.Is(err, unix.EINPROGRESS) {
 				return
 			}
 			_ = unix.Close(fd)

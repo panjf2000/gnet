@@ -157,6 +157,7 @@ func (q *lockFreeQueue) IsEmpty() bool {
 	return atomic.LoadInt32(&q.length) == 0
 }
 
+// Length returns the number of elements in the queue.
 func (q *lockFreeQueue) Length() int32 {
 	return atomic.LoadInt32(&q.length)
 }
@@ -165,6 +166,6 @@ func load(p *unsafe.Pointer) (n *node) {
 	return (*node)(atomic.LoadPointer(p))
 }
 
-func cas(p *unsafe.Pointer, old, new *node) bool {
+func cas(p *unsafe.Pointer, old, new *node) bool { //nolint:revive
 	return atomic.CompareAndSwapPointer(p, unsafe.Pointer(old), unsafe.Pointer(new))
 }

@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package gnet implements a high-performance, lightweight, non-blocking,
+// event-driven networking framework written in pure Go.
+//
+// Visit https://gnet.host/ for more details about gnet.
 package gnet
 
 import (
@@ -23,10 +27,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/panjf2000/gnet/v2/internal/math"
 	"github.com/panjf2000/gnet/v2/pkg/buffer/ring"
 	"github.com/panjf2000/gnet/v2/pkg/errors"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
+	"github.com/panjf2000/gnet/v2/pkg/math"
 )
 
 // Action is an action that occurs after the completion of an event.

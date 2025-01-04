@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package bytebuffer is a pool of bytebufferpool.ByteBuffer.
 package bytebuffer
 
 import "github.com/valyala/bytebufferpool"

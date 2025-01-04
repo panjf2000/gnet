@@ -27,10 +27,10 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/panjf2000/gnet/v2/internal/gfd"
-	"github.com/panjf2000/gnet/v2/internal/netpoll"
-	"github.com/panjf2000/gnet/v2/internal/queue"
 	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
+	"github.com/panjf2000/gnet/v2/pkg/netpoll"
+	"github.com/panjf2000/gnet/v2/pkg/queue"
 )
 
 type engine struct {

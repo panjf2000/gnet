@@ -28,11 +28,11 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	gio "github.com/panjf2000/gnet/v2/internal/io"
-	"github.com/panjf2000/gnet/v2/internal/netpoll"
-	"github.com/panjf2000/gnet/v2/internal/queue"
 	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
+	gio "github.com/panjf2000/gnet/v2/pkg/io"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
+	"github.com/panjf2000/gnet/v2/pkg/netpoll"
+	"github.com/panjf2000/gnet/v2/pkg/queue"
 )
 
 type eventloop struct {
@@ -238,11 +238,11 @@ func (el *eventloop) close(c *conn, err error) error {
 		if len(iov) > iovMax {
 			iov = iov[:iovMax]
 		}
-		if n, e := gio.Writev(c.fd, iov); e != nil {
+		n, err := gio.Writev(c.fd, iov)
+		if err != nil {
 			break
-		} else { //nolint:revive
-			_, _ = c.outboundBuffer.Discard(n)
 		}
+		_, _ = c.outboundBuffer.Discard(n)
 	}
 
 	c.release()

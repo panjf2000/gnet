@@ -18,12 +18,13 @@
 package socket
 
 import (
+	"errors"
 	"net"
 	"os"
 
 	"golang.org/x/sys/unix"
 
-	"github.com/panjf2000/gnet/v2/pkg/errors"
+	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
 )
 
 // GetUnixSockAddr the structured addresses based on the protocol and raw address.
@@ -37,14 +38,13 @@ func GetUnixSockAddr(proto, addr string) (sa unix.Sockaddr, family int, unixAddr
 	case "unix":
 		sa, family = &unix.SockaddrUnix{Name: unixAddr.Name}, unix.AF_UNIX
 	default:
-		err = errors.ErrUnsupportedUDSProtocol
+		err = errorx.ErrUnsupportedUDSProtocol
 	}
 
 	return
 }
 
 // udsSocket creates an endpoint for communication and returns a file descriptor that refers to that endpoint.
-// Argument `reusePort` indicates whether the SO_REUSEPORT flag will be assigned.
 func udsSocket(proto, addr string, passive bool, sockOptInts []Option[int], sockOptStrs []Option[string]) (fd int, netAddr net.Addr, err error) {
 	var (
 		family int
@@ -60,10 +60,10 @@ func udsSocket(proto, addr string, passive bool, sockOptInts []Option[int], sock
 		return
 	}
 	defer func() {
-		// ignore EINPROGRESS for non-blocking socket connect, should be processed by caller
-		// though there is less situation for EINPROGRESS when using unix socket
 		if err != nil {
-			if err, ok := err.(*os.SyscallError); ok && err.Err == unix.EINPROGRESS {
+			// Ignore EINPROGRESS for non-blocking socket connect, should be processed by caller
+			// though there is less situation for EINPROGRESS when using unix socket
+			if errors.Is(err, unix.EINPROGRESS) {
 				return
 			}
 			_ = unix.Close(fd)

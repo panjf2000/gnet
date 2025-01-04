@@ -1,5 +1,4 @@
-// Copyright (c) 2019 Andy Pan
-// Copyright (c) 2017 Joshua J Baker
+// Copyright (c) 2019 The Gnet Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build linux && !poll_opt
-// +build linux,!poll_opt
+//go:build (darwin || dragonfly || freebsd || netbsd || openbsd) && !poll_opt
+// +build darwin dragonfly freebsd netbsd openbsd
+// +build !poll_opt
 
 package netpoll
 
@@ -23,20 +23,18 @@ import (
 	"os"
 	"runtime"
 	"sync/atomic"
-	"unsafe"
 
 	"golang.org/x/sys/unix"
 
-	"github.com/panjf2000/gnet/v2/internal/queue"
 	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
+	"github.com/panjf2000/gnet/v2/pkg/queue"
 )
 
 // Poller represents a poller which is in charge of monitoring file-descriptors.
 type Poller struct {
-	fd                          int    // epoll fd
-	efd                         int    // eventfd
-	efdBuf                      []byte // efd buffer to read an 8-byte integer
+	fd                          int
+	pipe                        []int
 	wakeupCall                  int32
 	asyncTaskQueue              queue.AsyncTaskQueue // queue with low priority
 	urgentAsyncTaskQueue        queue.AsyncTaskQueue // queue with high priority
@@ -46,21 +44,15 @@ type Poller struct {
 // OpenPoller instantiates a poller.
 func OpenPoller() (poller *Poller, err error) {
 	poller = new(Poller)
-	if poller.fd, err = unix.EpollCreate1(unix.EPOLL_CLOEXEC); err != nil {
+	if poller.fd, err = unix.Kqueue(); err != nil {
 		poller = nil
-		err = os.NewSyscallError("epoll_create1", err)
+		err = os.NewSyscallError("kqueue", err)
 		return
 	}
-	if poller.efd, err = unix.Eventfd(0, unix.EFD_NONBLOCK|unix.EFD_CLOEXEC); err != nil {
+	if err = poller.addWakeupEvent(); err != nil {
 		_ = poller.Close()
 		poller = nil
-		err = os.NewSyscallError("eventfd", err)
-		return
-	}
-	poller.efdBuf = make([]byte, 8)
-	if err = poller.AddRead(&PollAttachment{FD: poller.efd}, true); err != nil {
-		_ = poller.Close()
-		poller = nil
+		err = os.NewSyscallError("kevent | pipe2", err)
 		return
 	}
 	poller.asyncTaskQueue = queue.NewLockFreeQueue()
@@ -71,16 +63,12 @@ func OpenPoller() (poller *Poller, err error) {
 
 // Close closes the poller.
 func (p *Poller) Close() error {
-	_ = unix.Close(p.efd)
+	if len(p.pipe) == 2 {
+		_ = unix.Close(p.pipe[0])
+		_ = unix.Close(p.pipe[1])
+	}
 	return os.NewSyscallError("close", unix.Close(p.fd))
 }
-
-// Make the endianness of bytes compatible with more linux OSs under different processor-architectures,
-// according to http://man7.org/linux/man-pages/man2/eventfd.2.html.
-var (
-	u uint64 = 1
-	b        = (*(*[8]byte)(unsafe.Pointer(&u)))[:]
-)
 
 // Trigger enqueues task and wakes up the poller to process pending tasks.
 // By default, any incoming task will enqueued into urgentAsyncTaskQueue
@@ -99,42 +87,40 @@ func (p *Poller) Trigger(priority queue.EventPriority, fn queue.Func, param any)
 		p.urgentAsyncTaskQueue.Enqueue(task)
 	}
 	if atomic.CompareAndSwapInt32(&p.wakeupCall, 0, 1) {
-		for {
-			_, err = unix.Write(p.efd, b)
-			if err == unix.EAGAIN {
-				_, _ = unix.Read(p.efd, p.efdBuf)
-				continue
-			}
-			break
-		}
+		err = p.wakePoller()
 	}
-	return os.NewSyscallError("write", err)
+	return os.NewSyscallError("kevent | write", err)
 }
 
-// Polling blocks the current goroutine, waiting for network-events.
+// Polling blocks the current goroutine, monitoring the registered file descriptors and waiting for network I/O.
+// When I/O occurs on any of the file descriptors, the provided callback function is invoked.
 func (p *Poller) Polling(callback PollEventHandler) error {
 	el := newEventList(InitPollEventsCap)
-	var doChores bool
 
-	msec := -1
+	var (
+		ts       unix.Timespec
+		tsp      *unix.Timespec
+		doChores bool
+	)
 	for {
-		n, err := unix.EpollWait(p.fd, el.events, msec)
+		n, err := unix.Kevent(p.fd, nil, el.events, tsp)
 		if n == 0 || (n < 0 && err == unix.EINTR) {
-			msec = -1
+			tsp = nil
 			runtime.Gosched()
 			continue
 		} else if err != nil {
-			logging.Errorf("error occurs in epoll: %v", os.NewSyscallError("epoll_wait", err))
+			logging.Errorf("error occurs in kqueue: %v", os.NewSyscallError("kevent wait", err))
 			return err
 		}
-		msec = 0
+		tsp = &ts
 
 		for i := 0; i < n; i++ {
 			ev := &el.events[i]
-			if fd := int(ev.Fd); fd == p.efd { // poller is awakened to run tasks in queues.
+			if fd := int(ev.Ident); fd == 0 { // poller is awakened to run tasks in queues
 				doChores = true
+				p.drainWakeupEvent()
 			} else {
-				err = callback(fd, ev.Events, 0)
+				err = callback(fd, ev.Filter, ev.Flags)
 				if errors.Is(err, errorx.ErrAcceptSocket) || errors.Is(err, errorx.ErrEngineShutdown) {
 					return err
 				}
@@ -163,16 +149,8 @@ func (p *Poller) Polling(callback PollEventHandler) error {
 			}
 			atomic.StoreInt32(&p.wakeupCall, 0)
 			if (!p.asyncTaskQueue.IsEmpty() || !p.urgentAsyncTaskQueue.IsEmpty()) && atomic.CompareAndSwapInt32(&p.wakeupCall, 0, 1) {
-				for {
-					_, err = unix.Write(p.efd, b)
-					if err == unix.EAGAIN {
-						_, _ = unix.Read(p.efd, p.efdBuf)
-						continue
-					}
-					if err != nil {
-						logging.Errorf("failed to notify next round of event-loop for leftover tasks, %v", os.NewSyscallError("write", err))
-					}
-					break
+				if err = p.wakePoller(); err != nil {
+					doChores = true
 				}
 			}
 		}
@@ -185,57 +163,64 @@ func (p *Poller) Polling(callback PollEventHandler) error {
 	}
 }
 
-// AddReadWrite registers the given file-descriptor with readable and writable events to the poller.
+// AddReadWrite registers the given file descriptor with readable and writable events to the poller.
 func (p *Poller) AddReadWrite(pa *PollAttachment, edgeTriggered bool) error {
-	var ev uint32 = ReadWriteEvents
+	var flags IOFlags = unix.EV_ADD
 	if edgeTriggered {
-		ev |= unix.EPOLLET | unix.EPOLLRDHUP
+		flags |= unix.EV_CLEAR
 	}
-	return os.NewSyscallError("epoll_ctl add",
-		unix.EpollCtl(p.fd, unix.EPOLL_CTL_ADD, pa.FD, &unix.EpollEvent{Fd: int32(pa.FD), Events: ev}))
+	_, err := unix.Kevent(p.fd, []unix.Kevent_t{
+		{Ident: keventIdent(pa.FD), Flags: flags, Filter: unix.EVFILT_READ},
+		{Ident: keventIdent(pa.FD), Flags: flags, Filter: unix.EVFILT_WRITE},
+	}, nil, nil)
+	return os.NewSyscallError("kevent add", err)
 }
 
-// AddRead registers the given file-descriptor with readable event to the poller.
+// AddRead registers the given file descriptor with readable event to the poller.
 func (p *Poller) AddRead(pa *PollAttachment, edgeTriggered bool) error {
-	var ev uint32 = ReadEvents
+	var flags IOFlags = unix.EV_ADD
 	if edgeTriggered {
-		ev |= unix.EPOLLET | unix.EPOLLRDHUP
+		flags |= unix.EV_CLEAR
 	}
-	return os.NewSyscallError("epoll_ctl add",
-		unix.EpollCtl(p.fd, unix.EPOLL_CTL_ADD, pa.FD, &unix.EpollEvent{Fd: int32(pa.FD), Events: ev}))
+	_, err := unix.Kevent(p.fd, []unix.Kevent_t{
+		{Ident: keventIdent(pa.FD), Flags: flags, Filter: unix.EVFILT_READ},
+	}, nil, nil)
+	return os.NewSyscallError("kevent add", err)
 }
 
-// AddWrite registers the given file-descriptor with writable event to the poller.
+// AddWrite registers the given file descriptor with writable event to the poller.
 func (p *Poller) AddWrite(pa *PollAttachment, edgeTriggered bool) error {
-	var ev uint32 = WriteEvents
+	var flags IOFlags = unix.EV_ADD
 	if edgeTriggered {
-		ev |= unix.EPOLLET | unix.EPOLLRDHUP
+		flags |= unix.EV_CLEAR
 	}
-	return os.NewSyscallError("epoll_ctl add",
-		unix.EpollCtl(p.fd, unix.EPOLL_CTL_ADD, pa.FD, &unix.EpollEvent{Fd: int32(pa.FD), Events: ev}))
+	_, err := unix.Kevent(p.fd, []unix.Kevent_t{
+		{Ident: keventIdent(pa.FD), Flags: flags, Filter: unix.EVFILT_WRITE},
+	}, nil, nil)
+	return os.NewSyscallError("kevent add", err)
 }
 
-// ModRead renews the given file-descriptor with readable event in the poller.
-func (p *Poller) ModRead(pa *PollAttachment, edgeTriggered bool) error {
-	var ev uint32 = ReadEvents
-	if edgeTriggered {
-		ev |= unix.EPOLLET | unix.EPOLLRDHUP
-	}
-	return os.NewSyscallError("epoll_ctl mod",
-		unix.EpollCtl(p.fd, unix.EPOLL_CTL_MOD, pa.FD, &unix.EpollEvent{Fd: int32(pa.FD), Events: ev}))
+// ModRead modifies the given file descriptor with readable event in the poller.
+func (p *Poller) ModRead(pa *PollAttachment, _ bool) error {
+	_, err := unix.Kevent(p.fd, []unix.Kevent_t{
+		{Ident: keventIdent(pa.FD), Flags: unix.EV_DELETE, Filter: unix.EVFILT_WRITE},
+	}, nil, nil)
+	return os.NewSyscallError("kevent delete", err)
 }
 
-// ModReadWrite renews the given file-descriptor with readable and writable events in the poller.
+// ModReadWrite modifies the given file descriptor with readable and writable events in the poller.
 func (p *Poller) ModReadWrite(pa *PollAttachment, edgeTriggered bool) error {
-	var ev uint32 = ReadWriteEvents
+	var flags IOFlags = unix.EV_ADD
 	if edgeTriggered {
-		ev |= unix.EPOLLET | unix.EPOLLRDHUP
+		flags |= unix.EV_CLEAR
 	}
-	return os.NewSyscallError("epoll_ctl mod",
-		unix.EpollCtl(p.fd, unix.EPOLL_CTL_MOD, pa.FD, &unix.EpollEvent{Fd: int32(pa.FD), Events: ev}))
+	_, err := unix.Kevent(p.fd, []unix.Kevent_t{
+		{Ident: keventIdent(pa.FD), Flags: flags, Filter: unix.EVFILT_WRITE},
+	}, nil, nil)
+	return os.NewSyscallError("kevent add", err)
 }
 
-// Delete removes the given file-descriptor from the poller.
-func (p *Poller) Delete(fd int) error {
-	return os.NewSyscallError("epoll_ctl del", unix.EpollCtl(p.fd, unix.EPOLL_CTL_DEL, fd, nil))
+// Delete removes the given file descriptor from the poller.
+func (*Poller) Delete(_ int) error {
+	return nil
 }

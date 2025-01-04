@@ -24,18 +24,22 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// Dup is the wrapper for dupCloseOnExec.
+// Dup duplicates the given fd and marks it close-on-exec.
 func Dup(fd int) (int, error) {
 	return dupCloseOnExec(fd)
 }
 
 // tryDupCloexec indicates whether F_DUPFD_CLOEXEC should be used.
-// If the kernel doesn't support it, this is set to 0.
-var tryDupCloexec = int32(1)
+// If the kernel doesn't support it, this is set to false.
+var tryDupCloexec atomic.Bool
 
-// dupCloseOnExec dups fd and marks it close-on-exec.
+func init() {
+	tryDupCloexec.Store(true)
+}
+
+// dupCloseOnExec duplicates the given fd and marks it close-on-exec.
 func dupCloseOnExec(fd int) (int, error) {
-	if atomic.LoadInt32(&tryDupCloexec) == 1 {
+	if tryDupCloexec.Load() {
 		r, err := unix.FcntlInt(uintptr(fd), unix.F_DUPFD_CLOEXEC, 0)
 		if err == nil {
 			return r, nil
@@ -45,7 +49,7 @@ func dupCloseOnExec(fd int) (int, error) {
 			// Old kernel, or js/wasm (which returns
 			// ENOSYS). Fall back to the portable way from
 			// now on.
-			atomic.StoreInt32(&tryDupCloexec, 0)
+			tryDupCloexec.Store(false)
 		default:
 			return -1, err
 		}
