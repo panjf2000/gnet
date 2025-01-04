@@ -111,7 +111,8 @@ func (p *Poller) Trigger(priority queue.EventPriority, fn queue.Func, param any)
 	return os.NewSyscallError("write", err)
 }
 
-// Polling blocks the current goroutine, waiting for network-events.
+// Polling blocks the current goroutine, monitoring the registered file descriptors and waiting for network I/O.
+// When I/O occurs on any of the file descriptors, the provided callback function is invoked.
 func (p *Poller) Polling(callback PollEventHandler) error {
 	el := newEventList(InitPollEventsCap)
 	var doChores bool
@@ -215,7 +216,7 @@ func (p *Poller) AddWrite(pa *PollAttachment, edgeTriggered bool) error {
 		unix.EpollCtl(p.fd, unix.EPOLL_CTL_ADD, pa.FD, &unix.EpollEvent{Fd: int32(pa.FD), Events: ev}))
 }
 
-// ModRead renews the given file descriptor with readable event in the poller.
+// ModRead modifies the given file descriptor with readable event in the poller.
 func (p *Poller) ModRead(pa *PollAttachment, edgeTriggered bool) error {
 	var ev uint32 = ReadEvents
 	if edgeTriggered {
@@ -225,7 +226,7 @@ func (p *Poller) ModRead(pa *PollAttachment, edgeTriggered bool) error {
 		unix.EpollCtl(p.fd, unix.EPOLL_CTL_MOD, pa.FD, &unix.EpollEvent{Fd: int32(pa.FD), Events: ev}))
 }
 
-// ModReadWrite renews the given file descriptor with readable and writable events in the poller.
+// ModReadWrite modifies the given file descriptor with readable and writable events in the poller.
 func (p *Poller) ModReadWrite(pa *PollAttachment, edgeTriggered bool) error {
 	var ev uint32 = ReadWriteEvents
 	if edgeTriggered {

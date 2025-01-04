@@ -81,7 +81,6 @@ func determineUDPProto(proto string, addr *net.UDPAddr) (string, error) {
 }
 
 // udpSocket creates an endpoint for communication and returns a file descriptor that refers to that endpoint.
-// Argument `reusePort` indicates whether the SO_REUSEPORT flag will be assigned.
 func udpSocket(proto, addr string, connect bool, sockOptInts []Option[int], sockOptStrs []Option[string]) (fd int, netAddr net.Addr, err error) {
 	var (
 		family   int

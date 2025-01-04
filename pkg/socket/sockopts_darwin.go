@@ -23,8 +23,9 @@ import (
 	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
 )
 
-// SetKeepAlivePeriod sets whether the operating system should send
-// keep-alive messages on the connection and sets period between keep-alive's.
+// SetKeepAlivePeriod enables the SO_KEEPALIVE option on the socket and sets
+// TCP_KEEPIDLE/TCP_KEEPALIVE to the specified duration in seconds, TCP_KEEPCNT
+// to 5, and TCP_KEEPINTVL to secs/5.
 func SetKeepAlivePeriod(fd, secs int) error {
 	if secs <= 0 {
 		return errors.New("invalid time duration")

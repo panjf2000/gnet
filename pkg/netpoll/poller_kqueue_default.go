@@ -92,7 +92,8 @@ func (p *Poller) Trigger(priority queue.EventPriority, fn queue.Func, param any)
 	return os.NewSyscallError("kevent | write", err)
 }
 
-// Polling blocks the current goroutine, waiting for network-events.
+// Polling blocks the current goroutine, monitoring the registered file descriptors and waiting for network I/O.
+// When I/O occurs on any of the file descriptors, the provided callback function is invoked.
 func (p *Poller) Polling(callback PollEventHandler) error {
 	el := newEventList(InitPollEventsCap)
 
@@ -199,7 +200,7 @@ func (p *Poller) AddWrite(pa *PollAttachment, edgeTriggered bool) error {
 	return os.NewSyscallError("kevent add", err)
 }
 
-// ModRead renews the given file descriptor with readable event in the poller.
+// ModRead modifies the given file descriptor with readable event in the poller.
 func (p *Poller) ModRead(pa *PollAttachment, _ bool) error {
 	_, err := unix.Kevent(p.fd, []unix.Kevent_t{
 		{Ident: keventIdent(pa.FD), Flags: unix.EV_DELETE, Filter: unix.EVFILT_WRITE},
@@ -207,7 +208,7 @@ func (p *Poller) ModRead(pa *PollAttachment, _ bool) error {
 	return os.NewSyscallError("kevent delete", err)
 }
 
-// ModReadWrite renews the given file descriptor with readable and writable events in the poller.
+// ModReadWrite modifies the given file descriptor with readable and writable events in the poller.
 func (p *Poller) ModReadWrite(pa *PollAttachment, edgeTriggered bool) error {
 	var flags IOFlags = unix.EV_ADD
 	if edgeTriggered {

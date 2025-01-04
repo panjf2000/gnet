@@ -157,6 +157,7 @@ func (q *lockFreeQueue) IsEmpty() bool {
 	return atomic.LoadInt32(&q.length) == 0
 }
 
+// Length returns the number of elements in the queue.
 func (q *lockFreeQueue) Length() int32 {
 	return atomic.LoadInt32(&q.length)
 }

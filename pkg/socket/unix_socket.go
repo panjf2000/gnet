@@ -45,7 +45,6 @@ func GetUnixSockAddr(proto, addr string) (sa unix.Sockaddr, family int, unixAddr
 }
 
 // udsSocket creates an endpoint for communication and returns a file descriptor that refers to that endpoint.
-// Argument `reusePort` indicates whether the SO_REUSEPORT flag will be assigned.
 func udsSocket(proto, addr string, passive bool, sockOptInts []Option[int], sockOptStrs []Option[string]) (fd int, netAddr net.Addr, err error) {
 	var (
 		family int

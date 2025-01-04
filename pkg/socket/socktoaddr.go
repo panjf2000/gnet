@@ -26,7 +26,7 @@ import (
 	bsPool "github.com/panjf2000/gnet/v2/pkg/pool/byteslice"
 )
 
-// SockaddrToTCPOrUnixAddr converts a Sockaddr to a net.TCPAddr or net.UnixAddr.
+// SockaddrToTCPOrUnixAddr converts a unix.Sockaddr to a net.TCPAddr or net.UnixAddr.
 // Returns nil if conversion fails.
 func SockaddrToTCPOrUnixAddr(sa unix.Sockaddr) net.Addr {
 	switch sa := sa.(type) {
@@ -40,7 +40,7 @@ func SockaddrToTCPOrUnixAddr(sa unix.Sockaddr) net.Addr {
 	return nil
 }
 
-// SockaddrToUDPAddr converts a Sockaddr to a net.UDPAddr
+// SockaddrToUDPAddr converts a unix.Sockaddr to a net.UDPAddr
 // Returns nil if conversion fails.
 func SockaddrToUDPAddr(sa unix.Sockaddr) net.Addr {
 	switch sa := sa.(type) {

@@ -40,17 +40,20 @@ func execSockOpts[T int | string](fd int, opts []Option[T]) error {
 	return nil
 }
 
-// TCPSocket calls the internal tcpSocket.
+// TCPSocket creates a TCP socket and returns a file descriptor that refers to it.
+// The given socket options will be set on the returned file descriptor.
 func TCPSocket(proto, addr string, passive bool, sockOptInts []Option[int], sockOptStrs []Option[string]) (int, net.Addr, error) {
 	return tcpSocket(proto, addr, passive, sockOptInts, sockOptStrs)
 }
 
-// UDPSocket calls the internal udpSocket.
+// UDPSocket creates a UDP socket and returns a file descriptor that refers to it.
+// The given socket options will be set on the returned file descriptor.
 func UDPSocket(proto, addr string, connect bool, sockOptInts []Option[int], sockOptStrs []Option[string]) (int, net.Addr, error) {
 	return udpSocket(proto, addr, connect, sockOptInts, sockOptStrs)
 }
 
-// UnixSocket calls the internal udsSocket.
+// UnixSocket creates a Unix socket and returns a file descriptor that refers to it.
+// The given socket options will be set on the returned file descriptor.
 func UnixSocket(proto, addr string, passive bool, sockOptInts []Option[int], sockOptStrs []Option[string]) (int, net.Addr, error) {
 	return udsSocket(proto, addr, passive, sockOptInts, sockOptStrs)
 }

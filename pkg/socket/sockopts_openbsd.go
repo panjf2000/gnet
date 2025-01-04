@@ -16,8 +16,8 @@ package socket
 
 import errorx "github.com/panjf2000/gnet/v2/pkg/errors"
 
-// SetKeepAlivePeriod sets whether the operating system should send
-// keep-alive messages on the connection and sets period between TCP keep-alive probes.
+// SetKeepAlivePeriod is not implemented on OpenBSD because there are
+// no equivalents of Linux's TCP_KEEPIDLE, TCP_KEEPINTVL, and TCP_KEEPCNT.
 func SetKeepAlivePeriod(_, _ int) error {
 	// OpenBSD has no user-settable per-socket TCP keepalive options.
 	return errorx.ErrUnsupportedOp
