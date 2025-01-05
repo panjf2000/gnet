@@ -55,7 +55,7 @@ The OpenPoller function creates a new Poller instance:
 	defer closeClient()
 
 The PollAttachment consists of a file descriptor and its callback function.
-PollAttachment is used to register a file descriptor with the Poller.
+PollAttachment is used to register a file descriptor to Poller.
 The callback function is called when an event occurs on the file descriptor:
 
 	pa := netpoll.PollAttachment{
