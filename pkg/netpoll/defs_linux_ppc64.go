@@ -2,7 +2,6 @@
 // cgo -cdefs defs_linux.go defs3_linux.go
 
 //go:build poll_opt
-// +build poll_opt
 
 package netpoll
 

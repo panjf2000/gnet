@@ -13,8 +13,6 @@
 // limitations under the License.
 
 //go:build (darwin || dragonfly || freebsd || linux || netbsd || openbsd) && poll_opt
-// +build darwin dragonfly freebsd linux netbsd openbsd
-// +build poll_opt
 
 package gnet
 

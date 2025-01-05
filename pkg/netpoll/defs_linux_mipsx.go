@@ -3,9 +3,6 @@
 // license that can be found in the LICENSE file.
 
 //go:build (mips || mipsle) && linux && poll_opt
-// +build mips mipsle
-// +build linux
-// +build poll_opt
 
 package netpoll
 
