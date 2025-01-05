@@ -10,7 +10,7 @@ hide_on_release_notes: false
 tags: ["type: tag", "domain: v2.7.0"]
 ---
 
-![](/img/gnet-v2-7-0.webp)
+![](/img/gnet-v2-7-0.jpg)
 
 The `gnet` v2.7.0 is officially released!
 
