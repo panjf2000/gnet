@@ -13,8 +13,6 @@
 // limitations under the License.
 
 //go:build (darwin || dragonfly || freebsd || linux || netbsd || openbsd) && !gc_opt
-// +build darwin dragonfly freebsd linux netbsd openbsd
-// +build !gc_opt
 
 package gnet
 

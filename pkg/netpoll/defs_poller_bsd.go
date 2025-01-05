@@ -13,7 +13,6 @@
 // limitations under the License.
 
 //go:build darwin || dragonfly || freebsd || openbsd
-// +build darwin dragonfly freebsd openbsd
 
 package netpoll
 

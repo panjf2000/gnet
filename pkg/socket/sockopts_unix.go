@@ -13,7 +13,6 @@
 // limitations under the License.
 
 //go:build dragonfly || freebsd || linux || netbsd
-// +build dragonfly freebsd linux netbsd
 
 package socket
 

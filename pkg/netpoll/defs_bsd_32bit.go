@@ -13,8 +13,6 @@
 // limitations under the License.
 
 //go:build (darwin || dragonfly || freebsd || netbsd || openbsd) && (386 || arm || mips || mipsle)
-// +build darwin dragonfly freebsd netbsd openbsd
-// +build 386 arm mips mipsle
 
 package netpoll
 

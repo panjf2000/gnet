@@ -14,7 +14,6 @@
 // limitations under the License.
 
 //go:build darwin || dragonfly || freebsd || linux || netbsd || openbsd
-// +build darwin dragonfly freebsd linux netbsd openbsd
 
 // Package socket provides some handy socket-related functions.
 package socket

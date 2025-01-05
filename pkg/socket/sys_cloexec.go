@@ -13,7 +13,6 @@
 // limitations under the License.
 
 //go:build darwin || netbsd || openbsd
-// +build darwin netbsd openbsd
 
 package socket
 
