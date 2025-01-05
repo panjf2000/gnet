@@ -13,8 +13,6 @@
 // limitations under the License.
 
 //go:build (darwin || dragonfly || freebsd || netbsd || openbsd) && (amd64 || arm64 || ppc64 || ppc64le || mips64 || mips64le || riscv64)
-// +build darwin dragonfly freebsd netbsd openbsd
-// +build amd64 arm64 ppc64 ppc64le mips64 mips64le riscv64
 
 package netpoll
 

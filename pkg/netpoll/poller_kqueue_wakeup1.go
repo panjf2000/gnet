@@ -13,7 +13,6 @@
 //  limitations under the License.
 
 //go:build netbsd || openbsd
-// +build netbsd openbsd
 
 package netpoll
 

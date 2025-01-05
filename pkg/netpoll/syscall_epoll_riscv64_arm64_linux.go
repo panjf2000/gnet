@@ -13,8 +13,6 @@
 // limitations under the License.
 
 //go:build ((linux && arm64) || (linux && riscv64)) && poll_opt
-// +build linux,arm64 linux,riscv64
-// +build poll_opt
 
 package netpoll
 

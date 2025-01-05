@@ -13,7 +13,6 @@
 // limitations under the License.
 
 //go:build !poll_opt
-// +build !poll_opt
 
 package netpoll
 
