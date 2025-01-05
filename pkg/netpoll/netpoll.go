@@ -52,6 +52,7 @@ The OpenPoller function creates a new Poller instance:
 		c.Close()
 		f.Close()
 	}
+	defer closeClient()
 
 The PollAttachment consists of a file descriptor and its callback function.
 PollAttachment is used to register a file descriptor with the Poller.
@@ -59,7 +60,7 @@ The callback function is called when an event occurs on the file descriptor:
 
 	pa := netpoll.PollAttachment{
 		FD: int(f.Fd()),
-		Callback: func(i int, event netpoll.IOEvent, flags netpoll.IOFlags) error {
+		Callback: func(fd int, event netpoll.IOEvent, flags netpoll.IOFlags) error {
 			if netpoll.IsErrorEvent(event, flags) {
 				closeClient()
 				return errors.ErrEngineShutdown
@@ -67,6 +68,7 @@ The callback function is called when an event occurs on the file descriptor:
 
 			if netpoll.IsReadEvent(event) {
 				buf := make([]byte, 64)
+				// Read data from the connection.
 				_, err := c.Read(buf)
 				if err != nil {
 					closeClient()
@@ -76,7 +78,7 @@ The callback function is called when an event occurs on the file descriptor:
 			}
 
 			if netpoll.IsWriteEvent(event) {
-				// Write data to the connection...
+				// Write data to the connection.
 				_, err := c.Write([]byte("hello"))
 				if err != nil {
 					closeClient()
@@ -97,5 +99,11 @@ waiting for I/O events to occur:
 	poller.Polling(func(fd int, event netpoll.IOEvent, flags netpoll.IOFlags) error {
 		return pa.Callback(fd, event, flags)
 	})
+
+Or
+
+	poller.Polling()
+
+if you've enabled the build tag `poll_opt`.
 */
 package netpoll
