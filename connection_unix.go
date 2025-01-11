@@ -252,7 +252,6 @@ func (c *conn) asyncWrite(a any) (err error) {
 	}()
 
 	if !c.opened {
-		c.outboundBuffer.Release() // release all remaining bytes in the outbound buffer
 		return net.ErrClosed
 	}
 
@@ -274,7 +273,6 @@ func (c *conn) asyncWritev(a any) (err error) {
 	}()
 
 	if !c.opened {
-		c.outboundBuffer.Release() // release all remaining bytes in the outbound buffer
 		return net.ErrClosed
 	}
 
