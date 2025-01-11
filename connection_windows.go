@@ -421,21 +421,21 @@ var workerPool = nonBlockingPool{Pool: goPool.Default()}
 // func (c *conn) Gfd() gfd.GFD { return gfd.GFD{} }
 
 func (c *conn) AsyncWrite(buf []byte, cb AsyncCallback) error {
-	_, err := c.Write(buf)
-
-	callback := func() error {
+	fn := func() error {
+		_, err := c.Write(buf)
 		if cb != nil {
 			_ = cb(c, err)
 		}
 		return err
 	}
 
+	var err error
 	select {
-	case c.loop.ch <- callback:
+	case c.loop.ch <- fn:
 	default:
 		// If the event-loop channel is full, asynchronize this operation to avoid blocking the eventloop.
 		err = workerPool.Go(func() {
-			c.loop.ch <- callback
+			c.loop.ch <- fn
 		})
 	}
 

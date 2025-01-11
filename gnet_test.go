@@ -1532,6 +1532,89 @@ func TestMultiInstLoggerRace(t *testing.T) {
 	assert.ErrorIs(t, g.Wait(), errorx.ErrUnsupportedProtocol)
 }
 
+type testDisconnectedAsyncWriteServer struct {
+	BuiltinEventEngine
+	tester                *testing.T
+	addr                  string
+	writev, clientStarted bool
+	exit                  atomic.Bool
+}
+
+func (t *testDisconnectedAsyncWriteServer) OnTraffic(c Conn) Action {
+	_, err := c.Next(0)
+	require.NoErrorf(t.tester, err, "c.Next error: %v", err)
+
+	go func() {
+		for range time.Tick(100 * time.Millisecond) {
+			if t.exit.Load() {
+				break
+			}
+
+			if t.writev {
+				err = c.AsyncWritev([][]byte{[]byte("hello"), []byte("hello")}, func(_ Conn, err error) error {
+					if err == nil {
+						return nil
+					}
+
+					require.ErrorIsf(t.tester, err, net.ErrClosed, "expected error: %v, but got: %v", net.ErrClosed, err)
+					t.exit.Store(true)
+					return nil
+				})
+			} else {
+				err = c.AsyncWrite([]byte("hello"), func(_ Conn, err error) error {
+					if err == nil {
+						return nil
+					}
+
+					require.ErrorIsf(t.tester, err, net.ErrClosed, "expected error: %v, but got: %v", net.ErrClosed, err)
+					t.exit.Store(true)
+					return nil
+				})
+			}
+
+			if err != nil {
+				return
+			}
+		}
+	}()
+
+	return None
+}
+
+func (t *testDisconnectedAsyncWriteServer) OnTick() (delay time.Duration, action Action) {
+	delay = 500 * time.Millisecond
+
+	if t.exit.Load() {
+		action = Shutdown
+		return
+	}
+
+	if !t.clientStarted {
+		t.clientStarted = true
+		go func() {
+			c, err := net.Dial("tcp", t.addr)
+			require.NoError(t.tester, err)
+			_, err = c.Write([]byte("hello"))
+			require.NoError(t.tester, err)
+			require.NoError(t.tester, c.Close())
+		}()
+	}
+	return
+}
+
+func TestDisconnectedAsyncWrite(t *testing.T) {
+	t.Run("async-write", func(t *testing.T) {
+		events := &testDisconnectedAsyncWriteServer{tester: t, addr: ":10000"}
+		err := Run(events, "tcp://:10000", WithTicker(true))
+		assert.NoError(t, err)
+	})
+	t.Run("async-writev", func(t *testing.T) {
+		events := &testDisconnectedAsyncWriteServer{tester: t, addr: ":10001", writev: true}
+		err := Run(events, "tcp://:10001", WithTicker(true))
+		assert.NoError(t, err)
+	})
+}
+
 var errIncompletePacket = errors.New("incomplete packet")
 
 type simServer struct {
