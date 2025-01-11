@@ -1604,13 +1604,13 @@ func (t *testDisconnectedAsyncWriteServer) OnTick() (delay time.Duration, action
 
 func TestDisconnectedAsyncWrite(t *testing.T) {
 	t.Run("async-write", func(t *testing.T) {
-		events := &testDisconnectedAsyncWriteServer{tester: t, addr: ":9998"}
-		err := Run(events, "tcp://:9998", WithTicker(true))
+		events := &testDisconnectedAsyncWriteServer{tester: t, addr: ":9990"}
+		err := Run(events, "tcp://:9990", WithTicker(true))
 		assert.NoError(t, err)
 	})
 	t.Run("async-writev", func(t *testing.T) {
-		events := &testDisconnectedAsyncWriteServer{tester: t, addr: ":9999", writev: true}
-		err := Run(events, "tcp://:9999", WithTicker(true))
+		events := &testDisconnectedAsyncWriteServer{tester: t, addr: ":9991", writev: true}
+		err := Run(events, "tcp://:9991", WithTicker(true))
 		assert.NoError(t, err)
 	})
 }
