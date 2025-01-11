@@ -90,7 +90,7 @@ jobs:
         run: go test -v -tags=poll_opt -coverprofile="codecov.report" -covermode=atomic -timeout 10m -failfast
 
       - name: Upload the code coverage report to codecov.io
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           files: ./codecov.report
           flags: unittests
