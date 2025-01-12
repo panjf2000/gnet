@@ -13,6 +13,10 @@
 <a title="Tag" target="_blank" href="https://github.com/panjf2000/gnet/tags"><img src="https://img.shields.io/github/v/tag/panjf2000/gnet?color=%23ff8936&logo=fitbit&style=flat-square" /></a>
 </p>
 
+<p align="center">
+<a href="https://trendshift.io/repositories/9602" target="_blank"><img src="https://trendshift.io/api/badge/repositories/9602" alt="panjf2000%2Fgnet | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
+</p>
+
 [英文](README.md) | 中文
 
 ### 🎉🎉🎉 欢迎加入 `gnet` 在 [Discord 服务器上的频道](https://discord.gg/UyKD7NZcfH).
