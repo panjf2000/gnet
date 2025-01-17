@@ -124,6 +124,13 @@ The following corporations/organizations use `gnet` as the underlying network se
         </a>
       </td>
     </tr>
+    <tr>
+      <td align="center" valign="middle">
+        <a href="https://www.bytedance.com/" target="_blank">
+          <img src="https://res.strikefreedom.top/static_res/logos/ByteDance_Logo.png" width="250" />
+        </a>
+      </td>
+    </tr>
   </tbody>
 </table>
 
