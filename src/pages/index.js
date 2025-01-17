@@ -27,8 +27,8 @@ const features = [
     description: (
       <>
         Built in <a href="https://go.dev/">Go</a>, gnet is an <a href="#performance">ultra-fast and
-        memory-efficient</a> networking framework. It is built from scratch by exploiting the event-driven techniques -
-        <a href="https://man7.org/linux/man-pages/man7/epoll.7.html">epoll</a> and <a href="https://man.freebsd.org/cgi/man.cgi?kqueue">kqueue</a>.
+        memory-efficient</a> networking framework. It is built from scratch by exploiting the event-driven
+        techniques - <a href="https://man7.org/linux/man-pages/man7/epoll.7.html">epoll</a> and <a href="https://man.freebsd.org/cgi/man.cgi?kqueue">kqueue</a>.
         gnet sells itself as a high-performance, lightweight, non-blocking, event-driven networking framework
         written in pure Go which works on the transport layer with TCP/UDP protocols and Unix Domain Socket.
       </>
@@ -48,9 +48,9 @@ const features = [
     icon: 'layers',
     description: (
       <>
-        gnet provides concise and easy-to-use APIs for users, it provides only the essential APIs and takes over most of the tough work for developers,
-        minimizing the complexity of networking applications so that developers are able to concentrate on business logic instead of the underlying
-        implementations of networking.
+        gnet provides concise and easy-to-use APIs. It takes over most of the tough work for developers,
+        minimizing the complexity of networking applications so that developers are able to concentrate on
+        business logic instead of the underlying implementations of networking.
       </>
     ),
   },
