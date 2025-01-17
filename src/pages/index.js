@@ -26,9 +26,11 @@ const features = [
     icon: 'zap',
     description: (
       <>
-        Built in <a href="https://go.dev/">Go</a>, gnet is <a href="#performance">ultra-fast and
-        memory efficient</a> based on the event-driven mechanism.
-        It's designed to create a networking server framework for Go that performs on par with Redis and Haproxy for networking packets handling.
+        Built in <a href="https://go.dev/">Go</a>, gnet is an <a href="#performance">ultra-fast and
+        memory-efficient</a> networking framework. It is built from scratch by exploiting the event-driven techniques -
+        <a href="https://man7.org/linux/man-pages/man7/epoll.7.html">epoll</a> and <a href="https://man.freebsd.org/cgi/man.cgi?kqueue">kqueue</a>.
+        gnet sells itself as a high-performance, lightweight, non-blocking, event-driven networking framework
+        written in pure Go which works on the transport layer with TCP/UDP protocols and Unix Domain Socket.
       </>
     ),
   },
@@ -46,8 +48,9 @@ const features = [
     icon: 'layers',
     description: (
       <>
-        gnet provides concise and easy-to-use APIs for users, it only exposes the essential APIs and takes over most of the tough work for users,
-        minimizing the complexity of business code so that developers are able to concentrate on business logic instead of the underlying implementations.
+        gnet provides concise and easy-to-use APIs for users, it provides only the essential APIs and takes over most of the tough work for developers,
+        minimizing the complexity of networking applications so that developers are able to concentrate on business logic instead of the underlying
+        implementations of networking.
       </>
     ),
   },
@@ -282,6 +285,13 @@ function UseCases() {
               <td align="center" valign="middle">
                 <a href="https://www.zuoyebang.com" target="_blank">
                   <img src="https://res.strikefreedom.top/static_res/logos/zuoyebang-logo.jpeg" width="200" />
+                </a>
+              </td>
+            </tr>
+            <tr>
+              <td align="center" valign="middle">
+                <a href="https://www.bytedance.com/" target="_blank">
+                  <img src="https://res.strikefreedom.top/static_res/logos/ByteDance_Logo.png" width="200" />
                 </a>
               </td>
             </tr>
