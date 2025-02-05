@@ -22,6 +22,7 @@ import (
 	"net"
 	"strconv"
 	"syscall"
+	"time"
 
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sys/unix"
@@ -145,6 +146,14 @@ func (cli *Client) Stop() (err error) {
 // Dial is like net.Dial().
 func (cli *Client) Dial(network, address string) (Conn, error) {
 	return cli.DialContext(network, address, nil)
+}
+
+func (cli *Client) DialContextWithTimeout(network, address string, timeout time.Duration, ctx any) (Conn, error) {
+	c, err := net.DialTimeout(network, address, timeout)
+	if err != nil {
+		return nil, err
+	}
+	return cli.EnrollContext(c, ctx)
 }
 
 // DialContext is like Dial but also accepts an empty interface ctx that can be obtained later via Conn.Context.
