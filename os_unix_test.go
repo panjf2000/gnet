@@ -126,7 +126,7 @@ func (s *testMcastServer) startMcastClient() {
 		require.NoError(s.t, err)
 		// Workaround for MacOS "write: no buffer space available" error messages
 		// https://developer.apple.com/forums/thread/42334
-		time.Sleep(time.Millisecond)
+		time.Sleep(time.Millisecond * 100)
 		select {
 		case respData := <-ch:
 			require.Equalf(s.t, reqData, respData, "response mismatch, length of bytes: %d vs %d", len(reqData), len(respData))
