@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package logging provides logging functionality for gnet server,
+// Package logging provides logging functionality for gnet applications,
 // it sets up a default logger (powered by go.uber.org/zap)
-// which is about to be used by gnet server, it also allows users
-// to replace the default logger with their customized logger by just
-// implementing the `Logger` interface and assign it to the functional option `Options.Logger`,
-// pass it to `gnet.Serve` method.
+// that is about to be used by your gnet application.
+// You're allowed to replace the default logger with your customized logger by
+// implementing Logger and assign it to the functional option via gnet.WithLogger,
+// and then passing it to gnet.Run or gnet.Rotate.
 //
 // The environment variable `GNET_LOGGING_LEVEL` determines which zap logger level will be applied for logging.
 // The environment variable `GNET_LOGGING_FILE` is set to a local file path when you want to print logs into local file.
