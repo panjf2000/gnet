@@ -280,11 +280,20 @@ func (c *conn) asyncWritev(a any) (err error) {
 	return
 }
 
-func (c *conn) sendTo(buf []byte) error {
-	if c.remote == nil {
-		return unix.Send(c.fd, buf, 0)
+func (c *conn) sendTo(buf []byte, addr unix.Sockaddr) (n int, err error) {
+	defer func() {
+		if err != nil {
+			n = 0
+		}
+	}()
+
+	if addr != nil {
+		return len(buf), unix.Sendto(c.fd, buf, 0, addr)
 	}
-	return unix.Sendto(c.fd, buf, 0, c.remote)
+	if c.remote == nil { // connected UDP socket of client
+		return len(buf), unix.Send(c.fd, buf, 0)
+	}
+	return len(buf), unix.Sendto(c.fd, buf, 0, c.remote) // unconnected UDP socket of server
 }
 
 func (c *conn) resetBuffer() {
@@ -389,12 +398,25 @@ func (c *conn) Discard(n int) (int, error) {
 
 func (c *conn) Write(p []byte) (int, error) {
 	if c.isDatagram {
-		if err := c.sendTo(p); err != nil {
-			return 0, err
-		}
-		return len(p), nil
+		return c.sendTo(p, nil)
 	}
 	return c.write(p)
+}
+
+func (c *conn) SendTo(p []byte, addr net.Addr) (int, error) {
+	if !c.isDatagram {
+		return 0, errorx.ErrUnsupportedOp
+	}
+
+	if addr == nil {
+		return 0, errorx.ErrInvalidNetworkAddress
+	}
+	sa := socket.NetAddrToSockaddr(addr)
+	if sa == nil {
+		return 0, errorx.ErrInvalidNetworkAddress
+	}
+
+	return c.sendTo(p, sa)
 }
 
 func (c *conn) Writev(bs [][]byte) (int, error) {
@@ -462,7 +484,7 @@ func (c *conn) SetKeepAlivePeriod(d time.Duration) error {
 
 func (c *conn) AsyncWrite(buf []byte, callback AsyncCallback) error {
 	if c.isDatagram {
-		err := c.sendTo(buf)
+		_, err := c.sendTo(buf, nil)
 		// TODO: it will not go asynchronously with UDP, so calling a callback is needless,
 		//  we may remove this branch in the future, please don't rely on the callback
 		// 	to do something important under UDP, if you're working with UDP, just call Conn.Write

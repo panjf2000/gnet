@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -1896,4 +1897,84 @@ func batchSendAndRecv(t *testing.T, c net.Conn, rd *bufio.Reader, packetSize, ba
 		require.Equalf(t, req, rsp, "request and response mismatch, packet size: %d, batch: %d, round: %d",
 			packetSize, batch, i)
 	}
+}
+
+type testUDPSendtoServer struct {
+	BuiltinEventEngine
+
+	addr string
+
+	tester           *testing.T
+	startClientsOnce sync.Once
+	broadcastOnce    sync.Once
+	broadcastMsg     []byte
+
+	mu          sync.Mutex
+	clientAddrs []net.Addr
+	clientCount int
+}
+
+func (t *testUDPSendtoServer) OnBoot(_ Engine) (action Action) {
+	t.broadcastMsg = []byte("Broadcasting message")
+	t.clientCount = 10
+	return
+}
+
+func (t *testUDPSendtoServer) OnTraffic(c Conn) Action {
+	msg, err := c.Next(-1)
+	assert.NoErrorf(t.tester, err, "c.Next error: %v", err)
+	assert.NotZero(t.tester, msg, "c.Next should not return empty buffer")
+
+	t.mu.Lock()
+	t.clientAddrs = append(t.clientAddrs, c.RemoteAddr())
+	if len(t.clientAddrs) == t.clientCount {
+		for _, addr := range t.clientAddrs {
+			n, err := c.SendTo(t.broadcastMsg, addr)
+			assert.NoError(t.tester, err, "c.SendTo error")
+			assert.EqualValuesf(t.tester, len(t.broadcastMsg), n,
+				"c.SendTo should send %d bytes, but sent %d bytes", len(t.broadcastMsg), n)
+		}
+	}
+	t.mu.Unlock()
+
+	return None
+}
+
+func (t *testUDPSendtoServer) OnTick() (delay time.Duration, action Action) {
+	t.startClientsOnce.Do(func() {
+		for i := 0; i < t.clientCount; i++ {
+			go func() {
+				c, err := net.Dial("udp", t.addr)
+				assert.NoError(t.tester, err)
+				defer c.Close()
+				_, err = c.Write([]byte("Hello World!"))
+				assert.NoError(t.tester, err)
+				msg := make([]byte, len(t.broadcastMsg))
+				_, err = c.Read(msg)
+				assert.NoError(t.tester, err)
+				assert.EqualValuesf(t.tester, msg, t.broadcastMsg,
+					"broadcast message mismatch, expected: %s, got: %s", t.broadcastMsg, msg)
+				t.mu.Lock()
+				t.clientCount--
+				t.mu.Unlock()
+			}()
+		}
+	})
+
+	t.mu.Lock()
+	if t.clientCount == 0 {
+		action = Shutdown
+	}
+	t.mu.Unlock()
+
+	delay = time.Millisecond * 100
+
+	return
+}
+
+func TestUDPSendtoServer(t *testing.T) {
+	addr := ":10000"
+	events := &testUDPSendtoServer{tester: t, addr: addr}
+	err := Run(events, "udp://"+addr, WithTicker(true))
+	assert.NoError(t, err)
 }
