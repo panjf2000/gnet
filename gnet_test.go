@@ -745,7 +745,7 @@ func runServer(t *testing.T, addrs []string, conf *testConf) {
 func startClient(t *testing.T, network, addr string, multicore, async bool) {
 	c, err := net.Dial(network, addr)
 	require.NoError(t, err)
-	defer c.Close()
+	defer c.Close() //nolint:errcheck
 	rd := bufio.NewReader(c)
 	if network != "udp" {
 		msg, err := rd.ReadBytes('\n')
@@ -878,7 +878,7 @@ func (t *testWakeConnServer) OnTick() (delay time.Duration, action Action) {
 		go func() {
 			conn, err := net.Dial(t.network, t.addr)
 			require.NoError(t.tester, err)
-			defer conn.Close()
+			defer conn.Close() //nolint:errcheck
 			r := make([]byte, 10)
 			_, err = conn.Read(r)
 			require.NoError(t.tester, err)
@@ -951,7 +951,7 @@ func (t *testShutdownServer) OnTick() (delay time.Duration, action Action) {
 			go func() {
 				conn, err := net.Dial(t.network, t.addr)
 				require.NoError(t.tester, err)
-				defer conn.Close()
+				defer conn.Close() //nolint:errcheck
 				_, err = conn.Read([]byte{0})
 				require.Error(t.tester, err)
 			}()
@@ -1018,7 +1018,7 @@ func (t *testCloseActionErrorServer) OnTick() (delay time.Duration, action Actio
 		go func() {
 			conn, err := net.Dial(t.network, t.addr)
 			require.NoError(t.tester, err)
-			defer conn.Close()
+			defer conn.Close() //nolint:errcheck
 			data := []byte("Hello World!")
 			_, _ = conn.Write(data)
 			_, err = conn.Read(data)
@@ -1062,7 +1062,7 @@ func (t *testShutdownActionErrorServer) OnTick() (delay time.Duration, action Ac
 		go func() {
 			conn, err := net.Dial(t.network, t.addr)
 			require.NoError(t.tester, err)
-			defer conn.Close()
+			defer conn.Close() //nolint:errcheck
 			data := []byte("Hello World!")
 			_, _ = conn.Write(data)
 			_, err = conn.Read(data)
@@ -1108,7 +1108,7 @@ func (t *testCloseActionOnOpenServer) OnTick() (delay time.Duration, action Acti
 		go func() {
 			conn, err := net.Dial(t.network, t.addr)
 			require.NoError(t.tester, err)
-			defer conn.Close()
+			defer conn.Close() //nolint:errcheck
 		}()
 		return
 	}
@@ -1155,7 +1155,7 @@ func (t *testShutdownActionOnOpenServer) OnTick() (delay time.Duration, action A
 		go func() {
 			conn, err := net.Dial(t.network, t.addr)
 			require.NoError(t.tester, err)
-			defer conn.Close()
+			defer conn.Close() //nolint:errcheck
 		}()
 		return
 	}
@@ -1199,7 +1199,7 @@ func (t *testUDPShutdownServer) OnTick() (delay time.Duration, action Action) {
 		go func() {
 			conn, err := net.Dial(t.network, t.addr)
 			require.NoError(t.tester, err)
-			defer conn.Close()
+			defer conn.Close() //nolint:errcheck
 			data := []byte("Hello World!")
 			_, err = conn.Write(data)
 			require.NoError(t.tester, err)
@@ -1255,7 +1255,7 @@ func (t *testCloseConnectionServer) OnTick() (delay time.Duration, action Action
 		go func() {
 			conn, err := net.Dial(t.network, t.addr)
 			require.NoError(t.tester, err)
-			defer conn.Close()
+			defer conn.Close() //nolint:errcheck
 			data := []byte("Hello World!")
 			_, _ = conn.Write(data)
 			_, err = conn.Read(data)
@@ -1316,7 +1316,7 @@ func (t *testStopServer) OnTick() (delay time.Duration, action Action) {
 		go func() {
 			conn, err := net.Dial(t.network, t.addr)
 			require.NoError(t.tester, err)
-			defer conn.Close()
+			defer conn.Close() //nolint:errcheck
 			data := []byte("Hello World!")
 			_, _ = conn.Write(data)
 			_, err = conn.Read(data)
@@ -1380,7 +1380,7 @@ func (t *testStopEngine) OnTick() (delay time.Duration, action Action) {
 	go func() {
 		conn, err := net.Dial(t.network, t.addr)
 		require.NoError(t.tester, err)
-		defer conn.Close()
+		defer conn.Close() //nolint:errcheck
 		data := []byte("Hello World! " + t.name)
 		_, _ = conn.Write(data)
 		_, err = conn.Read(data)
@@ -1846,7 +1846,7 @@ func runSimServer(t *testing.T, addr string, et bool, nclients, packetSize, batc
 func runSimClient(t *testing.T, network, addr string, packetSize, batch int) {
 	c, err := net.Dial(network, addr)
 	require.NoError(t, err)
-	defer c.Close()
+	defer c.Close() //nolint:errcheck
 	rd := bufio.NewReader(c)
 	msg, err := rd.ReadBytes('\n')
 	require.NoError(t, err)
@@ -1906,7 +1906,6 @@ type testUDPSendtoServer struct {
 
 	tester           *testing.T
 	startClientsOnce sync.Once
-	broadcastOnce    sync.Once
 	broadcastMsg     []byte
 
 	mu          sync.Mutex
@@ -1946,7 +1945,7 @@ func (t *testUDPSendtoServer) OnTick() (delay time.Duration, action Action) {
 			go func() {
 				c, err := net.Dial("udp", t.addr)
 				assert.NoError(t.tester, err)
-				defer c.Close()
+				defer c.Close() //nolint:errcheck
 				_, err = c.Write([]byte("Hello World!"))
 				assert.NoError(t.tester, err)
 				msg := make([]byte, len(t.broadcastMsg))

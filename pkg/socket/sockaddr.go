@@ -135,8 +135,8 @@ func SockaddrToUDPAddr(sa unix.Sockaddr) net.Addr {
 	return nil
 }
 
-// ip6ZoneToInt converts an IP6 Zone net string to a unix int
-// returns 0 if zone is ""
+// ip6ZoneToInt converts an IP6 Zone net string to a unix int.
+// Returns 0 if zone is "".
 func ip6ZoneToInt(zone string) int {
 	if zone == "" {
 		return 0
@@ -149,7 +149,7 @@ func ip6ZoneToInt(zone string) int {
 }
 
 // ip6ZoneToString converts an IP6 Zone unix int to a net string,
-// returns "" if zone is 0.
+// Returns "" if zone is 0.
 func ip6ZoneToString(zone uint32) string {
 	if zone == 0 {
 		return ""
@@ -175,7 +175,7 @@ func itod(v uint) string {
 	return bs.BytesToString(buf[i:])
 }
 
-// Bigger than we need, not too big to worry about overflow
+// Bigger than we need, not too big to worry about overflow.
 const big = 0xFFFFFF
 
 // Decimal to integer starting at &s[i0].

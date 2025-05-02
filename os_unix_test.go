@@ -112,7 +112,7 @@ func (s *testMcastServer) startMcastClient() {
 	defer cancel()
 	c, err := net.Dial("udp", s.addr)
 	require.NoError(s.t, err)
-	defer c.Close()
+	defer c.Close() //nolint:errcheck
 	ch := make(chan []byte, 10000)
 	s.mcast.Store(c.LocalAddr().String(), ch)
 	duration := time.Duration((rand.Float64()*2+1)*float64(time.Second)) / 2
@@ -290,7 +290,7 @@ func (s *testBindToDeviceServer[T]) OnTick() (delay time.Duration, action Action
 		assert.ErrorContains(s.tester, err, "connection refused")
 	} else {
 		assert.NoError(s.tester, err)
-		defer c.Close()
+		defer c.Close() //nolint:errcheck
 		_, err = c.Write(s.data)
 		assert.NoError(s.tester, err)
 	}
@@ -299,7 +299,7 @@ func (s *testBindToDeviceServer[T]) OnTick() (delay time.Duration, action Action
 		// Send a packet to the broadcast address, it should reach the server.
 		c6, err := netDial(s.network, s.broadcastAddr)
 		assert.NoError(s.tester, err)
-		defer c6.Close()
+		defer c6.Close() //nolint:errcheck
 		_, err = c6.Write(s.data)
 		assert.NoError(s.tester, err)
 	}
@@ -307,7 +307,7 @@ func (s *testBindToDeviceServer[T]) OnTick() (delay time.Duration, action Action
 	// Send a packet to the eth0 interface, it should reach the server.
 	c4, err := netDial(s.network, s.eth0Addr)
 	assert.NoError(s.tester, err)
-	defer c4.Close()
+	defer c4.Close() //nolint:errcheck
 	_, err = c4.Write(s.data)
 	assert.NoError(s.tester, err)
 	buf := make([]byte, len(s.data))
