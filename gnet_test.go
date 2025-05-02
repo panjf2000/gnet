@@ -594,17 +594,6 @@ func (s *testServer) OnTraffic(c Conn) (action Action) {
 		buf := bbPool.Get()
 		_, _ = c.WriteTo(buf)
 		if c.LocalAddr().Network() == "tcp" || c.LocalAddr().Network() == "unix" {
-			// Only for test
-			_ = c.InboundBuffered()
-			_ = c.OutboundBuffered()
-			_, _ = c.Discard(1)
-			assert.ErrorIs(s.tester, c.SetDeadline(time.Now().Add(time.Second)), errorx.ErrUnsupportedOp)
-			assert.ErrorIs(s.tester, c.SetReadDeadline(time.Now().Add(time.Second)), errorx.ErrUnsupportedOp)
-			assert.ErrorIs(s.tester, c.SetWriteDeadline(time.Now().Add(time.Second)), errorx.ErrUnsupportedOp)
-			_, err := c.SendTo(buf.Bytes(), c.RemoteAddr())
-			assert.ErrorIsf(s.tester, err, errorx.ErrUnsupportedOp,
-				"got error: %v, expected error: %v", err, errorx.ErrUnsupportedOp)
-
 			_ = s.workerPool.Submit(
 				func() {
 					if s.writev {
@@ -631,16 +620,6 @@ func (s *testServer) OnTraffic(c Conn) (action Action) {
 				})
 			return
 		} else if c.LocalAddr().Network() == "udp" {
-			// Only for test
-			n, err := c.Writev([][]byte{})
-			assert.ErrorIs(s.tester, err, errorx.ErrUnsupportedOp, "udp Writev error")
-			assert.Zero(s.tester, n, "udp Writev error")
-			err = c.AsyncWritev([][]byte{}, nil)
-			assert.ErrorIs(s.tester, err, errorx.ErrUnsupportedOp, "udp Writev error")
-			_, err = c.SendTo(buf.Bytes(), nil)
-			assert.ErrorIsf(s.tester, err, errorx.ErrInvalidNetworkAddress,
-				"got error: %v, expected error: %v", err, errorx.ErrInvalidNetworkAddress)
-
 			_ = s.workerPool.Submit(
 				func() {
 					_ = c.AsyncWrite(buf.Bytes(), nil)
@@ -680,6 +659,30 @@ func (s *testServer) OnTraffic(c Conn) (action Action) {
 			assert.NoErrorf(s.tester, c.SetLinger(1), "set linger error")
 			assert.NoErrorf(s.tester, c.SetNoDelay(false), "set no delay error")
 			assert.NoErrorf(s.tester, c.SetKeepAlivePeriod(time.Minute), "set keep alive period error")
+		}
+
+		assert.Zerof(s.tester, c.InboundBuffered(), "inbound buffer error")
+		assert.Zerof(s.tester, c.OutboundBuffered(), "outbound buffer error")
+		n, err := c.Discard(1)
+		assert.NoErrorf(s.tester, err, "discard error")
+		assert.Zerof(s.tester, n, "discard error")
+		assert.ErrorIs(s.tester, c.SetDeadline(time.Now().Add(time.Second)), errorx.ErrUnsupportedOp)
+		assert.ErrorIs(s.tester, c.SetReadDeadline(time.Now().Add(time.Second)), errorx.ErrUnsupportedOp)
+		assert.ErrorIs(s.tester, c.SetWriteDeadline(time.Now().Add(time.Second)), errorx.ErrUnsupportedOp)
+
+		if c.LocalAddr().Network() == "udp" {
+			n, err := c.Writev([][]byte{})
+			assert.ErrorIs(s.tester, err, errorx.ErrUnsupportedOp, "udp Writev error")
+			assert.Zero(s.tester, n, "udp Writev error")
+			err = c.AsyncWritev([][]byte{}, nil)
+			assert.ErrorIs(s.tester, err, errorx.ErrUnsupportedOp, "udp Writev error")
+			_, err = c.SendTo(buf, nil)
+			assert.ErrorIsf(s.tester, err, errorx.ErrInvalidNetworkAddress,
+				"got error: %v, expected error: %v", err, errorx.ErrInvalidNetworkAddress)
+		} else {
+			_, err = c.SendTo(buf, c.RemoteAddr())
+			assert.ErrorIsf(s.tester, err, errorx.ErrUnsupportedOp,
+				"got error: %v, expected error: %v", err, errorx.ErrUnsupportedOp)
 		}
 	}
 
