@@ -500,14 +500,21 @@ func createListeners(addrs []string, opts ...Option) ([]*listener, *Options, err
 	// with the capability of load balancing, it's the equivalent of Linux's SO_REUSEPORT.
 	// Also note that DragonFlyBSD 3.6.0 extended SO_REUSEPORT to distribute workload to
 	// available sockets, which make it the same as Linux's SO_REUSEPORT.
-	//
+	goos := runtime.GOOS
+	if options.ReusePort &&
+		(options.Multicore || options.NumEventLoop > 1) &&
+		(goos != "linux" && goos != "dragonfly" && goos != "freebsd") {
+		options.ReusePort = false
+	}
+
 	// Despite the fact that SO_REUSEPORT can be set on a Unix domain socket
 	// via setsockopt() without reporting an error, SO_REUSEPORT is actually
 	// not supported for sockets of AF_UNIX. Thus, we avoid setting it on the
 	// Unix domain sockets.
-	goos := runtime.GOOS
-	if (options.Multicore || options.NumEventLoop > 1) && options.ReusePort &&
-		((goos != "linux" && goos != "dragonfly" && goos != "freebsd") || hasUnix) {
+	// As of this commit https://git.kernel.org/pub/scm/linux/kernel/git/netdev/net.git/commit/?id=5b0af621c3f6,
+	// EOPNOTSUPP will be returned when trying to set SO_REUSEPORT on an AF_UNIX socket on Linux. We therefore
+	// avoid setting it on Unix domain sockets on all UNIX-like platforms to keep this behavior consistent.
+	if options.ReusePort && hasUnix {
 		options.ReusePort = false
 	}
 
