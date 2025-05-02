@@ -594,10 +594,13 @@ func (s *testServer) OnTraffic(c Conn) (action Action) {
 		buf := bbPool.Get()
 		_, _ = c.WriteTo(buf)
 		if c.LocalAddr().Network() == "tcp" || c.LocalAddr().Network() == "unix" {
-			// just for test
+			// Only for test
 			_ = c.InboundBuffered()
 			_ = c.OutboundBuffered()
 			_, _ = c.Discard(1)
+			_, err := c.SendTo(buf.Bytes(), c.RemoteAddr())
+			assert.ErrorIsf(s.tester, err, errorx.ErrUnsupportedOp,
+				"got error: %v, expected error: %v", err, errorx.ErrUnsupportedOp)
 
 			_ = s.workerPool.Submit(
 				func() {
@@ -625,6 +628,10 @@ func (s *testServer) OnTraffic(c Conn) (action Action) {
 				})
 			return
 		} else if c.LocalAddr().Network() == "udp" {
+			// Only for test
+			_, err := c.SendTo(buf.Bytes(), nil)
+			assert.ErrorIsf(s.tester, err, errorx.ErrInvalidNetworkAddress,
+				"got error: %v, expected error: %v", err, errorx.ErrInvalidNetworkAddress)
 			_ = s.workerPool.Submit(
 				func() {
 					_ = c.AsyncWrite(buf.Bytes(), nil)

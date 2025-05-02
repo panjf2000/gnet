@@ -408,9 +408,6 @@ func (c *conn) SendTo(p []byte, addr net.Addr) (int, error) {
 		return 0, errorx.ErrUnsupportedOp
 	}
 
-	if addr == nil {
-		return 0, errorx.ErrInvalidNetworkAddress
-	}
 	sa := socket.NetAddrToSockaddr(addr)
 	if sa == nil {
 		return 0, errorx.ErrInvalidNetworkAddress

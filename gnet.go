@@ -213,8 +213,10 @@ type Writer interface {
 	io.ReaderFrom // not concurrency-safe
 
 	// SendTo transmits a message to the given address, it's not concurrency-safe.
-	// It is available only for UDP sockets, it should be used only when you need
-	// to send a message to a specific address over the UDP socket.
+	// It is available only for UDP sockets, an ErrUnsupportedOp will be returned
+	// when it is called on a non-UDP socket.
+	// This method should be used only when you need to send a message to a specific
+	// address over the UDP socket, otherwise you should use Conn.Write() instead.
 	SendTo(buf []byte, addr net.Addr) (n int, err error)
 
 	// Writev writes multiple byte slices to remote synchronously, it's not concurrency-safe,
