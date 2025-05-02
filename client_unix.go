@@ -163,7 +163,7 @@ func (cli *Client) Enroll(c net.Conn) (Conn, error) {
 
 // EnrollContext is like Enroll but also accepts an empty interface ctx that can be obtained later via Conn.Context.
 func (cli *Client) EnrollContext(c net.Conn, ctx any) (Conn, error) {
-	defer c.Close()
+	defer c.Close() //nolint:errcheck
 
 	sc, ok := c.(syscall.Conn)
 	if !ok {
@@ -242,7 +242,7 @@ func (cli *Client) EnrollContext(c net.Conn, ctx any) (Conn, error) {
 	}}
 	err = cli.el.poller.Trigger(queue.HighPriority, cli.el.register, ccb)
 	if err != nil {
-		gc.Close()
+		_ = gc.Close()
 		return nil, err
 	}
 

@@ -533,7 +533,7 @@ func startGnetClient(t *testing.T, cli *Client, network, addr string, multicore,
 		c, err = cli.DialContext(network, addr, handler)
 	}
 	require.NoError(t, err)
-	defer c.Close()
+	defer c.Close() //nolint:errcheck
 	err = c.Wake(nil)
 	require.NoError(t, err)
 	rspCh := handler.rspCh
@@ -688,7 +688,7 @@ func TestClientReadOnEOF(t *testing.T) {
 
 	ln, err := net.Listen("tcp", "127.0.0.1:9999")
 	assert.NoError(t, err)
-	defer ln.Close()
+	defer ln.Close() //nolint:errcheck
 
 	go func() {
 		for {
@@ -733,7 +733,7 @@ func TestClientReadOnEOF(t *testing.T) {
 }
 
 func process(conn net.Conn) {
-	defer conn.Close() //noliint:errcheck
+	defer conn.Close() //nolint:errcheck
 	buf := make([]byte, 8)
 	n, err := conn.Read(buf)
 	if err != nil {

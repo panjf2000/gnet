@@ -222,7 +222,23 @@ func (c *conn) Write(p []byte) (int, error) {
 	return c.pc.WriteTo(p, c.remoteAddr)
 }
 
+func (c *conn) SendTo(p []byte, addr net.Addr) (int, error) {
+	if c.pc == nil {
+		return 0, errorx.ErrUnsupportedOp
+	}
+
+	if addr == nil {
+		return 0, errorx.ErrInvalidNetworkAddress
+	}
+
+	return c.pc.WriteTo(p, addr)
+}
+
 func (c *conn) Writev(bs [][]byte) (int, error) {
+	if c.pc != nil { // not available for UDP
+		return 0, errorx.ErrUnsupportedOp
+	}
+
 	if c.rawConn != nil {
 		bb := bbPool.Get()
 		defer bbPool.Put(bb)
@@ -443,6 +459,10 @@ func (c *conn) AsyncWrite(buf []byte, cb AsyncCallback) error {
 }
 
 func (c *conn) AsyncWritev(bs [][]byte, cb AsyncCallback) error {
+	if c.pc != nil {
+		return errorx.ErrUnsupportedOp
+	}
+
 	buf := bbPool.Get()
 	for _, b := range bs {
 		_, _ = buf.Write(b)

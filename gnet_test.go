@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -593,11 +594,6 @@ func (s *testServer) OnTraffic(c Conn) (action Action) {
 		buf := bbPool.Get()
 		_, _ = c.WriteTo(buf)
 		if c.LocalAddr().Network() == "tcp" || c.LocalAddr().Network() == "unix" {
-			// just for test
-			_ = c.InboundBuffered()
-			_ = c.OutboundBuffered()
-			_, _ = c.Discard(1)
-
 			_ = s.workerPool.Submit(
 				func() {
 					if s.writev {
@@ -663,6 +659,30 @@ func (s *testServer) OnTraffic(c Conn) (action Action) {
 			assert.NoErrorf(s.tester, c.SetLinger(1), "set linger error")
 			assert.NoErrorf(s.tester, c.SetNoDelay(false), "set no delay error")
 			assert.NoErrorf(s.tester, c.SetKeepAlivePeriod(time.Minute), "set keep alive period error")
+		}
+
+		assert.Zero(s.tester, c.InboundBuffered(), "inbound buffer error")
+		assert.GreaterOrEqual(s.tester, c.OutboundBuffered(), 0, "outbound buffer error")
+		n, err := c.Discard(1)
+		assert.NoErrorf(s.tester, err, "discard error")
+		assert.Zerof(s.tester, n, "discard error")
+		assert.ErrorIs(s.tester, c.SetDeadline(time.Now().Add(time.Second)), errorx.ErrUnsupportedOp)
+		assert.ErrorIs(s.tester, c.SetReadDeadline(time.Now().Add(time.Second)), errorx.ErrUnsupportedOp)
+		assert.ErrorIs(s.tester, c.SetWriteDeadline(time.Now().Add(time.Second)), errorx.ErrUnsupportedOp)
+
+		if c.LocalAddr().Network() == "udp" {
+			n, err := c.Writev([][]byte{})
+			assert.ErrorIs(s.tester, err, errorx.ErrUnsupportedOp, "udp Writev error")
+			assert.Zero(s.tester, n, "udp Writev error")
+			err = c.AsyncWritev([][]byte{}, nil)
+			assert.ErrorIs(s.tester, err, errorx.ErrUnsupportedOp, "udp Writev error")
+			_, err = c.SendTo(buf, nil)
+			assert.ErrorIsf(s.tester, err, errorx.ErrInvalidNetworkAddress,
+				"got error: %v, expected error: %v", err, errorx.ErrInvalidNetworkAddress)
+		} else {
+			_, err = c.SendTo(buf, c.RemoteAddr())
+			assert.ErrorIsf(s.tester, err, errorx.ErrUnsupportedOp,
+				"got error: %v, expected error: %v", err, errorx.ErrUnsupportedOp)
 		}
 	}
 
@@ -744,7 +764,7 @@ func runServer(t *testing.T, addrs []string, conf *testConf) {
 func startClient(t *testing.T, network, addr string, multicore, async bool) {
 	c, err := net.Dial(network, addr)
 	require.NoError(t, err)
-	defer c.Close()
+	defer c.Close() //nolint:errcheck
 	rd := bufio.NewReader(c)
 	if network != "udp" {
 		msg, err := rd.ReadBytes('\n')
@@ -877,7 +897,7 @@ func (t *testWakeConnServer) OnTick() (delay time.Duration, action Action) {
 		go func() {
 			conn, err := net.Dial(t.network, t.addr)
 			require.NoError(t.tester, err)
-			defer conn.Close()
+			defer conn.Close() //nolint:errcheck
 			r := make([]byte, 10)
 			_, err = conn.Read(r)
 			require.NoError(t.tester, err)
@@ -950,7 +970,7 @@ func (t *testShutdownServer) OnTick() (delay time.Duration, action Action) {
 			go func() {
 				conn, err := net.Dial(t.network, t.addr)
 				require.NoError(t.tester, err)
-				defer conn.Close()
+				defer conn.Close() //nolint:errcheck
 				_, err = conn.Read([]byte{0})
 				require.Error(t.tester, err)
 			}()
@@ -1017,7 +1037,7 @@ func (t *testCloseActionErrorServer) OnTick() (delay time.Duration, action Actio
 		go func() {
 			conn, err := net.Dial(t.network, t.addr)
 			require.NoError(t.tester, err)
-			defer conn.Close()
+			defer conn.Close() //nolint:errcheck
 			data := []byte("Hello World!")
 			_, _ = conn.Write(data)
 			_, err = conn.Read(data)
@@ -1061,7 +1081,7 @@ func (t *testShutdownActionErrorServer) OnTick() (delay time.Duration, action Ac
 		go func() {
 			conn, err := net.Dial(t.network, t.addr)
 			require.NoError(t.tester, err)
-			defer conn.Close()
+			defer conn.Close() //nolint:errcheck
 			data := []byte("Hello World!")
 			_, _ = conn.Write(data)
 			_, err = conn.Read(data)
@@ -1107,7 +1127,7 @@ func (t *testCloseActionOnOpenServer) OnTick() (delay time.Duration, action Acti
 		go func() {
 			conn, err := net.Dial(t.network, t.addr)
 			require.NoError(t.tester, err)
-			defer conn.Close()
+			defer conn.Close() //nolint:errcheck
 		}()
 		return
 	}
@@ -1154,7 +1174,7 @@ func (t *testShutdownActionOnOpenServer) OnTick() (delay time.Duration, action A
 		go func() {
 			conn, err := net.Dial(t.network, t.addr)
 			require.NoError(t.tester, err)
-			defer conn.Close()
+			defer conn.Close() //nolint:errcheck
 		}()
 		return
 	}
@@ -1198,7 +1218,7 @@ func (t *testUDPShutdownServer) OnTick() (delay time.Duration, action Action) {
 		go func() {
 			conn, err := net.Dial(t.network, t.addr)
 			require.NoError(t.tester, err)
-			defer conn.Close()
+			defer conn.Close() //nolint:errcheck
 			data := []byte("Hello World!")
 			_, err = conn.Write(data)
 			require.NoError(t.tester, err)
@@ -1254,7 +1274,7 @@ func (t *testCloseConnectionServer) OnTick() (delay time.Duration, action Action
 		go func() {
 			conn, err := net.Dial(t.network, t.addr)
 			require.NoError(t.tester, err)
-			defer conn.Close()
+			defer conn.Close() //nolint:errcheck
 			data := []byte("Hello World!")
 			_, _ = conn.Write(data)
 			_, err = conn.Read(data)
@@ -1315,7 +1335,7 @@ func (t *testStopServer) OnTick() (delay time.Duration, action Action) {
 		go func() {
 			conn, err := net.Dial(t.network, t.addr)
 			require.NoError(t.tester, err)
-			defer conn.Close()
+			defer conn.Close() //nolint:errcheck
 			data := []byte("Hello World!")
 			_, _ = conn.Write(data)
 			_, err = conn.Read(data)
@@ -1379,7 +1399,7 @@ func (t *testStopEngine) OnTick() (delay time.Duration, action Action) {
 	go func() {
 		conn, err := net.Dial(t.network, t.addr)
 		require.NoError(t.tester, err)
-		defer conn.Close()
+		defer conn.Close() //nolint:errcheck
 		data := []byte("Hello World! " + t.name)
 		_, _ = conn.Write(data)
 		_, err = conn.Read(data)
@@ -1845,7 +1865,7 @@ func runSimServer(t *testing.T, addr string, et bool, nclients, packetSize, batc
 func runSimClient(t *testing.T, network, addr string, packetSize, batch int) {
 	c, err := net.Dial(network, addr)
 	require.NoError(t, err)
-	defer c.Close()
+	defer c.Close() //nolint:errcheck
 	rd := bufio.NewReader(c)
 	msg, err := rd.ReadBytes('\n')
 	require.NoError(t, err)
@@ -1896,4 +1916,88 @@ func batchSendAndRecv(t *testing.T, c net.Conn, rd *bufio.Reader, packetSize, ba
 		require.Equalf(t, req, rsp, "request and response mismatch, packet size: %d, batch: %d, round: %d",
 			packetSize, batch, i)
 	}
+}
+
+type testUDPSendtoServer struct {
+	BuiltinEventEngine
+
+	addr string
+
+	tester           *testing.T
+	startClientsOnce sync.Once
+	broadcastMsg     []byte
+
+	mu          sync.Mutex
+	clientAddrs []net.Addr
+	clientCount int
+}
+
+func (t *testUDPSendtoServer) OnBoot(_ Engine) (action Action) {
+	t.broadcastMsg = []byte("Broadcasting message")
+	t.clientCount = 10
+	return
+}
+
+func (t *testUDPSendtoServer) OnTraffic(c Conn) Action {
+	msg, err := c.Next(-1)
+	assert.NoErrorf(t.tester, err, "c.Next error: %v", err)
+	assert.NotZero(t.tester, msg, "c.Next should not return empty buffer")
+
+	t.mu.Lock()
+	t.clientAddrs = append(t.clientAddrs, c.RemoteAddr())
+	if len(t.clientAddrs) == t.clientCount {
+		for _, addr := range t.clientAddrs {
+			n, err := c.SendTo(t.broadcastMsg, addr)
+			assert.NoError(t.tester, err, "c.SendTo error")
+			assert.EqualValuesf(t.tester, len(t.broadcastMsg), n,
+				"c.SendTo should send %d bytes, but sent %d bytes", len(t.broadcastMsg), n)
+		}
+	}
+	t.mu.Unlock()
+
+	return None
+}
+
+func (t *testUDPSendtoServer) OnTick() (delay time.Duration, action Action) {
+	t.startClientsOnce.Do(func() {
+		for i := 0; i < t.clientCount; i++ {
+			go func() {
+				c, err := net.Dial("udp", t.addr)
+				assert.NoError(t.tester, err)
+				defer c.Close() //nolint:errcheck
+				_, err = c.Write([]byte("Hello World!"))
+				assert.NoError(t.tester, err)
+				msg := make([]byte, len(t.broadcastMsg))
+				_, err = c.Read(msg)
+				assert.NoError(t.tester, err)
+				assert.EqualValuesf(t.tester, msg, t.broadcastMsg,
+					"broadcast message mismatch, expected: %s, got: %s", t.broadcastMsg, msg)
+				t.mu.Lock()
+				t.clientCount--
+				t.mu.Unlock()
+			}()
+		}
+	})
+
+	t.mu.Lock()
+	if t.clientCount == 0 {
+		action = Shutdown
+	}
+	t.mu.Unlock()
+
+	delay = time.Millisecond * 100
+
+	return
+}
+
+func TestUDPSendtoServer(t *testing.T) {
+	// The listening address without an explicit IP works on Linux and Windows
+	// while sendto fails on macOS with EINVAL (invalid argument) that might
+	// also occur on more BSD systems: FreeBSD, OpenBSD, NetBSD, and DragonflyBSD.
+	// To pass this test on all platforms, specify an explicit IP address here.
+	// addr := ":10000"
+	addr := "127.0.0.1:10000"
+	events := &testUDPSendtoServer{tester: t, addr: addr}
+	err := Run(events, "udp://"+addr, WithTicker(true))
+	assert.NoError(t, err)
 }
