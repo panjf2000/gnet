@@ -25,6 +25,7 @@ import (
 
 	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
+	"github.com/panjf2000/gnet/v2/pkg/pool/goroutine"
 )
 
 type Client struct {
@@ -164,58 +165,59 @@ func (cli *Client) EnrollContext(nc net.Conn, ctx any) (gc Conn, err error) {
 		c := newTCPConn(nc, cli.el)
 		c.SetContext(ctx)
 		cli.el.ch <- &openConn{c: c, cb: func() { close(connOpened) }}
-		go func(c *conn, tc net.Conn, el *eventloop) {
+		goroutine.DefaultWorkerPool.Submit(func() {
 			var buffer [0x10000]byte
 			for {
-				n, err := tc.Read(buffer[:])
+				n, err := nc.Read(buffer[:])
 				if err != nil {
-					el.ch <- &netErr{c, err}
+					cli.el.ch <- &netErr{c, err}
 					return
 				}
-				el.ch <- packTCPConn(c, buffer[:n])
+				cli.el.ch <- packTCPConn(c, buffer[:n])
 			}
-		}(c, nc, cli.el)
+		})
 		gc = c
 	case *net.UnixConn:
 		c := newTCPConn(nc, cli.el)
 		c.SetContext(ctx)
 		cli.el.ch <- &openConn{c: c, cb: func() { close(connOpened) }}
-		go func(c *conn, uc net.Conn, el *eventloop) {
+		goroutine.DefaultWorkerPool.Submit(func() {
 			var buffer [0x10000]byte
 			for {
-				n, err := uc.Read(buffer[:])
+				n, err := nc.Read(buffer[:])
 				if err != nil {
-					el.ch <- &netErr{c, err}
+					cli.el.ch <- &netErr{c, err}
 					mu.RLock()
-					tmpDir := unixAddrDirs[uc.LocalAddr().String()]
+					tmpDir := unixAddrDirs[nc.LocalAddr().String()]
 					mu.RUnlock()
 					if err := os.RemoveAll(tmpDir); err != nil {
 						logging.Errorf("failed to remove temporary directory for unix local address: %v", err)
 					}
 					return
 				}
-				el.ch <- packTCPConn(c, buffer[:n])
+				cli.el.ch <- packTCPConn(c, buffer[:n])
 			}
-		}(c, nc, cli.el)
+		})
 		gc = c
 	case *net.UDPConn:
 		c := newUDPConn(cli.el, nil, nc.LocalAddr(), nc.RemoteAddr())
 		c.SetContext(ctx)
 		c.rawConn = nc
 		cli.el.ch <- &openConn{c: c, cb: func() { close(connOpened) }}
-		go func(uc net.Conn, el *eventloop) {
+		goroutine.DefaultWorkerPool.Submit(func() {
 			var buffer [0x10000]byte
 			for {
-				n, err := uc.Read(buffer[:])
+				n, err := nc.Read(buffer[:])
 				if err != nil {
+					cli.el.ch <- &netErr{c, err}
 					return
 				}
-				c := newUDPConn(cli.el, nil, uc.LocalAddr(), uc.RemoteAddr())
+				c := newUDPConn(cli.el, nil, nc.LocalAddr(), nc.RemoteAddr())
 				c.SetContext(ctx)
-				c.rawConn = uc
-				el.ch <- packUDPConn(c, buffer[:n])
+				c.rawConn = nc
+				cli.el.ch <- packUDPConn(c, buffer[:n])
 			}
-		}(nc, cli.el)
+		})
 		gc = c
 	default:
 		return nil, errorx.ErrUnsupportedProtocol

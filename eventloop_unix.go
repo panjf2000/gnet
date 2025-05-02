@@ -21,8 +21,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"os"
+	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"golang.org/x/sys/unix"
@@ -31,7 +34,9 @@ import (
 	gio "github.com/panjf2000/gnet/v2/pkg/io"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
 	"github.com/panjf2000/gnet/v2/pkg/netpoll"
+	"github.com/panjf2000/gnet/v2/pkg/pool/goroutine"
 	"github.com/panjf2000/gnet/v2/pkg/queue"
+	"github.com/panjf2000/gnet/v2/pkg/socket"
 )
 
 type eventloop struct {
@@ -42,6 +47,33 @@ type eventloop struct {
 	buffer       []byte            // read packet buffer whose capacity is set by user, default value is 64KB
 	connections  connMatrix        // loop connections storage
 	eventHandler EventHandler      // user eventHandler
+}
+
+func (el *eventloop) Register(addr net.Addr) error {
+	if el.engine.isShutdown() {
+		return errorx.ErrEngineShutdown
+	}
+
+	if addr == nil {
+		return errorx.ErrInvalidNetworkAddress
+	}
+
+	return el.enroll(addr)
+}
+
+func (el *eventloop) Execute(runnable Runnable) error {
+	if el.engine.isShutdown() {
+		return errorx.ErrEngineShutdown
+	}
+
+	if runnable == nil {
+		return errorx.ErrNilRunnable
+	}
+
+	return el.poller.Trigger(queue.LowPriority, func(any) error {
+		runnable.Run()
+		return nil
+	}, nil)
 }
 
 func (el *eventloop) getLogger() logging.Logger {
@@ -63,6 +95,84 @@ func (el *eventloop) closeConns() {
 type connWithCallback struct {
 	c  *conn
 	cb func()
+}
+
+func (el *eventloop) enroll(addr net.Addr) error {
+	return goroutine.DefaultWorkerPool.Submit(func() {
+		c, err := net.Dial(addr.Network(), addr.String())
+		if err != nil {
+			return
+		}
+		defer c.Close() //nolint:errcheck
+
+		sc, ok := c.(syscall.Conn)
+		if !ok {
+			el.getLogger().Errorf("failed to assert syscall.Conn from net.Conn: %s", addr.String())
+			return
+		}
+		rc, err := sc.SyscallConn()
+		if err != nil {
+			el.getLogger().Debugf("failed to get syscall.Conn from net.Conn: %s", addr.String())
+			return
+		}
+
+		var dupFD int
+		err1 := rc.Control(func(fd uintptr) {
+			dupFD, err = unix.Dup(int(fd))
+		})
+		if err != nil {
+			el.getLogger().Errorf("failed to duplicate %s fd: %s", addr.String(), err)
+			return
+		}
+		if err1 != nil {
+			el.getLogger().Errorf("failed to duplicate %s fd: %s", addr.String(), err1.Error())
+			return
+		}
+
+		var (
+			sockAddr unix.Sockaddr
+			gc       *conn
+		)
+		switch c.(type) {
+		case *net.UnixConn:
+			sockAddr, _, _, err = socket.GetUnixSockAddr(c.RemoteAddr().Network(), c.RemoteAddr().String())
+			if err != nil {
+				el.getLogger().Errorf("failed to get unix socket addr: %s", addr.String())
+				return
+			}
+			ua := c.LocalAddr().(*net.UnixAddr)
+			ua.Name = c.RemoteAddr().String() + "." + strconv.Itoa(dupFD)
+			gc = newTCPConn(dupFD, el, sockAddr, c.LocalAddr(), c.RemoteAddr())
+		case *net.TCPConn:
+			sockAddr, _, _, _, err = socket.GetTCPSockAddr(c.RemoteAddr().Network(), c.RemoteAddr().String())
+			if err != nil {
+				el.getLogger().Errorf("failed to get tcp socket addr: %s", addr.String())
+				return
+			}
+			gc = newTCPConn(dupFD, el, sockAddr, c.LocalAddr(), c.RemoteAddr())
+		case *net.UDPConn:
+			sockAddr, _, _, _, err = socket.GetUDPSockAddr(c.RemoteAddr().Network(), c.RemoteAddr().String())
+			if err != nil {
+				el.getLogger().Errorf("failed to get udp socket addr: %s", addr.String())
+				return
+			}
+			gc = newUDPConn(dupFD, el, c.LocalAddr(), sockAddr, true)
+		default:
+			el.getLogger().Errorf("unknown type of conn: %T", c)
+			return
+		}
+
+		connOpened := make(chan struct{})
+		ccb := &connWithCallback{c: gc, cb: func() {
+			close(connOpened)
+		}}
+		if err := el.poller.Trigger(queue.LowPriority, el.register, ccb); err != nil {
+			gc.Close() //nolint:errcheck
+			el.getLogger().Errorf("failed to register %s fd: %s", addr.String(), err)
+			return
+		}
+		<-connOpened
+	})
 }
 
 func (el *eventloop) register(a any) error {

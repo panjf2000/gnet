@@ -18,12 +18,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"runtime"
 	"sync/atomic"
 	"time"
 
 	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
+	"github.com/panjf2000/gnet/v2/pkg/pool/goroutine"
 )
 
 type eventloop struct {
@@ -33,6 +35,73 @@ type eventloop struct {
 	connCount    int32              // number of active connections in event-loop
 	connections  map[*conn]struct{} // TCP connection map: fd -> conn
 	eventHandler EventHandler       // user eventHandler
+}
+
+func (el *eventloop) Register(addr net.Addr) error {
+	if el.eng.isShutdown() {
+		return errorx.ErrEngineShutdown
+	}
+
+	if addr == nil {
+		return errorx.ErrInvalidNetworkAddress
+	}
+
+	return goroutine.DefaultWorkerPool.Submit(func() {
+		nc, err := net.Dial(addr.Network(), addr.String())
+		if err != nil {
+			el.getLogger().Errorf("failed to dial %s: %v", addr, err)
+			return
+		}
+		switch addr.Network() {
+		case "tcp", "tcp4", "tcp6", "unix":
+			c := newTCPConn(nc, el)
+			el.ch <- &openConn{c: c}
+			goroutine.DefaultWorkerPool.Submit(func() {
+				var buffer [0x10000]byte
+				for {
+					n, err := nc.Read(buffer[:])
+					if err != nil {
+						el.ch <- &netErr{c, err}
+						return
+					}
+					el.ch <- packTCPConn(c, buffer[:n])
+				}
+			})
+		case "udp", "udp4", "udp6":
+			c := newUDPConn(el, nil, nc.LocalAddr(), nc.RemoteAddr())
+			el.ch <- &openConn{c: c}
+			goroutine.DefaultWorkerPool.Submit(func() {
+				var buffer [0x10000]byte
+				for {
+					n, err := nc.Read(buffer[:])
+					if err != nil {
+						el.ch <- &netErr{c, err}
+						return
+					}
+					c := newUDPConn(el, nil, nc.LocalAddr(), nc.RemoteAddr())
+					c.rawConn = nc
+					el.ch <- packUDPConn(c, buffer[:n])
+				}
+			})
+		}
+	})
+}
+
+func (el *eventloop) Execute(runnable Runnable) error {
+	if el.eng.isShutdown() {
+		return errorx.ErrEngineShutdown
+	}
+
+	if runnable == nil {
+		return errorx.ErrNilRunnable
+	}
+
+	return goroutine.DefaultWorkerPool.Submit(func() {
+		el.ch <- func() error {
+			runnable.Run()
+			return nil
+		}
+	})
 }
 
 func (el *eventloop) getLogger() logging.Logger {

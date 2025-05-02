@@ -28,7 +28,7 @@ import (
 	"time"
 
 	"github.com/panjf2000/gnet/v2/pkg/buffer/ring"
-	"github.com/panjf2000/gnet/v2/pkg/errors"
+	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
 	"github.com/panjf2000/gnet/v2/pkg/math"
 )
@@ -56,10 +56,10 @@ type Engine struct {
 // Validate checks whether the engine is available.
 func (e Engine) Validate() error {
 	if e.eng == nil || len(e.eng.listeners) == 0 {
-		return errors.ErrEmptyEngine
+		return errorx.ErrEmptyEngine
 	}
 	if e.eng.isShutdown() {
-		return errors.ErrEngineInShutdown
+		return errorx.ErrEngineInShutdown
 	}
 	return nil
 }
@@ -77,6 +77,16 @@ func (e Engine) CountConnections() (count int) {
 	return
 }
 
+// Register connects to the given address and registers the corresponding socket
+// to the event-loop that is chosen based off of the algorithm set by WithLoadBalancing.
+func (e Engine) Register(addr net.Addr) error {
+	if err := e.Validate(); err != nil {
+		return err
+	}
+
+	return e.eng.eventLoops.next(addr).Register(addr)
+}
+
 // Dup returns a copy of the underlying file descriptor of listener.
 // It is the caller's responsibility to close dupFD when finished.
 // Closing listener does not affect dupFD, and closing dupFD does not affect listener.
@@ -88,7 +98,7 @@ func (e Engine) Dup() (fd int, err error) {
 	}
 
 	if len(e.eng.listeners) > 1 {
-		return -1, errors.ErrUnsupportedOp
+		return -1, errorx.ErrUnsupportedOp
 	}
 
 	for _, ln := range e.eng.listeners {
@@ -330,6 +340,26 @@ type Socket interface {
 	SetNoDelay(noDelay bool) error
 }
 
+// Runnable defines the common protocol of an execution on an event-loop.
+// This interface should be implemented and passed to an event-loop in some way,
+// then the event-loop invokes Run to perform the execution.
+// !!!Caution: Run must not contain any blocking operations like heavy disk or
+// network I/O, or else it will block the event-loop.
+type Runnable interface {
+	// Run is about to be executed by the event-loop.
+	Run()
+}
+
+// EventLoop provides a set of methods for manipulating the event-loop.
+// It's safe to invoke all methods of EventLoop in the event-loop.
+type EventLoop interface {
+	// Register connects to the given address and registers the corresponding socket
+	// to the current event-loop.
+	Register(addr net.Addr) error
+	// Execute executes the given runnable on the event-loop at some time in the future.
+	Execute(runnable Runnable) error
+}
+
 // Conn is an interface of underlying connection.
 type Conn interface {
 	Reader // all methods in Reader are not concurrency-safe.
@@ -339,6 +369,10 @@ type Conn interface {
 	// Context returns a user-defined context, it's not concurrency-safe,
 	// you must invoke it within any method in EventHandler.
 	Context() (ctx any)
+
+	// EventLoop returns the event-loop that the connection belongs to.
+	// The returned EventLoop is concurrency-safe.
+	EventLoop() EventLoop
 
 	// SetContext sets a user-defined context, it's not concurrency-safe,
 	// you must invoke it within any method in EventHandler.
@@ -475,7 +509,7 @@ func createListeners(addrs []string, opts ...Option) ([]*listener, *Options, err
 	if options.LockOSThread && options.NumEventLoop > 10000 {
 		logging.Errorf("too many event-loops under LockOSThread mode, should be less than 10,000 "+
 			"while you are trying to set up %d\n", options.NumEventLoop)
-		return nil, nil, errors.ErrTooManyEventLoopThreads
+		return nil, nil, errorx.ErrTooManyEventLoopThreads
 	}
 
 	if options.EdgeTriggeredIOChunk > 0 {
@@ -635,11 +669,11 @@ func Stop(ctx context.Context, protoAddr string) error {
 		eng.shutdown(nil)
 		defer allEngines.Delete(protoAddr)
 	} else {
-		return errors.ErrEngineInShutdown
+		return errorx.ErrEngineInShutdown
 	}
 
 	if eng.isShutdown() {
-		return errors.ErrEngineInShutdown
+		return errorx.ErrEngineInShutdown
 	}
 
 	ticker := time.NewTicker(shutdownPollInterval)
@@ -659,17 +693,17 @@ func Stop(ctx context.Context, protoAddr string) error {
 func parseProtoAddr(protoAddr string) (string, string, error) {
 	protoAddr = strings.ToLower(protoAddr)
 	if strings.Count(protoAddr, "://") != 1 {
-		return "", "", errors.ErrInvalidNetworkAddress
+		return "", "", errorx.ErrInvalidNetworkAddress
 	}
 	pair := strings.SplitN(protoAddr, "://", 2)
 	proto, addr := pair[0], pair[1]
 	switch proto {
 	case "tcp", "tcp4", "tcp6", "udp", "udp4", "udp6", "unix":
 	default:
-		return "", "", errors.ErrUnsupportedProtocol
+		return "", "", errorx.ErrUnsupportedProtocol
 	}
 	if addr == "" {
-		return "", "", errors.ErrInvalidNetworkAddress
+		return "", "", errorx.ErrInvalidNetworkAddress
 	}
 	return proto, addr, nil
 }

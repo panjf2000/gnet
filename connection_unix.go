@@ -519,6 +519,10 @@ func (c *conn) Close() error {
 	}, nil)
 }
 
+func (c *conn) EventLoop() EventLoop {
+	return c.loop
+}
+
 func (*conn) SetDeadline(_ time.Time) error {
 	return errorx.ErrUnsupportedOp
 }

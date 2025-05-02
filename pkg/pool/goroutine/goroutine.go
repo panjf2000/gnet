@@ -40,6 +40,9 @@ func init() {
 	ants.Release()
 }
 
+// DefaultWorkerPool is the global worker pool.
+var DefaultWorkerPool = Default()
+
 // Pool is the alias of ants.Pool.
 type Pool = ants.Pool
 

@@ -21,14 +21,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/panjf2000/ants/v2"
 	"golang.org/x/sys/windows"
 
 	"github.com/panjf2000/gnet/v2/pkg/buffer/elastic"
 	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
 	bbPool "github.com/panjf2000/gnet/v2/pkg/pool/bytebuffer"
 	bsPool "github.com/panjf2000/gnet/v2/pkg/pool/byteslice"
-	goPool "github.com/panjf2000/gnet/v2/pkg/pool/goroutine"
+	"github.com/panjf2000/gnet/v2/pkg/pool/goroutine"
 )
 
 type netErr struct {
@@ -419,19 +418,6 @@ func (c *conn) SetKeepAlivePeriod(d time.Duration) error {
 	return nil
 }
 
-type nonBlockingPool struct {
-	*goPool.Pool
-}
-
-func (np *nonBlockingPool) Go(task func()) (err error) {
-	if err = np.Submit(task); err == ants.ErrPoolOverload {
-		go task()
-	}
-	return
-}
-
-var workerPool = nonBlockingPool{Pool: goPool.Default()}
-
 // Gfd return an uninitialized GFD which is not valid,
 // this method is only implemented for compatibility, don't use it on Windows.
 // func (c *conn) Gfd() gfd.GFD { return gfd.GFD{} }
@@ -450,7 +436,7 @@ func (c *conn) AsyncWrite(buf []byte, cb AsyncCallback) error {
 	case c.loop.ch <- fn:
 	default:
 		// If the event-loop channel is full, asynchronize this operation to avoid blocking the eventloop.
-		err = workerPool.Go(func() {
+		err = goroutine.DefaultWorkerPool.Submit(func() {
 			c.loop.ch <- fn
 		})
 	}
@@ -489,7 +475,7 @@ func (c *conn) Wake(cb AsyncCallback) (err error) {
 	case c.loop.ch <- wakeFn:
 	default:
 		// If the event-loop channel is full, asynchronize this operation to avoid blocking the eventloop.
-		err = workerPool.Go(func() {
+		err = goroutine.DefaultWorkerPool.Submit(func() {
 			c.loop.ch <- wakeFn
 		})
 	}
@@ -506,7 +492,7 @@ func (c *conn) Close() (err error) {
 	case c.loop.ch <- closeFn:
 	default:
 		// If the event-loop channel is full, asynchronize this operation to avoid blocking the eventloop.
-		err = workerPool.Go(func() {
+		err = goroutine.DefaultWorkerPool.Submit(func() {
 			c.loop.ch <- closeFn
 		})
 	}
@@ -527,12 +513,16 @@ func (c *conn) CloseWithCallback(cb AsyncCallback) (err error) {
 	case c.loop.ch <- closeFn:
 	default:
 		// If the event-loop channel is full, asynchronize this operation to avoid blocking the eventloop.
-		err = workerPool.Go(func() {
+		err = goroutine.DefaultWorkerPool.Submit(func() {
 			c.loop.ch <- closeFn
 		})
 	}
 
 	return
+}
+
+func (c *conn) EventLoop() EventLoop {
+	return c.loop
 }
 
 func (*conn) SetDeadline(_ time.Time) error {

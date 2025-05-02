@@ -20,6 +20,7 @@ import (
 	"runtime"
 
 	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
+	"github.com/panjf2000/gnet/v2/pkg/pool/goroutine"
 )
 
 func (eng *engine) listenStream(ln net.Listener) (err error) {
@@ -45,7 +46,7 @@ func (eng *engine) listenStream(ln net.Listener) (err error) {
 		el := eng.eventLoops.next(tc.RemoteAddr())
 		c := newTCPConn(tc, el)
 		el.ch <- &openConn{c: c}
-		go func(c *conn, tc net.Conn, el *eventloop) {
+		goroutine.DefaultWorkerPool.Submit(func() {
 			var buffer [0x10000]byte
 			for {
 				n, err := tc.Read(buffer[:])
@@ -55,7 +56,7 @@ func (eng *engine) listenStream(ln net.Listener) (err error) {
 				}
 				el.ch <- packTCPConn(c, buffer[:n])
 			}
-		}(c, tc, el)
+		})
 	}
 }
 
