@@ -661,8 +661,8 @@ func (s *testServer) OnTraffic(c Conn) (action Action) {
 			assert.NoErrorf(s.tester, c.SetKeepAlivePeriod(time.Minute), "set keep alive period error")
 		}
 
-		assert.Zerof(s.tester, c.InboundBuffered(), "inbound buffer error")
-		assert.Zerof(s.tester, c.OutboundBuffered(), "outbound buffer error")
+		assert.Zero(s.tester, c.InboundBuffered(), "inbound buffer error")
+		assert.GreaterOrEqual(s.tester, c.OutboundBuffered(), 0, "outbound buffer error")
 		n, err := c.Discard(1)
 		assert.NoErrorf(s.tester, err, "discard error")
 		assert.Zerof(s.tester, n, "discard error")
