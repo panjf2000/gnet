@@ -598,6 +598,9 @@ func (s *testServer) OnTraffic(c Conn) (action Action) {
 			_ = c.InboundBuffered()
 			_ = c.OutboundBuffered()
 			_, _ = c.Discard(1)
+			assert.ErrorIs(s.tester, c.SetDeadline(time.Now().Add(time.Second)), errorx.ErrUnsupportedOp)
+			assert.ErrorIs(s.tester, c.SetReadDeadline(time.Now().Add(time.Second)), errorx.ErrUnsupportedOp)
+			assert.ErrorIs(s.tester, c.SetWriteDeadline(time.Now().Add(time.Second)), errorx.ErrUnsupportedOp)
 			_, err := c.SendTo(buf.Bytes(), c.RemoteAddr())
 			assert.ErrorIsf(s.tester, err, errorx.ErrUnsupportedOp,
 				"got error: %v, expected error: %v", err, errorx.ErrUnsupportedOp)
@@ -629,9 +632,15 @@ func (s *testServer) OnTraffic(c Conn) (action Action) {
 			return
 		} else if c.LocalAddr().Network() == "udp" {
 			// Only for test
-			_, err := c.SendTo(buf.Bytes(), nil)
+			n, err := c.Writev([][]byte{})
+			assert.ErrorIs(s.tester, err, errorx.ErrUnsupportedOp, "udp Writev error")
+			assert.Zero(s.tester, n, "udp Writev error")
+			err = c.AsyncWritev([][]byte{}, nil)
+			assert.ErrorIs(s.tester, err, errorx.ErrUnsupportedOp, "udp Writev error")
+			_, err = c.SendTo(buf.Bytes(), nil)
 			assert.ErrorIsf(s.tester, err, errorx.ErrInvalidNetworkAddress,
 				"got error: %v, expected error: %v", err, errorx.ErrInvalidNetworkAddress)
+
 			_ = s.workerPool.Submit(
 				func() {
 					_ = c.AsyncWrite(buf.Bytes(), nil)

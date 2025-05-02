@@ -29,7 +29,6 @@ import (
 	"github.com/panjf2000/gnet/v2/pkg/buffer/elastic"
 	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
 	gio "github.com/panjf2000/gnet/v2/pkg/io"
-	"github.com/panjf2000/gnet/v2/pkg/logging"
 	"github.com/panjf2000/gnet/v2/pkg/netpoll"
 	bsPool "github.com/panjf2000/gnet/v2/pkg/pool/byteslice"
 	"github.com/panjf2000/gnet/v2/pkg/queue"
@@ -158,11 +157,7 @@ loop:
 			}
 			return
 		}
-		if err := c.loop.close(c, os.NewSyscallError("write", err)); err != nil {
-			logging.Errorf("failed to close connection(fd=%d,remote=%+v) on conn.write: %v",
-				c.fd, c.remoteAddr, err)
-		}
-		return 0, os.NewSyscallError("write", err)
+		return 0, c.loop.close(c, os.NewSyscallError("write", err))
 	}
 	data = data[sent:]
 	if isET && len(data) > 0 {
@@ -206,11 +201,7 @@ loop:
 			}
 			return
 		}
-		if err := c.loop.close(c, os.NewSyscallError("writev", err)); err != nil {
-			logging.Errorf("failed to close connection(fd=%d,remote=%+v) on conn.writev: %v",
-				c.fd, c.remoteAddr, err)
-		}
-		return 0, os.NewSyscallError("writev", err)
+		return 0, c.loop.close(c, os.NewSyscallError("writev", err))
 	}
 	pos := len(bs)
 	if remaining -= sent; remaining > 0 {
