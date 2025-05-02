@@ -1972,7 +1972,12 @@ func (t *testUDPSendtoServer) OnTick() (delay time.Duration, action Action) {
 }
 
 func TestUDPSendtoServer(t *testing.T) {
-	addr := ":10000"
+	// The listening address without an explicit IP works on Linux and Windows
+	// while sendto fails on macOS with EINVAL (invalid argument) that might
+	// also occur on more BSD systems: FreeBSD, OpenBSD, NetBSD, and DragonflyBSD.
+	// To pass this test on all platforms, specify an explicit IP address here.
+	// addr := ":10000"
+	addr := "127.0.0.1:10000"
 	events := &testUDPSendtoServer{tester: t, addr: addr}
 	err := Run(events, "udp://"+addr, WithTicker(true))
 	assert.NoError(t, err)
