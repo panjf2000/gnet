@@ -581,12 +581,26 @@ func (s *testServer) OnOpen(c Conn) (out []byte, action Action) {
 }
 
 func (s *testServer) OnShutdown(_ Engine) {
-	fd, err := s.eng.Dup()
 	if len(s.addrs) > 1 {
+		fd, err := s.eng.Dup()
 		assert.ErrorIsf(s.tester, err, errorx.ErrUnsupportedOp, "dup error")
+		assert.EqualValuesf(s.tester, -1, fd, "expected fd: -1, but got: %d", fd)
+
+		addr := s.addrs[rand.Intn(len(s.addrs))]
+		network, address, _ := parseProtoAddr(addr)
+		fd, err = s.eng.DupListener(network, address)
+		assert.NoErrorf(s.tester, err, "DupListener error")
+		assert.Greaterf(s.tester, fd, 2, "expected duplicated fd: > 2, but got: %d", fd)
+		assert.NoErrorf(s.tester, SysClose(fd), "close fd error")
+
+		// Test invalid input
+		fd, err = s.eng.DupListener("tcp", "abc")
+		assert.ErrorIsf(s.tester, err, errorx.ErrInvalidNetworkAddress, "expected ErrInvalidNetworkAddress")
+		assert.EqualValuesf(s.tester, -1, fd, "expected fd: -1, but got: %d", fd)
 	} else {
-		assert.NoErrorf(s.tester, err, "dup error")
-		assert.Greaterf(s.tester, fd, 2, "expected fd: > 2, but got: %d", fd)
+		fd, err := s.eng.Dup()
+		assert.NoErrorf(s.tester, err, "Dup error")
+		assert.Greaterf(s.tester, fd, 2, "expected duplicated fd: > 2, but got: %d", fd)
 		assert.NoErrorf(s.tester, SysClose(fd), "close fd error")
 	}
 }

@@ -41,6 +41,11 @@ func (ev *clientEvents) OnBoot(e Engine) Action {
 	assert.ErrorIsf(ev.tester, err, errorx.ErrEmptyEngine, "expected error: %v, but got: %v",
 		errorx.ErrUnsupportedOp, err)
 	assert.EqualValuesf(ev.tester, fd, -1, "expected -1, but got: %d", fd)
+
+	fd, err = e.DupListener("tcp", "abc")
+	assert.ErrorIsf(ev.tester, err, errorx.ErrEmptyEngine, "expected error: %v, but got: %v",
+		errorx.ErrUnsupportedOp, err)
+	assert.EqualValuesf(ev.tester, fd, -1, "expected -1, but got: %d", fd)
 	return None
 }
 
@@ -83,6 +88,11 @@ func (ev *clientEvents) OnTick() (delay time.Duration, action Action) {
 
 func (ev *clientEvents) OnShutdown(e Engine) {
 	fd, err := e.Dup()
+	assert.ErrorIsf(ev.tester, err, errorx.ErrEmptyEngine, "expected error: %v, but got: %v",
+		errorx.ErrUnsupportedOp, err)
+	assert.EqualValuesf(ev.tester, fd, -1, "expected -1, but got: %d", fd)
+
+	fd, err = e.DupListener("tcp", "abc")
 	assert.ErrorIsf(ev.tester, err, errorx.ErrEmptyEngine, "expected error: %v, but got: %v",
 		errorx.ErrUnsupportedOp, err)
 	assert.EqualValuesf(ev.tester, fd, -1, "expected -1, but got: %d", fd)
