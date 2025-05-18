@@ -2072,17 +2072,19 @@ type streamProxyServer struct {
 	connected    int32
 	disconnected int32
 
-	backendAddrMu  sync.Mutex
-	once           sync.Once
+	backendServerPoolMu   sync.Mutex
+	backendServerPoolOnce sync.Once
+	backendServerPool     []string
+
 	backendServers []string
 
-	backendListenerMu sync.Mutex
-	backendListeners  []net.Listener
+	backendListenersMu sync.Mutex
+	backendListeners   []net.Listener
 }
 
 func (p *streamProxyServer) OnShutdown(_ Engine) {
-	p.backendListenerMu.Lock()
-	defer p.backendListenerMu.Unlock()
+	p.backendListenersMu.Lock()
+	defer p.backendListenersMu.Unlock()
 
 	for _, ln := range p.backendListeners {
 		if err := ln.Close(); err != nil {
@@ -2096,10 +2098,10 @@ func (p *streamProxyServer) OnShutdown(_ Engine) {
 func (p *streamProxyServer) OnOpen(c Conn) (out []byte, action Action) {
 	if c.LocalAddr().String() == p.ListenerAddr { // it's a server connection
 		out = []byte("andypan\r\n")
-		p.backendAddrMu.Lock()
-		backendServer := p.backendServers[len(p.backendServers)-1]
-		p.backendServers = p.backendServers[:len(p.backendServers)-1]
-		p.backendAddrMu.Unlock()
+		p.backendServerPoolMu.Lock()
+		backendServer := p.backendServerPool[len(p.backendServerPool)-1]
+		p.backendServerPool = p.backendServerPool[:len(p.backendServerPool)-1]
+		p.backendServerPoolMu.Unlock()
 
 		network, addr, err := parseProtoAddr(backendServer)
 		assert.NoError(p.tester, err, "parseProtoAddr error")
@@ -2166,8 +2168,8 @@ func (p *streamProxyServer) OnTraffic(c Conn) Action {
 }
 
 func (p *streamProxyServer) OnTick() (time.Duration, Action) {
-	p.once.Do(func() {
-		p.backendListenerMu.Lock()
+	p.backendServerPoolOnce.Do(func() {
+		p.backendListenersMu.Lock()
 		for _, backendServer := range p.backendServers {
 			network, addr, _ := parseProtoAddr(backendServer)
 			ln, err := net.Listen(network, addr)
@@ -2178,16 +2180,14 @@ func (p *streamProxyServer) OnTick() (time.Duration, Action) {
 			assert.NoErrorf(p.tester, err, "Start backend server %s error: %v", backendServer, err)
 			p.backendListeners = append(p.backendListeners, ln)
 		}
-		p.backendListenerMu.Unlock()
+		p.backendListenersMu.Unlock()
 
-		p.backendAddrMu.Lock()
 		for i := 0; i < len(p.backendServers); i++ {
 			err := goPool.DefaultWorkerPool.Submit(func() {
 				startClient(p.tester, p.ListenerNet, p.ListenerAddr, true, false)
 			})
 			assert.NoErrorf(p.tester, err, "Submit backend server %s error: %v", p.ListenerAddr, err)
 		}
-		p.backendAddrMu.Unlock()
 	})
 
 	return time.Millisecond * 200, None
@@ -2238,10 +2238,11 @@ func testStreamProxyServer(t *testing.T, addr string, backendAddrs []string) {
 	}
 
 	srv := streamProxyServer{
-		tester:         t,
-		ListenerNet:    network,
-		ListenerAddr:   address,
-		backendServers: backendServers,
+		tester:            t,
+		ListenerNet:       network,
+		ListenerAddr:      address,
+		backendServers:    backendServers,
+		backendServerPool: backendServers,
 	}
 
 	err := Run(&srv, addr, WithMulticore(true), WithTicker(true))
