@@ -574,7 +574,7 @@ func (s *testServer) OnBoot(eng Engine) (action Action) {
 func (s *testServer) OnOpen(c Conn) (out []byte, action Action) {
 	c.SetContext(c)
 	atomic.AddInt32(&s.connected, 1)
-	out = []byte("sweetness\r\n")
+	out = []byte("andypan\r\n")
 	assert.NotNil(s.tester, c.LocalAddr(), "nil local addr")
 	assert.NotNil(s.tester, c.RemoteAddr(), "nil remote addr")
 	return
@@ -796,7 +796,7 @@ func startClient(t *testing.T, network, addr string, multicore, async bool) {
 	if network != "udp" {
 		msg, err := rd.ReadBytes('\n')
 		assert.NoError(t, err)
-		assert.Equal(t, string(msg), "sweetness\r\n", "bad header")
+		assert.Equal(t, string(msg), "andypan\r\n", "bad header")
 	}
 	duration := time.Duration((rand.Float64()*2+1)*float64(time.Second)) / 2
 	logging.Debugf("test duration: %v", duration)
@@ -1688,7 +1688,7 @@ func (s *simServer) OnBoot(eng Engine) (action Action) {
 func (s *simServer) OnOpen(c Conn) (out []byte, action Action) {
 	c.SetContext(&testCodec{})
 	atomic.AddInt32(&s.connected, 1)
-	out = []byte("sweetness\r\n")
+	out = []byte("andypan\r\n")
 	assert.NotNil(s.tester, c.LocalAddr(), "nil local addr")
 	assert.NotNil(s.tester, c.RemoteAddr(), "nil remote addr")
 	return
@@ -1896,7 +1896,7 @@ func runSimClient(t *testing.T, network, addr string, packetSize, batch int) {
 	rd := bufio.NewReader(c)
 	msg, err := rd.ReadBytes('\n')
 	assert.NoError(t, err)
-	assert.Equal(t, string(msg), "sweetness\r\n", "bad header")
+	assert.Equal(t, string(msg), "andypan\r\n", "bad header")
 	var duration time.Duration
 	packetBytes := packetSize * batch
 	switch {
@@ -2027,4 +2027,221 @@ func TestUDPSendtoServer(t *testing.T) {
 	events := &testUDPSendtoServer{tester: t, addr: addr}
 	err := Run(events, "udp://"+addr, WithTicker(true))
 	assert.NoError(t, err)
+}
+
+func startStreamEchoServer(t *testing.T, ln net.Listener) {
+	for {
+		c, err := ln.Accept()
+		if err != nil {
+			logging.Debugf("error occurred on TCP echo server %s accept, %v", ln.Addr().String(), err)
+			return
+		}
+
+		err = goPool.DefaultWorkerPool.Submit(func() {
+			defer c.Close() //nolint:errcheck
+
+			buf := make([]byte, streamLen)
+			for {
+				n, err := c.Read(buf)
+				if err != nil {
+					logging.Debugf("error occurred on TCP echo server %s read from %s, %v",
+						ln.Addr().String(), c.RemoteAddr().String(), err)
+					break
+				}
+				_, err = c.Write(buf[:n])
+				assert.NoErrorf(t, err, "error occurred on TCP echo server %s write to %s, %v",
+					ln.Addr().String(), c.RemoteAddr().String(), err)
+				if err != nil {
+					break
+				}
+			}
+		})
+		assert.NoError(t, err, "error occurred on TCP echo server %s submit task, %v",
+			ln.Addr().String(), err)
+	}
+}
+
+type streamProxyServer struct {
+	BuiltinEventEngine
+
+	tester       *testing.T
+	ListenerNet  string
+	ListenerAddr string
+
+	connected    int32
+	disconnected int32
+
+	backendAddrMu  sync.Mutex
+	once           sync.Once
+	backendServers []string
+
+	backendListenerMu sync.Mutex
+	backendListeners  []net.Listener
+}
+
+func (p *streamProxyServer) OnShutdown(_ Engine) {
+	p.backendListenerMu.Lock()
+	defer p.backendListenerMu.Unlock()
+
+	for _, ln := range p.backendListeners {
+		if err := ln.Close(); err != nil {
+			logging.Debugf("error occurred on backend listener closing, %v", err)
+		}
+	}
+
+	logging.Debugf("proxy server %s shutdown!", p.ListenerAddr)
+}
+
+func (p *streamProxyServer) OnOpen(c Conn) (out []byte, action Action) {
+	if c.LocalAddr().String() == p.ListenerAddr { // it's a server connection
+		out = []byte("andypan\r\n")
+		p.backendAddrMu.Lock()
+		backendServer := p.backendServers[len(p.backendServers)-1]
+		p.backendServers = p.backendServers[:len(p.backendServers)-1]
+		p.backendAddrMu.Unlock()
+
+		network, addr, err := parseProtoAddr(backendServer)
+		assert.NoError(p.tester, err, "parseProtoAddr error")
+		var address net.Addr
+		if p.ListenerNet == "tcp" {
+			address, err = net.ResolveTCPAddr(network, addr)
+		} else {
+			address, err = net.ResolveUnixAddr(network, addr)
+		}
+		assert.NoError(p.tester, err, "ResolveNetAddr error")
+		ctx := NewContext(context.Background(), c)
+		err = c.EventLoop().Register(ctx, address)
+		assert.NoError(p.tester, err, "Register connection error")
+		atomic.AddInt32(&p.connected, 1)
+	} else { // it's a client connection
+		// Store the client connection in the context of the server connection.
+		serverConn := c.Context().(Conn)
+		serverConn.SetContext(c)
+	}
+
+	return
+}
+
+func (p *streamProxyServer) OnClose(c Conn, err error) (action Action) {
+	connType := "client"
+	if c.LocalAddr().String() == p.ListenerAddr {
+		connType = "server"
+	}
+	logging.Debugf("closing %s connection: %s", connType, c.LocalAddr().String())
+
+	if err != nil {
+		logging.Debugf("error occurred on server connnection closing, %v", err)
+	}
+
+	if c.LocalAddr().String() == p.ListenerAddr { // it's a server connection
+		if err := c.EventLoop().Close(c); err != nil {
+			logging.Debugf("error occurred on client connection closing, %v", err)
+		}
+		if atomic.AddInt32(&p.disconnected, 1) == atomic.LoadInt32(&p.connected) {
+			action = Shutdown
+		}
+	}
+
+	return
+}
+
+func (p *streamProxyServer) OnTraffic(c Conn) Action {
+	connType := "client"
+	if c.LocalAddr().String() == p.ListenerAddr {
+		connType = "server"
+	}
+
+	pc, ok := c.Context().(Conn)
+	if !ok {
+		logging.Debugf("connection %s context is not ready, retry...", c.LocalAddr().String())
+		return None
+	}
+
+	_, err := c.WriteTo(pc)
+	assert.NoErrorf(p.tester, err, "%s: Write error from %s to %s",
+		connType, c.LocalAddr().String(), p.ListenerAddr)
+	return None
+}
+
+func (p *streamProxyServer) OnTick() (time.Duration, Action) {
+	p.once.Do(func() {
+		p.backendListenerMu.Lock()
+		defer p.backendListenerMu.Unlock()
+
+		for _, backendServer := range p.backendServers {
+			network, addr, _ := parseProtoAddr(backendServer)
+			ln, err := net.Listen(network, addr)
+			assert.NoErrorf(p.tester, err, "Create backend server %s error: %v", backendServer, err)
+			err = goPool.DefaultWorkerPool.Submit(func() {
+				startStreamEchoServer(p.tester, ln)
+			})
+			assert.NoErrorf(p.tester, err, "Start backend server %s error: %v", backendServer, err)
+			p.backendListeners = append(p.backendListeners, ln)
+		}
+
+		p.backendAddrMu.Lock()
+		for i := 0; i < len(p.backendServers); i++ {
+			err := goPool.DefaultWorkerPool.Submit(func() {
+				startClient(p.tester, p.ListenerNet, p.ListenerAddr, true, false)
+			})
+			assert.NoErrorf(p.tester, err, "Submit backend server %s error: %v", p.ListenerAddr, err)
+		}
+		p.backendAddrMu.Unlock()
+	})
+	return time.Millisecond * 200, None
+}
+
+func TestStreamProxyServer(t *testing.T) {
+	t.Run("tcp-proxy-server", func(t *testing.T) {
+		addr := "tcp://127.0.0.1:10000"
+		backendServers := []string{
+			"127.0.0.1:10001",
+			"127.0.0.1:10002",
+			"127.0.0.1:10003",
+			"127.0.0.1:10004",
+			"127.0.0.1:10005",
+			"127.0.0.1:10006",
+			"127.0.0.1:10007",
+			"127.0.0.1:10008",
+			"127.0.0.1:10009",
+			"127.0.0.1:10010",
+		}
+		testStreamProxyServer(t, addr, backendServers)
+	})
+
+	t.Run("unix-proxy-server", func(t *testing.T) {
+		addr := "unix://unix-proxy-server.sock"
+		backendServers := []string{
+			"unix-proxy-server-1.sock",
+			"unix-proxy-server-2.sock",
+			"unix-proxy-server-3.sock",
+			"unix-proxy-server-4.sock",
+			"unix-proxy-server-5.sock",
+			"unix-proxy-server-6.sock",
+			"unix-proxy-server-7.sock",
+			"unix-proxy-server-8.sock",
+			"unix-proxy-server-9.sock",
+			"unix-proxy-server-10.sock",
+		}
+		testStreamProxyServer(t, addr, backendServers)
+	})
+}
+
+func testStreamProxyServer(t *testing.T, addr string, backendAddrs []string) {
+	network, address, _ := parseProtoAddr(addr)
+
+	backendServers := make([]string, len(backendAddrs))
+	for i, addr := range backendAddrs {
+		backendServers[i] = network + "://" + addr
+	}
+
+	srv := streamProxyServer{
+		tester:         t,
+		ListenerNet:    network,
+		ListenerAddr:   address,
+		backendServers: backendServers,
+	}
+
+	err := Run(&srv, addr, WithMulticore(true), WithTicker(true))
+	assert.NoErrorf(t, err, "Run error: %v", err)
 }

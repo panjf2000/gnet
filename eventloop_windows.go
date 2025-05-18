@@ -37,7 +37,7 @@ type eventloop struct {
 	eventHandler EventHandler       // user eventHandler
 }
 
-func (el *eventloop) Register(addr net.Addr) error {
+func (el *eventloop) Register(ctx context.Context, addr net.Addr) error {
 	if el.eng.isShutdown() {
 		return errorx.ErrEngineShutdown
 	}
@@ -52,9 +52,11 @@ func (el *eventloop) Register(addr net.Addr) error {
 			el.getLogger().Errorf("failed to dial %s: %v", addr, err)
 			return
 		}
+
 		switch addr.Network() {
 		case "tcp", "tcp4", "tcp6", "unix":
 			c := newTCPConn(nc, el)
+			c.ctx = FromContext(ctx)
 			el.ch <- &openConn{c: c}
 			goroutine.DefaultWorkerPool.Submit(func() {
 				var buffer [0x10000]byte
@@ -69,6 +71,7 @@ func (el *eventloop) Register(addr net.Addr) error {
 			})
 		case "udp", "udp4", "udp6":
 			c := newUDPConn(el, nil, nc.LocalAddr(), nc.RemoteAddr())
+			c.ctx = FromContext(ctx)
 			el.ch <- &openConn{c: c}
 			goroutine.DefaultWorkerPool.Submit(func() {
 				var buffer [0x10000]byte
@@ -87,7 +90,7 @@ func (el *eventloop) Register(addr net.Addr) error {
 	})
 }
 
-func (el *eventloop) Execute(runnable Runnable) error {
+func (el *eventloop) Execute(_ context.Context, runnable Runnable) error {
 	if el.eng.isShutdown() {
 		return errorx.ErrEngineShutdown
 	}
@@ -102,6 +105,10 @@ func (el *eventloop) Execute(runnable Runnable) error {
 			return nil
 		}
 	})
+}
+
+func (el *eventloop) Close(c Conn) error {
+	return el.close(c.(*conn), nil)
 }
 
 func (el *eventloop) getLogger() logging.Logger {

@@ -49,7 +49,7 @@ type eventloop struct {
 	eventHandler EventHandler      // user eventHandler
 }
 
-func (el *eventloop) Register(addr net.Addr) error {
+func (el *eventloop) Register(ctx context.Context, addr net.Addr) error {
 	if el.engine.isShutdown() {
 		return errorx.ErrEngineShutdown
 	}
@@ -58,10 +58,10 @@ func (el *eventloop) Register(addr net.Addr) error {
 		return errorx.ErrInvalidNetworkAddress
 	}
 
-	return el.enroll(addr)
+	return el.enroll(addr, FromContext(ctx))
 }
 
-func (el *eventloop) Execute(runnable Runnable) error {
+func (el *eventloop) Execute(_ context.Context, runnable Runnable) error {
 	if el.engine.isShutdown() {
 		return errorx.ErrEngineShutdown
 	}
@@ -74,6 +74,10 @@ func (el *eventloop) Execute(runnable Runnable) error {
 		runnable.Run()
 		return nil
 	}, nil)
+}
+
+func (el *eventloop) Close(c Conn) error {
+	return el.close(c.(*conn), nil)
 }
 
 func (el *eventloop) getLogger() logging.Logger {
@@ -97,7 +101,7 @@ type connWithCallback struct {
 	cb func()
 }
 
-func (el *eventloop) enroll(addr net.Addr) error {
+func (el *eventloop) enroll(addr net.Addr, ctx any) error {
 	return goroutine.DefaultWorkerPool.Submit(func() {
 		c, err := net.Dial(addr.Network(), addr.String())
 		if err != nil {
@@ -161,6 +165,8 @@ func (el *eventloop) enroll(addr net.Addr) error {
 			el.getLogger().Errorf("unknown type of conn: %T", c)
 			return
 		}
+
+		gc.ctx = ctx
 
 		connOpened := make(chan struct{})
 		ccb := &connWithCallback{c: gc, cb: func() {

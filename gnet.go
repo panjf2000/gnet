@@ -79,12 +79,12 @@ func (e Engine) CountConnections() (count int) {
 
 // Register connects to the given address and registers the corresponding socket
 // to the event-loop that is chosen based off of the algorithm set by WithLoadBalancing.
-func (e Engine) Register(addr net.Addr) error {
+func (e Engine) Register(ctx context.Context, addr net.Addr) error {
 	if err := e.Validate(); err != nil {
 		return err
 	}
 
-	return e.eng.eventLoops.next(addr).Register(addr)
+	return e.eng.eventLoops.next(addr).Register(ctx, addr)
 }
 
 // Dup returns a copy of the underlying file descriptor of listener.
@@ -121,7 +121,7 @@ func (e Engine) DupListener(network, addr string) (int, error) {
 		}
 	}
 
-	return -1, errors.ErrInvalidNetworkAddress
+	return -1, errorx.ErrInvalidNetworkAddress
 }
 
 // Stop gracefully shuts down this Engine without interrupting any active event-loops,
@@ -350,14 +350,33 @@ type Runnable interface {
 	Run()
 }
 
+// contextKey is a key for Conn values in context.Context.
+type contextKey struct{}
+
+// NewContext returns a new context.Context that carries the value Conn.
+func NewContext(ctx context.Context, v any) context.Context {
+	return context.WithValue(ctx, contextKey{}, v)
+}
+
+// FromContext returns the Conn value stored in ctx, if any.
+func FromContext(ctx context.Context) any {
+	return ctx.Value(contextKey{})
+}
+
 // EventLoop provides a set of methods for manipulating the event-loop.
-// It's safe to invoke all methods of EventLoop in the event-loop.
 type EventLoop interface {
+	// Concurrency-safe methods
+
 	// Register connects to the given address and registers the corresponding socket
 	// to the current event-loop.
-	Register(addr net.Addr) error
+	Register(ctx context.Context, addr net.Addr) error
 	// Execute executes the given runnable on the event-loop at some time in the future.
-	Execute(runnable Runnable) error
+	Execute(ctx context.Context, runnable Runnable) error
+
+	// Concurrency-unsafe methods
+
+	// Close closes the given Conn that belongs to the current event-loop.
+	Close(Conn) error
 }
 
 // Conn is an interface of underlying connection.
