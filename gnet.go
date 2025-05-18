@@ -82,7 +82,7 @@ func (e Engine) CountConnections() (count int) {
 // Closing listener does not affect dupFD, and closing dupFD does not affect listener.
 //
 // Note that this method is only available when the engine has only one listener.
-func (e Engine) Dup() (int, error) {
+func (e Engine) Dup() (fd int, err error) {
 	if err := e.Validate(); err != nil {
 		return -1, err
 	}
@@ -92,23 +92,25 @@ func (e Engine) Dup() (int, error) {
 	}
 
 	for _, ln := range e.eng.listeners {
-		return ln.dup()
+		fd, err = ln.dup()
 	}
 
-	return -1, nil
+	return
 }
 
 // DupListener is like Dup, but it duplicates the listener with the given network and address.
 // This is useful when there are multiple listeners.
-func (e Engine) DupListener(network, addr string) (fd int, err error) {
+func (e Engine) DupListener(network, addr string) (int, error) {
 	if err := e.Validate(); err != nil {
 		return -1, err
 	}
+
 	for _, ln := range e.eng.listeners {
 		if ln.network == network && ln.address == addr {
 			return ln.dup()
 		}
 	}
+
 	return -1, errors.ErrInvalidNetworkAddress
 }
 

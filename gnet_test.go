@@ -557,6 +557,11 @@ func (s *testServer) OnBoot(eng Engine) (action Action) {
 		assert.NoErrorf(s.tester, err, "DupListener error")
 		assert.Greaterf(s.tester, fd, 2, "expected duplicated fd: > 2, but got: %d", fd)
 		assert.NoErrorf(s.tester, SysClose(fd), "close fd error")
+
+		// Test invalid input
+		fd, err = s.eng.DupListener("tcp", "abc")
+		assert.ErrorIsf(s.tester, err, errorx.ErrInvalidNetworkAddress, "expected ErrInvalidNetworkAddress")
+		assert.EqualValuesf(s.tester, -1, fd, "expected fd: -1, but got: %d", fd)
 	} else {
 		fd, err := s.eng.Dup()
 		assert.NoErrorf(s.tester, err, "Dup error")
