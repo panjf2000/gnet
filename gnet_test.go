@@ -2042,15 +2042,21 @@ func startStreamEchoServer(t *testing.T, ln net.Listener) {
 
 			buf := make([]byte, streamLen)
 			for {
-				n, err := c.Read(buf)
+				nr, err := c.Read(buf)
 				if err != nil {
 					logging.Debugf("error occurred on TCP echo server %s read from %s, %v",
 						ln.Addr().String(), c.RemoteAddr().String(), err)
 					break
 				}
-				_, err = c.Write(buf[:n])
-				assert.NoErrorf(t, err, "error occurred on TCP echo server %s write to %s, %v",
-					ln.Addr().String(), c.RemoteAddr().String(), err)
+				b := buf[:nr]
+				for nr > 0 {
+					nw, err := c.Write(b)
+					assert.NoErrorf(t, err, "error occurred on TCP echo server %s write to %s, %v",
+						ln.Addr().String(), c.RemoteAddr().String(), err)
+					nr -= nw
+					b = b[nw:]
+
+				}
 				if err != nil {
 					break
 				}
