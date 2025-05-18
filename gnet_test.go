@@ -2049,16 +2049,11 @@ func startStreamEchoServer(t *testing.T, ln net.Listener) {
 					break
 				}
 				b := buf[:nr]
-				for nr > 0 {
+				for len(b) > 0 {
 					nw, err := c.Write(b)
 					assert.NoErrorf(t, err, "error occurred on TCP echo server %s write to %s, %v",
 						ln.Addr().String(), c.RemoteAddr().String(), err)
-					nr -= nw
 					b = b[nw:]
-
-				}
-				if err != nil {
-					break
 				}
 			}
 		})
@@ -2140,9 +2135,10 @@ func (p *streamProxyServer) OnClose(c Conn, err error) (action Action) {
 	}
 
 	if c.LocalAddr().String() == p.ListenerAddr { // it's a server connection
-		if err := c.EventLoop().Close(c); err != nil {
+		if err := c.EventLoop().Close(c.Context().(Conn)); err != nil { // close the corresponding client connection
 			logging.Debugf("error occurred on client connection closing, %v", err)
 		}
+
 		if atomic.AddInt32(&p.disconnected, 1) == atomic.LoadInt32(&p.connected) {
 			action = Shutdown
 		}
@@ -2172,8 +2168,6 @@ func (p *streamProxyServer) OnTraffic(c Conn) Action {
 func (p *streamProxyServer) OnTick() (time.Duration, Action) {
 	p.once.Do(func() {
 		p.backendListenerMu.Lock()
-		defer p.backendListenerMu.Unlock()
-
 		for _, backendServer := range p.backendServers {
 			network, addr, _ := parseProtoAddr(backendServer)
 			ln, err := net.Listen(network, addr)
@@ -2184,6 +2178,7 @@ func (p *streamProxyServer) OnTick() (time.Duration, Action) {
 			assert.NoErrorf(p.tester, err, "Start backend server %s error: %v", backendServer, err)
 			p.backendListeners = append(p.backendListeners, ln)
 		}
+		p.backendListenerMu.Unlock()
 
 		p.backendAddrMu.Lock()
 		for i := 0; i < len(p.backendServers); i++ {
@@ -2194,6 +2189,7 @@ func (p *streamProxyServer) OnTick() (time.Duration, Action) {
 		}
 		p.backendAddrMu.Unlock()
 	})
+
 	return time.Millisecond * 200, None
 }
 
