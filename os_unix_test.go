@@ -18,7 +18,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/unix"
 
 	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
@@ -47,7 +46,7 @@ func TestServeMulticast(t *testing.T) {
 	})
 	t.Run("IPv6", func(t *testing.T) {
 		iface, err := findLoopbackInterface()
-		require.NoError(t, err)
+		assert.NoError(t, err)
 		if iface.Flags&net.FlagMulticast != net.FlagMulticast {
 			t.Skip("multicast is not supported on loopback interface")
 		}
@@ -111,7 +110,7 @@ func (s *testMcastServer) startMcastClient() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	c, err := net.Dial("udp", s.addr)
-	require.NoError(s.t, err)
+	assert.NoError(s.t, err)
 	defer c.Close() //nolint:errcheck
 	ch := make(chan []byte, 10000)
 	s.mcast.Store(c.LocalAddr().String(), ch)
@@ -121,17 +120,17 @@ func (s *testMcastServer) startMcastClient() {
 	for time.Since(start) < duration {
 		reqData := make([]byte, 1024)
 		_, err = crand.Read(reqData)
-		require.NoError(s.t, err)
+		assert.NoError(s.t, err)
 		_, err = c.Write(reqData)
-		require.NoError(s.t, err)
+		assert.NoError(s.t, err)
 		// Workaround for MacOS "write: no buffer space available" error messages
 		// https://developer.apple.com/forums/thread/42334
 		time.Sleep(time.Millisecond * 100)
 		select {
 		case respData := <-ch:
-			require.Equalf(s.t, reqData, respData, "response mismatch, length of bytes: %d vs %d", len(reqData), len(respData))
+			assert.Equalf(s.t, reqData, respData, "response mismatch, length of bytes: %d vs %d", len(reqData), len(respData))
 		case <-ctx.Done():
-			require.Fail(s.t, "timeout receiving message")
+			assert.Fail(s.t, "timeout receiving message")
 			return
 		}
 	}
@@ -142,7 +141,7 @@ func (s *testMcastServer) OnTraffic(c Conn) (action Action) {
 	b := make([]byte, len(buf))
 	copy(b, buf)
 	ch, ok := s.mcast.Load(c.RemoteAddr().String())
-	require.True(s.t, ok)
+	assert.True(s.t, ok)
 	ch.(chan []byte) <- b
 	return
 }
@@ -177,7 +176,7 @@ func (t *testMulticastBindServer) OnTick() (delay time.Duration, action Action) 
 func TestMulticastBindIPv4(t *testing.T) {
 	ts := &testMulticastBindServer{}
 	iface, err := findLoopbackInterface()
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	err = Run(ts, "udp://224.0.0.169:9991",
 		WithMulticastInterfaceIndex(iface.Index),
 		WithTicker(true))
@@ -187,7 +186,7 @@ func TestMulticastBindIPv4(t *testing.T) {
 func TestMulticastBindIPv6(t *testing.T) {
 	ts := &testMulticastBindServer{}
 	iface, err := findLoopbackInterface()
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	err = Run(ts, fmt.Sprintf("udp://[ff02::3%%%s]:9991", iface.Name),
 		WithMulticastInterfaceIndex(iface.Index),
 		WithTicker(true))
@@ -343,7 +342,7 @@ func TestBindToDevice(t *testing.T) {
 				loopBackAddr:    &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 9999, Zone: ""},
 				eth0Addr:        &net.TCPAddr{IP: ip, Port: 9999, Zone: ""},
 			}
-			require.NoError(t, err)
+			assert.NoError(t, err)
 			err = Run(ts, "tcp://0.0.0.0:9999",
 				WithTicker(true),
 				WithBindToDevice(dev))
@@ -359,7 +358,7 @@ func TestBindToDevice(t *testing.T) {
 				eth0Addr:        &net.UDPAddr{IP: ip, Port: 9999, Zone: ""},
 				broadcastAddr:   &net.UDPAddr{IP: net.IPv4bcast, Port: 9999, Zone: ""},
 			}
-			require.NoError(t, err)
+			assert.NoError(t, err)
 			err = Run(ts, "udp://0.0.0.0:9999",
 				WithTicker(true),
 				WithBindToDevice(dev))
@@ -378,7 +377,7 @@ func TestBindToDevice(t *testing.T) {
 				loopBackAddr:    &net.TCPAddr{IP: net.IPv6loopback, Port: 9999, Zone: lp.Name},
 				eth0Addr:        &net.TCPAddr{IP: ip, Port: 9999, Zone: dev},
 			}
-			require.NoError(t, err)
+			assert.NoError(t, err)
 			err = Run(ts, "tcp6://[::]:9999",
 				WithTicker(true),
 				WithBindToDevice(dev))
@@ -396,7 +395,7 @@ func TestBindToDevice(t *testing.T) {
 				eth0Addr:        &net.UDPAddr{IP: ip, Port: 9999, Zone: dev},
 				broadcastAddr:   &net.UDPAddr{IP: net.IPv6linklocalallnodes, Port: 9999, Zone: dev},
 			}
-			require.NoError(t, err)
+			assert.NoError(t, err)
 			err = Run(ts, "udp6://[::]:9999",
 				WithTicker(true),
 				WithBindToDevice(dev))
@@ -450,8 +449,8 @@ func (s *testEngineAsyncWriteServer) OnOpen(c Conn) (out []byte, action Action) 
 	c.SetContext(c)
 	atomic.AddInt32(&s.connected, 1)
 	out = []byte("sweetness\r\n")
-	require.NotNil(s.tester, c.LocalAddr(), "nil local addr")
-	require.NotNil(s.tester, c.RemoteAddr(), "nil remote addr")
+	assert.NotNil(s.tester, c.LocalAddr(), "nil local addr")
+	assert.NotNil(s.tester, c.RemoteAddr(), "nil remote addr")
 	return
 }
 
@@ -460,7 +459,7 @@ func (s *testEngineAsyncWriteServer) OnClose(c Conn, err error) (action Action) 
 		logging.Debugf("error occurred on closed, %v\n", err)
 	}
 	if s.network != "udp" {
-		require.Equal(s.tester, c.Context(), c, "invalid context")
+		assert.Equal(s.tester, c.Context(), c, "invalid context")
 	}
 
 	atomic.AddInt32(&s.disconnected, 1)
@@ -550,25 +549,25 @@ func testEngineAsyncWrite(t *testing.T, network, addr string, multicore, writev 
 func initClient(t *testing.T, network, addr string, multicore bool) {
 	rand.Seed(time.Now().UnixNano())
 	c, err := net.Dial(network, addr)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	defer c.Close()
 	rd := bufio.NewReader(c)
 	msg, err := rd.ReadBytes('\n')
-	require.NoError(t, err)
-	require.Equal(t, string(msg), "sweetness\r\n", "bad header")
+	assert.NoError(t, err)
+	assert.Equal(t, string(msg), "sweetness\r\n", "bad header")
 	duration := time.Duration((rand.Float64()*2+1)*float64(time.Second)) / 2
 	t.Logf("test duration: %dms", duration/time.Millisecond)
 	start := time.Now()
 	for time.Since(start) < duration {
 		reqData := make([]byte, streamLen)
 		_, err = rand.Read(reqData)
-		require.NoError(t, err)
+		assert.NoError(t, err)
 		_, err = c.Write(reqData)
-		require.NoError(t, err)
+		assert.NoError(t, err)
 		respData := make([]byte, len(reqData))
 		_, err = io.ReadFull(rd, respData)
-		require.NoError(t, err)
-		require.Equalf(
+		assert.NoError(t, err)
+		assert.Equalf(
 			t,
 			len(reqData),
 			len(respData),
@@ -622,11 +621,11 @@ func (t *testEngineWakeConnServer) OnTick() (delay time.Duration, action Action)
 		delay = time.Millisecond * 100
 		go func() {
 			conn, err := net.Dial(t.network, t.addr)
-			require.NoError(t.tester, err)
+			assert.NoError(t.tester, err)
 			defer conn.Close()
 			r := make([]byte, 10)
 			_, err = conn.Read(r)
-			require.NoError(t.tester, err)
+			assert.NoError(t.tester, err)
 		}()
 		return
 	}
@@ -684,14 +683,14 @@ func (s *testEngineClosedWakeUpServer) OnBoot(eng Engine) (action Action) {
 	s.eng = eng
 	go func() {
 		c, err := net.Dial(s.network, s.addr)
-		require.NoError(s.tester, err)
+		assert.NoError(s.tester, err)
 
 		_, err = c.Write([]byte("hello"))
-		require.NoError(s.tester, err)
+		assert.NoError(s.tester, err)
 
 		<-s.wakeup
 		_, err = c.Write([]byte("hello again"))
-		require.NoError(s.tester, err)
+		assert.NoError(s.tester, err)
 
 		close(s.clientClosed)
 		<-s.serverClosed
@@ -713,7 +712,7 @@ func (s *testEngineClosedWakeUpServer) OnTraffic(c Conn) Action {
 
 	fd := c.Gfd()
 
-	go func() { require.NoError(s.tester, c.Wake(nil)) }()
+	go func() { assert.NoError(s.tester, c.Wake(nil)) }()
 	go s.eng.Close(fd, nil)
 
 	<-s.clientClosed

@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
@@ -547,12 +546,26 @@ type testServer struct {
 
 func (s *testServer) OnBoot(eng Engine) (action Action) {
 	s.eng = eng
-	fd, err := s.eng.Dup()
 	if len(s.addrs) > 1 {
+		fd, err := s.eng.Dup()
 		assert.ErrorIsf(s.tester, err, errorx.ErrUnsupportedOp, "dup error")
+		assert.EqualValuesf(s.tester, -1, fd, "expected fd: -1, but got: %d", fd)
+
+		addr := s.addrs[rand.Intn(len(s.addrs))]
+		network, address, _ := parseProtoAddr(addr)
+		fd, err = s.eng.DupListener(network, address)
+		assert.NoErrorf(s.tester, err, "DupListener error")
+		assert.Greaterf(s.tester, fd, 2, "expected duplicated fd: > 2, but got: %d", fd)
+		assert.NoErrorf(s.tester, SysClose(fd), "close fd error")
+
+		// Test invalid input
+		fd, err = s.eng.DupListener("tcp", "abc")
+		assert.ErrorIsf(s.tester, err, errorx.ErrInvalidNetworkAddress, "expected ErrInvalidNetworkAddress")
+		assert.EqualValuesf(s.tester, -1, fd, "expected fd: -1, but got: %d", fd)
 	} else {
-		require.NoErrorf(s.tester, err, "dup error")
-		assert.Greaterf(s.tester, fd, 2, "expected fd: > 2, but got: %d", fd)
+		fd, err := s.eng.Dup()
+		assert.NoErrorf(s.tester, err, "Dup error")
+		assert.Greaterf(s.tester, fd, 2, "expected duplicated fd: > 2, but got: %d", fd)
 		assert.NoErrorf(s.tester, SysClose(fd), "close fd error")
 	}
 	return
@@ -562,18 +575,32 @@ func (s *testServer) OnOpen(c Conn) (out []byte, action Action) {
 	c.SetContext(c)
 	atomic.AddInt32(&s.connected, 1)
 	out = []byte("sweetness\r\n")
-	require.NotNil(s.tester, c.LocalAddr(), "nil local addr")
-	require.NotNil(s.tester, c.RemoteAddr(), "nil remote addr")
+	assert.NotNil(s.tester, c.LocalAddr(), "nil local addr")
+	assert.NotNil(s.tester, c.RemoteAddr(), "nil remote addr")
 	return
 }
 
 func (s *testServer) OnShutdown(_ Engine) {
-	fd, err := s.eng.Dup()
 	if len(s.addrs) > 1 {
+		fd, err := s.eng.Dup()
 		assert.ErrorIsf(s.tester, err, errorx.ErrUnsupportedOp, "dup error")
+		assert.EqualValuesf(s.tester, -1, fd, "expected fd: -1, but got: %d", fd)
+
+		addr := s.addrs[rand.Intn(len(s.addrs))]
+		network, address, _ := parseProtoAddr(addr)
+		fd, err = s.eng.DupListener(network, address)
+		assert.NoErrorf(s.tester, err, "DupListener error")
+		assert.Greaterf(s.tester, fd, 2, "expected duplicated fd: > 2, but got: %d", fd)
+		assert.NoErrorf(s.tester, SysClose(fd), "close fd error")
+
+		// Test invalid input
+		fd, err = s.eng.DupListener("tcp", "abc")
+		assert.ErrorIsf(s.tester, err, errorx.ErrInvalidNetworkAddress, "expected ErrInvalidNetworkAddress")
+		assert.EqualValuesf(s.tester, -1, fd, "expected fd: -1, but got: %d", fd)
 	} else {
-		require.NoErrorf(s.tester, err, "dup error")
-		assert.Greaterf(s.tester, fd, 2, "expected fd: > 2, but got: %d", fd)
+		fd, err := s.eng.Dup()
+		assert.NoErrorf(s.tester, err, "Dup error")
+		assert.Greaterf(s.tester, fd, 2, "expected duplicated fd: > 2, but got: %d", fd)
 		assert.NoErrorf(s.tester, SysClose(fd), "close fd error")
 	}
 }
@@ -583,7 +610,7 @@ func (s *testServer) OnClose(c Conn, err error) (action Action) {
 		logging.Debugf("error occurred on closed, %v\n", err)
 	}
 
-	require.Equal(s.tester, c.Context(), c, "invalid context")
+	assert.Equal(s.tester, c.Context(), c, "invalid context")
 
 	atomic.AddInt32(&s.disconnected, 1)
 	return
@@ -642,7 +669,7 @@ func (s *testServer) OnTraffic(c Conn) (action Action) {
 		assert.NoErrorf(s.tester, c.Flush(), "flush error")
 		_ = c.Fd()
 		fd, err := c.Dup()
-		require.NoErrorf(s.tester, err, "dup error")
+		assert.NoErrorf(s.tester, err, "dup error")
 		assert.Greaterf(s.tester, fd, 2, "expected fd: > 2, but got: %d", fd)
 		assert.NoErrorf(s.tester, SysClose(fd), "close error")
 		// TODO(panjf2000): somehow these two system calls will fail with Unix Domain Socket,
@@ -716,7 +743,7 @@ func (s *testServer) OnTick() (delay time.Duration, action Action) {
 		if int(disconnected) == streamConns && disconnected == atomic.LoadInt32(&s.connected) {
 			action = Shutdown
 			s.workerPool.Release()
-			require.EqualValues(s.tester, 0, s.eng.CountConnections())
+			assert.EqualValues(s.tester, 0, s.eng.CountConnections())
 		}
 	}
 	return
@@ -763,13 +790,13 @@ func runServer(t *testing.T, addrs []string, conf *testConf) {
 
 func startClient(t *testing.T, network, addr string, multicore, async bool) {
 	c, err := net.Dial(network, addr)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	defer c.Close() //nolint:errcheck
 	rd := bufio.NewReader(c)
 	if network != "udp" {
 		msg, err := rd.ReadBytes('\n')
-		require.NoError(t, err)
-		require.Equal(t, string(msg), "sweetness\r\n", "bad header")
+		assert.NoError(t, err)
+		assert.Equal(t, string(msg), "sweetness\r\n", "bad header")
 	}
 	duration := time.Duration((rand.Float64()*2+1)*float64(time.Second)) / 2
 	logging.Debugf("test duration: %v", duration)
@@ -780,15 +807,15 @@ func startClient(t *testing.T, network, addr string, multicore, async bool) {
 			reqData = reqData[:datagramLen]
 		}
 		_, err = crand.Read(reqData)
-		require.NoError(t, err)
+		assert.NoError(t, err)
 		_, err = c.Write(reqData)
-		require.NoError(t, err)
+		assert.NoError(t, err)
 		respData := make([]byte, len(reqData))
 		_, err = io.ReadFull(rd, respData)
-		require.NoError(t, err)
+		assert.NoError(t, err)
 		if !async {
-			// require.Equalf(t, reqData, respData, "response mismatch with protocol:%s, multi-core:%t, content of bytes: %d vs %d", network, multicore, string(reqData), string(respData))
-			require.Equalf(
+			// assert.Equalf(t, reqData, respData, "response mismatch with protocol:%s, multi-core:%t, content of bytes: %d vs %d", network, multicore, string(reqData), string(respData))
+			assert.Equalf(
 				t,
 				reqData,
 				respData,
@@ -896,11 +923,11 @@ func (t *testWakeConnServer) OnTick() (delay time.Duration, action Action) {
 		delay = time.Millisecond * 100
 		go func() {
 			conn, err := net.Dial(t.network, t.addr)
-			require.NoError(t.tester, err)
+			assert.NoError(t.tester, err)
 			defer conn.Close() //nolint:errcheck
 			r := make([]byte, 10)
 			_, err = conn.Read(r)
-			require.NoError(t.tester, err)
+			assert.NoError(t.tester, err)
 		}()
 		return
 	}
@@ -954,7 +981,7 @@ func (t *testShutdownServer) OnBoot(eng Engine) (action Action) {
 }
 
 func (t *testShutdownServer) OnOpen(Conn) (out []byte, action Action) {
-	require.EqualValues(t.tester, atomic.AddInt32(&t.clients, 1), t.eng.CountConnections())
+	assert.EqualValues(t.tester, atomic.AddInt32(&t.clients, 1), t.eng.CountConnections())
 	return
 }
 
@@ -969,10 +996,10 @@ func (t *testShutdownServer) OnTick() (delay time.Duration, action Action) {
 		for i := 0; i < t.N; i++ {
 			go func() {
 				conn, err := net.Dial(t.network, t.addr)
-				require.NoError(t.tester, err)
+				assert.NoError(t.tester, err)
 				defer conn.Close() //nolint:errcheck
 				_, err = conn.Read([]byte{0})
-				require.Error(t.tester, err)
+				assert.Error(t.tester, err)
 			}()
 		}
 	} else if int(atomic.LoadInt32(&t.clients)) == t.N {
@@ -998,7 +1025,7 @@ func testShutdown(t *testing.T, network, addr string) {
 		WithReadBufferCap(512),
 		WithWriteBufferCap(512))
 	assert.NoError(t, err)
-	require.Equal(t, 0, int(events.clients), "did not close all clients")
+	assert.Equal(t, 0, int(events.clients), "did not close all clients")
 }
 
 func TestCloseActionError(t *testing.T) {
@@ -1036,12 +1063,12 @@ func (t *testCloseActionErrorServer) OnTick() (delay time.Duration, action Actio
 		delay = time.Millisecond * 100
 		go func() {
 			conn, err := net.Dial(t.network, t.addr)
-			require.NoError(t.tester, err)
+			assert.NoError(t.tester, err)
 			defer conn.Close() //nolint:errcheck
 			data := []byte("Hello World!")
 			_, _ = conn.Write(data)
 			_, err = conn.Read(data)
-			require.NoError(t.tester, err)
+			assert.NoError(t.tester, err)
 		}()
 		return
 	}
@@ -1080,12 +1107,12 @@ func (t *testShutdownActionErrorServer) OnTick() (delay time.Duration, action Ac
 		delay = time.Millisecond * 100
 		go func() {
 			conn, err := net.Dial(t.network, t.addr)
-			require.NoError(t.tester, err)
+			assert.NoError(t.tester, err)
 			defer conn.Close() //nolint:errcheck
 			data := []byte("Hello World!")
 			_, _ = conn.Write(data)
 			_, err = conn.Read(data)
-			require.NoError(t.tester, err)
+			assert.NoError(t.tester, err)
 		}()
 		return
 	}
@@ -1126,7 +1153,7 @@ func (t *testCloseActionOnOpenServer) OnTick() (delay time.Duration, action Acti
 		delay = time.Millisecond * 100
 		go func() {
 			conn, err := net.Dial(t.network, t.addr)
-			require.NoError(t.tester, err)
+			assert.NoError(t.tester, err)
 			defer conn.Close() //nolint:errcheck
 		}()
 		return
@@ -1162,7 +1189,7 @@ func (t *testShutdownActionOnOpenServer) OnShutdown(e Engine) {
 	t.eng = e
 	fd, err := t.eng.Dup()
 	assert.Greaterf(t.tester, fd, 2, "expected fd: > 2, but got: %d", fd)
-	require.NoErrorf(t.tester, err, "dup error")
+	assert.NoErrorf(t.tester, err, "dup error")
 	assert.NoErrorf(t.tester, SysClose(fd), "close error")
 	logging.Debugf("dup fd: %d with error: %v\n", fd, err)
 }
@@ -1173,7 +1200,7 @@ func (t *testShutdownActionOnOpenServer) OnTick() (delay time.Duration, action A
 		delay = time.Millisecond * 100
 		go func() {
 			conn, err := net.Dial(t.network, t.addr)
-			require.NoError(t.tester, err)
+			assert.NoError(t.tester, err)
 			defer conn.Close() //nolint:errcheck
 		}()
 		return
@@ -1217,13 +1244,13 @@ func (t *testUDPShutdownServer) OnTick() (delay time.Duration, action Action) {
 		delay = time.Millisecond * 100
 		go func() {
 			conn, err := net.Dial(t.network, t.addr)
-			require.NoError(t.tester, err)
+			assert.NoError(t.tester, err)
 			defer conn.Close() //nolint:errcheck
 			data := []byte("Hello World!")
 			_, err = conn.Write(data)
-			require.NoError(t.tester, err)
+			assert.NoError(t.tester, err)
 			_, err = conn.Read(data)
-			require.NoError(t.tester, err)
+			assert.NoError(t.tester, err)
 		}()
 		return
 	}
@@ -1273,15 +1300,15 @@ func (t *testCloseConnectionServer) OnTick() (delay time.Duration, action Action
 		t.action = true
 		go func() {
 			conn, err := net.Dial(t.network, t.addr)
-			require.NoError(t.tester, err)
+			assert.NoError(t.tester, err)
 			defer conn.Close() //nolint:errcheck
 			data := []byte("Hello World!")
 			_, _ = conn.Write(data)
 			_, err = conn.Read(data)
-			require.NoError(t.tester, err)
+			assert.NoError(t.tester, err)
 			// waiting the engine shutdown.
 			_, err = conn.Read(data)
-			require.Error(t.tester, err)
+			assert.Error(t.tester, err)
 		}()
 		return
 	}
@@ -1334,12 +1361,12 @@ func (t *testStopServer) OnTick() (delay time.Duration, action Action) {
 		t.action = true
 		go func() {
 			conn, err := net.Dial(t.network, t.addr)
-			require.NoError(t.tester, err)
+			assert.NoError(t.tester, err)
 			defer conn.Close() //nolint:errcheck
 			data := []byte("Hello World!")
 			_, _ = conn.Write(data)
 			_, err = conn.Read(data)
-			require.NoError(t.tester, err)
+			assert.NoError(t.tester, err)
 
 			go func() {
 				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -1349,7 +1376,7 @@ func (t *testStopServer) OnTick() (delay time.Duration, action Action) {
 
 			// waiting the engine shutdown.
 			_, err = conn.Read(data)
-			require.Error(t.tester, err)
+			assert.Error(t.tester, err)
 		}()
 		return
 	}
@@ -1398,12 +1425,12 @@ func (t *testStopEngine) OnTick() (delay time.Duration, action Action) {
 	delay = time.Millisecond * 100
 	go func() {
 		conn, err := net.Dial(t.network, t.addr)
-		require.NoError(t.tester, err)
+		assert.NoError(t.tester, err)
 		defer conn.Close() //nolint:errcheck
 		data := []byte("Hello World! " + t.name)
 		_, _ = conn.Write(data)
 		_, err = conn.Read(data)
-		require.NoError(t.tester, err)
+		assert.NoError(t.tester, err)
 
 		iter := atomic.LoadInt64(&t.stopIter)
 		if iter <= 0 {
@@ -1412,7 +1439,7 @@ func (t *testStopEngine) OnTick() (delay time.Duration, action Action) {
 			logging.Debugf("stop engine...", t.eng.Stop(ctx))
 			// waiting the engine shutdown.
 			_, err = conn.Read(data)
-			require.Error(t.tester, err)
+			assert.Error(t.tester, err)
 		}
 		atomic.AddInt64(&t.stopIter, -1)
 	}()
@@ -1441,11 +1468,11 @@ func testEngineStop(t *testing.T, network, addr string) {
 	err = <-result2
 	assert.NoError(t, err)
 	// make sure that each handler processed at least 1
-	require.Greater(t, events1.exchngCount, int64(0))
-	require.Greater(t, events2.exchngCount, int64(0))
-	require.Equal(t, int64(2+1+5+1), events1.exchngCount+events2.exchngCount)
+	assert.Greater(t, events1.exchngCount, int64(0))
+	assert.Greater(t, events2.exchngCount, int64(0))
+	assert.Equal(t, int64(2+1+5+1), events1.exchngCount+events2.exchngCount)
 	// stop an already stopped engine
-	require.Equal(t, errorx.ErrEngineInShutdown, events1.eng.Stop(context.Background()))
+	assert.Equal(t, errorx.ErrEngineInShutdown, events1.eng.Stop(context.Background()))
 }
 
 // Test should not panic when we wake-up server_closed conn.
@@ -1475,14 +1502,14 @@ type testClosedWakeUpServer struct {
 func (s *testClosedWakeUpServer) OnBoot(eng Engine) (action Action) {
 	go func() {
 		c, err := net.Dial(s.network, s.addr)
-		require.NoError(s.tester, err)
+		assert.NoError(s.tester, err)
 
 		_, err = c.Write([]byte("hello"))
-		require.NoError(s.tester, err)
+		assert.NoError(s.tester, err)
 
 		<-s.wakeup
 		_, err = c.Write([]byte("hello again"))
-		require.NoError(s.tester, err)
+		assert.NoError(s.tester, err)
 
 		close(s.clientClosed)
 		<-s.serverClosed
@@ -1502,8 +1529,8 @@ func (s *testClosedWakeUpServer) OnTraffic(c Conn) Action {
 		close(s.wakeup)
 	}
 
-	go func() { require.NoError(s.tester, c.Wake(nil)) }()
-	go func() { require.NoError(s.tester, c.Close()) }()
+	go func() { assert.NoError(s.tester, c.Wake(nil)) }()
+	go func() { assert.NoError(s.tester, c.Close()) }()
 
 	<-s.clientClosed
 
@@ -1562,7 +1589,7 @@ type testDisconnectedAsyncWriteServer struct {
 
 func (t *testDisconnectedAsyncWriteServer) OnTraffic(c Conn) Action {
 	_, err := c.Next(0)
-	require.NoErrorf(t.tester, err, "c.Next error: %v", err)
+	assert.NoErrorf(t.tester, err, "c.Next error: %v", err)
 
 	go func() {
 		for range time.Tick(100 * time.Millisecond) {
@@ -1576,7 +1603,7 @@ func (t *testDisconnectedAsyncWriteServer) OnTraffic(c Conn) Action {
 						return nil
 					}
 
-					require.ErrorIsf(t.tester, err, net.ErrClosed, "expected error: %v, but got: %v", net.ErrClosed, err)
+					assert.ErrorIsf(t.tester, err, net.ErrClosed, "expected error: %v, but got: %v", net.ErrClosed, err)
 					t.exit.Store(true)
 					return nil
 				})
@@ -1586,7 +1613,7 @@ func (t *testDisconnectedAsyncWriteServer) OnTraffic(c Conn) Action {
 						return nil
 					}
 
-					require.ErrorIsf(t.tester, err, net.ErrClosed, "expected error: %v, but got: %v", net.ErrClosed, err)
+					assert.ErrorIsf(t.tester, err, net.ErrClosed, "expected error: %v, but got: %v", net.ErrClosed, err)
 					t.exit.Store(true)
 					return nil
 				})
@@ -1613,10 +1640,10 @@ func (t *testDisconnectedAsyncWriteServer) OnTick() (delay time.Duration, action
 		t.clientStarted = true
 		go func() {
 			c, err := net.Dial("tcp", t.addr)
-			require.NoError(t.tester, err)
+			assert.NoError(t.tester, err)
 			_, err = c.Write([]byte("hello"))
-			require.NoError(t.tester, err)
-			require.NoError(t.tester, c.Close())
+			assert.NoError(t.tester, err)
+			assert.NoError(t.tester, c.Close())
 		}()
 	}
 	return
@@ -1662,8 +1689,8 @@ func (s *simServer) OnOpen(c Conn) (out []byte, action Action) {
 	c.SetContext(&testCodec{})
 	atomic.AddInt32(&s.connected, 1)
 	out = []byte("sweetness\r\n")
-	require.NotNil(s.tester, c.LocalAddr(), "nil local addr")
-	require.NotNil(s.tester, c.RemoteAddr(), "nil remote addr")
+	assert.NotNil(s.tester, c.LocalAddr(), "nil local addr")
+	assert.NotNil(s.tester, c.RemoteAddr(), "nil remote addr")
 	return
 }
 
@@ -1864,12 +1891,12 @@ func runSimServer(t *testing.T, addr string, et bool, nclients, packetSize, batc
 
 func runSimClient(t *testing.T, network, addr string, packetSize, batch int) {
 	c, err := net.Dial(network, addr)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	defer c.Close() //nolint:errcheck
 	rd := bufio.NewReader(c)
 	msg, err := rd.ReadBytes('\n')
-	require.NoError(t, err)
-	require.Equal(t, string(msg), "sweetness\r\n", "bad header")
+	assert.NoError(t, err)
+	assert.Equal(t, string(msg), "sweetness\r\n", "bad header")
 	var duration time.Duration
 	packetBytes := packetSize * batch
 	switch {
@@ -1899,21 +1926,21 @@ func batchSendAndRecv(t *testing.T, c net.Conn, rd *bufio.Reader, packetSize, ba
 	for i := 0; i < batch; i++ {
 		req := make([]byte, packetSize)
 		_, err := crand.Read(req)
-		require.NoError(t, err)
+		assert.NoError(t, err)
 		requests = append(requests, req)
 		packet, _ := codec.Encode(req)
 		packetLen = len(packet)
 		buf = append(buf, packet...)
 	}
 	_, err := c.Write(buf)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	respPacket := make([]byte, batch*packetLen)
 	_, err = io.ReadFull(rd, respPacket)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	for i, req := range requests {
 		rsp, err := codec.Unpack(respPacket[i*packetLen:])
-		require.NoError(t, err)
-		require.Equalf(t, req, rsp, "request and response mismatch, packet size: %d, batch: %d, round: %d",
+		assert.NoError(t, err)
+		assert.Equalf(t, req, rsp, "request and response mismatch, packet size: %d, batch: %d, round: %d",
 			packetSize, batch, i)
 	}
 }

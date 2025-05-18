@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
 	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
@@ -39,7 +38,12 @@ type clientEvents struct {
 
 func (ev *clientEvents) OnBoot(e Engine) Action {
 	fd, err := e.Dup()
-	require.ErrorIsf(ev.tester, err, errorx.ErrEmptyEngine, "expected error: %v, but got: %v",
+	assert.ErrorIsf(ev.tester, err, errorx.ErrEmptyEngine, "expected error: %v, but got: %v",
+		errorx.ErrUnsupportedOp, err)
+	assert.EqualValuesf(ev.tester, fd, -1, "expected -1, but got: %d", fd)
+
+	fd, err = e.DupListener("tcp", "abc")
+	assert.ErrorIsf(ev.tester, err, errorx.ErrEmptyEngine, "expected error: %v, but got: %v",
 		errorx.ErrUnsupportedOp, err)
 	assert.EqualValuesf(ev.tester, fd, -1, "expected -1, but got: %d", fd)
 	return None
@@ -84,7 +88,12 @@ func (ev *clientEvents) OnTick() (delay time.Duration, action Action) {
 
 func (ev *clientEvents) OnShutdown(e Engine) {
 	fd, err := e.Dup()
-	require.ErrorIsf(ev.tester, err, errorx.ErrEmptyEngine, "expected error: %v, but got: %v",
+	assert.ErrorIsf(ev.tester, err, errorx.ErrEmptyEngine, "expected error: %v, but got: %v",
+		errorx.ErrUnsupportedOp, err)
+	assert.EqualValuesf(ev.tester, fd, -1, "expected -1, but got: %d", fd)
+
+	fd, err = e.DupListener("tcp", "abc")
+	assert.ErrorIsf(ev.tester, err, errorx.ErrEmptyEngine, "expected error: %v, but got: %v",
 		errorx.ErrUnsupportedOp, err)
 	assert.EqualValuesf(ev.tester, fd, -1, "expected -1, but got: %d", fd)
 }
@@ -378,8 +387,8 @@ func (s *testClient) OnBoot(eng Engine) (action Action) {
 func (s *testClient) OnOpen(c Conn) (out []byte, action Action) {
 	c.SetContext(&sync.Once{})
 	atomic.AddInt32(&s.connected, 1)
-	require.NotNil(s.tester, c.LocalAddr(), "nil local addr")
-	require.NotNil(s.tester, c.RemoteAddr(), "nil remote addr")
+	assert.NotNil(s.tester, c.LocalAddr(), "nil local addr")
+	assert.NotNil(s.tester, c.RemoteAddr(), "nil remote addr")
 	return
 }
 
@@ -388,7 +397,7 @@ func (s *testClient) OnClose(c Conn, err error) (action Action) {
 		logging.Debugf("error occurred on closed, %v\n", err)
 	}
 	if s.network != "udp" {
-		require.IsType(s.tester, c.Context(), new(sync.Once), "invalid context")
+		assert.IsType(s.tester, c.Context(), new(sync.Once), "invalid context")
 	}
 
 	atomic.AddInt32(&s.disconnected, 1)
@@ -403,7 +412,7 @@ func (s *testClient) OnClose(c Conn, err error) (action Action) {
 
 func (s *testClient) OnShutdown(Engine) {
 	if s.network == "udp" {
-		require.EqualValues(s.tester, int32(s.nclients), atomic.LoadInt32(&s.udpReadHeader))
+		assert.EqualValues(s.tester, int32(s.nclients), atomic.LoadInt32(&s.udpReadHeader))
 	}
 }
 
@@ -411,9 +420,9 @@ func (s *testClient) OnTraffic(c Conn) (action Action) {
 	readHeader := func() {
 		ping := make([]byte, len(pingMsg))
 		n, err := io.ReadFull(c, ping)
-		require.NoError(s.tester, err)
-		require.EqualValues(s.tester, len(pingMsg), n)
-		require.Equal(s.tester, string(pingMsg), string(ping), "bad header")
+		assert.NoError(s.tester, err)
+		assert.EqualValues(s.tester, len(pingMsg), n)
+		assert.Equal(s.tester, string(pingMsg), string(ping), "bad header")
 	}
 	v := c.Context()
 	if v != nil {
@@ -438,7 +447,7 @@ func (s *testClient) OnTraffic(c Conn) (action Action) {
 			func() {
 				if buf.Len() > 0 {
 					err := c.AsyncWrite(buf.Bytes(), nil)
-					require.NoError(s.tester, err)
+					assert.NoError(s.tester, err)
 				}
 			})
 		return
@@ -451,8 +460,8 @@ func (s *testClient) OnTraffic(c Conn) (action Action) {
 	}
 	if len(buf) > 0 {
 		n, err := c.Write(buf)
-		require.NoError(s.tester, err)
-		require.EqualValues(s.tester, len(buf), n)
+		assert.NoError(s.tester, err)
+		assert.EqualValues(s.tester, len(buf), n)
 	}
 	return
 }
@@ -527,15 +536,15 @@ func startGnetClient(t *testing.T, cli *Client, network, addr string, multicore,
 	if netDial {
 		var netConn net.Conn
 		netConn, err = stdDial(network, addr)
-		require.NoError(t, err)
+		assert.NoError(t, err)
 		c, err = cli.EnrollContext(netConn, handler)
 	} else {
 		c, err = cli.DialContext(network, addr, handler)
 	}
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	defer c.Close() //nolint:errcheck
 	err = c.Wake(nil)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	rspCh := handler.rspCh
 	duration := time.Duration((rand.Float64()*2+1)*float64(time.Second)) / 2
 	logging.Debugf("test duration: %v", duration)
@@ -546,14 +555,14 @@ func startGnetClient(t *testing.T, cli *Client, network, addr string, multicore,
 			reqData = reqData[:datagramLen]
 		}
 		_, err = crand.Read(reqData)
-		require.NoError(t, err)
+		assert.NoError(t, err)
 		err = c.AsyncWrite(reqData, nil)
-		require.NoError(t, err)
+		assert.NoError(t, err)
 		respData := <-rspCh
-		require.NoError(t, err)
+		assert.NoError(t, err)
 		if !async {
-			// require.Equalf(t, reqData, respData, "response mismatch with protocol:%s, multi-core:%t, content of bytes: %d vs %d", network, multicore, string(reqData), string(respData))
-			require.Equalf(
+			// assert.Equalf(t, reqData, respData, "response mismatch with protocol:%s, multi-core:%t, content of bytes: %d vs %d", network, multicore, string(reqData), string(respData))
+			assert.Equalf(
 				t,
 				reqData,
 				respData,
