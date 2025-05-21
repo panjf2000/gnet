@@ -2096,6 +2096,7 @@ func (p *streamProxyServer) OnShutdown(_ Engine) {
 }
 
 func (p *streamProxyServer) OnOpen(c Conn) (out []byte, action Action) {
+	p.tester.Logf("open connection %s", c.LocalAddr().String())
 	if c.LocalAddr().String() == p.ListenerAddr { // it's a server connection
 		out = []byte("andypan\r\n")
 		p.backendServerPoolMu.Lock()
@@ -2115,7 +2116,8 @@ func (p *streamProxyServer) OnOpen(c Conn) (out []byte, action Action) {
 		ctx := NewContext(context.Background(), c)
 		err = c.EventLoop().Register(ctx, address)
 		assert.NoError(p.tester, err, "Register connection error")
-		atomic.AddInt32(&p.connected, 1)
+		count := atomic.AddInt32(&p.connected, 1)
+		p.tester.Logf("connected %d clients", count)
 	} else { // it's a client connection
 		// Store the client connection in the context of the server connection.
 		serverConn := c.Context().(Conn)
