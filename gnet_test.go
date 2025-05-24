@@ -2432,7 +2432,6 @@ func (p *udpProxyServer) OnBoot(eng Engine) (action Action) {
 }
 
 func (p *udpProxyServer) OnOpen(c Conn) (out []byte, action Action) {
-	p.tester.Logf("OnOpen connection %s", c.RemoteAddr().String())
 	p.backendServerPoolMu.Lock()
 	p.backendServerPool = append(p.backendServerPool, c)
 	p.backendServerPoolMu.Unlock()
