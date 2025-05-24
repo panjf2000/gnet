@@ -2495,8 +2495,8 @@ func (p *udpProxyServer) OnTick() (delay time.Duration, action Action) {
 	})
 	p.startClientOnce.Do(func() {
 		for i := 0; i < len(p.backendServers); i++ {
+			atomic.AddInt32(&p.activeClients, 1)
 			err := goPool.DefaultWorkerPool.Submit(func() {
-				atomic.AddInt32(&p.activeClients, 1)
 				startClient(p.tester, p.ListenerNet, p.ListenerAddr,
 					true, false, p.packetSize, p.stallCh)
 				atomic.AddInt32(&p.activeClients, -1)
