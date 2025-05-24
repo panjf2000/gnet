@@ -2616,6 +2616,7 @@ func testUDPProxyServer(t *testing.T, addr string, backendServers []string, mult
 	}
 
 	err = Run(&srv, addr,
+		WithLoadBalancing(LeastConnections),
 		WithEdgeTriggeredIO(et),
 		WithMulticore(multicore),
 		WithTicker(true))
