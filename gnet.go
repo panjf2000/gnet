@@ -347,7 +347,15 @@ type Socket interface {
 // network I/O, or else it will block the event-loop.
 type Runnable interface {
 	// Run is about to be executed by the event-loop.
-	Run()
+	Run(ctx context.Context) error
+}
+
+// RunnableFunc is an adapter to allow the use of ordinary function as a Runnable.
+type RunnableFunc func(ctx context.Context) error
+
+// Run executes the RunnableFunc itself.
+func (fn RunnableFunc) Run(ctx context.Context) error {
+	return fn(ctx)
 }
 
 // contextKey is a key for Conn values in context.Context.

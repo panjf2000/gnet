@@ -39,7 +39,7 @@ type eventloop struct {
 
 func (el *eventloop) Register(ctx context.Context, addr net.Addr) (<-chan RegisteredResult, error) {
 	if el.eng.isShutdown() {
-		return nil, errorx.ErrEngineShutdown
+		return nil, errorx.ErrEngineInShutdown
 	}
 	if addr == nil {
 		return nil, errorx.ErrInvalidNetworkAddress
@@ -96,9 +96,9 @@ func (el *eventloop) Register(ctx context.Context, addr net.Addr) (<-chan Regist
 	return resCh, err
 }
 
-func (el *eventloop) Execute(_ context.Context, runnable Runnable) error {
+func (el *eventloop) Execute(ctx context.Context, runnable Runnable) error {
 	if el.eng.isShutdown() {
-		return errorx.ErrEngineShutdown
+		return errorx.ErrEngineInShutdown
 	}
 
 	if runnable == nil {
@@ -107,8 +107,7 @@ func (el *eventloop) Execute(_ context.Context, runnable Runnable) error {
 
 	return goroutine.DefaultWorkerPool.Submit(func() {
 		el.ch <- func() error {
-			runnable.Run()
-			return nil
+			return runnable.Run(ctx)
 		}
 	})
 }

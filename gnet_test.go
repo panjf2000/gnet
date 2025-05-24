@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
@@ -726,7 +727,7 @@ func (s *testServer) OnTick() (delay time.Duration, action Action) {
 			for i := 0; i < s.nclients; i++ {
 				atomic.AddInt32(&s.clientActive, 1)
 				go func() {
-					startClient(s.tester, proto, addr, s.multicore, s.async, 0)
+					startClient(s.tester, proto, addr, s.multicore, s.async, 0, nil)
 					atomic.AddInt32(&s.clientActive, -1)
 				}()
 			}
@@ -789,7 +790,7 @@ func runServer(t *testing.T, addrs []string, conf *testConf) {
 	assert.NoError(t, err)
 }
 
-func startClient(t *testing.T, network, addr string, multicore, async bool, packetSize int) {
+func startClient(t *testing.T, network, addr string, multicore, async bool, packetSize int, stallCh chan struct{}) {
 	c, err := net.Dial(network, addr)
 	assert.NoError(t, err)
 	defer c.Close() //nolint:errcheck
@@ -799,6 +800,11 @@ func startClient(t *testing.T, network, addr string, multicore, async bool, pack
 		assert.NoError(t, err)
 		assert.Equal(t, string(msg), "andypan\r\n", "bad header")
 	}
+
+	if stallCh != nil {
+		<-stallCh
+	}
+
 	duration := time.Duration((rand.Float64()*2+1)*float64(time.Second)) / 2
 	logging.Debugf("test duration: %v", duration)
 	start := time.Now()
@@ -2093,12 +2099,18 @@ func startStreamEchoServer(t *testing.T, ln net.Listener) {
 type streamProxyServer struct {
 	BuiltinEventEngine
 
+	engine    Engine
+	eventLoop EventLoop
+
+	stallCh chan struct{}
+
 	tester       *testing.T
 	ListenerNet  string
 	ListenerAddr string
 
-	connected    int32
-	disconnected int32
+	connected          int32
+	disconnected       int32
+	backendEstablished int32
 
 	backendServerPoolMu   sync.Mutex
 	backendServerPoolOnce sync.Once
@@ -2108,7 +2120,8 @@ type streamProxyServer struct {
 	packetSize     int
 }
 
-func (p *streamProxyServer) OnShutdown(_ Engine) {
+func (p *streamProxyServer) OnShutdown(eng Engine) {
+	p.engine = eng
 	p.tester.Logf("proxy server %s shutdown!", p.ListenerAddr)
 }
 
@@ -2119,6 +2132,10 @@ func (p *streamProxyServer) OnOpen(c Conn) (out []byte, action Action) {
 		backendServer := p.backendServerPool[len(p.backendServerPool)-1]
 		p.backendServerPool = p.backendServerPool[:len(p.backendServerPool)-1]
 		p.backendServerPoolMu.Unlock()
+
+		_, err := c.EventLoop().Register(context.Background(), nil)
+		assert.ErrorIsf(p.tester, err, errorx.ErrInvalidNetworkAddress, "Expected error: %v, but got: %v",
+			errorx.ErrInvalidNetworkAddress, err)
 
 		network, addr, err := parseProtoAddr(backendServer)
 		assert.NoError(p.tester, err, "parseProtoAddr error")
@@ -2146,8 +2163,25 @@ func (p *streamProxyServer) OnOpen(c Conn) (out []byte, action Action) {
 		atomic.AddInt32(&p.connected, 1)
 	} else { // it's a client connection
 		// Store the client connection in the context of the server connection.
-		serverConn := c.Context().(Conn)
+		serverConn, ok := c.Context().(Conn)
+		assert.True(p.tester, ok, "context is not Conn")
+		assert.NotNil(p.tester, serverConn, "context is not Conn")
 		serverConn.SetContext(c)
+
+		err := c.EventLoop().Execute(context.Background(), nil)
+		assert.ErrorIsf(p.tester, err, errorx.ErrNilRunnable, "Expected error: %v, but got: %v",
+			errorx.ErrNilRunnable, err)
+		err = c.EventLoop().Execute(NewContext(context.Background(), c.LocalAddr()),
+			RunnableFunc(func(ctx context.Context) error {
+				p.tester.Logf("backend connection %v established", FromContext(ctx))
+				return nil
+			}))
+		assert.NoError(p.tester, err, "Execute task error")
+
+		if int(atomic.AddInt32(&p.backendEstablished, 1)) == len(p.backendServers) {
+			// Unlock the clients to start sending data.
+			close(p.stallCh)
+		}
 	}
 
 	return
@@ -2173,6 +2207,7 @@ func (p *streamProxyServer) OnClose(c Conn, err error) (action Action) {
 
 		if disconnected := atomic.AddInt32(&p.disconnected, 1); int(disconnected) == len(p.backendServers) &&
 			disconnected == atomic.LoadInt32(&p.connected) {
+			p.eventLoop = c.EventLoop()
 			action = Shutdown
 		}
 	}
@@ -2193,11 +2228,6 @@ func (p *streamProxyServer) OnTraffic(c Conn) Action {
 		return None
 	}
 
-	if pc.RemoteAddr() == nil {
-		b, err := c.Next(-1)
-		p.tester.Logf("%s: %d context conn: %+v\ndata: %d, error: %v", connType, c.Fd(), pc, len(b), err)
-	}
-
 	_, err := c.WriteTo(pc)
 	assert.NoErrorf(p.tester, err, "%s: Write error from %s to %s",
 		connType, c.LocalAddr().String(), pc.RemoteAddr().String())
@@ -2208,12 +2238,12 @@ func (p *streamProxyServer) OnTick() (time.Duration, Action) {
 	p.backendServerPoolOnce.Do(func() {
 		for i := 0; i < len(p.backendServers); i++ {
 			err := goPool.DefaultWorkerPool.Submit(func() {
-				startClient(p.tester, p.ListenerNet, p.ListenerAddr, true, false, p.packetSize)
+				startClient(p.tester, p.ListenerNet, p.ListenerAddr,
+					true, false, p.packetSize, p.stallCh)
 			})
 			assert.NoErrorf(p.tester, err, "Submit backend server %s error: %v", p.ListenerAddr, err)
 		}
 	})
-
 	return time.Millisecond * 200, None
 }
 
@@ -2305,10 +2335,11 @@ func TestStreamProxyServer(t *testing.T) {
 
 func testStreamProxyServer(t *testing.T, addr string, backendServers []string, multicore, et bool) {
 	network, address, err := parseProtoAddr(addr)
-	assert.NoError(t, err, "parseProtoAddr error")
+	require.NoError(t, err, "parseProtoAddr error")
 
 	srv := streamProxyServer{
 		tester:            t,
+		stallCh:           make(chan struct{}),
 		ListenerNet:       network,
 		ListenerAddr:      address,
 		backendServers:    backendServers,
@@ -2350,10 +2381,17 @@ func testStreamProxyServer(t *testing.T, addr string, backendServers []string, m
 	time.Sleep(time.Second)
 
 	err = Run(&srv, addr, WithEdgeTriggeredIO(et), WithMulticore(multicore), WithTicker(true))
-	assert.NoErrorf(t, err, "Run error: %v", err)
+	require.NoErrorf(t, err, "Run error: %v", err)
+
+	_, err = srv.eventLoop.Register(context.Background(), nil)
+	require.ErrorIsf(t, err, errorx.ErrEngineInShutdown, "Expected error: %v, but got: %v",
+		errorx.ErrEngineInShutdown, err)
+	err = srv.eventLoop.Execute(context.Background(), nil)
+	require.ErrorIsf(t, err, errorx.ErrEngineInShutdown, "Expected error: %v, but got: %v",
+		errorx.ErrEngineInShutdown, err)
 
 	for _, server := range netServers {
-		assert.NoErrorf(t, err, "Close backend server error: %v", server.Close())
+		require.NoError(t, server.Close(), "Close backend server error")
 	}
 
 	backends.Wait() //nolint:errcheck

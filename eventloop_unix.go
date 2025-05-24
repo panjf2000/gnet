@@ -51,7 +51,7 @@ type eventloop struct {
 
 func (el *eventloop) Register(ctx context.Context, addr net.Addr) (<-chan RegisteredResult, error) {
 	if el.engine.isShutdown() {
-		return nil, errorx.ErrEngineShutdown
+		return nil, errorx.ErrEngineInShutdown
 	}
 
 	if addr == nil {
@@ -61,9 +61,9 @@ func (el *eventloop) Register(ctx context.Context, addr net.Addr) (<-chan Regist
 	return el.enroll(addr, FromContext(ctx))
 }
 
-func (el *eventloop) Execute(_ context.Context, runnable Runnable) error {
+func (el *eventloop) Execute(ctx context.Context, runnable Runnable) error {
 	if el.engine.isShutdown() {
-		return errorx.ErrEngineShutdown
+		return errorx.ErrEngineInShutdown
 	}
 
 	if runnable == nil {
@@ -71,8 +71,7 @@ func (el *eventloop) Execute(_ context.Context, runnable Runnable) error {
 	}
 
 	return el.poller.Trigger(queue.LowPriority, func(any) error {
-		runnable.Run()
-		return nil
+		return runnable.Run(ctx)
 	}, nil)
 }
 
