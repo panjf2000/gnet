@@ -79,9 +79,9 @@ func (e Engine) CountConnections() (count int) {
 
 // Register connects to the given address and registers the corresponding socket
 // to the event-loop that is chosen based off of the algorithm set by WithLoadBalancing.
-func (e Engine) Register(ctx context.Context, addr net.Addr) error {
+func (e Engine) Register(ctx context.Context, addr net.Addr) (<-chan RegisteredResult, error) {
 	if err := e.Validate(); err != nil {
-		return err
+		return nil, err
 	}
 
 	return e.eng.eventLoops.next(addr).Register(ctx, addr)
@@ -363,13 +363,19 @@ func FromContext(ctx context.Context) any {
 	return ctx.Value(contextKey{})
 }
 
+// RegisteredResult is the result of a Register call.
+type RegisteredResult struct {
+	Conn Conn
+	Err  error
+}
+
 // EventLoop provides a set of methods for manipulating the event-loop.
 type EventLoop interface {
 	// Concurrency-safe methods
 
 	// Register connects to the given address and registers the corresponding socket
 	// to the current event-loop.
-	Register(ctx context.Context, addr net.Addr) error
+	Register(ctx context.Context, addr net.Addr) (<-chan RegisteredResult, error)
 	// Execute executes the given runnable on the event-loop at some time in the future.
 	Execute(ctx context.Context, runnable Runnable) error
 

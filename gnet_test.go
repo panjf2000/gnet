@@ -2078,14 +2078,10 @@ type streamProxyServer struct {
 
 	backendServers []string
 
-	backendListenersMu sync.Mutex
-	backendListeners   []net.Listener
+	backendListeners []net.Listener
 }
 
 func (p *streamProxyServer) OnShutdown(_ Engine) {
-	p.backendListenersMu.Lock()
-	defer p.backendListenersMu.Unlock()
-
 	for _, ln := range p.backendListeners {
 		if err := ln.Close(); err != nil {
 			logging.Debugf("error occurred on backend listener closing, %v", err)
@@ -2096,7 +2092,6 @@ func (p *streamProxyServer) OnShutdown(_ Engine) {
 }
 
 func (p *streamProxyServer) OnOpen(c Conn) (out []byte, action Action) {
-	p.tester.Logf("open connection %s", c.LocalAddr().String())
 	if c.LocalAddr().String() == p.ListenerAddr { // it's a server connection
 		out = []byte("andypan\r\n")
 		p.backendServerPoolMu.Lock()
@@ -2114,10 +2109,15 @@ func (p *streamProxyServer) OnOpen(c Conn) (out []byte, action Action) {
 		}
 		assert.NoError(p.tester, err, "ResolveNetAddr error")
 		ctx := NewContext(context.Background(), c)
-		err = c.EventLoop().Register(ctx, address)
+		resCh, err := c.EventLoop().Register(ctx, address)
 		assert.NoError(p.tester, err, "Register connection error")
-		count := atomic.AddInt32(&p.connected, 1)
-		p.tester.Logf("connected %d clients", count)
+		err = goPool.DefaultWorkerPool.Submit(func() {
+			res := <-resCh
+			assert.NoError(p.tester, res.Err, "Register connection error")
+			assert.NotNil(p.tester, res.Conn, "Register connection nil")
+		})
+		assert.NoError(p.tester, err, "Submit task error")
+		atomic.AddInt32(&p.connected, 1)
 	} else { // it's a client connection
 		// Store the client connection in the context of the server connection.
 		serverConn := c.Context().(Conn)
@@ -2139,11 +2139,11 @@ func (p *streamProxyServer) OnClose(c Conn, err error) (action Action) {
 	}
 
 	if c.LocalAddr().String() == p.ListenerAddr { // it's a server connection
-		if err := c.EventLoop().Close(c.Context().(Conn)); err != nil { // close the corresponding client connection
-			logging.Debugf("error occurred on client connection closing, %v", err)
-		}
+		err := c.EventLoop().Close(c.Context().(Conn)) // close the corresponding client connection
+		assert.NoError(p.tester, err, "Close client connection error")
 
-		if atomic.AddInt32(&p.disconnected, 1) == atomic.LoadInt32(&p.connected) {
+		if disconnected := atomic.AddInt32(&p.disconnected, 1); int(disconnected) == len(p.backendServers) &&
+			disconnected == atomic.LoadInt32(&p.connected) {
 			action = Shutdown
 		}
 	}
@@ -2160,6 +2160,7 @@ func (p *streamProxyServer) OnTraffic(c Conn) Action {
 	pc, ok := c.Context().(Conn)
 	if !ok {
 		logging.Debugf("connection %s context is not ready, retry...", c.LocalAddr().String())
+		assert.NoError(p.tester, c.Wake(nil), "Wake connection error")
 		return None
 	}
 
@@ -2171,19 +2172,6 @@ func (p *streamProxyServer) OnTraffic(c Conn) Action {
 
 func (p *streamProxyServer) OnTick() (time.Duration, Action) {
 	p.backendServerPoolOnce.Do(func() {
-		p.backendListenersMu.Lock()
-		for _, backendServer := range p.backendServers {
-			network, addr, _ := parseProtoAddr(backendServer)
-			ln, err := net.Listen(network, addr)
-			assert.NoErrorf(p.tester, err, "Create backend server %s error: %v", backendServer, err)
-			err = goPool.DefaultWorkerPool.Submit(func() {
-				startStreamEchoServer(p.tester, ln)
-			})
-			assert.NoErrorf(p.tester, err, "Start backend server %s error: %v", backendServer, err)
-			p.backendListeners = append(p.backendListeners, ln)
-		}
-		p.backendListenersMu.Unlock()
-
 		for i := 0; i < len(p.backendServers); i++ {
 			err := goPool.DefaultWorkerPool.Submit(func() {
 				startClient(p.tester, p.ListenerNet, p.ListenerAddr, true, false)
@@ -2246,6 +2234,20 @@ func testStreamProxyServer(t *testing.T, addr string, backendAddrs []string) {
 		backendServers:    backendServers,
 		backendServerPool: backendServers,
 	}
+
+	for _, backendServer := range backendServers {
+		network, addr, _ := parseProtoAddr(backendServer)
+		ln, err := net.Listen(network, addr)
+		assert.NoErrorf(t, err, "Create backend server %s error: %v", backendServer, err)
+		err = goPool.DefaultWorkerPool.Submit(func() {
+			startStreamEchoServer(t, ln)
+		})
+		assert.NoErrorf(t, err, "Start backend server %s error: %v", backendServer, err)
+		srv.backendListeners = append(srv.backendListeners, ln)
+	}
+
+	// Give the backend servers some time to start.
+	time.Sleep(time.Second)
 
 	err := Run(&srv, addr, WithMulticore(true), WithTicker(true))
 	assert.NoErrorf(t, err, "Run error: %v", err)

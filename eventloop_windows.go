@@ -37,25 +37,28 @@ type eventloop struct {
 	eventHandler EventHandler       // user eventHandler
 }
 
-func (el *eventloop) Register(ctx context.Context, addr net.Addr) error {
+func (el *eventloop) Register(ctx context.Context, addr net.Addr) (<-chan RegisteredResult, error) {
 	if el.eng.isShutdown() {
-		return errorx.ErrEngineShutdown
+		return nil, errorx.ErrEngineShutdown
 	}
-
 	if addr == nil {
-		return errorx.ErrInvalidNetworkAddress
+		return nil, errorx.ErrInvalidNetworkAddress
 	}
+	resCh := make(chan RegisteredResult, 1)
+	err := goroutine.DefaultWorkerPool.Submit(func() {
+		defer close(resCh)
 
-	return goroutine.DefaultWorkerPool.Submit(func() {
 		nc, err := net.Dial(addr.Network(), addr.String())
 		if err != nil {
 			el.getLogger().Errorf("failed to dial %s: %v", addr, err)
+			resCh <- RegisteredResult{Err: fmt.Errorf("failed to dial %s: %v", addr, err)}
 			return
 		}
 
+		var c *conn
 		switch addr.Network() {
 		case "tcp", "tcp4", "tcp6", "unix":
-			c := newTCPConn(nc, el)
+			c = newTCPConn(nc, el)
 			c.ctx = FromContext(ctx)
 			el.ch <- &openConn{c: c}
 			goroutine.DefaultWorkerPool.Submit(func() {
@@ -70,7 +73,7 @@ func (el *eventloop) Register(ctx context.Context, addr net.Addr) error {
 				}
 			})
 		case "udp", "udp4", "udp6":
-			c := newUDPConn(el, nil, nc.LocalAddr(), nc.RemoteAddr())
+			c = newUDPConn(el, nil, nc.LocalAddr(), nc.RemoteAddr())
 			c.ctx = FromContext(ctx)
 			el.ch <- &openConn{c: c}
 			goroutine.DefaultWorkerPool.Submit(func() {
@@ -87,7 +90,10 @@ func (el *eventloop) Register(ctx context.Context, addr net.Addr) error {
 				}
 			})
 		}
+
+		resCh <- RegisteredResult{Conn: c}
 	})
+	return resCh, err
 }
 
 func (el *eventloop) Execute(_ context.Context, runnable Runnable) error {
