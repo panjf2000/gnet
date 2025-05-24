@@ -82,8 +82,9 @@ func packUDPConn(c *conn, buf []byte) *udpConn {
 	return &udpConn{c}
 }
 
-func newTCPConn(nc net.Conn, el *eventloop) (c *conn) {
+func newTCPConn(el *eventloop, nc net.Conn, ctx any) (c *conn) {
 	return &conn{
+		ctx:        ctx,
 		loop:       el,
 		buffer:     bbPool.Get(),
 		rawConn:    nc,
@@ -104,9 +105,11 @@ func (c *conn) release() {
 	c.buffer = nil
 }
 
-func newUDPConn(el *eventloop, pc net.PacketConn, localAddr, remoteAddr net.Addr) *conn {
+func newUDPConn(el *eventloop, pc net.PacketConn, rc net.Conn, localAddr, remoteAddr net.Addr, ctx any) *conn {
 	return &conn{
+		ctx:        ctx,
 		pc:         pc,
+		rawConn:    rc,
 		loop:       el,
 		buffer:     bbPool.Get(),
 		localAddr:  localAddr,

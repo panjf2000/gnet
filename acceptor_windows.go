@@ -44,7 +44,7 @@ func (eng *engine) listenStream(ln net.Listener) (err error) {
 			return
 		}
 		el := eng.eventLoops.next(tc.RemoteAddr())
-		c := newTCPConn(tc, el)
+		c := newTCPConn(el, tc, nil)
 		el.ch <- &openConn{c: c}
 		goroutine.DefaultWorkerPool.Submit(func() {
 			var buffer [0x10000]byte
@@ -82,7 +82,7 @@ func (eng *engine) ListenUDP(pc net.PacketConn) (err error) {
 			return
 		}
 		el := eng.eventLoops.next(addr)
-		c := newUDPConn(el, pc, pc.LocalAddr(), addr)
+		c := newUDPConn(el, pc, nil, pc.LocalAddr(), addr, nil)
 		el.ch <- packUDPConn(c, buffer[:n])
 	}
 }

@@ -162,8 +162,7 @@ func (cli *Client) EnrollContext(nc net.Conn, ctx any) (gc Conn, err error) {
 			}
 		}
 
-		c := newTCPConn(nc, cli.el)
-		c.SetContext(ctx)
+		c := newTCPConn(cli.el, nc, ctx)
 		cli.el.ch <- &openConn{c: c, cb: func() { close(connOpened) }}
 		goroutine.DefaultWorkerPool.Submit(func() {
 			var buffer [0x10000]byte
@@ -178,8 +177,7 @@ func (cli *Client) EnrollContext(nc net.Conn, ctx any) (gc Conn, err error) {
 		})
 		gc = c
 	case *net.UnixConn:
-		c := newTCPConn(nc, cli.el)
-		c.SetContext(ctx)
+		c := newTCPConn(cli.el, nc, ctx)
 		cli.el.ch <- &openConn{c: c, cb: func() { close(connOpened) }}
 		goroutine.DefaultWorkerPool.Submit(func() {
 			var buffer [0x10000]byte
@@ -200,9 +198,7 @@ func (cli *Client) EnrollContext(nc net.Conn, ctx any) (gc Conn, err error) {
 		})
 		gc = c
 	case *net.UDPConn:
-		c := newUDPConn(cli.el, nil, nc.LocalAddr(), nc.RemoteAddr())
-		c.SetContext(ctx)
-		c.rawConn = nc
+		c := newUDPConn(cli.el, nil, nc, nc.LocalAddr(), nc.RemoteAddr(), ctx)
 		cli.el.ch <- &openConn{c: c, cb: func() { close(connOpened) }}
 		goroutine.DefaultWorkerPool.Submit(func() {
 			var buffer [0x10000]byte
@@ -212,9 +208,7 @@ func (cli *Client) EnrollContext(nc net.Conn, ctx any) (gc Conn, err error) {
 					cli.el.ch <- &netErr{c, err}
 					return
 				}
-				c := newUDPConn(cli.el, nil, nc.LocalAddr(), nc.RemoteAddr())
-				c.SetContext(ctx)
-				c.rawConn = nc
+				c := newUDPConn(cli.el, nil, nc, nc.LocalAddr(), nc.RemoteAddr(), ctx)
 				cli.el.ch <- packUDPConn(c, buffer[:n])
 			}
 		})

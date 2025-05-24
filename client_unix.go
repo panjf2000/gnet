@@ -242,7 +242,7 @@ func (cli *Client) EnrollContext(c net.Conn, ctx any) (Conn, error) {
 	}}
 	err = cli.el.poller.Trigger(queue.HighPriority, cli.el.register, ccb)
 	if err != nil {
-		_ = gc.Close()
+		gc.Close() //nolint:errcheck
 		return nil, err
 	}
 

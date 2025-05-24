@@ -114,7 +114,6 @@ func (el *eventloop) enroll(addr net.Addr, ctx any) (resCh chan RegisteredResult
 
 		sc, ok := c.(syscall.Conn)
 		if !ok {
-			el.getLogger().Errorf("failed to assert syscall.Conn from net.Conn: %s", addr.String())
 			resCh <- RegisteredResult{
 				Err: fmt.Errorf("failed to assert syscall.Conn from net.Conn: %s", addr.String()),
 			}
@@ -122,10 +121,7 @@ func (el *eventloop) enroll(addr net.Addr, ctx any) (resCh chan RegisteredResult
 		}
 		rc, err := sc.SyscallConn()
 		if err != nil {
-			el.getLogger().Errorf("failed to get syscall.Conn from net.Conn %s: %v", addr.String(), err)
-			resCh <- RegisteredResult{
-				Err: fmt.Errorf("failed to get syscall.Conn from net.Conn %s: %v", addr.String(), err),
-			}
+			resCh <- RegisteredResult{Err: err}
 			return
 		}
 
@@ -134,13 +130,11 @@ func (el *eventloop) enroll(addr net.Addr, ctx any) (resCh chan RegisteredResult
 			dupFD, err = unix.Dup(int(fd))
 		})
 		if err != nil {
-			el.getLogger().Errorf("failed to duplicate %s fd: %s", addr.String(), err)
-			resCh <- RegisteredResult{Err: fmt.Errorf("failed to duplicate %s fd: %s", addr.String(), err)}
+			resCh <- RegisteredResult{Err: err}
 			return
 		}
 		if err1 != nil {
-			el.getLogger().Errorf("failed to duplicate %s fd: %v", addr.String(), err1)
-			resCh <- RegisteredResult{Err: fmt.Errorf("failed to duplicate %s fd: %v", addr.String(), err1)}
+			resCh <- RegisteredResult{Err: err1}
 			return
 		}
 
@@ -152,10 +146,7 @@ func (el *eventloop) enroll(addr net.Addr, ctx any) (resCh chan RegisteredResult
 		case *net.UnixConn:
 			sockAddr, _, _, err = socket.GetUnixSockAddr(c.RemoteAddr().Network(), c.RemoteAddr().String())
 			if err != nil {
-				el.getLogger().Errorf("failed to get unix socket addr %s: %v", addr.String(), err)
-				resCh <- RegisteredResult{
-					Err: fmt.Errorf("failed to get unix socket addr %s: %v", addr.String(), err),
-				}
+				resCh <- RegisteredResult{Err: err}
 				return
 			}
 			ua := c.LocalAddr().(*net.UnixAddr)
@@ -164,25 +155,18 @@ func (el *eventloop) enroll(addr net.Addr, ctx any) (resCh chan RegisteredResult
 		case *net.TCPConn:
 			sockAddr, _, _, _, err = socket.GetTCPSockAddr(c.RemoteAddr().Network(), c.RemoteAddr().String())
 			if err != nil {
-				el.getLogger().Errorf("failed to get tcp socket addr %s: %v", addr.String(), err)
-				resCh <- RegisteredResult{
-					Err: fmt.Errorf("failed to get tcp socket addr %s: %v", addr.String(), err),
-				}
+				resCh <- RegisteredResult{Err: err}
 				return
 			}
 			gc = newTCPConn(dupFD, el, sockAddr, c.LocalAddr(), c.RemoteAddr())
 		case *net.UDPConn:
 			sockAddr, _, _, _, err = socket.GetUDPSockAddr(c.RemoteAddr().Network(), c.RemoteAddr().String())
 			if err != nil {
-				el.getLogger().Errorf("failed to get udp socket addr %s: %v", addr.String(), err)
-				resCh <- RegisteredResult{
-					Err: fmt.Errorf("failed to get udp socket addr %s: %v", addr.String(), err),
-				}
+				resCh <- RegisteredResult{Err: err}
 				return
 			}
 			gc = newUDPConn(dupFD, el, c.LocalAddr(), sockAddr, true)
 		default:
-			el.getLogger().Errorf("unknown type of conn: %T", c)
 			resCh <- RegisteredResult{Err: fmt.Errorf("unknown type of conn: %T", c)}
 			return
 		}
@@ -195,8 +179,7 @@ func (el *eventloop) enroll(addr net.Addr, ctx any) (resCh chan RegisteredResult
 		}}
 		if err := el.poller.Trigger(queue.LowPriority, el.register, ccb); err != nil {
 			gc.Close() //nolint:errcheck
-			el.getLogger().Errorf("failed to register %s fd: %s", addr.String(), err)
-			resCh <- RegisteredResult{Err: fmt.Errorf("failed to register %s fd: %s", addr.String(), err)}
+			resCh <- RegisteredResult{Err: err}
 			return
 		}
 		<-connOpened

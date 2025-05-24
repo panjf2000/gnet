@@ -59,8 +59,7 @@ func (el *eventloop) Register(ctx context.Context, addr net.Addr) (<-chan Regist
 		var c *conn
 		switch addr.Network() {
 		case "tcp", "tcp4", "tcp6", "unix":
-			c = newTCPConn(nc, el)
-			c.ctx = FromContext(ctx)
+			c = newTCPConn(el, nc, FromContext(ctx))
 			el.ch <- &openConn{c: c, cb: func() { close(connOpened) }}
 			goroutine.DefaultWorkerPool.Submit(func() {
 				var buffer [0x10000]byte
@@ -74,10 +73,8 @@ func (el *eventloop) Register(ctx context.Context, addr net.Addr) (<-chan Regist
 				}
 			})
 		case "udp", "udp4", "udp6":
-			c = newUDPConn(el, nil, nc.LocalAddr(), nc.RemoteAddr())
 			v := FromContext(ctx)
-			c.ctx = v
-			c.rawConn = nc
+			c = newUDPConn(el, nil, nc, nc.LocalAddr(), nc.RemoteAddr(), v)
 			el.ch <- &openConn{c: c, cb: func() { close(connOpened) }}
 			goroutine.DefaultWorkerPool.Submit(func() {
 				var buffer [0x10000]byte
@@ -87,9 +84,7 @@ func (el *eventloop) Register(ctx context.Context, addr net.Addr) (<-chan Regist
 						el.ch <- &netErr{c, err}
 						return
 					}
-					c := newUDPConn(el, nil, nc.LocalAddr(), nc.RemoteAddr())
-					c.ctx = v
-					c.rawConn = nc
+					c := newUDPConn(el, nil, nc, nc.LocalAddr(), nc.RemoteAddr(), v)
 					el.ch <- packUDPConn(c, buffer[:n])
 				}
 			})
