@@ -2413,6 +2413,7 @@ type udpProxyServer struct {
 
 	activeClients      int32
 	backendEstablished int32
+	backendBytes       int32
 
 	initBackendPoolOnce sync.Once
 	backendServerPoolMu sync.Mutex
@@ -2429,6 +2430,11 @@ func (p *udpProxyServer) OnBoot(eng Engine) (action Action) {
 	assert.ErrorIsf(p.tester, err, errorx.ErrEmptyEngine, "Expected error: %v, but got: %v",
 		errorx.ErrEmptyEngine, err)
 	return
+}
+
+func (p *udpProxyServer) OnShutdown(Engine) {
+	assert.Zero(p.tester, atomic.LoadInt32(&p.backendBytes)%int32(len(p.packet)),
+		"backend received bytes should be a multiple of packet size")
 }
 
 func (p *udpProxyServer) OnOpen(c Conn) (out []byte, action Action) {
@@ -2462,6 +2468,7 @@ func (p *udpProxyServer) OnTraffic(c Conn) Action {
 		buf, err := c.Next(len(p.packet))
 		assert.NoError(p.tester, err, "Next error")
 		assert.EqualValuesf(p.tester, buf, p.packet, "Packet mismatch, expected: %s, got: %s", p.packet, buf)
+		atomic.AddInt32(&p.backendBytes, int32(len(buf)))
 	}
 	return None
 }
