@@ -31,7 +31,7 @@ import (
 
 var (
 	datagramLen = 1024
-	streamLen   = 1024 // only for test
+	streamLen   = 1024 * 1024
 )
 
 type testConf struct {
