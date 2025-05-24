@@ -84,6 +84,10 @@ func (e Engine) Register(ctx context.Context, addr net.Addr) (<-chan RegisteredR
 		return nil, err
 	}
 
+	if e.eng.eventLoops.len() == 0 {
+		return nil, errorx.ErrEmptyEngine
+	}
+
 	return e.eng.eventLoops.next(addr).Register(ctx, addr)
 }
 

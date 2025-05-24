@@ -2045,13 +2045,11 @@ func startUDPEchoServer(t *testing.T, c *net.UDPConn) {
 	buf := make([]byte, datagramLen)
 	for {
 		nr, remote, err := c.ReadFromUDP(buf)
-		// t.Logf("read %d bytes from %v: %v", nr, remote, err)
 		if err != nil {
 			break
 		}
 		if nr > 0 {
 			nw, err := c.WriteToUDP(buf[:nr], remote)
-			// t.Logf("wrote %d bytes to %v: %v", nw, remote, err)
 			assert.EqualValuesf(t, nr, nw, "UDP echo server should send %d bytes, but sent %d bytes", nr, nw)
 			assert.NoErrorf(t, err, "error occurred on UDP echo server %v write to %s, %v",
 				remote, c.LocalAddr().String(), err)
@@ -2112,9 +2110,10 @@ type streamProxyServer struct {
 	disconnected       int32
 	backendEstablished int32
 
-	backendServerPoolMu   sync.Mutex
-	backendServerPoolOnce sync.Once
-	backendServerPool     []string
+	backendServerPoolMu sync.Mutex
+	backendServerPool   []string
+
+	startClintOnce sync.Once
 
 	backendServers []string
 	packetSize     int
@@ -2235,7 +2234,7 @@ func (p *streamProxyServer) OnTraffic(c Conn) Action {
 }
 
 func (p *streamProxyServer) OnTick() (time.Duration, Action) {
-	p.backendServerPoolOnce.Do(func() {
+	p.startClintOnce.Do(func() {
 		for i := 0; i < len(p.backendServers); i++ {
 			err := goPool.DefaultWorkerPool.Submit(func() {
 				startClient(p.tester, p.ListenerNet, p.ListenerAddr,
@@ -2351,27 +2350,28 @@ func testStreamProxyServer(t *testing.T, addr string, backendServers []string, m
 		netServers []io.Closer
 	)
 	for _, backendServer := range backendServers {
-		network, addr, _ := parseProtoAddr(backendServer)
+		network, addr, err := parseProtoAddr(backendServer)
+		require.NoError(t, err, "parseProtoAddr error")
 		if strings.HasPrefix(network, "udp") {
 			udpAddr, err := net.ResolveUDPAddr(network, addr)
-			assert.NoError(t, err, "ResolveUDPAddr error")
+			require.NoError(t, err, "ResolveUDPAddr error")
 			c, err := net.ListenUDP("udp", udpAddr)
-			assert.NoError(t, err, "ListenUDP error")
+			require.NoError(t, err, "ListenUDP error")
 			backends.Go(func() error {
 				startUDPEchoServer(t, c)
 				return nil
 			})
-			assert.NoErrorf(t, err, "Start backend UDP server %s error: %v", backendServer, err)
+			require.NoErrorf(t, err, "Start backend UDP server %s error: %v", backendServer, err)
 			srv.packetSize = datagramLen
 			netServers = append(netServers, c)
 		} else {
 			ln, err := net.Listen(network, addr)
-			assert.NoErrorf(t, err, "Create backend server %s error: %v", network+"://"+addr, err)
+			require.NoErrorf(t, err, "Create backend server %s error: %v", network+"://"+addr, err)
 			backends.Go(func() error {
 				startStreamEchoServer(t, ln)
 				return nil
 			})
-			assert.NoErrorf(t, err, "Start backend stream server %s error: %v", backendServer, err)
+			require.NoErrorf(t, err, "Start backend stream server %s error: %v", backendServer, err)
 			srv.packetSize = streamLen
 			netServers = append(netServers, ln)
 		}
@@ -2389,6 +2389,237 @@ func testStreamProxyServer(t *testing.T, addr string, backendServers []string, m
 	err = srv.eventLoop.Execute(context.Background(), nil)
 	require.ErrorIsf(t, err, errorx.ErrEngineInShutdown, "Expected error: %v, but got: %v",
 		errorx.ErrEngineInShutdown, err)
+
+	for _, server := range netServers {
+		require.NoError(t, server.Close(), "Close backend server error")
+	}
+
+	backends.Wait() //nolint:errcheck
+}
+
+type udpProxyServer struct {
+	BuiltinEventEngine
+
+	packet []byte
+
+	engine Engine
+
+	tester *testing.T
+
+	stallCh chan struct{}
+
+	ListenerNet  string
+	ListenerAddr string
+
+	activeClients      int32
+	backendEstablished int32
+
+	initBackendPoolOnce sync.Once
+	backendServerPoolMu sync.Mutex
+	backendServerPool   []Conn
+
+	startClientOnce sync.Once
+	backendServers  []string
+	packetSize      int
+}
+
+func (p *udpProxyServer) OnBoot(eng Engine) (action Action) {
+	p.engine = eng
+	_, err := eng.Register(context.Background(), nil)
+	assert.ErrorIsf(p.tester, err, errorx.ErrEmptyEngine, "Expected error: %v, but got: %v",
+		errorx.ErrEmptyEngine, err)
+	return
+}
+
+func (p *udpProxyServer) OnOpen(c Conn) (out []byte, action Action) {
+	p.tester.Logf("OnOpen connection %s", c.RemoteAddr().String())
+	p.backendServerPoolMu.Lock()
+	p.backendServerPool = append(p.backendServerPool, c)
+	p.backendServerPoolMu.Unlock()
+	if int(atomic.AddInt32(&p.backendEstablished, 1)) == len(p.backendServers) {
+		// Unlock the clients to start sending data.
+		close(p.stallCh)
+	}
+	return nil, None
+}
+
+func (p *udpProxyServer) OnTraffic(c Conn) Action {
+	if c.LocalAddr().String() == p.ListenerAddr { // it's a server connection
+		// Echo back to the client.
+		buf, err := c.Next(-1)
+		assert.NoError(p.tester, err, "Next error")
+		assert.Greaterf(p.tester, len(buf), 0, "Next should not return empty buffer")
+		n, err := c.Write(buf)
+		assert.NoError(p.tester, err, "Write error")
+		assert.EqualValuesf(p.tester, n, len(buf), "Write should send %d bytes, but sent %d bytes", len(buf), n)
+
+		// Send the packet to a random backend server.
+		p.backendServerPoolMu.Lock()
+		backendServer := p.backendServerPool[rand.Intn(len(p.backendServerPool))]
+		p.backendServerPoolMu.Unlock()
+		err = backendServer.AsyncWrite(p.packet, nil)
+		assert.NoError(p.tester, err, "AsyncWrite error")
+	} else { // it's a backend connection
+		buf, err := c.Next(len(p.packet))
+		assert.NoError(p.tester, err, "Next error")
+		assert.EqualValuesf(p.tester, buf, p.packet, "Packet mismatch, expected: %s, got: %s", p.packet, buf)
+	}
+	return None
+}
+
+func (p *udpProxyServer) OnTick() (delay time.Duration, action Action) {
+	p.initBackendPoolOnce.Do(func() {
+		for _, backendServer := range p.backendServers {
+			network, addr, err := parseProtoAddr(backendServer)
+			assert.NoError(p.tester, err, "parseProtoAddr error")
+			var address net.Addr
+			switch {
+			case strings.HasPrefix(network, "tcp"):
+				address, err = net.ResolveTCPAddr(network, addr)
+			case strings.HasPrefix(network, "udp"):
+				address, err = net.ResolveUDPAddr(network, addr)
+			case strings.HasPrefix(network, "unix"):
+				address, err = net.ResolveUnixAddr(network, addr)
+			default:
+				assert.Failf(p.tester, "unsupported protocol", "unsupported protocol: %s", network)
+			}
+			assert.NoError(p.tester, err, "ResolveNetAddr error")
+			resCh, err := p.engine.Register(context.Background(), address)
+			assert.NoError(p.tester, err, "Register connection error")
+			err = goPool.DefaultWorkerPool.Submit(func() {
+				res := <-resCh
+				assert.NoError(p.tester, res.Err, "Register connection error")
+				assert.NotNil(p.tester, res.Conn, "Register connection nil")
+			})
+			assert.NoError(p.tester, err, "Submit connection error")
+		}
+	})
+	p.startClientOnce.Do(func() {
+		for i := 0; i < len(p.backendServers); i++ {
+			err := goPool.DefaultWorkerPool.Submit(func() {
+				atomic.AddInt32(&p.activeClients, 1)
+				startClient(p.tester, p.ListenerNet, p.ListenerAddr,
+					true, false, p.packetSize, p.stallCh)
+				atomic.AddInt32(&p.activeClients, -1)
+			})
+			assert.NoErrorf(p.tester, err, "Submit backend server %s error: %v", p.ListenerAddr, err)
+		}
+	})
+
+	if atomic.LoadInt32(&p.activeClients) == 0 {
+		return 0, Shutdown
+	}
+
+	return time.Millisecond * 200, None
+}
+
+func TestUDPProxyServer(t *testing.T) {
+	t.Run("backend-udp-proxy-server", func(t *testing.T) {
+		addr := "udp://127.0.0.1:10000"
+		backendServers := []string{
+			"udp://127.0.0.1:10001",
+			"udp://127.0.0.1:10002",
+			"udp://127.0.0.1:10003",
+			"udp://127.0.0.1:10004",
+			"udp://127.0.0.1:10005",
+			"udp://127.0.0.1:10006",
+			"udp://127.0.0.1:10007",
+			"udp://127.0.0.1:10008",
+			"udp://127.0.0.1:10009",
+			"udp://127.0.0.1:10010",
+		}
+		t.Run("1-loop-LT", func(t *testing.T) {
+			testUDPProxyServer(t, addr, backendServers, false, false)
+		})
+		t.Run("1-loop-ET", func(t *testing.T) {
+			testUDPProxyServer(t, addr, backendServers, false, true)
+		})
+		t.Run("N-loop-LT", func(t *testing.T) {
+			testUDPProxyServer(t, addr, backendServers, true, false)
+		})
+		t.Run("N-loop-ET", func(t *testing.T) {
+			testUDPProxyServer(t, addr, backendServers, true, true)
+		})
+	})
+
+	t.Run("backend-tcp-proxy-server", func(t *testing.T) {
+		addr := "udp://127.0.0.1:20000"
+		backendServers := []string{
+			"tcp://127.0.0.1:20001",
+			"tcp://127.0.0.1:20002",
+			"tcp://127.0.0.1:20003",
+			"tcp://127.0.0.1:20004",
+			"tcp://127.0.0.1:20005",
+			"tcp://127.0.0.1:20006",
+			"tcp://127.0.0.1:20007",
+			"tcp://127.0.0.1:20008",
+			"tcp://127.0.0.1:20009",
+			"tcp://127.0.0.1:20010",
+		}
+		t.Run("1-loop-LT", func(t *testing.T) {
+			testUDPProxyServer(t, addr, backendServers, false, false)
+		})
+		t.Run("1-loop-ET", func(t *testing.T) {
+			testUDPProxyServer(t, addr, backendServers, false, true)
+		})
+		t.Run("N-loop-LT", func(t *testing.T) {
+			testUDPProxyServer(t, addr, backendServers, true, false)
+		})
+		t.Run("N-loop-ET", func(t *testing.T) {
+			testUDPProxyServer(t, addr, backendServers, true, true)
+		})
+	})
+}
+
+func testUDPProxyServer(t *testing.T, addr string, backendServers []string, multicore, et bool) {
+	network, address, err := parseProtoAddr(addr)
+	require.NoError(t, err, "parseProtoAddr error")
+
+	srv := udpProxyServer{
+		tester:         t,
+		stallCh:        make(chan struct{}),
+		ListenerNet:    network,
+		ListenerAddr:   address,
+		backendServers: backendServers,
+		packet:         []byte("andypan"),
+		packetSize:     datagramLen,
+	}
+
+	var (
+		backends   errgroup.Group
+		netServers []io.Closer
+	)
+	for _, backendServer := range backendServers {
+		network, addr, err := parseProtoAddr(backendServer)
+		require.NoError(t, err, "parseProtoAddr error")
+		if strings.HasPrefix(network, "udp") {
+			udpAddr, err := net.ResolveUDPAddr(network, addr)
+			require.NoError(t, err, "ResolveUDPAddr error")
+			c, err := net.ListenUDP("udp", udpAddr)
+			require.NoError(t, err, "ListenUDP error")
+			backends.Go(func() error {
+				startUDPEchoServer(t, c)
+				return nil
+			})
+			require.NoErrorf(t, err, "Start backend UDP server %s error: %v", backendServer, err)
+			netServers = append(netServers, c)
+		} else {
+			ln, err := net.Listen(network, addr)
+			require.NoErrorf(t, err, "Create backend server %s error: %v", network+"://"+addr, err)
+			backends.Go(func() error {
+				startStreamEchoServer(t, ln)
+				return nil
+			})
+			require.NoErrorf(t, err, "Start backend stream server %s error: %v", backendServer, err)
+			netServers = append(netServers, ln)
+		}
+	}
+
+	err = Run(&srv, addr,
+		WithEdgeTriggeredIO(et),
+		WithMulticore(multicore),
+		WithTicker(true))
+	require.NoErrorf(t, err, "Run error: %v", err)
 
 	for _, server := range netServers {
 		require.NoError(t, server.Close(), "Close backend server error")
