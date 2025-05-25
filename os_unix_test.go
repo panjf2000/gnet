@@ -22,6 +22,7 @@ import (
 
 	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
+	goPool "github.com/panjf2000/gnet/v2/pkg/pool/goroutine"
 )
 
 var (
@@ -150,10 +151,11 @@ func (s *testMcastServer) OnTick() (delay time.Duration, action Action) {
 	if atomic.CompareAndSwapInt32(&s.started, 0, 1) {
 		for i := 0; i < s.nclients; i++ {
 			atomic.AddInt32(&s.active, 1)
-			go func() {
+			err := goPool.DefaultWorkerPool.Submit(func() {
 				defer atomic.AddInt32(&s.active, -1)
 				s.startMcastClient()
-			}()
+			})
+			assert.NoError(s.t, err)
 		}
 	}
 	if atomic.LoadInt32(&s.active) == 0 {
