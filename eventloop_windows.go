@@ -44,73 +44,35 @@ func (el *eventloop) Register(ctx context.Context, addr net.Addr) (<-chan Regist
 	if addr == nil {
 		return nil, errorx.ErrInvalidNetworkAddress
 	}
-	resCh := make(chan RegisteredResult, 1)
-	err := goroutine.DefaultWorkerPool.Submit(func() {
-		defer close(resCh)
+	return el.enroll(nil, addr, FromContext(ctx))
+}
 
-		nc, err := net.Dial(addr.Network(), addr.String())
-		if err != nil {
-			el.getLogger().Errorf("failed to dial %s: %v", addr, err)
-			resCh <- RegisteredResult{Err: fmt.Errorf("failed to dial %s: %v", addr, err)}
-			return
-		}
-
-		connOpened := make(chan struct{})
-		var c *conn
-		switch addr.Network() {
-		case "tcp", "tcp4", "tcp6", "unix":
-			c = newTCPConn(el, nc, FromContext(ctx))
-			el.ch <- &openConn{c: c, cb: func() { close(connOpened) }}
-			goroutine.DefaultWorkerPool.Submit(func() {
-				var buffer [0x10000]byte
-				for {
-					n, err := nc.Read(buffer[:])
-					if err != nil {
-						el.ch <- &netErr{c, err}
-						return
-					}
-					el.ch <- packTCPConn(c, buffer[:n])
-				}
-			})
-		case "udp", "udp4", "udp6":
-			v := FromContext(ctx)
-			c = newUDPConn(el, nil, nc, nc.LocalAddr(), nc.RemoteAddr(), v)
-			el.ch <- &openConn{c: c, cb: func() { close(connOpened) }}
-			goroutine.DefaultWorkerPool.Submit(func() {
-				var buffer [0x10000]byte
-				for {
-					n, err := nc.Read(buffer[:])
-					if err != nil {
-						el.ch <- &netErr{c, err}
-						return
-					}
-					c := newUDPConn(el, nil, nc, nc.LocalAddr(), nc.RemoteAddr(), v)
-					el.ch <- packUDPConn(c, buffer[:n])
-				}
-			})
-		}
-
-		<-connOpened
-
-		resCh <- RegisteredResult{Conn: c}
-	})
-	return resCh, err
+func (el *eventloop) Enroll(ctx context.Context, c net.Conn) (<-chan RegisteredResult, error) {
+	if el.eng.isShutdown() {
+		return nil, errorx.ErrEngineInShutdown
+	}
+	if c == nil {
+		return nil, errorx.ErrInvalidNetConn
+	}
+	return el.enroll(c, c.RemoteAddr(), FromContext(ctx))
 }
 
 func (el *eventloop) Execute(ctx context.Context, runnable Runnable) error {
 	if el.eng.isShutdown() {
 		return errorx.ErrEngineInShutdown
 	}
-
 	if runnable == nil {
 		return errorx.ErrNilRunnable
 	}
-
 	return goroutine.DefaultWorkerPool.Submit(func() {
 		el.ch <- func() error {
 			return runnable.Run(ctx)
 		}
 	})
+}
+
+func (el *eventloop) Schedule(context.Context, Runnable, time.Duration) error {
+	return errorx.ErrUnsupportedOp
 }
 
 func (el *eventloop) Close(c Conn) error {
@@ -119,6 +81,60 @@ func (el *eventloop) Close(c Conn) error {
 
 func (el *eventloop) getLogger() logging.Logger {
 	return el.eng.opts.Logger
+}
+
+func (el *eventloop) enroll(c net.Conn, addr net.Addr, ctx any) (resCh chan RegisteredResult, err error) {
+	resCh = make(chan RegisteredResult, 1)
+	err = goroutine.DefaultWorkerPool.Submit(func() {
+		defer close(resCh)
+
+		var err error
+		if c == nil {
+			if c, err = net.Dial(addr.Network(), addr.String()); err != nil {
+				resCh <- RegisteredResult{Err: err}
+				return
+			}
+		}
+
+		connOpened := make(chan struct{})
+		var gc *conn
+		switch addr.Network() {
+		case "tcp", "tcp4", "tcp6", "unix":
+			gc = newTCPConn(el, c, ctx)
+			el.ch <- &openConn{c: gc, cb: func() { close(connOpened) }}
+			goroutine.DefaultWorkerPool.Submit(func() {
+				var buffer [0x10000]byte
+				for {
+					n, err := c.Read(buffer[:])
+					if err != nil {
+						el.ch <- &netErr{gc, err}
+						return
+					}
+					el.ch <- packTCPConn(gc, buffer[:n])
+				}
+			})
+		case "udp", "udp4", "udp6":
+			gc = newUDPConn(el, nil, c, c.LocalAddr(), c.RemoteAddr(), ctx)
+			el.ch <- &openConn{c: gc, cb: func() { close(connOpened) }}
+			goroutine.DefaultWorkerPool.Submit(func() {
+				var buffer [0x10000]byte
+				for {
+					n, err := c.Read(buffer[:])
+					if err != nil {
+						el.ch <- &netErr{gc, err}
+						return
+					}
+					gc := newUDPConn(el, nil, c, c.LocalAddr(), c.RemoteAddr(), ctx)
+					el.ch <- packUDPConn(gc, buffer[:n])
+				}
+			})
+		}
+
+		<-connOpened
+
+		resCh <- RegisteredResult{Conn: gc}
+	})
+	return
 }
 
 func (el *eventloop) incConn(delta int32) {

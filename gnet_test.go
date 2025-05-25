@@ -2132,9 +2132,19 @@ func (p *streamProxyServer) OnOpen(c Conn) (out []byte, action Action) {
 		p.backendServerPool = p.backendServerPool[:len(p.backendServerPool)-1]
 		p.backendServerPoolMu.Unlock()
 
+		// Test the error handling of the methods of EventLoop.
 		_, err := c.EventLoop().Register(context.Background(), nil)
 		assert.ErrorIsf(p.tester, err, errorx.ErrInvalidNetworkAddress, "Expected error: %v, but got: %v",
 			errorx.ErrInvalidNetworkAddress, err)
+		_, err = c.EventLoop().Enroll(context.Background(), nil)
+		assert.ErrorIsf(p.tester, err, errorx.ErrInvalidNetConn, "Expected error: %v, but got: %v",
+			errorx.ErrInvalidNetConn, err)
+		err = c.EventLoop().Execute(context.Background(), nil)
+		assert.ErrorIsf(p.tester, err, errorx.ErrNilRunnable, "Expected error: %v, but got: %v",
+			errorx.ErrNilRunnable, err)
+		err = c.EventLoop().Schedule(context.Background(), nil, time.Millisecond)
+		assert.ErrorIsf(p.tester, err, errorx.ErrUnsupportedOp, "Expected error: %v, but got: %v",
+			errorx.ErrUnsupportedOp, err)
 
 		network, addr, err := parseProtoAddr(backendServer)
 		assert.NoError(p.tester, err, "parseProtoAddr error")
@@ -2167,10 +2177,7 @@ func (p *streamProxyServer) OnOpen(c Conn) (out []byte, action Action) {
 		assert.NotNil(p.tester, serverConn, "context is not Conn")
 		serverConn.SetContext(c)
 
-		err := c.EventLoop().Execute(context.Background(), nil)
-		assert.ErrorIsf(p.tester, err, errorx.ErrNilRunnable, "Expected error: %v, but got: %v",
-			errorx.ErrNilRunnable, err)
-		err = c.EventLoop().Execute(NewContext(context.Background(), c.LocalAddr()),
+		err := c.EventLoop().Execute(NewContext(context.Background(), c.LocalAddr()),
 			RunnableFunc(func(ctx context.Context) error {
 				p.tester.Logf("backend connection %v established", FromContext(ctx))
 				return nil
@@ -2383,12 +2390,19 @@ func testStreamProxyServer(t *testing.T, addr string, backendServers []string, m
 	err = Run(&srv, addr, WithEdgeTriggeredIO(et), WithMulticore(multicore), WithTicker(true))
 	require.NoErrorf(t, err, "Run error: %v", err)
 
+	// Test the error handling of the methods of EventLoop after a shutdown.
 	_, err = srv.eventLoop.Register(context.Background(), nil)
+	require.ErrorIsf(t, err, errorx.ErrEngineInShutdown, "Expected error: %v, but got: %v",
+		errorx.ErrEngineInShutdown, err)
+	_, err = srv.eventLoop.Enroll(context.Background(), nil)
 	require.ErrorIsf(t, err, errorx.ErrEngineInShutdown, "Expected error: %v, but got: %v",
 		errorx.ErrEngineInShutdown, err)
 	err = srv.eventLoop.Execute(context.Background(), nil)
 	require.ErrorIsf(t, err, errorx.ErrEngineInShutdown, "Expected error: %v, but got: %v",
 		errorx.ErrEngineInShutdown, err)
+	err = srv.eventLoop.Schedule(context.Background(), nil, time.Millisecond)
+	require.ErrorIsf(t, err, errorx.ErrUnsupportedOp, "Expected error: %v, but got: %v",
+		errorx.ErrUnsupportedOp, err)
 
 	for _, server := range netServers {
 		require.NoError(t, server.Close(), "Close backend server error")
@@ -2426,7 +2440,7 @@ type udpProxyServer struct {
 
 func (p *udpProxyServer) OnBoot(eng Engine) (action Action) {
 	p.engine = eng
-	_, err := eng.Register(context.Background(), nil)
+	_, err := eng.Register(context.Background())
 	assert.ErrorIsf(p.tester, err, errorx.ErrEmptyEngine, "Expected error: %v, but got: %v",
 		errorx.ErrEmptyEngine, err)
 	return
@@ -2475,7 +2489,7 @@ func (p *udpProxyServer) OnTraffic(c Conn) Action {
 
 func (p *udpProxyServer) OnTick() (delay time.Duration, action Action) {
 	p.initBackendPoolOnce.Do(func() {
-		for _, backendServer := range p.backendServers {
+		for i, backendServer := range p.backendServers {
 			network, addr, err := parseProtoAddr(backendServer)
 			assert.NoError(p.tester, err, "parseProtoAddr error")
 			var address net.Addr
@@ -2490,7 +2504,19 @@ func (p *udpProxyServer) OnTick() (delay time.Duration, action Action) {
 				assert.Failf(p.tester, "unsupported protocol", "unsupported protocol: %s", network)
 			}
 			assert.NoError(p.tester, err, "ResolveNetAddr error")
-			resCh, err := p.engine.Register(context.Background(), address)
+
+			// Test the error handling with empty context.
+			_, err = p.engine.Register(context.Background())
+			assert.ErrorIs(p.tester, err, errorx.ErrInvalidNetworkAddress)
+
+			var resCh <-chan RegisteredResult
+			if i%2 == 0 {
+				resCh, err = p.engine.Register(NewNetAddrContext(context.Background(), address))
+			} else {
+				c, e := net.Dial(network, addr)
+				assert.NoError(p.tester, e, "Dial error")
+				resCh, err = p.engine.Register(NewNetConnContext(context.Background(), c))
+			}
 			assert.NoError(p.tester, err, "Register connection error")
 			err = goPool.DefaultWorkerPool.Submit(func() {
 				res := <-resCh

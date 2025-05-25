@@ -53,26 +53,36 @@ func (el *eventloop) Register(ctx context.Context, addr net.Addr) (<-chan Regist
 	if el.engine.isShutdown() {
 		return nil, errorx.ErrEngineInShutdown
 	}
-
 	if addr == nil {
 		return nil, errorx.ErrInvalidNetworkAddress
 	}
+	return el.enroll(nil, addr, FromContext(ctx))
+}
 
-	return el.enroll(addr, FromContext(ctx))
+func (el *eventloop) Enroll(ctx context.Context, c net.Conn) (<-chan RegisteredResult, error) {
+	if el.engine.isShutdown() {
+		return nil, errorx.ErrEngineInShutdown
+	}
+	if c == nil {
+		return nil, errorx.ErrInvalidNetConn
+	}
+	return el.enroll(c, c.RemoteAddr(), FromContext(ctx))
 }
 
 func (el *eventloop) Execute(ctx context.Context, runnable Runnable) error {
 	if el.engine.isShutdown() {
 		return errorx.ErrEngineInShutdown
 	}
-
 	if runnable == nil {
 		return errorx.ErrNilRunnable
 	}
-
 	return el.poller.Trigger(queue.LowPriority, func(any) error {
 		return runnable.Run(ctx)
 	}, nil)
+}
+
+func (el *eventloop) Schedule(context.Context, Runnable, time.Duration) error {
+	return errorx.ErrUnsupportedOp
 }
 
 func (el *eventloop) Close(c Conn) error {
@@ -100,15 +110,17 @@ type connWithCallback struct {
 	cb func()
 }
 
-func (el *eventloop) enroll(addr net.Addr, ctx any) (resCh chan RegisteredResult, err error) {
+func (el *eventloop) enroll(c net.Conn, addr net.Addr, ctx any) (resCh chan RegisteredResult, err error) {
 	resCh = make(chan RegisteredResult, 1)
 	err = goroutine.DefaultWorkerPool.Submit(func() {
 		defer close(resCh)
 
-		c, err := net.Dial(addr.Network(), addr.String())
-		if err != nil {
-			resCh <- RegisteredResult{Err: err}
-			return
+		var err error
+		if c == nil {
+			if c, err = net.Dial(addr.Network(), addr.String()); err != nil {
+				resCh <- RegisteredResult{Err: err}
+				return
+			}
 		}
 		defer c.Close() //nolint:errcheck
 

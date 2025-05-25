@@ -77,9 +77,16 @@ func (e Engine) CountConnections() (count int) {
 	return
 }
 
-// Register connects to the given address and registers the corresponding socket
-// to the event-loop that is chosen based off of the algorithm set by WithLoadBalancing.
-func (e Engine) Register(ctx context.Context, addr net.Addr) (<-chan RegisteredResult, error) {
+// Register registers the new connection to the event-loop that is chosen
+// based off of the algorithm set by WithLoadBalancing.
+// You should call either of the NewNetConnContext or NewNetAddrContext
+// and pass the returned context to this method. net.Conn will precede
+// net.Addr if both are present in the context.
+//
+// Note that you need to switch to another load-balancing algorithm over
+// the default RoundRobin when starting the engine, to avoid data race
+// issue if you plan on calling this method from somewhere later on.
+func (e Engine) Register(ctx context.Context) (<-chan RegisteredResult, error) {
 	if err := e.Validate(); err != nil {
 		return nil, err
 	}
@@ -88,7 +95,17 @@ func (e Engine) Register(ctx context.Context, addr net.Addr) (<-chan RegisteredR
 		return nil, errorx.ErrEmptyEngine
 	}
 
-	return e.eng.eventLoops.next(addr).Register(ctx, addr)
+	c, ok := FromNetConnContext(ctx)
+	if ok {
+		return e.eng.eventLoops.next(c.RemoteAddr()).Enroll(ctx, c)
+	}
+
+	addr, ok := FromNetAddrContext(ctx)
+	if ok {
+		return e.eng.eventLoops.next(addr).Register(ctx, addr)
+	}
+
+	return nil, errorx.ErrInvalidNetworkAddress
 }
 
 // Dup returns a copy of the underlying file descriptor of listener.
@@ -362,19 +379,6 @@ func (fn RunnableFunc) Run(ctx context.Context) error {
 	return fn(ctx)
 }
 
-// contextKey is a key for Conn values in context.Context.
-type contextKey struct{}
-
-// NewContext returns a new context.Context that carries the value Conn.
-func NewContext(ctx context.Context, v any) context.Context {
-	return context.WithValue(ctx, contextKey{}, v)
-}
-
-// FromContext returns the Conn value stored in ctx, if any.
-func FromContext(ctx context.Context) any {
-	return ctx.Value(contextKey{})
-}
-
 // RegisteredResult is the result of a Register call.
 type RegisteredResult struct {
 	Conn Conn
@@ -388,8 +392,14 @@ type EventLoop interface {
 	// Register connects to the given address and registers the corresponding socket
 	// to the current event-loop.
 	Register(ctx context.Context, addr net.Addr) (<-chan RegisteredResult, error)
+	// Enroll adds a given net.Conn to the current event-loop.
+	Enroll(ctx context.Context, c net.Conn) (<-chan RegisteredResult, error)
 	// Execute executes the given runnable on the event-loop at some time in the future.
 	Execute(ctx context.Context, runnable Runnable) error
+	// Schedule is like Execute, but it allows you to specify when the runnable is executed.
+	// In other words, the runnable will be executed when the delay duration is reached.
+	// TODO(panjf2000): implement this.
+	Schedule(ctx context.Context, runnable Runnable, delay time.Duration) error
 
 	// Concurrency-unsafe methods
 
