@@ -375,7 +375,6 @@ type testClient struct {
 	connected     int32
 	clientActive  int32
 	disconnected  int32
-	workerPool    *goPool.Pool
 	udpReadHeader int32
 }
 
@@ -404,7 +403,6 @@ func (s *testClient) OnClose(c Conn, err error) (action Action) {
 	if atomic.LoadInt32(&s.connected) == atomic.LoadInt32(&s.disconnected) &&
 		atomic.LoadInt32(&s.disconnected) == int32(s.nclients) {
 		action = Shutdown
-		s.workerPool.Release()
 	}
 
 	return
@@ -431,7 +429,8 @@ func (s *testClient) OnTraffic(c Conn) (action Action) {
 
 	if s.async {
 		buf := bbPool.Get()
-		_, _ = c.WriteTo(buf)
+		_, err := c.WriteTo(buf)
+		assert.NoError(s.tester, err, "WriteTo error")
 
 		if s.network == "tcp" || s.network == "unix" {
 			// just for test
@@ -443,17 +442,19 @@ func (s *testClient) OnTraffic(c Conn) (action Action) {
 			atomic.AddInt32(&s.udpReadHeader, 1)
 			buf.Reset()
 		}
-		_ = s.workerPool.Submit(
+		err = goPool.DefaultWorkerPool.Submit(
 			func() {
 				if buf.Len() > 0 {
 					err := c.AsyncWrite(buf.Bytes(), nil)
 					assert.NoError(s.tester, err)
 				}
 			})
+		assert.NoError(s.tester, err)
 		return
 	}
 
-	buf, _ := c.Next(-1)
+	buf, err := c.Next(-1)
+	assert.NoError(s.tester, err, "Reading data error")
 	if v == nil && bytes.Equal(buf, pingMsg) {
 		atomic.AddInt32(&s.udpReadHeader, 1)
 		buf = nil
@@ -475,7 +476,12 @@ func (s *testClient) OnTick() (delay time.Duration, action Action) {
 			if i%2 == 0 {
 				netConn = true
 			}
-			go startGnetClient(s.tester, s.client, s.network, s.addr, s.multicore, s.async, netConn)
+			err := goPool.DefaultWorkerPool.Submit(
+				func() {
+					startGnetClient(s.tester, s.client, s.network, s.addr, s.multicore, s.async, netConn)
+				})
+			assert.NoError(s.tester, err)
+
 		}
 	}
 	if s.network == "udp" && atomic.LoadInt32(&s.clientActive) == 0 {
@@ -487,13 +493,12 @@ func (s *testClient) OnTick() (delay time.Duration, action Action) {
 
 func runClient(t *testing.T, network, addr string, conf *testConf) {
 	ts := &testClient{
-		tester:     t,
-		network:    network,
-		addr:       addr,
-		multicore:  conf.multicore,
-		async:      conf.async,
-		nclients:   conf.clients,
-		workerPool: goPool.Default(),
+		tester:    t,
+		network:   network,
+		addr:      addr,
+		multicore: conf.multicore,
+		async:     conf.async,
+		nclients:  conf.clients,
 	}
 	var err error
 	clientEV := &clientEvents{tester: t, packetLen: streamLen, svr: ts}
@@ -646,7 +651,10 @@ func (ev *serverEventsForWake) OnClose(_ Conn, _ error) Action {
 
 func (ev *serverEventsForWake) OnTick() (time.Duration, Action) {
 	if atomic.CompareAndSwapInt32(&ev.started, 0, 1) {
-		go testConnWakeImmediately(ev.tester, ev.client, ev.clientEV, ev.network, ev.addr)
+		err := goPool.DefaultWorkerPool.Submit(func() {
+			testConnWakeImmediately(ev.tester, ev.client, ev.clientEV, ev.network, ev.addr)
+		})
+		assert.NoError(ev.tester, err)
 	}
 	return 100 * time.Millisecond, None
 }
@@ -699,15 +707,19 @@ func TestClientReadOnEOF(t *testing.T) {
 	assert.NoError(t, err)
 	defer ln.Close() //nolint:errcheck
 
-	go func() {
+	err = goPool.DefaultWorkerPool.Submit(func() {
 		for {
 			conn, err := ln.Accept()
 			if err != nil {
 				break
 			}
-			go process(conn)
+			err = goPool.DefaultWorkerPool.Submit(func() {
+				process(conn)
+			})
+			assert.NoError(t, err)
 		}
-	}()
+	})
+	assert.NoError(t, err)
 
 	ev := &clientReadOnEOF{
 		result: make(chan struct {

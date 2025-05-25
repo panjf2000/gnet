@@ -543,7 +543,6 @@ type testServer struct {
 	connected    int32
 	disconnected int32
 	clientActive int32
-	workerPool   *goPool.Pool
 }
 
 func (s *testServer) OnBoot(eng Engine) (action Action) {
@@ -621,50 +620,61 @@ func (s *testServer) OnClose(c Conn, err error) (action Action) {
 func (s *testServer) OnTraffic(c Conn) (action Action) {
 	if s.async {
 		buf := bbPool.Get()
-		_, _ = c.WriteTo(buf)
+		n, err := c.WriteTo(buf)
+		assert.NoError(s.tester, err, "WriteTo error")
+		assert.Greater(s.tester, n, int64(0), "WriteTo error")
 		if c.LocalAddr().Network() == "tcp" || c.LocalAddr().Network() == "unix" {
-			_ = s.workerPool.Submit(
+			err = goPool.DefaultWorkerPool.Submit(
 				func() {
 					if s.writev {
 						mid := buf.Len() / 2
 						bs := make([][]byte, 2)
 						bs[0] = buf.B[:mid]
 						bs[1] = buf.B[mid:]
-						_ = c.AsyncWritev(bs, func(c Conn, err error) error {
+						err := c.AsyncWritev(bs, func(c Conn, err error) error {
 							if c.RemoteAddr() != nil {
 								logging.Debugf("conn=%s done writev: %v", c.RemoteAddr().String(), err)
 							}
 							bbPool.Put(buf)
 							return nil
 						})
+						assert.NoError(s.tester, err, "AsyncWritev error")
 					} else {
-						_ = c.AsyncWrite(buf.Bytes(), func(c Conn, err error) error {
+						err := c.AsyncWrite(buf.Bytes(), func(c Conn, err error) error {
 							if c.RemoteAddr() != nil {
 								logging.Debugf("conn=%s done write: %v", c.RemoteAddr().String(), err)
 							}
 							bbPool.Put(buf)
 							return nil
 						})
+						assert.NoError(s.tester, err, "AsyncWritev error")
 					}
 				})
+			assert.NoError(s.tester, err)
 			return
 		} else if c.LocalAddr().Network() == "udp" {
-			_ = s.workerPool.Submit(
+			err := goPool.DefaultWorkerPool.Submit(
 				func() {
-					_ = c.AsyncWrite(buf.Bytes(), nil)
+					err := c.AsyncWrite(buf.Bytes(), nil)
+					assert.NoError(s.tester, err, "AsyncWritev error")
 				})
+			assert.NoError(s.tester, err)
 			return
 		}
 		return
 	}
 
-	buf, _ := c.Next(-1)
+	buf, err := c.Next(-1)
+	assert.NoError(s.tester, err, "reading data error")
+	var n int
 	if s.writev {
 		mid := len(buf) / 2
-		_, _ = c.Writev([][]byte{buf[:mid], buf[mid:]})
+		n, err = c.Writev([][]byte{buf[:mid], buf[mid:]})
 	} else {
-		_, _ = c.Write(buf)
+		n, err = c.Write(buf)
 	}
+	assert.NoError(s.tester, err, "writev error")
+	assert.EqualValues(s.tester, n, len(buf), "short writev")
 
 	// Only for code coverage of testing.
 	if !s.multicore {
@@ -726,10 +736,11 @@ func (s *testServer) OnTick() (delay time.Duration, action Action) {
 			assert.NoError(s.tester, err)
 			for i := 0; i < s.nclients; i++ {
 				atomic.AddInt32(&s.clientActive, 1)
-				go func() {
+				err := goPool.DefaultWorkerPool.Submit(func() {
 					startClient(s.tester, proto, addr, s.multicore, s.async, 0, nil)
 					atomic.AddInt32(&s.clientActive, -1)
-				}()
+				})
+				assert.NoError(s.tester, err)
 			}
 		}
 	}
@@ -744,7 +755,6 @@ func (s *testServer) OnTick() (delay time.Duration, action Action) {
 		disconnected := atomic.LoadInt32(&s.disconnected)
 		if int(disconnected) == streamConns && disconnected == atomic.LoadInt32(&s.connected) {
 			action = Shutdown
-			s.workerPool.Release()
 			assert.EqualValues(s.tester, 0, s.eng.CountConnections())
 		}
 	}
@@ -753,13 +763,12 @@ func (s *testServer) OnTick() (delay time.Duration, action Action) {
 
 func runServer(t *testing.T, addrs []string, conf *testConf) {
 	ts := &testServer{
-		tester:     t,
-		addrs:      addrs,
-		multicore:  conf.multicore,
-		async:      conf.async,
-		writev:     conf.writev,
-		nclients:   conf.clients,
-		workerPool: goPool.Default(),
+		tester:    t,
+		addrs:     addrs,
+		multicore: conf.multicore,
+		async:     conf.async,
+		writev:    conf.writev,
+		nclients:  conf.clients,
 	}
 	var err error
 	if len(addrs) > 1 {
@@ -931,14 +940,15 @@ func (t *testWakeConnServer) OnTick() (delay time.Duration, action Action) {
 	if !t.wake {
 		t.wake = true
 		delay = time.Millisecond * 100
-		go func() {
+		err := goPool.DefaultWorkerPool.Submit(func() {
 			conn, err := net.Dial(t.network, t.addr)
 			assert.NoError(t.tester, err)
 			defer conn.Close() //nolint:errcheck
 			r := make([]byte, 10)
 			_, err = conn.Read(r)
 			assert.NoError(t.tester, err)
-		}()
+		})
+		assert.NoError(t.tester, err)
 		return
 	}
 	t.c = <-t.conn
@@ -1004,13 +1014,14 @@ func (t *testShutdownServer) OnTick() (delay time.Duration, action Action) {
 	if t.count == 0 {
 		// start clients
 		for i := 0; i < t.N; i++ {
-			go func() {
+			err := goPool.DefaultWorkerPool.Submit(func() {
 				conn, err := net.Dial(t.network, t.addr)
 				assert.NoError(t.tester, err)
 				defer conn.Close() //nolint:errcheck
 				_, err = conn.Read([]byte{0})
 				assert.Error(t.tester, err)
-			}()
+			})
+			assert.NoError(t.tester, err)
 		}
 	} else if int(atomic.LoadInt32(&t.clients)) == t.N {
 		action = Shutdown
@@ -1071,7 +1082,7 @@ func (t *testCloseActionErrorServer) OnTick() (delay time.Duration, action Actio
 	if !t.action {
 		t.action = true
 		delay = time.Millisecond * 100
-		go func() {
+		err := goPool.DefaultWorkerPool.Submit(func() {
 			conn, err := net.Dial(t.network, t.addr)
 			assert.NoError(t.tester, err)
 			defer conn.Close() //nolint:errcheck
@@ -1079,7 +1090,8 @@ func (t *testCloseActionErrorServer) OnTick() (delay time.Duration, action Actio
 			_, _ = conn.Write(data)
 			_, err = conn.Read(data)
 			assert.NoError(t.tester, err)
-		}()
+		})
+		assert.NoError(t.tester, err)
 		return
 	}
 	delay = time.Millisecond * 100
@@ -1115,7 +1127,7 @@ func (t *testShutdownActionErrorServer) OnTick() (delay time.Duration, action Ac
 	if !t.action {
 		t.action = true
 		delay = time.Millisecond * 100
-		go func() {
+		err := goPool.DefaultWorkerPool.Submit(func() {
 			conn, err := net.Dial(t.network, t.addr)
 			assert.NoError(t.tester, err)
 			defer conn.Close() //nolint:errcheck
@@ -1123,7 +1135,8 @@ func (t *testShutdownActionErrorServer) OnTick() (delay time.Duration, action Ac
 			_, _ = conn.Write(data)
 			_, err = conn.Read(data)
 			assert.NoError(t.tester, err)
-		}()
+		})
+		assert.NoError(t.tester, err)
 		return
 	}
 	delay = time.Millisecond * 100
@@ -1161,11 +1174,12 @@ func (t *testCloseActionOnOpenServer) OnTick() (delay time.Duration, action Acti
 	if !t.action {
 		t.action = true
 		delay = time.Millisecond * 100
-		go func() {
+		err := goPool.DefaultWorkerPool.Submit(func() {
 			conn, err := net.Dial(t.network, t.addr)
 			assert.NoError(t.tester, err)
 			defer conn.Close() //nolint:errcheck
-		}()
+		})
+		assert.NoError(t.tester, err)
 		return
 	}
 	delay = time.Millisecond * 100
@@ -1208,11 +1222,12 @@ func (t *testShutdownActionOnOpenServer) OnTick() (delay time.Duration, action A
 	if !t.action {
 		t.action = true
 		delay = time.Millisecond * 100
-		go func() {
+		err := goPool.DefaultWorkerPool.Submit(func() {
 			conn, err := net.Dial(t.network, t.addr)
 			assert.NoError(t.tester, err)
 			defer conn.Close() //nolint:errcheck
-		}()
+		})
+		assert.NoError(t.tester, err)
 		return
 	}
 	delay = time.Millisecond * 100
@@ -1252,7 +1267,7 @@ func (t *testUDPShutdownServer) OnTick() (delay time.Duration, action Action) {
 	if !t.tick {
 		t.tick = true
 		delay = time.Millisecond * 100
-		go func() {
+		err := goPool.DefaultWorkerPool.Submit(func() {
 			conn, err := net.Dial(t.network, t.addr)
 			assert.NoError(t.tester, err)
 			defer conn.Close() //nolint:errcheck
@@ -1261,7 +1276,8 @@ func (t *testUDPShutdownServer) OnTick() (delay time.Duration, action Action) {
 			assert.NoError(t.tester, err)
 			_, err = conn.Read(data)
 			assert.NoError(t.tester, err)
-		}()
+		})
+		assert.NoError(t.tester, err)
 		return
 	}
 	delay = time.Millisecond * 100
@@ -1294,13 +1310,14 @@ func (t *testCloseConnectionServer) OnTraffic(c Conn) (action Action) {
 	buf, _ := c.Peek(-1)
 	_, _ = c.Write(buf)
 	_, _ = c.Discard(-1)
-	go func() {
+	err := goPool.DefaultWorkerPool.Submit(func() {
 		time.Sleep(time.Second)
 		_ = c.CloseWithCallback(func(_ Conn, err error) error {
 			assert.ErrorIsf(t.tester, err, errorx.ErrEngineShutdown, "should be engine shutdown error")
 			return nil
 		})
-	}()
+	})
+	assert.NoError(t.tester, err)
 	return
 }
 
@@ -1308,7 +1325,7 @@ func (t *testCloseConnectionServer) OnTick() (delay time.Duration, action Action
 	delay = time.Millisecond * 100
 	if !t.action {
 		t.action = true
-		go func() {
+		err := goPool.DefaultWorkerPool.Submit(func() {
 			conn, err := net.Dial(t.network, t.addr)
 			assert.NoError(t.tester, err)
 			defer conn.Close() //nolint:errcheck
@@ -1319,7 +1336,8 @@ func (t *testCloseConnectionServer) OnTick() (delay time.Duration, action Action
 			// waiting the engine shutdown.
 			_, err = conn.Read(data)
 			assert.Error(t.tester, err)
-		}()
+		})
+		assert.NoError(t.tester, err)
 		return
 	}
 	return
@@ -1369,7 +1387,7 @@ func (t *testStopServer) OnTick() (delay time.Duration, action Action) {
 	delay = time.Millisecond * 100
 	if !t.action {
 		t.action = true
-		go func() {
+		err := goPool.DefaultWorkerPool.Submit(func() {
 			conn, err := net.Dial(t.network, t.addr)
 			assert.NoError(t.tester, err)
 			defer conn.Close() //nolint:errcheck
@@ -1378,16 +1396,18 @@ func (t *testStopServer) OnTick() (delay time.Duration, action Action) {
 			_, err = conn.Read(data)
 			assert.NoError(t.tester, err)
 
-			go func() {
+			err = goPool.DefaultWorkerPool.Submit(func() {
 				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 				defer cancel()
 				logging.Debugf("stop engine...", t.eng.Stop(ctx))
-			}()
+			})
+			assert.NoError(t.tester, err)
 
 			// waiting the engine shutdown.
 			_, err = conn.Read(data)
 			assert.Error(t.tester, err)
-		}()
+		})
+		assert.NoError(t.tester, err)
 		return
 	}
 	return
@@ -1433,7 +1453,7 @@ func (t *testStopEngine) OnTraffic(c Conn) (action Action) {
 
 func (t *testStopEngine) OnTick() (delay time.Duration, action Action) {
 	delay = time.Millisecond * 100
-	go func() {
+	err := goPool.DefaultWorkerPool.Submit(func() {
 		conn, err := net.Dial(t.network, t.addr)
 		assert.NoError(t.tester, err)
 		defer conn.Close() //nolint:errcheck
@@ -1452,7 +1472,8 @@ func (t *testStopEngine) OnTick() (delay time.Duration, action Action) {
 			assert.Error(t.tester, err)
 		}
 		atomic.AddInt64(&t.stopIter, -1)
-	}()
+	})
+	assert.NoError(t.tester, err)
 	return
 }
 
@@ -1461,31 +1482,33 @@ func testEngineStop(t *testing.T, network, addr string) {
 	events2 := &testStopEngine{tester: t, network: network, addr: addr, protoAddr: network + "://" + addr, name: "2", stopIter: 5}
 
 	result1 := make(chan error, 1)
-	go func() {
+	err := goPool.DefaultWorkerPool.Submit(func() {
 		err := Run(events1, events1.protoAddr, WithTicker(true), WithReuseAddr(true), WithReusePort(true))
 		result1 <- err
-	}()
+	})
+	require.NoError(t, err)
 	// ensure the first handler processes before starting the next since the delay per tick is 100ms
 	time.Sleep(150 * time.Millisecond)
 	result2 := make(chan error, 1)
-	go func() {
+	err = goPool.DefaultWorkerPool.Submit(func() {
 		err := Run(events2, events2.protoAddr, WithTicker(true), WithReuseAddr(true), WithReusePort(true))
 		result2 <- err
-	}()
+	})
+	assert.NoError(t, err)
 
-	err := <-result1
-	assert.NoError(t, err)
+	err = <-result1
+	require.NoError(t, err)
 	err = <-result2
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	// make sure that each handler processed at least 1
-	assert.Greater(t, events1.exchngCount, int64(0))
-	assert.Greater(t, events2.exchngCount, int64(0))
-	assert.Equal(t, int64(2+1+5+1), events1.exchngCount+events2.exchngCount)
+	require.Greater(t, events1.exchngCount, int64(0))
+	require.Greater(t, events2.exchngCount, int64(0))
+	require.Equal(t, int64(2+1+5+1), events1.exchngCount+events2.exchngCount)
 	// stop an already stopped engine
-	assert.Equal(t, errorx.ErrEngineInShutdown, events1.eng.Stop(context.Background()))
+	require.Equal(t, errorx.ErrEngineInShutdown, events1.eng.Stop(context.Background()))
 }
 
-// Test should not panic when we wake-up server_closed conn.
+// Test should not panic when we wake up server_closed conn.
 func TestClosedWakeUp(t *testing.T) {
 	events := &testClosedWakeUpServer{
 		tester:             t,
@@ -1510,7 +1533,7 @@ type testClosedWakeUpServer struct {
 }
 
 func (s *testClosedWakeUpServer) OnBoot(eng Engine) (action Action) {
-	go func() {
+	err := goPool.DefaultWorkerPool.Submit(func() {
 		c, err := net.Dial(s.network, s.addr)
 		assert.NoError(s.tester, err)
 
@@ -1525,7 +1548,8 @@ func (s *testClosedWakeUpServer) OnBoot(eng Engine) (action Action) {
 		<-s.serverClosed
 
 		logging.Debugf("stop engine...", eng.Stop(context.TODO()))
-	}()
+	})
+	assert.NoError(s.tester, err)
 
 	return None
 }
@@ -1539,8 +1563,10 @@ func (s *testClosedWakeUpServer) OnTraffic(c Conn) Action {
 		close(s.wakeup)
 	}
 
-	go func() { assert.NoError(s.tester, c.Wake(nil)) }()
-	go func() { assert.NoError(s.tester, c.Close()) }()
+	err := goPool.DefaultWorkerPool.Submit(func() { assert.NoError(s.tester, c.Wake(nil)) })
+	assert.NoError(s.tester, err)
+	err = goPool.DefaultWorkerPool.Submit(func() { assert.NoError(s.tester, c.Close()) })
+	assert.NoError(s.tester, err)
 
 	<-s.clientClosed
 
@@ -1601,7 +1627,7 @@ func (t *testDisconnectedAsyncWriteServer) OnTraffic(c Conn) Action {
 	_, err := c.Next(0)
 	assert.NoErrorf(t.tester, err, "c.Next error: %v", err)
 
-	go func() {
+	err = goPool.DefaultWorkerPool.Submit(func() {
 		for range time.Tick(100 * time.Millisecond) {
 			if t.exit.Load() {
 				break
@@ -1633,7 +1659,8 @@ func (t *testDisconnectedAsyncWriteServer) OnTraffic(c Conn) Action {
 				return
 			}
 		}
-	}()
+	})
+	assert.NoError(t.tester, err)
 
 	return None
 }
@@ -1648,13 +1675,14 @@ func (t *testDisconnectedAsyncWriteServer) OnTick() (delay time.Duration, action
 
 	if !t.clientStarted {
 		t.clientStarted = true
-		go func() {
+		err := goPool.DefaultWorkerPool.Submit(func() {
 			c, err := net.Dial("tcp", t.addr)
 			assert.NoError(t.tester, err)
 			_, err = c.Write([]byte("hello"))
 			assert.NoError(t.tester, err)
 			assert.NoError(t.tester, c.Close())
-		}()
+		})
+		assert.NoError(t.tester, err)
 	}
 	return
 }
@@ -1748,9 +1776,10 @@ func (s *simServer) OnTraffic(c Conn) (action Action) {
 func (s *simServer) OnTick() (delay time.Duration, action Action) {
 	if atomic.CompareAndSwapInt32(&s.started, 0, 1) {
 		for i := 0; i < s.nclients; i++ {
-			go func() {
+			err := goPool.DefaultWorkerPool.Submit(func() {
 				runSimClient(s.tester, s.network, s.addr, s.packetSize, s.batchWrite)
-			}()
+			})
+			assert.NoError(s.tester, err)
 		}
 	}
 	delay = 100 * time.Millisecond
@@ -1998,7 +2027,7 @@ func (t *testUDPSendtoServer) OnTraffic(c Conn) Action {
 func (t *testUDPSendtoServer) OnTick() (delay time.Duration, action Action) {
 	t.startClientsOnce.Do(func() {
 		for i := 0; i < t.clientCount; i++ {
-			go func() {
+			err := goPool.DefaultWorkerPool.Submit(func() {
 				c, err := net.Dial("udp", t.addr)
 				assert.NoError(t.tester, err)
 				defer c.Close() //nolint:errcheck
@@ -2012,7 +2041,8 @@ func (t *testUDPSendtoServer) OnTick() (delay time.Duration, action Action) {
 				t.mu.Lock()
 				t.clientCount--
 				t.mu.Unlock()
-			}()
+			})
+			assert.NoError(t.tester, err)
 		}
 	})
 
