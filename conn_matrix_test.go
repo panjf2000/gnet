@@ -6,6 +6,7 @@ import (
 	"net"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/unix"
 
 	goPool "github.com/panjf2000/gnet/v2/pkg/pool/goroutine"
@@ -51,7 +52,7 @@ func testConnMatrix(t *testing.T, n int) {
 	el := eventloop{engine: &engine{opts: &Options{}}}
 
 	done := make(chan struct{})
-	go func() {
+	err := goPool.DefaultWorkerPool.Submit(func() {
 		for i := 0; i < n+n/2; i++ {
 			v := <-handleConns
 			switch v.action {
@@ -62,14 +63,14 @@ func testConnMatrix(t *testing.T, n int) {
 			}
 		}
 		close(done)
-	}()
+	})
+	require.NoError(t, err)
 
-	pool := goPool.Default()
 	for i := 0; i < n; i++ {
 		c := newTCPConn(i, &el, &unix.SockaddrInet4{}, &net.TCPAddr{}, &net.TCPAddr{})
 		handleConns <- &handleConn{c, actionAdd}
 		if i%2 == 0 {
-			pool.Submit(func() {
+			_ = goPool.DefaultWorkerPool.Submit(func() {
 				handleConns <- &handleConn{c, actionDel}
 			})
 		}

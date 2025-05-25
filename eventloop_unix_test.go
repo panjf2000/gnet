@@ -14,6 +14,8 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/stretchr/testify/assert"
+
+	goPool "github.com/panjf2000/gnet/v2/pkg/pool/goroutine"
 )
 
 func (lb *roundRobinLoadBalancer) register(el *eventloop) {
@@ -98,7 +100,7 @@ func benchServeGC(b *testing.B, network, addr string, async bool, elNum int, ini
 	}
 
 	nowEventLoopInitConn = initConnCount
-	go func() {
+	_ = goPool.DefaultWorkerPool.Submit(func() {
 		err := Run(ts,
 			network+"://"+addr,
 			WithLockOSThread(async),
@@ -107,7 +109,7 @@ func benchServeGC(b *testing.B, network, addr string, async bool, elNum int, ini
 			WithTCPNoDelay(TCPDelay))
 		assert.NoError(b, err)
 		nowEventLoopInitConn = 0
-	}()
+	})
 	<-ts.initOk
 	return ts
 }
@@ -126,12 +128,12 @@ type benchmarkServerGC struct {
 
 func (s *benchmarkServerGC) OnBoot(eng Engine) (action Action) {
 	s.eng = eng
-	go func() {
+	_ = goPool.DefaultWorkerPool.Submit(func() {
 		for s.eng.eng.eventLoops.len() != s.elNum || s.eng.CountConnections() != s.elNum*int(s.initConnCount) {
 			time.Sleep(time.Millisecond)
 		}
 		close(s.initOk)
-	}()
+	})
 	return
 }
 
@@ -253,7 +255,10 @@ func (s *testServerGC) OnBoot(eng Engine) (action Action) {
 	if testBigGC {
 		gcSecs = 10
 	}
-	go s.GC(gcSecs)
+	err := goPool.DefaultWorkerPool.Submit(func() {
+		s.GC(gcSecs)
+	})
+	assert.NoError(s.tester, err)
 
 	return
 }
