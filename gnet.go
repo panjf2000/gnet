@@ -387,23 +387,23 @@ type RegisteredResult struct {
 
 // EventLoop provides a set of methods for manipulating the event-loop.
 type EventLoop interface {
-	// Concurrency-safe methods
+	// ============= Concurrency-safe methods =============
 
-	// Register connects to the given address and registers the corresponding socket
-	// to the current event-loop.
+	// Register connects to the given address and registers the connection to the current event-loop.
 	Register(ctx context.Context, addr net.Addr) (<-chan RegisteredResult, error)
-	// Enroll adds a given net.Conn to the current event-loop.
+	// Enroll is like Register, but it accepts an established net.Conn instead of a net.Addr.
 	Enroll(ctx context.Context, c net.Conn) (<-chan RegisteredResult, error)
 	// Execute executes the given runnable on the event-loop at some time in the future.
 	Execute(ctx context.Context, runnable Runnable) error
 	// Schedule is like Execute, but it allows you to specify when the runnable is executed.
 	// In other words, the runnable will be executed when the delay duration is reached.
-	// TODO(panjf2000): implement this.
+	// TODO(panjf2000): not supported yet, implement this.
 	Schedule(ctx context.Context, runnable Runnable, delay time.Duration) error
 
-	// Concurrency-unsafe methods
+	// ============ Concurrency-unsafe methods ============
 
 	// Close closes the given Conn that belongs to the current event-loop.
+	// It must be called on the same event-loop that the connection belongs to.
 	Close(Conn) error
 }
 
