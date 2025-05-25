@@ -114,6 +114,8 @@ Or
 
 if you've enabled the build tag `poll_opt`.
 
-Check out [gnet/pkg](https://pkg.go.dev/github.com/panjf2000/gnet/v2@v2.7.0/pkg) for more details.
+Check out [gnet/pkg](https://pkg.go.dev/github.com/panjf2000/gnet/v2@v2.7.0/pkg) for more docs.
+
+For more details, please refer to the [release notes](https://github.com/panjf2000/gnet/releases/tag/v2.7.0).
 
 P.S. Follow me on Twitter [@panjf2000](https://twitter.com/panjf2000) to get the latest updates about gnet!
