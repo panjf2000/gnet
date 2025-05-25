@@ -34,7 +34,7 @@ func Example() {
 		panic(fmt.Sprintf("Error listening: %v", err))
 	}
 
-	defer ln.Close()
+	defer ln.Close() //nolint:errcheck
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
 	defer cancel()
@@ -45,7 +45,7 @@ func Example() {
 			panic(fmt.Sprintf("Error accepting connection: %v", err))
 		}
 
-		defer c.Close()
+		defer c.Close() //nolint:errcheck
 
 		buf := make([]byte, 64)
 
@@ -82,7 +82,7 @@ func Example() {
 		panic(fmt.Sprintf("Error opening poller: %v", err))
 	}
 
-	defer poller.Close()
+	defer poller.Close() //nolint:errcheck
 
 	addr, err := net.ResolveTCPAddr("tcp", ln.Addr().String())
 	if err != nil {
@@ -99,8 +99,8 @@ func Example() {
 	}
 
 	closeClient := func() {
-		c.Close()
-		f.Close()
+		c.Close() //nolint:errcheck
+		f.Close() //nolint:errcheck
 	}
 	defer closeClient()
 

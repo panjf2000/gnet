@@ -127,10 +127,7 @@ type benchmarkServerGC struct {
 func (s *benchmarkServerGC) OnBoot(eng Engine) (action Action) {
 	s.eng = eng
 	go func() {
-		for {
-			if s.eng.eng.eventLoops.len() == s.elNum && s.eng.CountConnections() == s.elNum*int(s.initConnCount) {
-				break
-			}
+		for s.eng.eng.eventLoops.len() != s.elNum || s.eng.CountConnections() != s.elNum*int(s.initConnCount) {
 			time.Sleep(time.Millisecond)
 		}
 		close(s.initOk)

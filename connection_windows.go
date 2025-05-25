@@ -21,14 +21,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/panjf2000/ants/v2"
 	"golang.org/x/sys/windows"
 
 	"github.com/panjf2000/gnet/v2/pkg/buffer/elastic"
 	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
 	bbPool "github.com/panjf2000/gnet/v2/pkg/pool/bytebuffer"
 	bsPool "github.com/panjf2000/gnet/v2/pkg/pool/byteslice"
-	goPool "github.com/panjf2000/gnet/v2/pkg/pool/goroutine"
+	"github.com/panjf2000/gnet/v2/pkg/pool/goroutine"
 )
 
 type netErr struct {
@@ -83,8 +82,9 @@ func packUDPConn(c *conn, buf []byte) *udpConn {
 	return &udpConn{c}
 }
 
-func newTCPConn(nc net.Conn, el *eventloop) (c *conn) {
+func newTCPConn(el *eventloop, nc net.Conn, ctx any) (c *conn) {
 	return &conn{
+		ctx:        ctx,
 		loop:       el,
 		buffer:     bbPool.Get(),
 		rawConn:    nc,
@@ -105,9 +105,11 @@ func (c *conn) release() {
 	c.buffer = nil
 }
 
-func newUDPConn(el *eventloop, pc net.PacketConn, localAddr, remoteAddr net.Addr) *conn {
+func newUDPConn(el *eventloop, pc net.PacketConn, rc net.Conn, localAddr, remoteAddr net.Addr, ctx any) *conn {
 	return &conn{
+		ctx:        ctx,
 		pc:         pc,
+		rawConn:    rc,
 		loop:       el,
 		buffer:     bbPool.Get(),
 		localAddr:  localAddr,
@@ -222,7 +224,23 @@ func (c *conn) Write(p []byte) (int, error) {
 	return c.pc.WriteTo(p, c.remoteAddr)
 }
 
+func (c *conn) SendTo(p []byte, addr net.Addr) (int, error) {
+	if c.pc == nil {
+		return 0, errorx.ErrUnsupportedOp
+	}
+
+	if addr == nil {
+		return 0, errorx.ErrInvalidNetworkAddress
+	}
+
+	return c.pc.WriteTo(p, addr)
+}
+
 func (c *conn) Writev(bs [][]byte) (int, error) {
+	if c.pc != nil { // not available for UDP
+		return 0, errorx.ErrUnsupportedOp
+	}
+
 	if c.rawConn != nil {
 		bb := bbPool.Get()
 		defer bbPool.Put(bb)
@@ -403,19 +421,6 @@ func (c *conn) SetKeepAlivePeriod(d time.Duration) error {
 	return nil
 }
 
-type nonBlockingPool struct {
-	*goPool.Pool
-}
-
-func (np *nonBlockingPool) Go(task func()) (err error) {
-	if err = np.Submit(task); err == ants.ErrPoolOverload {
-		go task()
-	}
-	return
-}
-
-var workerPool = nonBlockingPool{Pool: goPool.Default()}
-
 // Gfd return an uninitialized GFD which is not valid,
 // this method is only implemented for compatibility, don't use it on Windows.
 // func (c *conn) Gfd() gfd.GFD { return gfd.GFD{} }
@@ -434,7 +439,7 @@ func (c *conn) AsyncWrite(buf []byte, cb AsyncCallback) error {
 	case c.loop.ch <- fn:
 	default:
 		// If the event-loop channel is full, asynchronize this operation to avoid blocking the eventloop.
-		err = workerPool.Go(func() {
+		err = goroutine.DefaultWorkerPool.Submit(func() {
 			c.loop.ch <- fn
 		})
 	}
@@ -443,6 +448,10 @@ func (c *conn) AsyncWrite(buf []byte, cb AsyncCallback) error {
 }
 
 func (c *conn) AsyncWritev(bs [][]byte, cb AsyncCallback) error {
+	if c.pc != nil {
+		return errorx.ErrUnsupportedOp
+	}
+
 	buf := bbPool.Get()
 	for _, b := range bs {
 		_, _ = buf.Write(b)
@@ -469,7 +478,7 @@ func (c *conn) Wake(cb AsyncCallback) (err error) {
 	case c.loop.ch <- wakeFn:
 	default:
 		// If the event-loop channel is full, asynchronize this operation to avoid blocking the eventloop.
-		err = workerPool.Go(func() {
+		err = goroutine.DefaultWorkerPool.Submit(func() {
 			c.loop.ch <- wakeFn
 		})
 	}
@@ -486,7 +495,7 @@ func (c *conn) Close() (err error) {
 	case c.loop.ch <- closeFn:
 	default:
 		// If the event-loop channel is full, asynchronize this operation to avoid blocking the eventloop.
-		err = workerPool.Go(func() {
+		err = goroutine.DefaultWorkerPool.Submit(func() {
 			c.loop.ch <- closeFn
 		})
 	}
@@ -507,12 +516,16 @@ func (c *conn) CloseWithCallback(cb AsyncCallback) (err error) {
 	case c.loop.ch <- closeFn:
 	default:
 		// If the event-loop channel is full, asynchronize this operation to avoid blocking the eventloop.
-		err = workerPool.Go(func() {
+		err = goroutine.DefaultWorkerPool.Submit(func() {
 			c.loop.ch <- closeFn
 		})
 	}
 
 	return
+}
+
+func (c *conn) EventLoop() EventLoop {
+	return c.loop
 }
 
 func (*conn) SetDeadline(_ time.Time) error {

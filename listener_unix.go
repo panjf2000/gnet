@@ -83,7 +83,8 @@ func initListener(network, addr string, options *Options) (l *listener, err erro
 		sockOptInts []socket.Option[int]
 		sockOptStrs []socket.Option[string]
 	)
-	if options.ReusePort || strings.HasPrefix(network, "udp") {
+
+	if options.ReusePort && network != "unix" {
 		sockOpt := socket.Option[int]{SetSockOpt: socket.SetReuseport, Opt: 1}
 		sockOptInts = append(sockOptInts, sockOpt)
 	}

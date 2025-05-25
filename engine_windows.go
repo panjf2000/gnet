@@ -66,6 +66,7 @@ func (eng *engine) closeEventLoops() {
 }
 
 func (eng *engine) start(ctx context.Context, numEventLoop int) error {
+	var el0 *eventloop
 	for i := 0; i < numEventLoop; i++ {
 		el := eventloop{
 			ch:           make(chan any, 1024),
@@ -77,11 +78,15 @@ func (eng *engine) start(ctx context.Context, numEventLoop int) error {
 		eng.eventLoops.register(&el)
 		eng.concurrency.Go(el.run)
 		if i == 0 && eng.opts.Ticker {
-			eng.concurrency.Go(func() error {
-				el.ticker(ctx)
-				return nil
-			})
+			el0 = &el
 		}
+	}
+
+	if el0 != nil {
+		eng.concurrency.Go(func() error {
+			el0.ticker(ctx)
+			return nil
+		})
 	}
 
 	for _, ln := range eng.listeners {

@@ -29,7 +29,7 @@ func maxListenerBacklog() int {
 	if err != nil {
 		return unix.SOMAXCONN
 	}
-	defer fd.Close()
+	defer fd.Close() //nolint:errcheck
 
 	rd := bufio.NewReader(fd)
 	line, err := rd.ReadString('\n')

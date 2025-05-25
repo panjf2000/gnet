@@ -46,16 +46,16 @@ jobs:
           cache: false
 
       - name: Setup and run golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v7
         with:
-          version: v1.61.0
-          args: -v -E gofumpt -E gocritic -E misspell -E revive -E godot
+          version: v2.1.5
+          args: -v -E gocritic -E misspell -E revive -E godot
   test:
     needs: lint
     strategy:
       fail-fast: false
       matrix:
-        go: ['1.20', '1.23']
+        go: ['1.20', '1.24']
         os: [ubuntu-latest, macos-latest]
     name: Go ${{ matrix.go }} @ ${{ matrix.os }}
     runs-on: ${{ matrix.os }}

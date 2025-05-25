@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
 	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
@@ -39,7 +38,12 @@ type clientEvents struct {
 
 func (ev *clientEvents) OnBoot(e Engine) Action {
 	fd, err := e.Dup()
-	require.ErrorIsf(ev.tester, err, errorx.ErrEmptyEngine, "expected error: %v, but got: %v",
+	assert.ErrorIsf(ev.tester, err, errorx.ErrEmptyEngine, "expected error: %v, but got: %v",
+		errorx.ErrUnsupportedOp, err)
+	assert.EqualValuesf(ev.tester, fd, -1, "expected -1, but got: %d", fd)
+
+	fd, err = e.DupListener("tcp", "abc")
+	assert.ErrorIsf(ev.tester, err, errorx.ErrEmptyEngine, "expected error: %v, but got: %v",
 		errorx.ErrUnsupportedOp, err)
 	assert.EqualValuesf(ev.tester, fd, -1, "expected -1, but got: %d", fd)
 	return None
@@ -84,7 +88,12 @@ func (ev *clientEvents) OnTick() (delay time.Duration, action Action) {
 
 func (ev *clientEvents) OnShutdown(e Engine) {
 	fd, err := e.Dup()
-	require.ErrorIsf(ev.tester, err, errorx.ErrEmptyEngine, "expected error: %v, but got: %v",
+	assert.ErrorIsf(ev.tester, err, errorx.ErrEmptyEngine, "expected error: %v, but got: %v",
+		errorx.ErrUnsupportedOp, err)
+	assert.EqualValuesf(ev.tester, fd, -1, "expected -1, but got: %d", fd)
+
+	fd, err = e.DupListener("tcp", "abc")
+	assert.ErrorIsf(ev.tester, err, errorx.ErrEmptyEngine, "expected error: %v, but got: %v",
 		errorx.ErrUnsupportedOp, err)
 	assert.EqualValuesf(ev.tester, fd, -1, "expected -1, but got: %d", fd)
 }
@@ -366,7 +375,6 @@ type testClient struct {
 	connected     int32
 	clientActive  int32
 	disconnected  int32
-	workerPool    *goPool.Pool
 	udpReadHeader int32
 }
 
@@ -378,8 +386,8 @@ func (s *testClient) OnBoot(eng Engine) (action Action) {
 func (s *testClient) OnOpen(c Conn) (out []byte, action Action) {
 	c.SetContext(&sync.Once{})
 	atomic.AddInt32(&s.connected, 1)
-	require.NotNil(s.tester, c.LocalAddr(), "nil local addr")
-	require.NotNil(s.tester, c.RemoteAddr(), "nil remote addr")
+	assert.NotNil(s.tester, c.LocalAddr(), "nil local addr")
+	assert.NotNil(s.tester, c.RemoteAddr(), "nil remote addr")
 	return
 }
 
@@ -388,14 +396,13 @@ func (s *testClient) OnClose(c Conn, err error) (action Action) {
 		logging.Debugf("error occurred on closed, %v\n", err)
 	}
 	if s.network != "udp" {
-		require.IsType(s.tester, c.Context(), new(sync.Once), "invalid context")
+		assert.IsType(s.tester, c.Context(), new(sync.Once), "invalid context")
 	}
 
 	atomic.AddInt32(&s.disconnected, 1)
 	if atomic.LoadInt32(&s.connected) == atomic.LoadInt32(&s.disconnected) &&
 		atomic.LoadInt32(&s.disconnected) == int32(s.nclients) {
 		action = Shutdown
-		s.workerPool.Release()
 	}
 
 	return
@@ -403,7 +410,7 @@ func (s *testClient) OnClose(c Conn, err error) (action Action) {
 
 func (s *testClient) OnShutdown(Engine) {
 	if s.network == "udp" {
-		require.EqualValues(s.tester, int32(s.nclients), atomic.LoadInt32(&s.udpReadHeader))
+		assert.EqualValues(s.tester, int32(s.nclients), atomic.LoadInt32(&s.udpReadHeader))
 	}
 }
 
@@ -411,9 +418,9 @@ func (s *testClient) OnTraffic(c Conn) (action Action) {
 	readHeader := func() {
 		ping := make([]byte, len(pingMsg))
 		n, err := io.ReadFull(c, ping)
-		require.NoError(s.tester, err)
-		require.EqualValues(s.tester, len(pingMsg), n)
-		require.Equal(s.tester, string(pingMsg), string(ping), "bad header")
+		assert.NoError(s.tester, err)
+		assert.EqualValues(s.tester, len(pingMsg), n)
+		assert.Equal(s.tester, string(pingMsg), string(ping), "bad header")
 	}
 	v := c.Context()
 	if v != nil {
@@ -422,7 +429,8 @@ func (s *testClient) OnTraffic(c Conn) (action Action) {
 
 	if s.async {
 		buf := bbPool.Get()
-		_, _ = c.WriteTo(buf)
+		_, err := c.WriteTo(buf)
+		assert.NoError(s.tester, err, "WriteTo error")
 
 		if s.network == "tcp" || s.network == "unix" {
 			// just for test
@@ -434,25 +442,27 @@ func (s *testClient) OnTraffic(c Conn) (action Action) {
 			atomic.AddInt32(&s.udpReadHeader, 1)
 			buf.Reset()
 		}
-		_ = s.workerPool.Submit(
+		err = goPool.DefaultWorkerPool.Submit(
 			func() {
 				if buf.Len() > 0 {
 					err := c.AsyncWrite(buf.Bytes(), nil)
-					require.NoError(s.tester, err)
+					assert.NoError(s.tester, err)
 				}
 			})
+		assert.NoError(s.tester, err)
 		return
 	}
 
-	buf, _ := c.Next(-1)
+	buf, err := c.Next(-1)
+	assert.NoError(s.tester, err, "Reading data error")
 	if v == nil && bytes.Equal(buf, pingMsg) {
 		atomic.AddInt32(&s.udpReadHeader, 1)
 		buf = nil
 	}
 	if len(buf) > 0 {
 		n, err := c.Write(buf)
-		require.NoError(s.tester, err)
-		require.EqualValues(s.tester, len(buf), n)
+		assert.NoError(s.tester, err)
+		assert.EqualValues(s.tester, len(buf), n)
 	}
 	return
 }
@@ -466,7 +476,12 @@ func (s *testClient) OnTick() (delay time.Duration, action Action) {
 			if i%2 == 0 {
 				netConn = true
 			}
-			go startGnetClient(s.tester, s.client, s.network, s.addr, s.multicore, s.async, netConn)
+			err := goPool.DefaultWorkerPool.Submit(
+				func() {
+					startGnetClient(s.tester, s.client, s.network, s.addr, s.multicore, s.async, netConn)
+				})
+			assert.NoError(s.tester, err)
+
 		}
 	}
 	if s.network == "udp" && atomic.LoadInt32(&s.clientActive) == 0 {
@@ -478,13 +493,12 @@ func (s *testClient) OnTick() (delay time.Duration, action Action) {
 
 func runClient(t *testing.T, network, addr string, conf *testConf) {
 	ts := &testClient{
-		tester:     t,
-		network:    network,
-		addr:       addr,
-		multicore:  conf.multicore,
-		async:      conf.async,
-		nclients:   conf.clients,
-		workerPool: goPool.Default(),
+		tester:    t,
+		network:   network,
+		addr:      addr,
+		multicore: conf.multicore,
+		async:     conf.async,
+		nclients:  conf.clients,
 	}
 	var err error
 	clientEV := &clientEvents{tester: t, packetLen: streamLen, svr: ts}
@@ -527,15 +541,15 @@ func startGnetClient(t *testing.T, cli *Client, network, addr string, multicore,
 	if netDial {
 		var netConn net.Conn
 		netConn, err = stdDial(network, addr)
-		require.NoError(t, err)
+		assert.NoError(t, err)
 		c, err = cli.EnrollContext(netConn, handler)
 	} else {
 		c, err = cli.DialContext(network, addr, handler)
 	}
-	require.NoError(t, err)
-	defer c.Close()
+	assert.NoError(t, err)
+	defer c.Close() //nolint:errcheck
 	err = c.Wake(nil)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	rspCh := handler.rspCh
 	duration := time.Duration((rand.Float64()*2+1)*float64(time.Second)) / 2
 	logging.Debugf("test duration: %v", duration)
@@ -546,14 +560,14 @@ func startGnetClient(t *testing.T, cli *Client, network, addr string, multicore,
 			reqData = reqData[:datagramLen]
 		}
 		_, err = crand.Read(reqData)
-		require.NoError(t, err)
+		assert.NoError(t, err)
 		err = c.AsyncWrite(reqData, nil)
-		require.NoError(t, err)
+		assert.NoError(t, err)
 		respData := <-rspCh
-		require.NoError(t, err)
+		assert.NoError(t, err)
 		if !async {
-			// require.Equalf(t, reqData, respData, "response mismatch with protocol:%s, multi-core:%t, content of bytes: %d vs %d", network, multicore, string(reqData), string(respData))
-			require.Equalf(
+			// assert.Equalf(t, reqData, respData, "response mismatch with protocol:%s, multi-core:%t, content of bytes: %d vs %d", network, multicore, string(reqData), string(respData))
+			assert.Equalf(
 				t,
 				reqData,
 				respData,
@@ -637,7 +651,10 @@ func (ev *serverEventsForWake) OnClose(_ Conn, _ error) Action {
 
 func (ev *serverEventsForWake) OnTick() (time.Duration, Action) {
 	if atomic.CompareAndSwapInt32(&ev.started, 0, 1) {
-		go testConnWakeImmediately(ev.tester, ev.client, ev.clientEV, ev.network, ev.addr)
+		err := goPool.DefaultWorkerPool.Submit(func() {
+			testConnWakeImmediately(ev.tester, ev.client, ev.clientEV, ev.network, ev.addr)
+		})
+		assert.NoError(ev.tester, err)
 	}
 	return 100 * time.Millisecond, None
 }
@@ -688,17 +705,21 @@ func TestClientReadOnEOF(t *testing.T) {
 
 	ln, err := net.Listen("tcp", "127.0.0.1:9999")
 	assert.NoError(t, err)
-	defer ln.Close()
+	defer ln.Close() //nolint:errcheck
 
-	go func() {
+	err = goPool.DefaultWorkerPool.Submit(func() {
 		for {
 			conn, err := ln.Accept()
 			if err != nil {
 				break
 			}
-			go process(conn)
+			err = goPool.DefaultWorkerPool.Submit(func() {
+				process(conn)
+			})
+			assert.NoError(t, err)
 		}
-	}()
+	})
+	assert.NoError(t, err)
 
 	ev := &clientReadOnEOF{
 		result: make(chan struct {
@@ -733,7 +754,7 @@ func TestClientReadOnEOF(t *testing.T) {
 }
 
 func process(conn net.Conn) {
-	defer conn.Close() //noliint:errcheck
+	defer conn.Close() //nolint:errcheck
 	buf := make([]byte, 8)
 	n, err := conn.Read(buf)
 	if err != nil {
