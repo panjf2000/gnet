@@ -868,11 +868,11 @@ func (t *testBadAddrServer) OnBoot(_ Engine) (action Action) {
 func TestBadAddresses(t *testing.T) {
 	events := new(testBadAddrServer)
 	err := Run(events, "tulip://howdy")
-	assert.ErrorIs(t, err, errorx.ErrUnsupportedProtocol)
+	require.ErrorIs(t, err, errorx.ErrUnsupportedProtocol)
 	err = Run(events, "howdy")
-	assert.ErrorIs(t, err, errorx.ErrInvalidNetworkAddress)
+	require.ErrorIs(t, err, errorx.ErrInvalidNetworkAddress)
 	err = Run(events, "tcp://")
-	assert.ErrorIs(t, err, errorx.ErrInvalidNetworkAddress)
+	require.ErrorIs(t, err, errorx.ErrInvalidNetworkAddress)
 }
 
 func TestTick(t *testing.T) {
@@ -899,7 +899,7 @@ func testTick(network, addr string, t *testing.T) {
 	start := time.Now()
 	opts := Options{Ticker: true}
 	err := Run(events, network+"://"+addr, WithOptions(opts))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	dur := time.Since(start)
 	if dur < 250&time.Millisecond || dur > time.Second {
 		t.Logf("bad ticker timing: %d", dur)
@@ -1237,9 +1237,9 @@ func (t *testShutdownActionOnOpenServer) OnTick() (delay time.Duration, action A
 func testShutdownActionOnOpen(t *testing.T, network, addr string) {
 	events := &testShutdownActionOnOpenServer{tester: t, network: network, addr: addr}
 	err := Run(events, network+"://"+addr, WithTicker(true))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = events.eng.Dup()
-	assert.ErrorIsf(t, err, errorx.ErrEngineInShutdown, "expected error: %v, but got: %v",
+	require.ErrorIsf(t, err, errorx.ErrEngineInShutdown, "expected error: %v, but got: %v",
 		errorx.ErrEngineInShutdown, err)
 }
 
@@ -1312,10 +1312,11 @@ func (t *testCloseConnectionServer) OnTraffic(c Conn) (action Action) {
 	_, _ = c.Discard(-1)
 	err := goPool.DefaultWorkerPool.Submit(func() {
 		time.Sleep(time.Second)
-		_ = c.CloseWithCallback(func(_ Conn, err error) error {
+		err := c.CloseWithCallback(func(_ Conn, err error) error {
 			assert.ErrorIsf(t.tester, err, errorx.ErrEngineShutdown, "should be engine shutdown error")
 			return nil
 		})
+		assert.NoError(t.tester, err)
 	})
 	assert.NoError(t.tester, err)
 	return
@@ -1351,7 +1352,7 @@ func testCloseConnection(t *testing.T, network, addr string) {
 
 func TestServerOptionsCheck(t *testing.T) {
 	err := Run(&BuiltinEventEngine{}, "tcp://:3500", WithNumEventLoop(10001), WithLockOSThread(true))
-	assert.EqualError(t, err, errorx.ErrTooManyEventLoopThreads.Error(), "error returned with LockOSThread option")
+	assert.ErrorIs(t, err, errorx.ErrTooManyEventLoopThreads, "error returned with LockOSThread option")
 }
 
 func TestStopServer(t *testing.T) {
@@ -1494,7 +1495,7 @@ func testEngineStop(t *testing.T, network, addr string) {
 		err := Run(events2, events2.protoAddr, WithTicker(true), WithReuseAddr(true), WithReusePort(true))
 		result2 <- err
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = <-result1
 	require.NoError(t, err)
@@ -1633,6 +1634,7 @@ func (t *testDisconnectedAsyncWriteServer) OnTraffic(c Conn) Action {
 				break
 			}
 
+			var err error
 			if t.writev {
 				err = c.AsyncWritev([][]byte{[]byte("hello"), []byte("hello")}, func(_ Conn, err error) error {
 					if err == nil {
