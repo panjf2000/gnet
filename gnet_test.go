@@ -2391,6 +2391,9 @@ func testStreamProxyServer(t *testing.T, addr string, backendServers []string, m
 	require.NoErrorf(t, err, "Run error: %v", err)
 
 	// Test the error handling of the methods of EventLoop after a shutdown.
+	_, err = srv.engine.Register(context.Background())
+	assert.ErrorIsf(t, err, errorx.ErrEngineInShutdown, "Expected error: %v, but got: %v",
+		errorx.ErrEngineInShutdown, err)
 	_, err = srv.eventLoop.Register(context.Background(), nil)
 	require.ErrorIsf(t, err, errorx.ErrEngineInShutdown, "Expected error: %v, but got: %v",
 		errorx.ErrEngineInShutdown, err)
