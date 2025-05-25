@@ -4,10 +4,17 @@
         <title>gnet Blog</title>
         <link>https://gnet.host/blog</link>
         <description>gnet Blog</description>
-        <lastBuildDate>Sat, 04 Jan 2025 00:00:00 GMT</lastBuildDate>
+        <lastBuildDate>Sun, 25 May 2025 00:00:00 GMT</lastBuildDate>
         <docs>https://validator.w3.org/feed/docs/rss2.html</docs>
         <generator>https://github.com/jpmonette/feed</generator>
         <copyright>Copyright © 2025 Andy Pan.</copyright>
+        <item>
+            <title><![CDATA[Announcing gnet v2.8.0]]></title>
+            <link>https://gnet.host/blog/announcing-gnet-v2-8-0</link>
+            <guid>announcing-gnet-v2-8-0</guid>
+            <pubDate>Sun, 25 May 2025 00:00:00 GMT</pubDate>
+            <description><![CDATA[Hello World! We present you, gnet v2.8.0!]]></description>
+        </item>
         <item>
             <title><![CDATA[Announcing gnet v2.7.0]]></title>
             <link>https://gnet.host/blog/announcing-gnet-v2-7-0</link>
