@@ -44,4 +44,8 @@ var (
 	ErrNoIPv4AddressOnInterface = errors.New("gnet: no IPv4 address on interface")
 	// ErrInvalidNetworkAddress occurs when the network address is invalid.
 	ErrInvalidNetworkAddress = errors.New("gnet: invalid network address")
+	// ErrInvalidNetConn occurs when trying to do something with an empty net.Conn.
+	ErrInvalidNetConn = errors.New("gnet: the net.Conn is empty")
+	// ErrNilRunnable occurs when trying to execute a nil runnable.
+	ErrNilRunnable = errors.New("gnet: nil runnable is not allowed")
 )

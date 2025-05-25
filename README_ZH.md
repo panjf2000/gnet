@@ -49,6 +49,7 @@
 - [x] 支持 `Linux`, `macOS`, `Windows` 和 *BSD 操作系统: `Darwin`/`DragonFlyBSD`/`FreeBSD`/`NetBSD`/`OpenBSD`
 - [x] **Edge-triggered** I/O 支持
 - [x] 多网络地址绑定
+- [x] 支持注册新的连接到事件循环
 
 ## 🕊 未来计划
 

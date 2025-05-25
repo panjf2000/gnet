@@ -49,6 +49,7 @@ English | [中文](README_ZH.md)
 - [x] Running on `Linux`, `macOS`, `Windows`, and *BSD: `Darwin`/`DragonFlyBSD`/`FreeBSD`/`NetBSD`/`OpenBSD`
 - [x] **Edge-triggered** I/O support
 - [x] Multiple network addresses binding
+- [x] Support registering new connections to event-loops
 
 ## 🕊 Roadmap
 

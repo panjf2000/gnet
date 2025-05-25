@@ -28,7 +28,7 @@ import (
 	"time"
 
 	"github.com/panjf2000/gnet/v2/pkg/buffer/ring"
-	"github.com/panjf2000/gnet/v2/pkg/errors"
+	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
 	"github.com/panjf2000/gnet/v2/pkg/math"
 )
@@ -56,10 +56,10 @@ type Engine struct {
 // Validate checks whether the engine is available.
 func (e Engine) Validate() error {
 	if e.eng == nil || len(e.eng.listeners) == 0 {
-		return errors.ErrEmptyEngine
+		return errorx.ErrEmptyEngine
 	}
 	if e.eng.isShutdown() {
-		return errors.ErrEngineInShutdown
+		return errorx.ErrEngineInShutdown
 	}
 	return nil
 }
@@ -77,6 +77,37 @@ func (e Engine) CountConnections() (count int) {
 	return
 }
 
+// Register registers the new connection to the event-loop that is chosen
+// based off of the algorithm set by WithLoadBalancing.
+// You should call either of the NewNetConnContext or NewNetAddrContext
+// and pass the returned context to this method. net.Conn will precede
+// net.Addr if both are present in the context.
+//
+// Note that you need to switch to another load-balancing algorithm over
+// the default RoundRobin when starting the engine, to avoid data race
+// issue if you plan on calling this method from somewhere later on.
+func (e Engine) Register(ctx context.Context) (<-chan RegisteredResult, error) {
+	if err := e.Validate(); err != nil {
+		return nil, err
+	}
+
+	if e.eng.eventLoops.len() == 0 {
+		return nil, errorx.ErrEmptyEngine
+	}
+
+	c, ok := FromNetConnContext(ctx)
+	if ok {
+		return e.eng.eventLoops.next(c.RemoteAddr()).Enroll(ctx, c)
+	}
+
+	addr, ok := FromNetAddrContext(ctx)
+	if ok {
+		return e.eng.eventLoops.next(addr).Register(ctx, addr)
+	}
+
+	return nil, errorx.ErrInvalidNetworkAddress
+}
+
 // Dup returns a copy of the underlying file descriptor of listener.
 // It is the caller's responsibility to close dupFD when finished.
 // Closing listener does not affect dupFD, and closing dupFD does not affect listener.
@@ -88,7 +119,7 @@ func (e Engine) Dup() (fd int, err error) {
 	}
 
 	if len(e.eng.listeners) > 1 {
-		return -1, errors.ErrUnsupportedOp
+		return -1, errorx.ErrUnsupportedOp
 	}
 
 	for _, ln := range e.eng.listeners {
@@ -111,7 +142,7 @@ func (e Engine) DupListener(network, addr string) (int, error) {
 		}
 	}
 
-	return -1, errors.ErrInvalidNetworkAddress
+	return -1, errorx.ErrInvalidNetworkAddress
 }
 
 // Stop gracefully shuts down this Engine without interrupting any active event-loops,
@@ -330,6 +361,52 @@ type Socket interface {
 	SetNoDelay(noDelay bool) error
 }
 
+// Runnable defines the common protocol of an execution on an event-loop.
+// This interface should be implemented and passed to an event-loop in some way,
+// then the event-loop invokes Run to perform the execution.
+// !!!Caution: Run must not contain any blocking operations like heavy disk or
+// network I/O, or else it will block the event-loop.
+type Runnable interface {
+	// Run is about to be executed by the event-loop.
+	Run(ctx context.Context) error
+}
+
+// RunnableFunc is an adapter to allow the use of ordinary function as a Runnable.
+type RunnableFunc func(ctx context.Context) error
+
+// Run executes the RunnableFunc itself.
+func (fn RunnableFunc) Run(ctx context.Context) error {
+	return fn(ctx)
+}
+
+// RegisteredResult is the result of a Register call.
+type RegisteredResult struct {
+	Conn Conn
+	Err  error
+}
+
+// EventLoop provides a set of methods for manipulating the event-loop.
+type EventLoop interface {
+	// ============= Concurrency-safe methods =============
+
+	// Register connects to the given address and registers the connection to the current event-loop.
+	Register(ctx context.Context, addr net.Addr) (<-chan RegisteredResult, error)
+	// Enroll is like Register, but it accepts an established net.Conn instead of a net.Addr.
+	Enroll(ctx context.Context, c net.Conn) (<-chan RegisteredResult, error)
+	// Execute executes the given runnable on the event-loop at some time in the future.
+	Execute(ctx context.Context, runnable Runnable) error
+	// Schedule is like Execute, but it allows you to specify when the runnable is executed.
+	// In other words, the runnable will be executed when the delay duration is reached.
+	// TODO(panjf2000): not supported yet, implement this.
+	Schedule(ctx context.Context, runnable Runnable, delay time.Duration) error
+
+	// ============ Concurrency-unsafe methods ============
+
+	// Close closes the given Conn that belongs to the current event-loop.
+	// It must be called on the same event-loop that the connection belongs to.
+	Close(Conn) error
+}
+
 // Conn is an interface of underlying connection.
 type Conn interface {
 	Reader // all methods in Reader are not concurrency-safe.
@@ -339,6 +416,10 @@ type Conn interface {
 	// Context returns a user-defined context, it's not concurrency-safe,
 	// you must invoke it within any method in EventHandler.
 	Context() (ctx any)
+
+	// EventLoop returns the event-loop that the connection belongs to.
+	// The returned EventLoop is concurrency-safe.
+	EventLoop() EventLoop
 
 	// SetContext sets a user-defined context, it's not concurrency-safe,
 	// you must invoke it within any method in EventHandler.
@@ -475,7 +556,7 @@ func createListeners(addrs []string, opts ...Option) ([]*listener, *Options, err
 	if options.LockOSThread && options.NumEventLoop > 10000 {
 		logging.Errorf("too many event-loops under LockOSThread mode, should be less than 10,000 "+
 			"while you are trying to set up %d\n", options.NumEventLoop)
-		return nil, nil, errors.ErrTooManyEventLoopThreads
+		return nil, nil, errorx.ErrTooManyEventLoopThreads
 	}
 
 	if options.EdgeTriggeredIOChunk > 0 {
@@ -635,11 +716,11 @@ func Stop(ctx context.Context, protoAddr string) error {
 		eng.shutdown(nil)
 		defer allEngines.Delete(protoAddr)
 	} else {
-		return errors.ErrEngineInShutdown
+		return errorx.ErrEngineInShutdown
 	}
 
 	if eng.isShutdown() {
-		return errors.ErrEngineInShutdown
+		return errorx.ErrEngineInShutdown
 	}
 
 	ticker := time.NewTicker(shutdownPollInterval)
@@ -659,17 +740,17 @@ func Stop(ctx context.Context, protoAddr string) error {
 func parseProtoAddr(protoAddr string) (string, string, error) {
 	protoAddr = strings.ToLower(protoAddr)
 	if strings.Count(protoAddr, "://") != 1 {
-		return "", "", errors.ErrInvalidNetworkAddress
+		return "", "", errorx.ErrInvalidNetworkAddress
 	}
 	pair := strings.SplitN(protoAddr, "://", 2)
 	proto, addr := pair[0], pair[1]
 	switch proto {
 	case "tcp", "tcp4", "tcp6", "udp", "udp4", "udp6", "unix":
 	default:
-		return "", "", errors.ErrUnsupportedProtocol
+		return "", "", errorx.ErrUnsupportedProtocol
 	}
 	if addr == "" {
-		return "", "", errors.ErrInvalidNetworkAddress
+		return "", "", errorx.ErrInvalidNetworkAddress
 	}
 	return proto, addr, nil
 }

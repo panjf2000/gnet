@@ -11,6 +11,7 @@ import (
 	"math"
 	"math/rand"
 	"net"
+	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -20,6 +21,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
@@ -541,7 +543,6 @@ type testServer struct {
 	connected    int32
 	disconnected int32
 	clientActive int32
-	workerPool   *goPool.Pool
 }
 
 func (s *testServer) OnBoot(eng Engine) (action Action) {
@@ -574,7 +575,7 @@ func (s *testServer) OnBoot(eng Engine) (action Action) {
 func (s *testServer) OnOpen(c Conn) (out []byte, action Action) {
 	c.SetContext(c)
 	atomic.AddInt32(&s.connected, 1)
-	out = []byte("sweetness\r\n")
+	out = []byte("andypan\r\n")
 	assert.NotNil(s.tester, c.LocalAddr(), "nil local addr")
 	assert.NotNil(s.tester, c.RemoteAddr(), "nil remote addr")
 	return
@@ -619,50 +620,61 @@ func (s *testServer) OnClose(c Conn, err error) (action Action) {
 func (s *testServer) OnTraffic(c Conn) (action Action) {
 	if s.async {
 		buf := bbPool.Get()
-		_, _ = c.WriteTo(buf)
+		n, err := c.WriteTo(buf)
+		assert.NoError(s.tester, err, "WriteTo error")
+		assert.Greater(s.tester, n, int64(0), "WriteTo error")
 		if c.LocalAddr().Network() == "tcp" || c.LocalAddr().Network() == "unix" {
-			_ = s.workerPool.Submit(
+			err = goPool.DefaultWorkerPool.Submit(
 				func() {
 					if s.writev {
 						mid := buf.Len() / 2
 						bs := make([][]byte, 2)
 						bs[0] = buf.B[:mid]
 						bs[1] = buf.B[mid:]
-						_ = c.AsyncWritev(bs, func(c Conn, err error) error {
+						err := c.AsyncWritev(bs, func(c Conn, err error) error {
 							if c.RemoteAddr() != nil {
 								logging.Debugf("conn=%s done writev: %v", c.RemoteAddr().String(), err)
 							}
 							bbPool.Put(buf)
 							return nil
 						})
+						assert.NoError(s.tester, err, "AsyncWritev error")
 					} else {
-						_ = c.AsyncWrite(buf.Bytes(), func(c Conn, err error) error {
+						err := c.AsyncWrite(buf.Bytes(), func(c Conn, err error) error {
 							if c.RemoteAddr() != nil {
 								logging.Debugf("conn=%s done write: %v", c.RemoteAddr().String(), err)
 							}
 							bbPool.Put(buf)
 							return nil
 						})
+						assert.NoError(s.tester, err, "AsyncWritev error")
 					}
 				})
+			assert.NoError(s.tester, err)
 			return
 		} else if c.LocalAddr().Network() == "udp" {
-			_ = s.workerPool.Submit(
+			err := goPool.DefaultWorkerPool.Submit(
 				func() {
-					_ = c.AsyncWrite(buf.Bytes(), nil)
+					err := c.AsyncWrite(buf.Bytes(), nil)
+					assert.NoError(s.tester, err, "AsyncWritev error")
 				})
+			assert.NoError(s.tester, err)
 			return
 		}
 		return
 	}
 
-	buf, _ := c.Next(-1)
+	buf, err := c.Next(-1)
+	assert.NoError(s.tester, err, "reading data error")
+	var n int
 	if s.writev {
 		mid := len(buf) / 2
-		_, _ = c.Writev([][]byte{buf[:mid], buf[mid:]})
+		n, err = c.Writev([][]byte{buf[:mid], buf[mid:]})
 	} else {
-		_, _ = c.Write(buf)
+		n, err = c.Write(buf)
 	}
+	assert.NoError(s.tester, err, "writev error")
+	assert.EqualValues(s.tester, n, len(buf), "short writev")
 
 	// Only for code coverage of testing.
 	if !s.multicore {
@@ -724,10 +736,11 @@ func (s *testServer) OnTick() (delay time.Duration, action Action) {
 			assert.NoError(s.tester, err)
 			for i := 0; i < s.nclients; i++ {
 				atomic.AddInt32(&s.clientActive, 1)
-				go func() {
-					startClient(s.tester, proto, addr, s.multicore, s.async)
+				err := goPool.DefaultWorkerPool.Submit(func() {
+					startClient(s.tester, proto, addr, s.multicore, s.async, 0, nil)
 					atomic.AddInt32(&s.clientActive, -1)
-				}()
+				})
+				assert.NoError(s.tester, err)
 			}
 		}
 	}
@@ -742,7 +755,6 @@ func (s *testServer) OnTick() (delay time.Duration, action Action) {
 		disconnected := atomic.LoadInt32(&s.disconnected)
 		if int(disconnected) == streamConns && disconnected == atomic.LoadInt32(&s.connected) {
 			action = Shutdown
-			s.workerPool.Release()
 			assert.EqualValues(s.tester, 0, s.eng.CountConnections())
 		}
 	}
@@ -751,13 +763,12 @@ func (s *testServer) OnTick() (delay time.Duration, action Action) {
 
 func runServer(t *testing.T, addrs []string, conf *testConf) {
 	ts := &testServer{
-		tester:     t,
-		addrs:      addrs,
-		multicore:  conf.multicore,
-		async:      conf.async,
-		writev:     conf.writev,
-		nclients:   conf.clients,
-		workerPool: goPool.Default(),
+		tester:    t,
+		addrs:     addrs,
+		multicore: conf.multicore,
+		async:     conf.async,
+		writev:    conf.writev,
+		nclients:  conf.clients,
 	}
 	var err error
 	if len(addrs) > 1 {
@@ -788,7 +799,7 @@ func runServer(t *testing.T, addrs []string, conf *testConf) {
 	assert.NoError(t, err)
 }
 
-func startClient(t *testing.T, network, addr string, multicore, async bool) {
+func startClient(t *testing.T, network, addr string, multicore, async bool, packetSize int, stallCh chan struct{}) {
 	c, err := net.Dial(network, addr)
 	assert.NoError(t, err)
 	defer c.Close() //nolint:errcheck
@@ -796,16 +807,24 @@ func startClient(t *testing.T, network, addr string, multicore, async bool) {
 	if network != "udp" {
 		msg, err := rd.ReadBytes('\n')
 		assert.NoError(t, err)
-		assert.Equal(t, string(msg), "sweetness\r\n", "bad header")
+		assert.Equal(t, string(msg), "andypan\r\n", "bad header")
 	}
+
+	if stallCh != nil {
+		<-stallCh
+	}
+
 	duration := time.Duration((rand.Float64()*2+1)*float64(time.Second)) / 2
 	logging.Debugf("test duration: %v", duration)
 	start := time.Now()
-	for time.Since(start) < duration {
-		reqData := make([]byte, streamLen)
+	if packetSize == 0 {
+		packetSize = streamLen
 		if network == "udp" {
-			reqData = reqData[:datagramLen]
+			packetSize = datagramLen
 		}
+	}
+	for time.Since(start) < duration {
+		reqData := make([]byte, packetSize)
 		_, err = crand.Read(reqData)
 		assert.NoError(t, err)
 		_, err = c.Write(reqData)
@@ -849,11 +868,11 @@ func (t *testBadAddrServer) OnBoot(_ Engine) (action Action) {
 func TestBadAddresses(t *testing.T) {
 	events := new(testBadAddrServer)
 	err := Run(events, "tulip://howdy")
-	assert.ErrorIs(t, err, errorx.ErrUnsupportedProtocol)
+	require.ErrorIs(t, err, errorx.ErrUnsupportedProtocol)
 	err = Run(events, "howdy")
-	assert.ErrorIs(t, err, errorx.ErrInvalidNetworkAddress)
+	require.ErrorIs(t, err, errorx.ErrInvalidNetworkAddress)
 	err = Run(events, "tcp://")
-	assert.ErrorIs(t, err, errorx.ErrInvalidNetworkAddress)
+	require.ErrorIs(t, err, errorx.ErrInvalidNetworkAddress)
 }
 
 func TestTick(t *testing.T) {
@@ -880,7 +899,7 @@ func testTick(network, addr string, t *testing.T) {
 	start := time.Now()
 	opts := Options{Ticker: true}
 	err := Run(events, network+"://"+addr, WithOptions(opts))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	dur := time.Since(start)
 	if dur < 250&time.Millisecond || dur > time.Second {
 		t.Logf("bad ticker timing: %d", dur)
@@ -921,14 +940,15 @@ func (t *testWakeConnServer) OnTick() (delay time.Duration, action Action) {
 	if !t.wake {
 		t.wake = true
 		delay = time.Millisecond * 100
-		go func() {
+		err := goPool.DefaultWorkerPool.Submit(func() {
 			conn, err := net.Dial(t.network, t.addr)
 			assert.NoError(t.tester, err)
 			defer conn.Close() //nolint:errcheck
 			r := make([]byte, 10)
 			_, err = conn.Read(r)
 			assert.NoError(t.tester, err)
-		}()
+		})
+		assert.NoError(t.tester, err)
 		return
 	}
 	t.c = <-t.conn
@@ -994,13 +1014,14 @@ func (t *testShutdownServer) OnTick() (delay time.Duration, action Action) {
 	if t.count == 0 {
 		// start clients
 		for i := 0; i < t.N; i++ {
-			go func() {
+			err := goPool.DefaultWorkerPool.Submit(func() {
 				conn, err := net.Dial(t.network, t.addr)
 				assert.NoError(t.tester, err)
 				defer conn.Close() //nolint:errcheck
 				_, err = conn.Read([]byte{0})
 				assert.Error(t.tester, err)
-			}()
+			})
+			assert.NoError(t.tester, err)
 		}
 	} else if int(atomic.LoadInt32(&t.clients)) == t.N {
 		action = Shutdown
@@ -1061,7 +1082,7 @@ func (t *testCloseActionErrorServer) OnTick() (delay time.Duration, action Actio
 	if !t.action {
 		t.action = true
 		delay = time.Millisecond * 100
-		go func() {
+		err := goPool.DefaultWorkerPool.Submit(func() {
 			conn, err := net.Dial(t.network, t.addr)
 			assert.NoError(t.tester, err)
 			defer conn.Close() //nolint:errcheck
@@ -1069,7 +1090,8 @@ func (t *testCloseActionErrorServer) OnTick() (delay time.Duration, action Actio
 			_, _ = conn.Write(data)
 			_, err = conn.Read(data)
 			assert.NoError(t.tester, err)
-		}()
+		})
+		assert.NoError(t.tester, err)
 		return
 	}
 	delay = time.Millisecond * 100
@@ -1105,7 +1127,7 @@ func (t *testShutdownActionErrorServer) OnTick() (delay time.Duration, action Ac
 	if !t.action {
 		t.action = true
 		delay = time.Millisecond * 100
-		go func() {
+		err := goPool.DefaultWorkerPool.Submit(func() {
 			conn, err := net.Dial(t.network, t.addr)
 			assert.NoError(t.tester, err)
 			defer conn.Close() //nolint:errcheck
@@ -1113,7 +1135,8 @@ func (t *testShutdownActionErrorServer) OnTick() (delay time.Duration, action Ac
 			_, _ = conn.Write(data)
 			_, err = conn.Read(data)
 			assert.NoError(t.tester, err)
-		}()
+		})
+		assert.NoError(t.tester, err)
 		return
 	}
 	delay = time.Millisecond * 100
@@ -1151,11 +1174,12 @@ func (t *testCloseActionOnOpenServer) OnTick() (delay time.Duration, action Acti
 	if !t.action {
 		t.action = true
 		delay = time.Millisecond * 100
-		go func() {
+		err := goPool.DefaultWorkerPool.Submit(func() {
 			conn, err := net.Dial(t.network, t.addr)
 			assert.NoError(t.tester, err)
 			defer conn.Close() //nolint:errcheck
-		}()
+		})
+		assert.NoError(t.tester, err)
 		return
 	}
 	delay = time.Millisecond * 100
@@ -1198,11 +1222,12 @@ func (t *testShutdownActionOnOpenServer) OnTick() (delay time.Duration, action A
 	if !t.action {
 		t.action = true
 		delay = time.Millisecond * 100
-		go func() {
+		err := goPool.DefaultWorkerPool.Submit(func() {
 			conn, err := net.Dial(t.network, t.addr)
 			assert.NoError(t.tester, err)
 			defer conn.Close() //nolint:errcheck
-		}()
+		})
+		assert.NoError(t.tester, err)
 		return
 	}
 	delay = time.Millisecond * 100
@@ -1212,9 +1237,9 @@ func (t *testShutdownActionOnOpenServer) OnTick() (delay time.Duration, action A
 func testShutdownActionOnOpen(t *testing.T, network, addr string) {
 	events := &testShutdownActionOnOpenServer{tester: t, network: network, addr: addr}
 	err := Run(events, network+"://"+addr, WithTicker(true))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = events.eng.Dup()
-	assert.ErrorIsf(t, err, errorx.ErrEngineInShutdown, "expected error: %v, but got: %v",
+	require.ErrorIsf(t, err, errorx.ErrEngineInShutdown, "expected error: %v, but got: %v",
 		errorx.ErrEngineInShutdown, err)
 }
 
@@ -1242,7 +1267,7 @@ func (t *testUDPShutdownServer) OnTick() (delay time.Duration, action Action) {
 	if !t.tick {
 		t.tick = true
 		delay = time.Millisecond * 100
-		go func() {
+		err := goPool.DefaultWorkerPool.Submit(func() {
 			conn, err := net.Dial(t.network, t.addr)
 			assert.NoError(t.tester, err)
 			defer conn.Close() //nolint:errcheck
@@ -1251,7 +1276,8 @@ func (t *testUDPShutdownServer) OnTick() (delay time.Duration, action Action) {
 			assert.NoError(t.tester, err)
 			_, err = conn.Read(data)
 			assert.NoError(t.tester, err)
-		}()
+		})
+		assert.NoError(t.tester, err)
 		return
 	}
 	delay = time.Millisecond * 100
@@ -1284,13 +1310,15 @@ func (t *testCloseConnectionServer) OnTraffic(c Conn) (action Action) {
 	buf, _ := c.Peek(-1)
 	_, _ = c.Write(buf)
 	_, _ = c.Discard(-1)
-	go func() {
+	err := goPool.DefaultWorkerPool.Submit(func() {
 		time.Sleep(time.Second)
-		_ = c.CloseWithCallback(func(_ Conn, err error) error {
+		err := c.CloseWithCallback(func(_ Conn, err error) error {
 			assert.ErrorIsf(t.tester, err, errorx.ErrEngineShutdown, "should be engine shutdown error")
 			return nil
 		})
-	}()
+		assert.NoError(t.tester, err)
+	})
+	assert.NoError(t.tester, err)
 	return
 }
 
@@ -1298,7 +1326,7 @@ func (t *testCloseConnectionServer) OnTick() (delay time.Duration, action Action
 	delay = time.Millisecond * 100
 	if !t.action {
 		t.action = true
-		go func() {
+		err := goPool.DefaultWorkerPool.Submit(func() {
 			conn, err := net.Dial(t.network, t.addr)
 			assert.NoError(t.tester, err)
 			defer conn.Close() //nolint:errcheck
@@ -1309,7 +1337,8 @@ func (t *testCloseConnectionServer) OnTick() (delay time.Duration, action Action
 			// waiting the engine shutdown.
 			_, err = conn.Read(data)
 			assert.Error(t.tester, err)
-		}()
+		})
+		assert.NoError(t.tester, err)
 		return
 	}
 	return
@@ -1323,7 +1352,7 @@ func testCloseConnection(t *testing.T, network, addr string) {
 
 func TestServerOptionsCheck(t *testing.T) {
 	err := Run(&BuiltinEventEngine{}, "tcp://:3500", WithNumEventLoop(10001), WithLockOSThread(true))
-	assert.EqualError(t, err, errorx.ErrTooManyEventLoopThreads.Error(), "error returned with LockOSThread option")
+	assert.ErrorIs(t, err, errorx.ErrTooManyEventLoopThreads, "error returned with LockOSThread option")
 }
 
 func TestStopServer(t *testing.T) {
@@ -1359,7 +1388,7 @@ func (t *testStopServer) OnTick() (delay time.Duration, action Action) {
 	delay = time.Millisecond * 100
 	if !t.action {
 		t.action = true
-		go func() {
+		err := goPool.DefaultWorkerPool.Submit(func() {
 			conn, err := net.Dial(t.network, t.addr)
 			assert.NoError(t.tester, err)
 			defer conn.Close() //nolint:errcheck
@@ -1368,16 +1397,18 @@ func (t *testStopServer) OnTick() (delay time.Duration, action Action) {
 			_, err = conn.Read(data)
 			assert.NoError(t.tester, err)
 
-			go func() {
+			err = goPool.DefaultWorkerPool.Submit(func() {
 				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 				defer cancel()
 				logging.Debugf("stop engine...", t.eng.Stop(ctx))
-			}()
+			})
+			assert.NoError(t.tester, err)
 
 			// waiting the engine shutdown.
 			_, err = conn.Read(data)
 			assert.Error(t.tester, err)
-		}()
+		})
+		assert.NoError(t.tester, err)
 		return
 	}
 	return
@@ -1423,7 +1454,7 @@ func (t *testStopEngine) OnTraffic(c Conn) (action Action) {
 
 func (t *testStopEngine) OnTick() (delay time.Duration, action Action) {
 	delay = time.Millisecond * 100
-	go func() {
+	err := goPool.DefaultWorkerPool.Submit(func() {
 		conn, err := net.Dial(t.network, t.addr)
 		assert.NoError(t.tester, err)
 		defer conn.Close() //nolint:errcheck
@@ -1442,7 +1473,8 @@ func (t *testStopEngine) OnTick() (delay time.Duration, action Action) {
 			assert.Error(t.tester, err)
 		}
 		atomic.AddInt64(&t.stopIter, -1)
-	}()
+	})
+	assert.NoError(t.tester, err)
 	return
 }
 
@@ -1451,31 +1483,33 @@ func testEngineStop(t *testing.T, network, addr string) {
 	events2 := &testStopEngine{tester: t, network: network, addr: addr, protoAddr: network + "://" + addr, name: "2", stopIter: 5}
 
 	result1 := make(chan error, 1)
-	go func() {
+	err := goPool.DefaultWorkerPool.Submit(func() {
 		err := Run(events1, events1.protoAddr, WithTicker(true), WithReuseAddr(true), WithReusePort(true))
 		result1 <- err
-	}()
+	})
+	require.NoError(t, err)
 	// ensure the first handler processes before starting the next since the delay per tick is 100ms
 	time.Sleep(150 * time.Millisecond)
 	result2 := make(chan error, 1)
-	go func() {
+	err = goPool.DefaultWorkerPool.Submit(func() {
 		err := Run(events2, events2.protoAddr, WithTicker(true), WithReuseAddr(true), WithReusePort(true))
 		result2 <- err
-	}()
+	})
+	require.NoError(t, err)
 
-	err := <-result1
-	assert.NoError(t, err)
+	err = <-result1
+	require.NoError(t, err)
 	err = <-result2
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	// make sure that each handler processed at least 1
-	assert.Greater(t, events1.exchngCount, int64(0))
-	assert.Greater(t, events2.exchngCount, int64(0))
-	assert.Equal(t, int64(2+1+5+1), events1.exchngCount+events2.exchngCount)
+	require.Greater(t, events1.exchngCount, int64(0))
+	require.Greater(t, events2.exchngCount, int64(0))
+	require.Equal(t, int64(2+1+5+1), events1.exchngCount+events2.exchngCount)
 	// stop an already stopped engine
-	assert.Equal(t, errorx.ErrEngineInShutdown, events1.eng.Stop(context.Background()))
+	require.Equal(t, errorx.ErrEngineInShutdown, events1.eng.Stop(context.Background()))
 }
 
-// Test should not panic when we wake-up server_closed conn.
+// Test should not panic when we wake up server_closed conn.
 func TestClosedWakeUp(t *testing.T) {
 	events := &testClosedWakeUpServer{
 		tester:             t,
@@ -1500,7 +1534,7 @@ type testClosedWakeUpServer struct {
 }
 
 func (s *testClosedWakeUpServer) OnBoot(eng Engine) (action Action) {
-	go func() {
+	err := goPool.DefaultWorkerPool.Submit(func() {
 		c, err := net.Dial(s.network, s.addr)
 		assert.NoError(s.tester, err)
 
@@ -1515,7 +1549,8 @@ func (s *testClosedWakeUpServer) OnBoot(eng Engine) (action Action) {
 		<-s.serverClosed
 
 		logging.Debugf("stop engine...", eng.Stop(context.TODO()))
-	}()
+	})
+	assert.NoError(s.tester, err)
 
 	return None
 }
@@ -1529,8 +1564,10 @@ func (s *testClosedWakeUpServer) OnTraffic(c Conn) Action {
 		close(s.wakeup)
 	}
 
-	go func() { assert.NoError(s.tester, c.Wake(nil)) }()
-	go func() { assert.NoError(s.tester, c.Close()) }()
+	err := goPool.DefaultWorkerPool.Submit(func() { assert.NoError(s.tester, c.Wake(nil)) })
+	assert.NoError(s.tester, err)
+	err = goPool.DefaultWorkerPool.Submit(func() { assert.NoError(s.tester, c.Close()) })
+	assert.NoError(s.tester, err)
 
 	<-s.clientClosed
 
@@ -1591,12 +1628,13 @@ func (t *testDisconnectedAsyncWriteServer) OnTraffic(c Conn) Action {
 	_, err := c.Next(0)
 	assert.NoErrorf(t.tester, err, "c.Next error: %v", err)
 
-	go func() {
+	err = goPool.DefaultWorkerPool.Submit(func() {
 		for range time.Tick(100 * time.Millisecond) {
 			if t.exit.Load() {
 				break
 			}
 
+			var err error
 			if t.writev {
 				err = c.AsyncWritev([][]byte{[]byte("hello"), []byte("hello")}, func(_ Conn, err error) error {
 					if err == nil {
@@ -1623,7 +1661,8 @@ func (t *testDisconnectedAsyncWriteServer) OnTraffic(c Conn) Action {
 				return
 			}
 		}
-	}()
+	})
+	assert.NoError(t.tester, err)
 
 	return None
 }
@@ -1638,13 +1677,14 @@ func (t *testDisconnectedAsyncWriteServer) OnTick() (delay time.Duration, action
 
 	if !t.clientStarted {
 		t.clientStarted = true
-		go func() {
+		err := goPool.DefaultWorkerPool.Submit(func() {
 			c, err := net.Dial("tcp", t.addr)
 			assert.NoError(t.tester, err)
 			_, err = c.Write([]byte("hello"))
 			assert.NoError(t.tester, err)
 			assert.NoError(t.tester, c.Close())
-		}()
+		})
+		assert.NoError(t.tester, err)
 	}
 	return
 }
@@ -1688,7 +1728,7 @@ func (s *simServer) OnBoot(eng Engine) (action Action) {
 func (s *simServer) OnOpen(c Conn) (out []byte, action Action) {
 	c.SetContext(&testCodec{})
 	atomic.AddInt32(&s.connected, 1)
-	out = []byte("sweetness\r\n")
+	out = []byte("andypan\r\n")
 	assert.NotNil(s.tester, c.LocalAddr(), "nil local addr")
 	assert.NotNil(s.tester, c.RemoteAddr(), "nil remote addr")
 	return
@@ -1738,9 +1778,10 @@ func (s *simServer) OnTraffic(c Conn) (action Action) {
 func (s *simServer) OnTick() (delay time.Duration, action Action) {
 	if atomic.CompareAndSwapInt32(&s.started, 0, 1) {
 		for i := 0; i < s.nclients; i++ {
-			go func() {
+			err := goPool.DefaultWorkerPool.Submit(func() {
 				runSimClient(s.tester, s.network, s.addr, s.packetSize, s.batchWrite)
-			}()
+			})
+			assert.NoError(s.tester, err)
 		}
 	}
 	delay = 100 * time.Millisecond
@@ -1896,7 +1937,7 @@ func runSimClient(t *testing.T, network, addr string, packetSize, batch int) {
 	rd := bufio.NewReader(c)
 	msg, err := rd.ReadBytes('\n')
 	assert.NoError(t, err)
-	assert.Equal(t, string(msg), "sweetness\r\n", "bad header")
+	assert.Equal(t, string(msg), "andypan\r\n", "bad header")
 	var duration time.Duration
 	packetBytes := packetSize * batch
 	switch {
@@ -1988,7 +2029,7 @@ func (t *testUDPSendtoServer) OnTraffic(c Conn) Action {
 func (t *testUDPSendtoServer) OnTick() (delay time.Duration, action Action) {
 	t.startClientsOnce.Do(func() {
 		for i := 0; i < t.clientCount; i++ {
-			go func() {
+			err := goPool.DefaultWorkerPool.Submit(func() {
 				c, err := net.Dial("udp", t.addr)
 				assert.NoError(t.tester, err)
 				defer c.Close() //nolint:errcheck
@@ -2002,7 +2043,8 @@ func (t *testUDPSendtoServer) OnTick() (delay time.Duration, action Action) {
 				t.mu.Lock()
 				t.clientCount--
 				t.mu.Unlock()
-			}()
+			})
+			assert.NoError(t.tester, err)
 		}
 	})
 
@@ -2027,4 +2069,629 @@ func TestUDPSendtoServer(t *testing.T) {
 	events := &testUDPSendtoServer{tester: t, addr: addr}
 	err := Run(events, "udp://"+addr, WithTicker(true))
 	assert.NoError(t, err)
+}
+
+func startUDPEchoServer(t *testing.T, c *net.UDPConn) {
+	defer c.Close() //nolint:errcheck
+
+	buf := make([]byte, datagramLen)
+	for {
+		nr, remote, err := c.ReadFromUDP(buf)
+		if err != nil {
+			break
+		}
+		if nr > 0 {
+			nw, err := c.WriteToUDP(buf[:nr], remote)
+			assert.EqualValuesf(t, nr, nw, "UDP echo server should send %d bytes, but sent %d bytes", nr, nw)
+			assert.NoErrorf(t, err, "error occurred on UDP echo server %v write to %s, %v",
+				remote, c.LocalAddr().String(), err)
+		}
+	}
+}
+
+func startStreamEchoServer(t *testing.T, ln net.Listener) {
+	defer func() {
+		ln.Close() //nolint:errcheck
+		if strings.HasPrefix(ln.Addr().Network(), "unix") {
+			os.Remove(ln.Addr().String()) //nolint:errcheck
+		}
+	}()
+
+	for {
+		c, err := ln.Accept()
+		if err != nil {
+			return
+		}
+
+		err = goPool.DefaultWorkerPool.Submit(func() {
+			defer c.Close() //nolint:errcheck
+
+			buf := make([]byte, streamLen)
+			for {
+				nr, err := c.Read(buf)
+				if err != nil {
+					break
+				}
+				b := buf[:nr]
+				for len(b) > 0 {
+					nw, err := c.Write(b)
+					assert.NoErrorf(t, err, "error occurred on TCP echo server %s write to %s, %v",
+						ln.Addr().String(), c.RemoteAddr().String(), err)
+					b = b[nw:]
+				}
+			}
+		})
+		assert.NoError(t, err, "error occurred on TCP echo server %s submit task, %v",
+			ln.Addr().String(), err)
+	}
+}
+
+type streamProxyServer struct {
+	BuiltinEventEngine
+
+	engine    Engine
+	eventLoop EventLoop
+
+	stallCh chan struct{}
+
+	tester       *testing.T
+	ListenerNet  string
+	ListenerAddr string
+
+	connected          int32
+	disconnected       int32
+	backendEstablished int32
+
+	backendServerPoolMu sync.Mutex
+	backendServerPool   []string
+
+	startClintOnce sync.Once
+
+	backendServers []string
+	packetSize     int
+}
+
+func (p *streamProxyServer) OnShutdown(eng Engine) {
+	p.engine = eng
+	p.tester.Logf("proxy server %s shutdown!", p.ListenerAddr)
+}
+
+func (p *streamProxyServer) OnOpen(c Conn) (out []byte, action Action) {
+	if c.LocalAddr().String() == p.ListenerAddr { // it's a server connection
+		out = []byte("andypan\r\n")
+		p.backendServerPoolMu.Lock()
+		backendServer := p.backendServerPool[len(p.backendServerPool)-1]
+		p.backendServerPool = p.backendServerPool[:len(p.backendServerPool)-1]
+		p.backendServerPoolMu.Unlock()
+
+		// Test the error handling of the methods of EventLoop.
+		_, err := c.EventLoop().Register(context.Background(), nil)
+		assert.ErrorIsf(p.tester, err, errorx.ErrInvalidNetworkAddress, "Expected error: %v, but got: %v",
+			errorx.ErrInvalidNetworkAddress, err)
+		_, err = c.EventLoop().Enroll(context.Background(), nil)
+		assert.ErrorIsf(p.tester, err, errorx.ErrInvalidNetConn, "Expected error: %v, but got: %v",
+			errorx.ErrInvalidNetConn, err)
+		err = c.EventLoop().Execute(context.Background(), nil)
+		assert.ErrorIsf(p.tester, err, errorx.ErrNilRunnable, "Expected error: %v, but got: %v",
+			errorx.ErrNilRunnable, err)
+		err = c.EventLoop().Schedule(context.Background(), nil, time.Millisecond)
+		assert.ErrorIsf(p.tester, err, errorx.ErrUnsupportedOp, "Expected error: %v, but got: %v",
+			errorx.ErrUnsupportedOp, err)
+
+		network, addr, err := parseProtoAddr(backendServer)
+		assert.NoError(p.tester, err, "parseProtoAddr error")
+		var address net.Addr
+		switch {
+		case strings.HasPrefix(network, "tcp"):
+			address, err = net.ResolveTCPAddr(network, addr)
+		case strings.HasPrefix(network, "udp"):
+			address, err = net.ResolveUDPAddr(network, addr)
+		case strings.HasPrefix(network, "unix"):
+			address, err = net.ResolveUnixAddr(network, addr)
+		default:
+			assert.Failf(p.tester, "unsupported protocol", "unsupported protocol: %s", network)
+		}
+		assert.NoError(p.tester, err, "ResolveNetAddr error")
+		ctx := NewContext(context.Background(), c)
+		resCh, err := c.EventLoop().Register(ctx, address)
+		assert.NoError(p.tester, err, "Register connection error")
+		err = goPool.DefaultWorkerPool.Submit(func() {
+			res := <-resCh
+			assert.NoError(p.tester, res.Err, "Register connection error")
+			assert.NotNil(p.tester, res.Conn, "Register connection nil")
+		})
+		assert.NoError(p.tester, err, "Submit task error")
+		atomic.AddInt32(&p.connected, 1)
+	} else { // it's a client connection
+		// Store the client connection in the context of the server connection.
+		serverConn, ok := c.Context().(Conn)
+		assert.True(p.tester, ok, "context is not Conn")
+		assert.NotNil(p.tester, serverConn, "context is not Conn")
+		serverConn.SetContext(c)
+
+		err := c.EventLoop().Execute(NewContext(context.Background(), c.LocalAddr()),
+			RunnableFunc(func(ctx context.Context) error {
+				p.tester.Logf("backend connection %v established", FromContext(ctx))
+				return nil
+			}))
+		assert.NoError(p.tester, err, "Execute task error")
+
+		if int(atomic.AddInt32(&p.backendEstablished, 1)) == len(p.backendServers) {
+			// Unlock the clients to start sending data.
+			close(p.stallCh)
+		}
+	}
+
+	return
+}
+
+func (p *streamProxyServer) OnClose(c Conn, err error) (action Action) {
+	connType := "client"
+	if c.LocalAddr().String() == p.ListenerAddr {
+		connType = "server"
+	}
+	logging.Debugf("closing %s connection: %s", connType, c.LocalAddr().String())
+
+	if err != nil {
+		logging.Debugf("error occurred on server connnection closing, %v", err)
+	}
+
+	if c.LocalAddr().String() == p.ListenerAddr { // it's a server connection
+		pc, ok := c.Context().(Conn)
+		assert.True(p.tester, ok, "server context connection is nil")
+		assert.NotNil(p.tester, pc, "server context connection is nil")
+		err := c.EventLoop().Close(pc) // close the corresponding client connection
+		assert.NoError(p.tester, err, "Close client connection error")
+
+		if disconnected := atomic.AddInt32(&p.disconnected, 1); int(disconnected) == len(p.backendServers) &&
+			disconnected == atomic.LoadInt32(&p.connected) {
+			p.eventLoop = c.EventLoop()
+			action = Shutdown
+		}
+	}
+
+	return
+}
+
+func (p *streamProxyServer) OnTraffic(c Conn) Action {
+	connType := "client"
+	if c.LocalAddr().String() == p.ListenerAddr {
+		connType = "server"
+	}
+
+	pc, ok := c.Context().(Conn)
+	if !ok {
+		// The backend connection is not established yet, retry later.
+		assert.NoError(p.tester, c.Wake(nil), "Wake connection error")
+		return None
+	}
+
+	_, err := c.WriteTo(pc)
+	assert.NoErrorf(p.tester, err, "%s: Write error from %s to %s",
+		connType, c.LocalAddr().String(), pc.RemoteAddr().String())
+	return None
+}
+
+func (p *streamProxyServer) OnTick() (time.Duration, Action) {
+	p.startClintOnce.Do(func() {
+		for i := 0; i < len(p.backendServers); i++ {
+			err := goPool.DefaultWorkerPool.Submit(func() {
+				startClient(p.tester, p.ListenerNet, p.ListenerAddr,
+					true, false, p.packetSize, p.stallCh)
+			})
+			assert.NoErrorf(p.tester, err, "Submit backend server %s error: %v", p.ListenerAddr, err)
+		}
+	})
+	return time.Millisecond * 200, None
+}
+
+func TestStreamProxyServer(t *testing.T) {
+	t.Run("tcp-proxy-server", func(t *testing.T) {
+		addr := "tcp://127.0.0.1:10000"
+		backendServers := []string{
+			"tcp://127.0.0.1:10001",
+			"tcp://127.0.0.1:10002",
+			"tcp://127.0.0.1:10003",
+			"tcp://127.0.0.1:10004",
+			"tcp://127.0.0.1:10005",
+			"tcp://127.0.0.1:10006",
+			"tcp://127.0.0.1:10007",
+			"tcp://127.0.0.1:10008",
+			"tcp://127.0.0.1:10009",
+			"tcp://127.0.0.1:10010",
+		}
+		t.Run("1-loop-LT", func(t *testing.T) {
+			testStreamProxyServer(t, addr, backendServers, false, false)
+		})
+		t.Run("1-loop-ET", func(t *testing.T) {
+			testStreamProxyServer(t, addr, backendServers, false, true)
+		})
+		t.Run("N-loop-LT", func(t *testing.T) {
+			testStreamProxyServer(t, addr, backendServers, true, false)
+		})
+		t.Run("N-loop-ET", func(t *testing.T) {
+			testStreamProxyServer(t, addr, backendServers, true, true)
+		})
+	})
+
+	t.Run("unix-proxy-server", func(t *testing.T) {
+		addr := "unix://unix-proxy-server.sock"
+		backendServers := []string{
+			"unix://unix-proxy-server-1.sock",
+			"unix://unix-proxy-server-2.sock",
+			"unix://unix-proxy-server-3.sock",
+			"unix://unix-proxy-server-4.sock",
+			"unix://unix-proxy-server-5.sock",
+			"unix://unix-proxy-server-6.sock",
+			"unix://unix-proxy-server-7.sock",
+			"unix://unix-proxy-server-8.sock",
+			"unix://unix-proxy-server-9.sock",
+			"unix://unix-proxy-server-10.sock",
+		}
+		t.Run("1-loop-LT", func(t *testing.T) {
+			testStreamProxyServer(t, addr, backendServers, false, false)
+		})
+		t.Run("1-loop-ET", func(t *testing.T) {
+			testStreamProxyServer(t, addr, backendServers, false, true)
+		})
+		t.Run("N-loop-LT", func(t *testing.T) {
+			testStreamProxyServer(t, addr, backendServers, true, false)
+		})
+		t.Run("N-loop-ET", func(t *testing.T) {
+			testStreamProxyServer(t, addr, backendServers, true, true)
+		})
+	})
+
+	t.Run("udp-proxy-server", func(t *testing.T) {
+		addr := "tcp://127.0.0.1:11000"
+		backendServers := []string{
+			"udp://127.0.0.1:11001",
+			"udp://127.0.0.1:11002",
+			"udp://127.0.0.1:11003",
+			"udp://127.0.0.1:11004",
+			"udp://127.0.0.1:11005",
+			"udp://127.0.0.1:11006",
+			"udp://127.0.0.1:11007",
+			"udp://127.0.0.1:11008",
+			"udp://127.0.0.1:11009",
+			"udp://127.0.0.1:11010",
+		}
+		t.Run("1-loop-LT", func(t *testing.T) {
+			testStreamProxyServer(t, addr, backendServers, false, false)
+		})
+		t.Run("1-loop-ET", func(t *testing.T) {
+			testStreamProxyServer(t, addr, backendServers, false, true)
+		})
+		t.Run("N-loop-LT", func(t *testing.T) {
+			testStreamProxyServer(t, addr, backendServers, true, false)
+		})
+		t.Run("N-loop-ET", func(t *testing.T) {
+			testStreamProxyServer(t, addr, backendServers, true, true)
+		})
+	})
+}
+
+func testStreamProxyServer(t *testing.T, addr string, backendServers []string, multicore, et bool) {
+	network, address, err := parseProtoAddr(addr)
+	require.NoError(t, err, "parseProtoAddr error")
+
+	srv := streamProxyServer{
+		tester:            t,
+		stallCh:           make(chan struct{}),
+		ListenerNet:       network,
+		ListenerAddr:      address,
+		backendServers:    backendServers,
+		backendServerPool: backendServers,
+	}
+
+	var (
+		backends   errgroup.Group
+		netServers []io.Closer
+	)
+	for _, backendServer := range backendServers {
+		network, addr, err := parseProtoAddr(backendServer)
+		require.NoError(t, err, "parseProtoAddr error")
+		if strings.HasPrefix(network, "udp") {
+			udpAddr, err := net.ResolveUDPAddr(network, addr)
+			require.NoError(t, err, "ResolveUDPAddr error")
+			c, err := net.ListenUDP("udp", udpAddr)
+			require.NoError(t, err, "ListenUDP error")
+			backends.Go(func() error {
+				startUDPEchoServer(t, c)
+				return nil
+			})
+			require.NoErrorf(t, err, "Start backend UDP server %s error: %v", backendServer, err)
+			srv.packetSize = datagramLen
+			netServers = append(netServers, c)
+		} else {
+			ln, err := net.Listen(network, addr)
+			require.NoErrorf(t, err, "Create backend server %s error: %v", network+"://"+addr, err)
+			backends.Go(func() error {
+				startStreamEchoServer(t, ln)
+				return nil
+			})
+			require.NoErrorf(t, err, "Start backend stream server %s error: %v", backendServer, err)
+			srv.packetSize = streamLen
+			netServers = append(netServers, ln)
+		}
+	}
+
+	// Give the backend servers some time to start.
+	time.Sleep(time.Second)
+
+	err = Run(&srv, addr, WithEdgeTriggeredIO(et), WithMulticore(multicore), WithTicker(true))
+	require.NoErrorf(t, err, "Run error: %v", err)
+
+	// Test the error handling of the methods of EventLoop after a shutdown.
+	_, err = srv.engine.Register(context.Background())
+	assert.ErrorIsf(t, err, errorx.ErrEngineInShutdown, "Expected error: %v, but got: %v",
+		errorx.ErrEngineInShutdown, err)
+	_, err = srv.eventLoop.Register(context.Background(), nil)
+	require.ErrorIsf(t, err, errorx.ErrEngineInShutdown, "Expected error: %v, but got: %v",
+		errorx.ErrEngineInShutdown, err)
+	_, err = srv.eventLoop.Enroll(context.Background(), nil)
+	require.ErrorIsf(t, err, errorx.ErrEngineInShutdown, "Expected error: %v, but got: %v",
+		errorx.ErrEngineInShutdown, err)
+	err = srv.eventLoop.Execute(context.Background(), nil)
+	require.ErrorIsf(t, err, errorx.ErrEngineInShutdown, "Expected error: %v, but got: %v",
+		errorx.ErrEngineInShutdown, err)
+	err = srv.eventLoop.Schedule(context.Background(), nil, time.Millisecond)
+	require.ErrorIsf(t, err, errorx.ErrUnsupportedOp, "Expected error: %v, but got: %v",
+		errorx.ErrUnsupportedOp, err)
+
+	for _, server := range netServers {
+		require.NoError(t, server.Close(), "Close backend server error")
+	}
+
+	backends.Wait() //nolint:errcheck
+}
+
+type udpProxyServer struct {
+	BuiltinEventEngine
+
+	packet []byte
+
+	engine Engine
+
+	tester *testing.T
+
+	stallCh chan struct{}
+
+	ListenerNet  string
+	ListenerAddr string
+
+	activeClients      int32
+	backendEstablished int32
+	backendBytes       int32
+
+	initBackendPoolOnce sync.Once
+	backendServerPoolMu sync.Mutex
+	backendServerPool   []Conn
+
+	startClientOnce sync.Once
+	backendServers  []string
+	packetSize      int
+}
+
+func (p *udpProxyServer) OnBoot(eng Engine) (action Action) {
+	p.engine = eng
+	_, err := eng.Register(context.Background())
+	assert.ErrorIsf(p.tester, err, errorx.ErrEmptyEngine, "Expected error: %v, but got: %v",
+		errorx.ErrEmptyEngine, err)
+	return
+}
+
+func (p *udpProxyServer) OnShutdown(Engine) {
+	assert.Zero(p.tester, atomic.LoadInt32(&p.backendBytes)%int32(len(p.packet)),
+		"backend received bytes should be a multiple of packet size")
+}
+
+func (p *udpProxyServer) OnOpen(c Conn) (out []byte, action Action) {
+	p.backendServerPoolMu.Lock()
+	p.backendServerPool = append(p.backendServerPool, c)
+	p.backendServerPoolMu.Unlock()
+	if int(atomic.AddInt32(&p.backendEstablished, 1)) == len(p.backendServers) {
+		// Unlock the clients to start sending data.
+		close(p.stallCh)
+	}
+	return nil, None
+}
+
+func (p *udpProxyServer) OnTraffic(c Conn) Action {
+	if c.LocalAddr().String() == p.ListenerAddr { // it's a server connection
+		// Echo back to the client.
+		buf, err := c.Next(-1)
+		assert.NoError(p.tester, err, "Next error")
+		assert.Greaterf(p.tester, len(buf), 0, "Next should not return empty buffer")
+		n, err := c.Write(buf)
+		assert.NoError(p.tester, err, "Write error")
+		assert.EqualValuesf(p.tester, n, len(buf), "Write should send %d bytes, but sent %d bytes", len(buf), n)
+
+		// Send the packet to a random backend server.
+		p.backendServerPoolMu.Lock()
+		backendServer := p.backendServerPool[rand.Intn(len(p.backendServerPool))]
+		p.backendServerPoolMu.Unlock()
+		err = backendServer.AsyncWrite(p.packet, nil)
+		assert.NoError(p.tester, err, "AsyncWrite error")
+	} else { // it's a backend connection
+		buf, err := c.Next(len(p.packet))
+		assert.NoError(p.tester, err, "Next error")
+		assert.EqualValuesf(p.tester, buf, p.packet, "Packet mismatch, expected: %s, got: %s", p.packet, buf)
+		atomic.AddInt32(&p.backendBytes, int32(len(buf)))
+	}
+	return None
+}
+
+func (p *udpProxyServer) OnTick() (delay time.Duration, action Action) {
+	p.initBackendPoolOnce.Do(func() {
+		for i, backendServer := range p.backendServers {
+			network, addr, err := parseProtoAddr(backendServer)
+			assert.NoError(p.tester, err, "parseProtoAddr error")
+			var address net.Addr
+			switch {
+			case strings.HasPrefix(network, "tcp"):
+				address, err = net.ResolveTCPAddr(network, addr)
+			case strings.HasPrefix(network, "udp"):
+				address, err = net.ResolveUDPAddr(network, addr)
+			case strings.HasPrefix(network, "unix"):
+				address, err = net.ResolveUnixAddr(network, addr)
+			default:
+				assert.Failf(p.tester, "unsupported protocol", "unsupported protocol: %s", network)
+			}
+			assert.NoError(p.tester, err, "ResolveNetAddr error")
+
+			// Test the error handling with empty context.
+			_, err = p.engine.Register(context.Background())
+			assert.ErrorIs(p.tester, err, errorx.ErrInvalidNetworkAddress)
+
+			var resCh <-chan RegisteredResult
+			if i%2 == 0 {
+				resCh, err = p.engine.Register(NewNetAddrContext(context.Background(), address))
+			} else {
+				c, e := net.Dial(network, addr)
+				assert.NoError(p.tester, e, "Dial error")
+				resCh, err = p.engine.Register(NewNetConnContext(context.Background(), c))
+			}
+			assert.NoError(p.tester, err, "Register connection error")
+			err = goPool.DefaultWorkerPool.Submit(func() {
+				res := <-resCh
+				assert.NoError(p.tester, res.Err, "Register connection error")
+				assert.NotNil(p.tester, res.Conn, "Register connection nil")
+			})
+			assert.NoError(p.tester, err, "Submit connection error")
+		}
+	})
+	p.startClientOnce.Do(func() {
+		for i := 0; i < len(p.backendServers); i++ {
+			atomic.AddInt32(&p.activeClients, 1)
+			err := goPool.DefaultWorkerPool.Submit(func() {
+				startClient(p.tester, p.ListenerNet, p.ListenerAddr,
+					true, false, p.packetSize, p.stallCh)
+				atomic.AddInt32(&p.activeClients, -1)
+			})
+			assert.NoErrorf(p.tester, err, "Submit backend server %s error: %v", p.ListenerAddr, err)
+		}
+	})
+
+	if atomic.LoadInt32(&p.activeClients) == 0 {
+		return 0, Shutdown
+	}
+
+	return time.Millisecond * 200, None
+}
+
+func TestUDPProxyServer(t *testing.T) {
+	t.Run("backend-udp-proxy-server", func(t *testing.T) {
+		addr := "udp://127.0.0.1:10000"
+		backendServers := []string{
+			"udp://127.0.0.1:10001",
+			"udp://127.0.0.1:10002",
+			"udp://127.0.0.1:10003",
+			"udp://127.0.0.1:10004",
+			"udp://127.0.0.1:10005",
+			"udp://127.0.0.1:10006",
+			"udp://127.0.0.1:10007",
+			"udp://127.0.0.1:10008",
+			"udp://127.0.0.1:10009",
+			"udp://127.0.0.1:10010",
+		}
+		t.Run("1-loop-LT", func(t *testing.T) {
+			testUDPProxyServer(t, addr, backendServers, false, false)
+		})
+		t.Run("1-loop-ET", func(t *testing.T) {
+			testUDPProxyServer(t, addr, backendServers, false, true)
+		})
+		t.Run("N-loop-LT", func(t *testing.T) {
+			testUDPProxyServer(t, addr, backendServers, true, false)
+		})
+		t.Run("N-loop-ET", func(t *testing.T) {
+			testUDPProxyServer(t, addr, backendServers, true, true)
+		})
+	})
+
+	t.Run("backend-tcp-proxy-server", func(t *testing.T) {
+		addr := "udp://127.0.0.1:20000"
+		backendServers := []string{
+			"tcp://127.0.0.1:20001",
+			"tcp://127.0.0.1:20002",
+			"tcp://127.0.0.1:20003",
+			"tcp://127.0.0.1:20004",
+			"tcp://127.0.0.1:20005",
+			"tcp://127.0.0.1:20006",
+			"tcp://127.0.0.1:20007",
+			"tcp://127.0.0.1:20008",
+			"tcp://127.0.0.1:20009",
+			"tcp://127.0.0.1:20010",
+		}
+		t.Run("1-loop-LT", func(t *testing.T) {
+			testUDPProxyServer(t, addr, backendServers, false, false)
+		})
+		t.Run("1-loop-ET", func(t *testing.T) {
+			testUDPProxyServer(t, addr, backendServers, false, true)
+		})
+		t.Run("N-loop-LT", func(t *testing.T) {
+			testUDPProxyServer(t, addr, backendServers, true, false)
+		})
+		t.Run("N-loop-ET", func(t *testing.T) {
+			testUDPProxyServer(t, addr, backendServers, true, true)
+		})
+	})
+}
+
+func testUDPProxyServer(t *testing.T, addr string, backendServers []string, multicore, et bool) {
+	network, address, err := parseProtoAddr(addr)
+	require.NoError(t, err, "parseProtoAddr error")
+
+	srv := udpProxyServer{
+		tester:         t,
+		stallCh:        make(chan struct{}),
+		ListenerNet:    network,
+		ListenerAddr:   address,
+		backendServers: backendServers,
+		packet:         []byte("andypan"),
+		packetSize:     datagramLen,
+	}
+
+	var (
+		backends   errgroup.Group
+		netServers []io.Closer
+	)
+	for _, backendServer := range backendServers {
+		network, addr, err := parseProtoAddr(backendServer)
+		require.NoError(t, err, "parseProtoAddr error")
+		if strings.HasPrefix(network, "udp") {
+			udpAddr, err := net.ResolveUDPAddr(network, addr)
+			require.NoError(t, err, "ResolveUDPAddr error")
+			c, err := net.ListenUDP("udp", udpAddr)
+			require.NoError(t, err, "ListenUDP error")
+			backends.Go(func() error {
+				startUDPEchoServer(t, c)
+				return nil
+			})
+			require.NoErrorf(t, err, "Start backend UDP server %s error: %v", backendServer, err)
+			netServers = append(netServers, c)
+		} else {
+			ln, err := net.Listen(network, addr)
+			require.NoErrorf(t, err, "Create backend server %s error: %v", network+"://"+addr, err)
+			backends.Go(func() error {
+				startStreamEchoServer(t, ln)
+				return nil
+			})
+			require.NoErrorf(t, err, "Start backend stream server %s error: %v", backendServer, err)
+			netServers = append(netServers, ln)
+		}
+	}
+
+	err = Run(&srv, addr,
+		WithLoadBalancing(LeastConnections),
+		WithEdgeTriggeredIO(et),
+		WithMulticore(multicore),
+		WithTicker(true))
+	require.NoErrorf(t, err, "Run error: %v", err)
+
+	for _, server := range netServers {
+		require.NoError(t, server.Close(), "Close backend server error")
+	}
+
+	backends.Wait() //nolint:errcheck
 }
