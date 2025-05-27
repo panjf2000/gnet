@@ -15,7 +15,7 @@ The `gnet` v2.8.0 is officially released!
 
 Starting with v2.8.0, you're able to register new connections to an event loop, enabling you to delegate sockets that are not created by the `gnet` internally to the event loops of `gnet`.
 
-This feature is particularly useful for proxy scenarios where you need to create and manage a mass of connections to backend servers and want to take advantage of the `gnet` event loops by registering these connections to the event loops. Once you a connection is registered to a event loop, you will be able to use the `gnet` APIs to operate the connection in a event-driven way, such as sending and receiving data, closing the connection, etc., as you do with the connections created by `gnet` itself.
+This feature is particularly useful for proxy scenarios where you need to create and manage a mass of connections to backend servers and want to take advantage of the `gnet` event loops. Once the connection is registered to a event loop, you will be able to use the `gnet` APIs to manipulate that connection in a event-driven way, such as sending, receiving data, and closing the connection, etc., as you do with the connections created by `gnet` itself.
 
 The new feature is implemented by introducing a new `EventLoop` interface, which provides a set of methods for manipulating the event loops, including registering new connections and scheduling executions on the event loops, etc. This allows you to interact with the event loops in a more flexible and powerful way.
 
