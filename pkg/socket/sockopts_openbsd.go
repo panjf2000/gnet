@@ -24,7 +24,7 @@ func SetKeepAlivePeriod(_, _ int) error {
 }
 
 // SetKeepAlive is not implemented on OpenBSD.
-func SetKeepAlive(_, _, _, _, _ int) error {
+func SetKeepAlive(_ int, _ bool, _, _, _ int) error {
 	// OpenBSD has no user-settable per-socket TCP keepalive options.
 	return errorx.ErrUnsupportedOp
 }
