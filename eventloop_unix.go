@@ -163,14 +163,14 @@ func (el *eventloop) enroll(c net.Conn, addr net.Addr, ctx any) (resCh chan Regi
 			}
 			ua := c.LocalAddr().(*net.UnixAddr)
 			ua.Name = c.RemoteAddr().String() + "." + strconv.Itoa(dupFD)
-			gc = newTCPConn(dupFD, el, sockAddr, c.LocalAddr(), c.RemoteAddr())
+			gc = newStreamConn("unix", dupFD, el, sockAddr, c.LocalAddr(), c.RemoteAddr())
 		case *net.TCPConn:
 			sockAddr, _, _, _, err = socket.GetTCPSockAddr(c.RemoteAddr().Network(), c.RemoteAddr().String())
 			if err != nil {
 				resCh <- RegisteredResult{Err: err}
 				return
 			}
-			gc = newTCPConn(dupFD, el, sockAddr, c.LocalAddr(), c.RemoteAddr())
+			gc = newStreamConn("tcp", dupFD, el, sockAddr, c.LocalAddr(), c.RemoteAddr())
 		case *net.UDPConn:
 			sockAddr, _, _, _, err = socket.GetUDPSockAddr(c.RemoteAddr().Network(), c.RemoteAddr().String())
 			if err != nil {

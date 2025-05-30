@@ -17,7 +17,7 @@
 package gnet
 
 import (
-	"time"
+	"runtime"
 
 	"golang.org/x/sys/unix"
 
@@ -45,15 +45,26 @@ func (el *eventloop) accept0(fd int, _ netpoll.IOEvent, _ netpoll.IOFlags) error
 		}
 
 		remoteAddr := socket.SockaddrToTCPOrUnixAddr(sa)
-		if el.engine.opts.TCPKeepAlive > 0 && el.listeners[fd].network == "tcp" {
-			err = socket.SetKeepAlivePeriod(nfd, int(el.engine.opts.TCPKeepAlive.Seconds()))
-			if err != nil {
+		network := el.listeners[fd].network
+		if opts := el.engine.opts; opts.TCPKeepAlive > 0 && network == "tcp" &&
+			(runtime.GOOS != "linux" && runtime.GOOS != "freebsd" && runtime.GOOS != "dragonfly") {
+			// TCP keepalive options are not inherited from the listening socket
+			// on platforms other than Linux, FreeBSD, or DragonFlyBSD.
+			// We therefore need to set them on the accepted socket explicitly.
+			//
+			// Check out https://github.com/nginx/nginx/pull/337 for details.
+			if err = setKeepAlive(
+				nfd,
+				true,
+				opts.TCPKeepAlive,
+				opts.TCPKeepInterval,
+				opts.TCPKeepCount); err != nil {
 				el.getLogger().Errorf("failed to set TCP keepalive on fd=%d: %v", fd, err)
 			}
 		}
 
 		el := el.engine.eventLoops.next(remoteAddr)
-		c := newTCPConn(nfd, el, sa, el.listeners[fd].addr, remoteAddr)
+		c := newStreamConn(network, nfd, el, sa, el.listeners[fd].addr, remoteAddr)
 		err = el.poller.Trigger(queue.HighPriority, el.register, c)
 		if err != nil {
 			el.getLogger().Errorf("failed to enqueue the accepted socket fd=%d to poller: %v", c.fd, err)
@@ -64,7 +75,8 @@ func (el *eventloop) accept0(fd int, _ netpoll.IOEvent, _ netpoll.IOFlags) error
 }
 
 func (el *eventloop) accept(fd int, ev netpoll.IOEvent, flags netpoll.IOFlags) error {
-	if el.listeners[fd].network == "udp" {
+	network := el.listeners[fd].network
+	if network == "udp" {
 		return el.readUDP(fd, ev, flags)
 	}
 
@@ -82,13 +94,23 @@ func (el *eventloop) accept(fd int, ev netpoll.IOEvent, flags netpoll.IOFlags) e
 	}
 
 	remoteAddr := socket.SockaddrToTCPOrUnixAddr(sa)
-	if el.engine.opts.TCPKeepAlive > 0 && el.listeners[fd].network == "tcp" {
-		err = socket.SetKeepAlivePeriod(nfd, int(el.engine.opts.TCPKeepAlive/time.Second))
-		if err != nil {
+	if opts := el.engine.opts; opts.TCPKeepAlive > 0 && el.listeners[fd].network == "tcp" &&
+		(runtime.GOOS != "linux" && runtime.GOOS != "freebsd" && runtime.GOOS != "dragonfly") {
+		// TCP keepalive options are not inherited from the listening socket
+		// on platforms other than Linux, FreeBSD, or DragonFlyBSD.
+		// We therefore need to set them on the accepted socket explicitly.
+		//
+		// Check out https://github.com/nginx/nginx/pull/337 for details.
+		if err = setKeepAlive(
+			nfd,
+			true,
+			opts.TCPKeepAlive,
+			opts.TCPKeepInterval,
+			opts.TCPKeepCount); err != nil {
 			el.getLogger().Errorf("failed to set TCP keepalive on fd=%d: %v", fd, err)
 		}
 	}
 
-	c := newTCPConn(nfd, el, sa, el.listeners[fd].addr, remoteAddr)
+	c := newStreamConn(network, nfd, el, sa, el.listeners[fd].addr, remoteAddr)
 	return el.register0(c)
 }

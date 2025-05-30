@@ -35,7 +35,7 @@ func (lb *sourceAddrHashLoadBalancer) register(el *eventloop) {
 
 func registerInitConn(el *eventloop) {
 	for i := 0; i < int(atomic.LoadInt32(&nowEventLoopInitConn)); i++ {
-		c := newTCPConn(i, el, &unix.SockaddrInet4{}, &net.TCPAddr{}, &net.TCPAddr{})
+		c := newStreamConn("tcp", i, el, &unix.SockaddrInet4{}, &net.TCPAddr{}, &net.TCPAddr{})
 		el.connections.addConn(c, el.idx)
 	}
 }
@@ -105,7 +105,7 @@ func benchServeGC(b *testing.B, network, addr string, async bool, elNum int, ini
 			network+"://"+addr,
 			WithLockOSThread(async),
 			WithNumEventLoop(elNum),
-			WithTCPKeepAlive(time.Minute*1),
+			WithTCPKeepAlive(time.Minute),
 			WithTCPNoDelay(TCPDelay))
 		assert.NoError(b, err)
 		nowEventLoopInitConn = 0
@@ -232,7 +232,7 @@ func testServeGC(t *testing.T, network, addr string, multicore, async bool, elNu
 		WithLockOSThread(async),
 		WithMulticore(multicore),
 		WithNumEventLoop(elNum),
-		WithTCPKeepAlive(time.Minute*1),
+		WithTCPKeepAlive(time.Minute),
 		WithTCPNoDelay(TCPDelay))
 	assert.NoError(t, err)
 	nowEventLoopInitConn = 0

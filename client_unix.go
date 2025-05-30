@@ -208,7 +208,7 @@ func (cli *Client) EnrollContext(c net.Conn, ctx any) (Conn, error) {
 		}
 		ua := c.LocalAddr().(*net.UnixAddr)
 		ua.Name = c.RemoteAddr().String() + "." + strconv.Itoa(dupFD)
-		gc = newTCPConn(dupFD, cli.el, sockAddr, c.LocalAddr(), c.RemoteAddr())
+		gc = newStreamConn("unix", dupFD, cli.el, sockAddr, c.LocalAddr(), c.RemoteAddr())
 	case *net.TCPConn:
 		if cli.opts.TCPNoDelay == TCPNoDelay {
 			if err = socket.SetNoDelay(dupFD, 1); err != nil {
@@ -216,7 +216,12 @@ func (cli *Client) EnrollContext(c net.Conn, ctx any) (Conn, error) {
 			}
 		}
 		if cli.opts.TCPKeepAlive > 0 {
-			if err = socket.SetKeepAlivePeriod(dupFD, int(cli.opts.TCPKeepAlive.Seconds())); err != nil {
+			if err = setKeepAlive(
+				dupFD,
+				true,
+				cli.opts.TCPKeepAlive,
+				cli.opts.TCPKeepInterval,
+				cli.opts.TCPKeepCount); err != nil {
 				return nil, err
 			}
 		}
@@ -224,7 +229,7 @@ func (cli *Client) EnrollContext(c net.Conn, ctx any) (Conn, error) {
 		if err != nil {
 			return nil, err
 		}
-		gc = newTCPConn(dupFD, cli.el, sockAddr, c.LocalAddr(), c.RemoteAddr())
+		gc = newStreamConn("tcp", dupFD, cli.el, sockAddr, c.LocalAddr(), c.RemoteAddr())
 	case *net.UDPConn:
 		sockAddr, _, _, _, err = socket.GetUDPSockAddr(c.RemoteAddr().Network(), c.RemoteAddr().String())
 		if err != nil {

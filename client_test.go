@@ -524,7 +524,9 @@ func runClient(t *testing.T, network, addr string, conf *testConf) {
 		WithMulticore(conf.multicore),
 		WithReusePort(conf.reuseport),
 		WithTicker(true),
-		WithTCPKeepAlive(time.Minute*1),
+		WithTCPKeepAlive(time.Minute),
+		WithTCPKeepInterval(time.Second*10),
+		WithTCPKeepCount(10),
 		WithLoadBalancing(conf.lb))
 	assert.NoError(t, err)
 }

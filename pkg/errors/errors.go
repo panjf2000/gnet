@@ -36,7 +36,7 @@ var (
 	ErrUnsupportedUDPProtocol = errors.New("gnet: only udp/udp4/udp6 are supported")
 	// ErrUnsupportedUDSProtocol occurs when trying to use an unsupported Unix protocol.
 	ErrUnsupportedUDSProtocol = errors.New("gnet: only unix is supported")
-	// ErrUnsupportedOp occurs when calling some methods that has not been implemented yet.
+	// ErrUnsupportedOp occurs when calling some methods that are either not supported or have not been implemented yet.
 	ErrUnsupportedOp = errors.New("gnet: unsupported operation")
 	// ErrNegativeSize occurs when trying to pass a negative size to a buffer.
 	ErrNegativeSize = errors.New("gnet: negative size is not allowed")
