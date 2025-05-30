@@ -102,8 +102,18 @@ type Options struct {
 	Ticker bool
 
 	// TCPKeepAlive enables the TCP keep-alive mechanism (SO_KEEPALIVE) and set its value
-	// on TCP_KEEPIDLE, 1/5 of its value on TCP_KEEPINTVL, and 5 on TCP_KEEPCNT.
+	// on TCP_KEEPIDLE.
+	// When TCPKeepInterval is not set, 1/5 of TCPKeepAlive will be set on TCP_KEEPINTVL,
+	// and 5 will be set on TCP_KEEPCNT if TCPKeepCount is not assigned to a positive value.
 	TCPKeepAlive time.Duration
+
+	// TCPKeepInterval is the value for TCP_KEEPINTVL, it's the interval between
+	// TCP keep-alive probes.
+	TCPKeepInterval time.Duration
+
+	// TCPKeepCount is the number of keep-alive probes that will be sent before
+	// the connection is considered dead and dropped.
+	TCPKeepCount int
 
 	// TCPNoDelay controls whether the operating system should delay
 	// packet transmission in hopes of sending fewer packets (Nagle's algorithm).
@@ -217,6 +227,21 @@ func WithReuseAddr(reuseAddr bool) Option {
 func WithTCPKeepAlive(tcpKeepAlive time.Duration) Option {
 	return func(opts *Options) {
 		opts.TCPKeepAlive = tcpKeepAlive
+	}
+}
+
+// WithTCPKeepInterval sets the interval between TCP keep-alive probes.
+func WithTCPKeepInterval(tcpKeepInterval time.Duration) Option {
+	return func(opts *Options) {
+		opts.TCPKeepInterval = tcpKeepInterval
+	}
+}
+
+// WithTCPKeepCount sets the number of keep-alive probes that will be sent before
+// the connection is considered dead and dropped.
+func WithTCPKeepCount(tcpKeepCount int) Option {
+	return func(opts *Options) {
+		opts.TCPKeepCount = tcpKeepCount
 	}
 }
 

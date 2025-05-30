@@ -233,7 +233,7 @@ type Reader interface {
 	// Next returns a slice containing the next n bytes from the buffer,
 	// advancing the buffer as if the bytes had been returned by Read.
 	// Calling this method has the same effect as calling Peek and Discard.
-	// If the amount of the available bytes is less than requested, a pair of (0, io.ErrShortBuffer)
+	// If the number of the available bytes is less than requested, a pair of (0, io.ErrShortBuffer)
 	// is returned.
 	//
 	// Note that the []byte buf returned by Next() is not allowed to be passed to a new goroutine,
@@ -243,7 +243,7 @@ type Reader interface {
 	Next(n int) (buf []byte, err error)
 
 	// Peek returns the next n bytes without advancing the inbound buffer, the returned bytes
-	// remain valid until a Discard is called. If the amount of the available bytes is
+	// remain valid until a Discard is called. If the number of the available bytes is
 	// less than requested, a pair of (0, io.ErrShortBuffer) is returned.
 	//
 	// Note that the []byte buf returned by Peek() is not allowed to be passed to a new goroutine,
@@ -324,7 +324,7 @@ type Socket interface {
 	// Closing c does not affect fd, and closing fd does not affect c.
 	//
 	// The returned file descriptor is different from the
-	// connection's. Attempting to change properties of the original
+	//  connection. Attempting to change the properties of the original
 	// using this duplicate may or may not have the desired effect.
 	Dup() (int, error)
 
@@ -350,9 +350,24 @@ type Socket interface {
 	// unsent data may be discarded.
 	SetLinger(sec int) error
 
-	// SetKeepAlivePeriod tells operating system to send keep-alive messages on the connection
-	// and sets period between TCP keep-alive probes.
+	// SetKeepAlivePeriod tells the operating system to send keep-alive
+	// messages on the connection and sets period between TCP keep-alive probes.
 	SetKeepAlivePeriod(d time.Duration) error
+
+	// SetKeepAlive enables/disables the TCP keepalive with all socket options:
+	// TCP_KEEPIDLE, TCP_KEEPINTVL and TCP_KEEPCNT. idle is the value for TCP_KEEPIDLE,
+	// intvl is the value for TCP_KEEPINTVL, cnt is the value for TCP_KEEPCNT,
+	// ignored when enabled is false.
+	//
+	// With TCP keep-alive enabled, idle is the time (in seconds) the connection
+	// needs to remain idle before TCP starts sending keep-alive probes,
+	// intvl is the time (in seconds) between individual keep-alive probes.
+	// TCP will drop the connection after sending cnt probes without getting
+	// any replies from the peer; then the socket is destroyed, and OnClose
+	// is triggered.
+	//
+	// If one of idle, intvl, or cnt is less than 1, an error is returned.
+	SetKeepAlive(enabled bool, idle, intvl time.Duration, cnt int) error
 
 	// SetNoDelay controls whether the operating system should delay
 	// packet transmission in hopes of sending fewer packets (Nagle's
@@ -363,7 +378,7 @@ type Socket interface {
 
 // Runnable defines the common protocol of an execution on an event-loop.
 // This interface should be implemented and passed to an event-loop in some way,
-// then the event-loop invokes Run to perform the execution.
+// then the event-loop will invoke Run to perform the execution.
 // !!!Caution: Run must not contain any blocking operations like heavy disk or
 // network I/O, or else it will block the event-loop.
 type Runnable interface {
@@ -393,7 +408,7 @@ type EventLoop interface {
 	Register(ctx context.Context, addr net.Addr) (<-chan RegisteredResult, error)
 	// Enroll is like Register, but it accepts an established net.Conn instead of a net.Addr.
 	Enroll(ctx context.Context, c net.Conn) (<-chan RegisteredResult, error)
-	// Execute executes the given runnable on the event-loop at some time in the future.
+	// Execute will execute the given runnable on the event-loop at some time in the future.
 	Execute(ctx context.Context, runnable Runnable) error
 	// Schedule is like Execute, but it allows you to specify when the runnable is executed.
 	// In other words, the runnable will be executed when the delay duration is reached.
@@ -552,7 +567,7 @@ func createListeners(addrs []string, opts ...Option) ([]*listener, *Options, err
 	logging.Debugf("default logging level is %s", logging.LogLevel())
 
 	// The maximum number of operating system threads that the Go program can use is initially set to 10000,
-	// which should also be the maximum amount of I/O event-loops locked to OS threads that users can start up.
+	// which should also be the maximum number of I/O event-loops locked to OS threads that users can start up.
 	if options.LockOSThread && options.NumEventLoop > 10000 {
 		logging.Errorf("too many event-loops under LockOSThread mode, should be less than 10,000 "+
 			"while you are trying to set up %d\n", options.NumEventLoop)
@@ -608,7 +623,7 @@ func createListeners(addrs []string, opts ...Option) ([]*listener, *Options, err
 	// Note that FreeBSD 12 introduced a new socket option named SO_REUSEPORT_LB
 	// with the capability of load balancing, it's the equivalent of Linux's SO_REUSEPORT.
 	// Also note that DragonFlyBSD 3.6.0 extended SO_REUSEPORT to distribute workload to
-	// available sockets, which make it the same as Linux's SO_REUSEPORT.
+	// available sockets, which makes it the same as Linux's SO_REUSEPORT.
 	goos := runtime.GOOS
 	if options.ReusePort &&
 		(options.Multicore || options.NumEventLoop > 1) &&

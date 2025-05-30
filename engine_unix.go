@@ -22,6 +22,7 @@ import (
 	"runtime"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	"golang.org/x/sync/errgroup"
 
@@ -30,6 +31,7 @@ import (
 	"github.com/panjf2000/gnet/v2/pkg/logging"
 	"github.com/panjf2000/gnet/v2/pkg/netpoll"
 	"github.com/panjf2000/gnet/v2/pkg/queue"
+	"github.com/panjf2000/gnet/v2/pkg/socket"
 )
 
 type engine struct {
@@ -287,6 +289,16 @@ func run(eventHandler EventHandler, listeners []*listener, options *Options, add
 	}
 
 	return nil
+}
+
+func setKeepAlive(fd int, enabled bool, idle, intvl time.Duration, cnt int) error {
+	if intvl == 0 {
+		intvl = idle / 5
+	}
+	if cnt == 0 {
+		cnt = 5
+	}
+	return socket.SetKeepAlive(fd, enabled, int(idle.Seconds()), int(intvl.Seconds()), cnt)
 }
 
 /*

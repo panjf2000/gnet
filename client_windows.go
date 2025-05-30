@@ -153,16 +153,21 @@ func (cli *Client) EnrollContext(nc net.Conn, ctx any) (gc Conn, err error) {
 				return
 			}
 		}
-		if cli.opts.TCPKeepAlive > 0 {
-			if err = v.SetKeepAlive(true); err != nil {
-				return
+		c := newStreamConn(cli.el, nc, ctx)
+		if opts := cli.opts; opts.TCPKeepAlive > 0 {
+			idle := opts.TCPKeepAlive
+			intvl := opts.TCPKeepInterval
+			if intvl == 0 {
+				intvl = opts.TCPKeepAlive / 5
 			}
-			if err = v.SetKeepAlivePeriod(cli.opts.TCPKeepAlive); err != nil {
+			cnt := opts.TCPKeepCount
+			if opts.TCPKeepCount == 0 {
+				cnt = 5
+			}
+			if err = c.SetKeepAlive(true, idle, intvl, cnt); err != nil {
 				return
 			}
 		}
-
-		c := newTCPConn(cli.el, nc, ctx)
 		cli.el.ch <- &openConn{c: c, cb: func() { close(connOpened) }}
 		goroutine.DefaultWorkerPool.Submit(func() {
 			var buffer [0x10000]byte
@@ -177,7 +182,7 @@ func (cli *Client) EnrollContext(nc net.Conn, ctx any) (gc Conn, err error) {
 		})
 		gc = c
 	case *net.UnixConn:
-		c := newTCPConn(cli.el, nc, ctx)
+		c := newStreamConn(cli.el, nc, ctx)
 		cli.el.ch <- &openConn{c: c, cb: func() { close(connOpened) }}
 		goroutine.DefaultWorkerPool.Submit(func() {
 			var buffer [0x10000]byte

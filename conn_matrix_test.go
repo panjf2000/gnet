@@ -67,7 +67,7 @@ func testConnMatrix(t *testing.T, n int) {
 	require.NoError(t, err)
 
 	for i := 0; i < n; i++ {
-		c := newTCPConn(i, &el, &unix.SockaddrInet4{}, &net.TCPAddr{}, &net.TCPAddr{})
+		c := newStreamConn("tcp", i, &el, &unix.SockaddrInet4{}, &net.TCPAddr{}, &net.TCPAddr{})
 		handleConns <- &handleConn{c, actionAdd}
 		if i%2 == 0 {
 			_ = goPool.DefaultWorkerPool.Submit(func() {

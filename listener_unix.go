@@ -19,12 +19,13 @@ package gnet
 import (
 	"net"
 	"os"
+	"runtime"
 	"strings"
 	"sync"
 
 	"golang.org/x/sys/unix"
 
-	"github.com/panjf2000/gnet/v2/pkg/errors"
+	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
 	"github.com/panjf2000/gnet/v2/pkg/netpoll"
 	"github.com/panjf2000/gnet/v2/pkg/socket"
@@ -61,7 +62,7 @@ func (ln *listener) normalize() (err error) {
 		_ = os.RemoveAll(ln.address)
 		ln.fd, ln.addr, err = socket.UnixSocket(ln.network, ln.address, true, ln.sockOptInts, ln.sockOptStrs)
 	default:
-		err = errors.ErrUnsupportedProtocol
+		err = errorx.ErrUnsupportedProtocol
 	}
 	return
 }
@@ -78,7 +79,7 @@ func (ln *listener) close() {
 		})
 }
 
-func initListener(network, addr string, options *Options) (l *listener, err error) {
+func initListener(network, addr string, options *Options) (ln *listener, err error) {
 	var (
 		sockOptInts []socket.Option[int]
 		sockOptStrs []socket.Option[string]
@@ -117,7 +118,23 @@ func initListener(network, addr string, options *Options) (l *listener, err erro
 		sockOpt := socket.Option[string]{SetSockOpt: socket.SetBindToDevice, Opt: options.BindToDevice}
 		sockOptStrs = append(sockOptStrs, sockOpt)
 	}
-	l = &listener{network: network, address: addr, sockOptInts: sockOptInts, sockOptStrs: sockOptStrs}
-	err = l.normalize()
+
+	ln = &listener{network: network, address: addr, sockOptInts: sockOptInts, sockOptStrs: sockOptStrs}
+	err = ln.normalize()
+
+	if options.TCPKeepAlive > 0 && ln.network == "tcp" &&
+		(runtime.GOOS == "linux" || runtime.GOOS == "freebsd" || runtime.GOOS == "dragonfly") {
+		// TCP keepalive options will be inherited from the listening socket
+		// only when running on Linux, FreeBSD, or DragonFlyBSD.
+		//
+		// Check out https://github.com/nginx/nginx/pull/337 for details.
+		err = setKeepAlive(
+			ln.fd,
+			true,
+			options.TCPKeepAlive,
+			options.TCPKeepInterval,
+			options.TCPKeepCount)
+	}
+
 	return
 }

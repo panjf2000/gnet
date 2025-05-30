@@ -678,12 +678,12 @@ func (s *testServer) OnTraffic(c Conn) (action Action) {
 
 	// Only for code coverage of testing.
 	if !s.multicore {
-		assert.NoErrorf(s.tester, c.Flush(), "flush error")
+		assert.NoError(s.tester, c.Flush(), "flush error")
 		_ = c.Fd()
 		fd, err := c.Dup()
-		assert.NoErrorf(s.tester, err, "dup error")
+		assert.NoError(s.tester, err, "dup error")
 		assert.Greaterf(s.tester, fd, 2, "expected fd: > 2, but got: %d", fd)
-		assert.NoErrorf(s.tester, SysClose(fd), "close error")
+		assert.NoError(s.tester, SysClose(fd), "close error")
 		// TODO(panjf2000): somehow these two system calls will fail with Unix Domain Socket,
 		//  returning "invalid argument" error on macOS in Github actions intermittently,
 		//  try to figure it out.
@@ -691,13 +691,22 @@ func (s *testServer) OnTraffic(c Conn) (action Action) {
 			_ = c.SetReadBuffer(streamLen)
 			_ = c.SetWriteBuffer(streamLen)
 		} else {
-			assert.NoErrorf(s.tester, c.SetReadBuffer(streamLen), "set read buffer error")
-			assert.NoErrorf(s.tester, c.SetWriteBuffer(streamLen), "set write buffer error")
+			assert.NoError(s.tester, c.SetReadBuffer(streamLen), "set read buffer error")
+			assert.NoError(s.tester, c.SetWriteBuffer(streamLen), "set write buffer error")
 		}
 		if c.LocalAddr().Network() == "tcp" {
-			assert.NoErrorf(s.tester, c.SetLinger(1), "set linger error")
-			assert.NoErrorf(s.tester, c.SetNoDelay(false), "set no delay error")
-			assert.NoErrorf(s.tester, c.SetKeepAlivePeriod(time.Minute), "set keep alive period error")
+			assert.NoError(s.tester, c.SetLinger(1), "set linger error")
+			assert.NoError(s.tester, c.SetNoDelay(false), "set no delay error")
+			assert.NoError(s.tester, c.SetKeepAlivePeriod(time.Minute), "set keepalive period error")
+			assert.EqualError(s.tester, c.SetKeepAlive(true, 0, 0, 0),
+				"invalid time duration", "set keepalive error")
+			assert.NoError(s.tester, c.SetKeepAlive(false, 0, 0, 0), "set keepalive error")
+			assert.NoError(s.tester, c.SetKeepAlive(true, time.Minute*10, time.Minute, 10), "set keepalive error")
+		} else {
+			assert.ErrorIs(s.tester, c.SetKeepAlivePeriod(time.Minute), errorx.ErrUnsupportedOp,
+				"non-TCP connection should not support keepalive")
+			assert.ErrorIs(s.tester, c.SetKeepAlive(true, 0, 0, 0), errorx.ErrUnsupportedOp,
+				"non-TCP connection should not support keepalive")
 		}
 
 		assert.Zero(s.tester, c.InboundBuffered(), "inbound buffer error")
@@ -781,6 +790,8 @@ func runServer(t *testing.T, addrs []string, conf *testConf) {
 			WithReusePort(conf.reuseport),
 			WithTicker(true),
 			WithTCPKeepAlive(time.Minute),
+			WithTCPKeepInterval(time.Second*10),
+			WithTCPKeepCount(10),
 			WithTCPNoDelay(TCPNoDelay),
 			WithLoadBalancing(conf.lb))
 	} else {
@@ -793,6 +804,8 @@ func runServer(t *testing.T, addrs []string, conf *testConf) {
 			WithReusePort(conf.reuseport),
 			WithTicker(true),
 			WithTCPKeepAlive(time.Minute),
+			WithTCPKeepInterval(time.Second*10),
+			WithTCPKeepCount(10),
 			WithTCPNoDelay(TCPDelay),
 			WithLoadBalancing(conf.lb))
 	}
@@ -1926,7 +1939,10 @@ func runSimServer(t *testing.T, addr string, et bool, nclients, packetSize, batc
 		WithEdgeTriggeredIO(et),
 		WithMulticore(ts.multicore),
 		WithTicker(true),
-		WithTCPKeepAlive(time.Minute*1))
+		WithTCPKeepAlive(time.Minute),
+		WithTCPKeepInterval(time.Second*10),
+		WithTCPKeepCount(10),
+	)
 	assert.NoError(t, err)
 }
 

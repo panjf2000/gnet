@@ -100,7 +100,7 @@ func (el *eventloop) enroll(c net.Conn, addr net.Addr, ctx any) (resCh chan Regi
 		var gc *conn
 		switch addr.Network() {
 		case "tcp", "tcp4", "tcp6", "unix":
-			gc = newTCPConn(el, c, ctx)
+			gc = newStreamConn(el, c, ctx)
 			el.ch <- &openConn{c: gc, cb: func() { close(connOpened) }}
 			goroutine.DefaultWorkerPool.Submit(func() {
 				var buffer [0x10000]byte
