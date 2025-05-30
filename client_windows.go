@@ -154,12 +154,17 @@ func (cli *Client) EnrollContext(nc net.Conn, ctx any) (gc Conn, err error) {
 			}
 		}
 		c := newStreamConn(cli.el, nc, ctx)
-		if cli.opts.TCPKeepAlive > 0 {
-			if err = c.SetKeepAlive(
-				true,
-				cli.opts.TCPKeepAlive,
-				cli.opts.TCPKeepInterval,
-				cli.opts.TCPKeepCount); err != nil {
+		if opts := cli.opts; opts.TCPKeepAlive > 0 {
+			idle := opts.TCPKeepAlive
+			intvl := opts.TCPKeepInterval
+			if intvl == 0 {
+				intvl = opts.TCPKeepAlive / 5
+			}
+			cnt := opts.TCPKeepCount
+			if opts.TCPKeepCount == 0 {
+				cnt = 5
+			}
+			if err = c.SetKeepAlive(true, idle, intvl, cnt); err != nil {
 				return
 			}
 		}

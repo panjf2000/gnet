@@ -126,6 +126,8 @@ func initListener(network, addr string, options *Options) (ln *listener, err err
 		(runtime.GOOS == "linux" || runtime.GOOS == "freebsd" || runtime.GOOS == "dragonfly") {
 		// TCP keepalive options will be inherited from the listening socket
 		// only when running on Linux, FreeBSD, or DragonFlyBSD.
+		//
+		// Check out https://github.com/nginx/nginx/pull/337 for details.
 		err = setKeepAlive(
 			ln.fd,
 			true,

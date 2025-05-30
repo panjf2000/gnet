@@ -407,8 +407,12 @@ func (c *conn) SetKeepAlivePeriod(d time.Duration) error {
 }
 
 func (c *conn) SetKeepAlive(enabled bool, idle, intvl time.Duration, cnt int) error {
-	if c.rawConn == nil {
+	if c.rawConn == nil && c.pc == nil {
 		return net.ErrClosed
+	}
+
+	if c.pc != nil {
+		return errorx.ErrUnsupportedOp
 	}
 
 	tc, ok := c.rawConn.(*net.TCPConn)
