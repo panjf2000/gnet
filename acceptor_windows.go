@@ -44,7 +44,7 @@ func (eng *engine) listenStream(ln net.Listener) (err error) {
 			return
 		}
 		el := eng.eventLoops.next(tc.RemoteAddr())
-		c := newTCPConn(el, tc, nil)
+		c := newStreamConn(el, tc, nil)
 		el.ch <- &openConn{c: c}
 		goroutine.DefaultWorkerPool.Submit(func() {
 			var buffer [0x10000]byte

@@ -38,7 +38,7 @@ import (
 // Client of gnet.
 type Client struct {
 	opts *Options
-	el   *eventloop
+	eng  *engine
 }
 
 // NewClient creates an instance of Client.
@@ -59,11 +59,6 @@ func NewClient(eh EventHandler, opts ...Option) (cli *Client, err error) {
 	}
 	logging.SetDefaultLoggerAndFlusher(logger, logFlusher)
 
-	var p *netpoll.Poller
-	if p, err = netpoll.OpenPoller(); err != nil {
-		return
-	}
-
 	rootCtx, shutdown := context.WithCancel(context.Background())
 	eg, ctx := errgroup.WithContext(rootCtx)
 	eng := engine{
@@ -71,15 +66,11 @@ func NewClient(eh EventHandler, opts ...Option) (cli *Client, err error) {
 		opts:         options,
 		turnOff:      shutdown,
 		eventHandler: eh,
+		eventLoops:   new(leastConnectionsLoadBalancer),
 		concurrency: struct {
 			*errgroup.Group
 			ctx context.Context
 		}{eg, ctx},
-	}
-	el := eventloop{
-		listeners: eng.listeners,
-		engine:    &eng,
-		poller:    p,
 	}
 
 	if options.EdgeTriggeredIOChunk > 0 {
@@ -107,39 +98,82 @@ func NewClient(eh EventHandler, opts ...Option) (cli *Client, err error) {
 	default:
 		options.WriteBufferCap = math.CeilToPowerOfTwo(wbc)
 	}
-
-	el.buffer = make([]byte, options.ReadBufferCap)
-	el.connections.init()
-	el.eventHandler = eh
-	cli.el = &el
+	cli.eng = &eng
 	return
 }
 
 // Start starts the client event-loop, handing IO events.
 func (cli *Client) Start() error {
-	logging.Infof("Starting gnet client with 1 event-loop")
-	cli.el.eventHandler.OnBoot(Engine{cli.el.engine})
-	cli.el.engine.concurrency.Go(cli.el.run)
+	numEventLoop := determineEventLoops(cli.opts)
+	logging.Infof("Starting gnet client with %d event loops", numEventLoop)
+
+	cli.eng.eventHandler.OnBoot(Engine{cli.eng})
+
+	var el0 *eventloop
+	for i := 0; i < numEventLoop; i++ {
+		p, err := netpoll.OpenPoller()
+		if err != nil {
+			cli.eng.closeEventLoops()
+			return err
+		}
+		el := eventloop{
+			listeners:    cli.eng.listeners,
+			engine:       cli.eng,
+			poller:       p,
+			buffer:       make([]byte, cli.opts.ReadBufferCap),
+			eventHandler: cli.eng.eventHandler,
+		}
+		el.connections.init()
+		cli.eng.eventLoops.register(&el)
+		if cli.opts.Ticker && el.idx == 0 {
+			el0 = &el
+		}
+	}
+
+	cli.eng.eventLoops.iterate(func(_ int, el *eventloop) bool {
+		cli.eng.concurrency.Go(el.run)
+		return true
+	})
+
 	// Start the ticker.
-	if cli.opts.Ticker {
-		ctx := cli.el.engine.concurrency.ctx
-		cli.el.engine.concurrency.Go(func() error {
-			cli.el.ticker(ctx)
+	if el0 != nil {
+		ctx := cli.eng.concurrency.ctx
+		cli.eng.concurrency.Go(func() error {
+			el0.ticker(ctx)
 			return nil
 		})
 	}
+
 	logging.Debugf("default logging level is %s", logging.LogLevel())
+
 	return nil
 }
 
 // Stop stops the client event-loop.
-func (cli *Client) Stop() (err error) {
-	logging.Error(cli.el.poller.Trigger(queue.HighPriority, func(_ any) error { return errorx.ErrEngineShutdown }, nil))
-	err = cli.el.engine.concurrency.Wait()
-	logging.Error(cli.el.poller.Close())
-	cli.el.eventHandler.OnShutdown(Engine{cli.el.engine})
+func (cli *Client) Stop() error {
+	cli.eng.shutdown(nil)
+
+	cli.eng.eventHandler.OnShutdown(Engine{cli.eng})
+
+	// Notify all event-loops to exit.
+	cli.eng.eventLoops.iterate(func(_ int, el *eventloop) bool {
+		logging.Error(el.poller.Trigger(queue.HighPriority,
+			func(_ any) error { return errorx.ErrEngineShutdown }, nil))
+		return true
+	})
+
+	// Wait for all event-loops to exit.
+	err := cli.eng.concurrency.Wait()
+
+	cli.eng.closeEventLoops()
+
+	// Put the engine into the shutdown state.
+	cli.eng.inShutdown.Store(true)
+
+	// Flush the logger.
 	logging.Cleanup()
-	return
+
+	return err
 }
 
 // Dial is like net.Dial().
@@ -156,7 +190,7 @@ func (cli *Client) DialContext(network, address string, ctx any) (Conn, error) {
 	return cli.EnrollContext(c, ctx)
 }
 
-// Enroll converts a net.Conn to gnet.Conn and then adds it into Client.
+// Enroll converts a net.Conn to gnet.Conn and then adds it into the Client.
 func (cli *Client) Enroll(c net.Conn) (Conn, error) {
 	return cli.EnrollContext(c, nil)
 }
@@ -196,6 +230,7 @@ func (cli *Client) EnrollContext(c net.Conn, ctx any) (Conn, error) {
 		}
 	}
 
+	el := cli.eng.eventLoops.next(nil)
 	var (
 		sockAddr unix.Sockaddr
 		gc       *conn
@@ -208,7 +243,7 @@ func (cli *Client) EnrollContext(c net.Conn, ctx any) (Conn, error) {
 		}
 		ua := c.LocalAddr().(*net.UnixAddr)
 		ua.Name = c.RemoteAddr().String() + "." + strconv.Itoa(dupFD)
-		gc = newTCPConn(dupFD, cli.el, sockAddr, c.LocalAddr(), c.RemoteAddr())
+		gc = newStreamConn("unix", dupFD, el, sockAddr, c.LocalAddr(), c.RemoteAddr())
 	case *net.TCPConn:
 		if cli.opts.TCPNoDelay == TCPNoDelay {
 			if err = socket.SetNoDelay(dupFD, 1); err != nil {
@@ -216,7 +251,12 @@ func (cli *Client) EnrollContext(c net.Conn, ctx any) (Conn, error) {
 			}
 		}
 		if cli.opts.TCPKeepAlive > 0 {
-			if err = socket.SetKeepAlivePeriod(dupFD, int(cli.opts.TCPKeepAlive.Seconds())); err != nil {
+			if err = setKeepAlive(
+				dupFD,
+				true,
+				cli.opts.TCPKeepAlive,
+				cli.opts.TCPKeepInterval,
+				cli.opts.TCPKeepCount); err != nil {
 				return nil, err
 			}
 		}
@@ -224,13 +264,13 @@ func (cli *Client) EnrollContext(c net.Conn, ctx any) (Conn, error) {
 		if err != nil {
 			return nil, err
 		}
-		gc = newTCPConn(dupFD, cli.el, sockAddr, c.LocalAddr(), c.RemoteAddr())
+		gc = newStreamConn("tcp", dupFD, el, sockAddr, c.LocalAddr(), c.RemoteAddr())
 	case *net.UDPConn:
 		sockAddr, _, _, _, err = socket.GetUDPSockAddr(c.RemoteAddr().Network(), c.RemoteAddr().String())
 		if err != nil {
 			return nil, err
 		}
-		gc = newUDPConn(dupFD, cli.el, c.LocalAddr(), sockAddr, true)
+		gc = newUDPConn(dupFD, el, c.LocalAddr(), sockAddr, true)
 	default:
 		return nil, errorx.ErrUnsupportedProtocol
 	}
@@ -240,12 +280,12 @@ func (cli *Client) EnrollContext(c net.Conn, ctx any) (Conn, error) {
 	ccb := &connWithCallback{c: gc, cb: func() {
 		close(connOpened)
 	}}
-	err = cli.el.poller.Trigger(queue.HighPriority, cli.el.register, ccb)
+	err = el.poller.Trigger(queue.HighPriority, el.register, ccb)
 	if err != nil {
 		gc.Close() //nolint:errcheck
 		return nil, err
 	}
-
 	<-connOpened
+
 	return gc, nil
 }

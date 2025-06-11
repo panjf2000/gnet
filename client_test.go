@@ -31,9 +31,8 @@ type connHandler struct {
 
 type clientEvents struct {
 	*BuiltinEventEngine
-	tester    *testing.T
-	svr       *testClient
-	packetLen int
+	tester *testing.T
+	svr    *testClient
 }
 
 func (ev *clientEvents) OnBoot(e Engine) Action {
@@ -67,13 +66,14 @@ func (ev *clientEvents) OnClose(Conn, error) Action {
 
 func (ev *clientEvents) OnTraffic(c Conn) (action Action) {
 	handler := c.Context().(*connHandler)
+	packetLen := streamLen
 	if handler.network == "udp" {
-		ev.packetLen = datagramLen
+		packetLen = datagramLen
 	}
 	buf, err := c.Next(-1)
 	assert.NoError(ev.tester, err)
 	handler.data = append(handler.data, buf...)
-	if len(handler.data) < ev.packetLen {
+	if len(handler.data) < packetLen {
 		return
 	}
 	handler.rspCh <- handler.data
@@ -501,9 +501,10 @@ func runClient(t *testing.T, network, addr string, conf *testConf) {
 		nclients:  conf.clients,
 	}
 	var err error
-	clientEV := &clientEvents{tester: t, packetLen: streamLen, svr: ts}
+	clientEV := &clientEvents{tester: t, svr: ts}
 	ts.client, err = NewClient(
 		clientEV,
+		WithMulticore(conf.multicore),
 		WithEdgeTriggeredIO(conf.et),
 		WithEdgeTriggeredIOChunk(conf.etChunk),
 		WithTCPNoDelay(TCPNoDelay),
@@ -524,7 +525,9 @@ func runClient(t *testing.T, network, addr string, conf *testConf) {
 		WithMulticore(conf.multicore),
 		WithReusePort(conf.reuseport),
 		WithTicker(true),
-		WithTCPKeepAlive(time.Minute*1),
+		WithTCPKeepAlive(time.Minute),
+		WithTCPKeepInterval(time.Second*10),
+		WithTCPKeepCount(10),
 		WithLoadBalancing(conf.lb))
 	assert.NoError(t, err)
 }

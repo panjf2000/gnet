@@ -18,6 +18,7 @@ import (
 	"errors"
 	"io"
 	"net"
+	"os"
 	"syscall"
 	"time"
 
@@ -82,7 +83,7 @@ func packUDPConn(c *conn, buf []byte) *udpConn {
 	return &udpConn{c}
 }
 
-func newTCPConn(el *eventloop, nc net.Conn, ctx any) (c *conn) {
+func newStreamConn(el *eventloop, nc net.Conn, ctx any) (c *conn) {
 	return &conn{
 		ctx:        ctx,
 		loop:       el,
@@ -402,20 +403,53 @@ func (c *conn) SetNoDelay(noDelay bool) error {
 }
 
 func (c *conn) SetKeepAlivePeriod(d time.Duration) error {
-	if c.rawConn == nil {
+	return c.SetKeepAlive(d > 0, d, d/5, 5)
+}
+
+func (c *conn) SetKeepAlive(enabled bool, idle, intvl time.Duration, cnt int) error {
+	if c.rawConn == nil && c.pc == nil {
 		return net.ErrClosed
 	}
 
-	tc, ok := c.rawConn.(*net.TCPConn)
-	if !ok || d < 0 {
+	if c.pc != nil {
 		return errorx.ErrUnsupportedOp
 	}
-	if err := tc.SetKeepAlive(true); err != nil {
+
+	tc, ok := c.rawConn.(*net.TCPConn)
+	if !ok {
+		return errorx.ErrUnsupportedOp
+	}
+
+	if enabled && (idle <= 0 || intvl <= 0 || cnt <= 0) {
+		return errors.New("invalid time duration")
+	}
+
+	if err := tc.SetKeepAlive(enabled); err != nil {
 		return err
 	}
-	if err := tc.SetKeepAlivePeriod(d); err != nil {
-		_ = tc.SetKeepAlive(false)
+
+	if !enabled {
+		return nil
+	}
+
+	if err := tc.SetKeepAlivePeriod(idle); err != nil {
 		return err
+	}
+
+	if err := windows.SetsockoptInt(
+		windows.Handle(c.Fd()),
+		windows.IPPROTO_TCP,
+		windows.TCP_KEEPINTVL,
+		int(intvl.Seconds())); err != nil {
+		return os.NewSyscallError("setsockopt", err)
+	}
+
+	if err := windows.SetsockoptInt(
+		windows.Handle(c.Fd()),
+		windows.IPPROTO_TCP,
+		windows.TCP_KEEPCNT,
+		cnt); err != nil {
+		return os.NewSyscallError("setsockopt", err)
 	}
 
 	return nil

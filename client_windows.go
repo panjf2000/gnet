@@ -30,7 +30,7 @@ import (
 
 type Client struct {
 	opts *Options
-	el   *eventloop
+	eng  *engine
 }
 
 func NewClient(eh EventHandler, opts ...Option) (cli *Client, err error) {
@@ -51,45 +51,73 @@ func NewClient(eh EventHandler, opts ...Option) (cli *Client, err error) {
 
 	rootCtx, shutdown := context.WithCancel(context.Background())
 	eg, ctx := errgroup.WithContext(rootCtx)
-	eng := &engine{
+	eng := engine{
 		listeners:    []*listener{},
 		opts:         options,
 		turnOff:      shutdown,
 		eventHandler: eh,
+		eventLoops:   new(leastConnectionsLoadBalancer),
 		concurrency: struct {
 			*errgroup.Group
 			ctx context.Context
 		}{eg, ctx},
 	}
-	cli.el = &eventloop{
-		ch:           make(chan any, 1024),
-		eng:          eng,
-		connections:  make(map[*conn]struct{}),
-		eventHandler: eh,
-	}
+	cli.eng = &eng
 	return
 }
 
 func (cli *Client) Start() error {
-	cli.el.eventHandler.OnBoot(Engine{cli.el.eng})
-	cli.el.eng.concurrency.Go(cli.el.run)
-	if cli.opts.Ticker {
-		ctx := cli.el.eng.concurrency.ctx
-		cli.el.eng.concurrency.Go(func() error {
-			cli.el.ticker(ctx)
+	numEventLoop := determineEventLoops(cli.opts)
+	logging.Infof("Starting gnet client with %d event loops", numEventLoop)
+
+	cli.eng.eventHandler.OnBoot(Engine{cli.eng})
+
+	var el0 *eventloop
+	for i := 0; i < numEventLoop; i++ {
+		el := eventloop{
+			ch:           make(chan any, 1024),
+			eng:          cli.eng,
+			connections:  make(map[*conn]struct{}),
+			eventHandler: cli.eng.eventHandler,
+		}
+		cli.eng.eventLoops.register(&el)
+		cli.eng.concurrency.Go(el.run)
+		if cli.opts.Ticker && el.idx == 0 {
+			el0 = &el
+		}
+	}
+
+	if el0 != nil {
+		ctx := cli.eng.concurrency.ctx
+		cli.eng.concurrency.Go(func() error {
+			el0.ticker(ctx)
 			return nil
 		})
 	}
+
 	logging.Debugf("default logging level is %s", logging.LogLevel())
+
 	return nil
 }
 
-func (cli *Client) Stop() (err error) {
-	cli.el.ch <- errorx.ErrEngineShutdown
-	err = cli.el.eng.concurrency.Wait()
-	cli.el.eventHandler.OnShutdown(Engine{cli.el.eng})
+func (cli *Client) Stop() error {
+	cli.eng.shutdown(nil)
+
+	cli.eng.eventHandler.OnShutdown(Engine{cli.eng})
+
+	// Notify all event-loops to exit.
+	cli.eng.closeEventLoops()
+
+	// Wait for all event-loops to exit.
+	err := cli.eng.concurrency.Wait()
+
+	// Put the engine into the shutdown state.
+	cli.eng.inShutdown.Store(true)
+
+	// Flush the logger.
 	logging.Cleanup()
-	return
+
+	return err
 }
 
 var (
@@ -145,6 +173,7 @@ func (cli *Client) Enroll(nc net.Conn) (gc Conn, err error) {
 }
 
 func (cli *Client) EnrollContext(nc net.Conn, ctx any) (gc Conn, err error) {
+	el := cli.eng.eventLoops.next(nil)
 	connOpened := make(chan struct{})
 	switch v := nc.(type) {
 	case *net.TCPConn:
@@ -153,38 +182,43 @@ func (cli *Client) EnrollContext(nc net.Conn, ctx any) (gc Conn, err error) {
 				return
 			}
 		}
-		if cli.opts.TCPKeepAlive > 0 {
-			if err = v.SetKeepAlive(true); err != nil {
-				return
+		c := newStreamConn(el, nc, ctx)
+		if opts := cli.opts; opts.TCPKeepAlive > 0 {
+			idle := opts.TCPKeepAlive
+			intvl := opts.TCPKeepInterval
+			if intvl == 0 {
+				intvl = opts.TCPKeepAlive / 5
 			}
-			if err = v.SetKeepAlivePeriod(cli.opts.TCPKeepAlive); err != nil {
+			cnt := opts.TCPKeepCount
+			if opts.TCPKeepCount == 0 {
+				cnt = 5
+			}
+			if err = c.SetKeepAlive(true, idle, intvl, cnt); err != nil {
 				return
 			}
 		}
-
-		c := newTCPConn(cli.el, nc, ctx)
-		cli.el.ch <- &openConn{c: c, cb: func() { close(connOpened) }}
+		el.ch <- &openConn{c: c, cb: func() { close(connOpened) }}
 		goroutine.DefaultWorkerPool.Submit(func() {
 			var buffer [0x10000]byte
 			for {
 				n, err := nc.Read(buffer[:])
 				if err != nil {
-					cli.el.ch <- &netErr{c, err}
+					el.ch <- &netErr{c, err}
 					return
 				}
-				cli.el.ch <- packTCPConn(c, buffer[:n])
+				el.ch <- packTCPConn(c, buffer[:n])
 			}
 		})
 		gc = c
 	case *net.UnixConn:
-		c := newTCPConn(cli.el, nc, ctx)
-		cli.el.ch <- &openConn{c: c, cb: func() { close(connOpened) }}
+		c := newStreamConn(el, nc, ctx)
+		el.ch <- &openConn{c: c, cb: func() { close(connOpened) }}
 		goroutine.DefaultWorkerPool.Submit(func() {
 			var buffer [0x10000]byte
 			for {
 				n, err := nc.Read(buffer[:])
 				if err != nil {
-					cli.el.ch <- &netErr{c, err}
+					el.ch <- &netErr{c, err}
 					mu.RLock()
 					tmpDir := unixAddrDirs[nc.LocalAddr().String()]
 					mu.RUnlock()
@@ -193,30 +227,30 @@ func (cli *Client) EnrollContext(nc net.Conn, ctx any) (gc Conn, err error) {
 					}
 					return
 				}
-				cli.el.ch <- packTCPConn(c, buffer[:n])
+				el.ch <- packTCPConn(c, buffer[:n])
 			}
 		})
 		gc = c
 	case *net.UDPConn:
-		c := newUDPConn(cli.el, nil, nc, nc.LocalAddr(), nc.RemoteAddr(), ctx)
-		cli.el.ch <- &openConn{c: c, cb: func() { close(connOpened) }}
+		c := newUDPConn(el, nil, nc, nc.LocalAddr(), nc.RemoteAddr(), ctx)
+		el.ch <- &openConn{c: c, cb: func() { close(connOpened) }}
 		goroutine.DefaultWorkerPool.Submit(func() {
 			var buffer [0x10000]byte
 			for {
 				n, err := nc.Read(buffer[:])
 				if err != nil {
-					cli.el.ch <- &netErr{c, err}
+					el.ch <- &netErr{c, err}
 					return
 				}
-				c := newUDPConn(cli.el, nil, nc, nc.LocalAddr(), nc.RemoteAddr(), ctx)
-				cli.el.ch <- packUDPConn(c, buffer[:n])
+				c := newUDPConn(el, nil, nc, nc.LocalAddr(), nc.RemoteAddr(), ctx)
+				el.ch <- packUDPConn(c, buffer[:n])
 			}
 		})
 		gc = c
 	default:
 		return nil, errorx.ErrUnsupportedProtocol
 	}
-
 	<-connOpened
+
 	return
 }

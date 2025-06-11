@@ -19,17 +19,17 @@ package gnet
 import (
 	"context"
 	"errors"
-	"runtime"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/panjf2000/gnet/v2/internal/gfd"
 	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
 	"github.com/panjf2000/gnet/v2/pkg/netpoll"
 	"github.com/panjf2000/gnet/v2/pkg/queue"
+	"github.com/panjf2000/gnet/v2/pkg/socket"
 )
 
 type engine struct {
@@ -56,7 +56,7 @@ func (eng *engine) shutdown(err error) {
 	if err != nil && !errors.Is(err, errorx.ErrEngineShutdown) {
 		eng.opts.Logger.Errorf("engine is being shutdown with error: %v", err)
 	}
-
+	// Cancel the context to stop the engine.
 	eng.turnOff()
 }
 
@@ -118,7 +118,7 @@ func (eng *engine) runEventLoops(ctx context.Context, numEventLoop int) error {
 		}
 	}
 
-	// Start event-loops in background.
+	// Start event-loops in the background.
 	eng.eventLoops.iterate(func(_ int, el *eventloop) bool {
 		eng.concurrency.Go(el.run)
 		return true
@@ -150,7 +150,7 @@ func (eng *engine) activateReactors(ctx context.Context, numEventLoop int) error
 		eng.eventLoops.register(el)
 	}
 
-	// Start sub reactors in background.
+	// Start sub reactors in the background.
 	eng.eventLoops.iterate(func(_ int, el *eventloop) bool {
 		eng.concurrency.Go(el.orbit)
 		return true
@@ -173,7 +173,7 @@ func (eng *engine) activateReactors(ctx context.Context, numEventLoop int) error
 	}
 	eng.ingress = el
 
-	// Start main reactor in background.
+	// Start the main reactor in the background.
 	eng.concurrency.Go(el.rotate)
 
 	// Start the ticker.
@@ -228,18 +228,7 @@ func (eng *engine) stop(ctx context.Context, s Engine) {
 }
 
 func run(eventHandler EventHandler, listeners []*listener, options *Options, addrs []string) error {
-	// Figure out the proper number of event-loop to run.
-	numEventLoop := 1
-	if options.Multicore {
-		numEventLoop = runtime.NumCPU()
-	}
-	if options.NumEventLoop > 0 {
-		numEventLoop = options.NumEventLoop
-	}
-	if numEventLoop > gfd.EventLoopIndexMax {
-		numEventLoop = gfd.EventLoopIndexMax
-	}
-
+	numEventLoop := determineEventLoops(options)
 	logging.Infof("Launching gnet with %d event-loops, listening on: %s",
 		numEventLoop, strings.Join(addrs, " | "))
 
@@ -287,6 +276,16 @@ func run(eventHandler EventHandler, listeners []*listener, options *Options, add
 	}
 
 	return nil
+}
+
+func setKeepAlive(fd int, enabled bool, idle, intvl time.Duration, cnt int) error {
+	if intvl == 0 {
+		intvl = idle / 5
+	}
+	if cnt == 0 {
+		cnt = 5
+	}
+	return socket.SetKeepAlive(fd, enabled, int(idle.Seconds()), int(intvl.Seconds()), cnt)
 }
 
 /*

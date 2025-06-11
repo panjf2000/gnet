@@ -42,10 +42,30 @@ const (
 
 // Options are configurations for the gnet application.
 type Options struct {
-	// ================================== Options for only server-side ==================================
+	// LB represents the load-balancing algorithm used when assigning new connections
+	// to event loops. This option is server-only, and it is not applicable to the client.
+	LB LoadBalancing
+
+	// ReuseAddr indicates whether to set the SO_REUSEADDR socket option.
+	// This option is server-only.
+	ReuseAddr bool
+
+	// ReusePort indicates whether to set the SO_REUSEPORT socket option.
+	// This option is server-only.
+	ReusePort bool
+
+	// MulticastInterfaceIndex is the index of the interface name where the multicast UDP addresses will be bound to.
+	// This option is server-only.
+	MulticastInterfaceIndex int
+
+	// BindToDevice is the name of the interface to which the listening socket will be bound.
+	// It is only available on Linux at the moment, an error will therefore be returned when
+	// setting this option on non-linux platforms.
+	// This option is server-only.
+	BindToDevice string
 
 	// Multicore indicates whether the engine will be effectively created with multi-cores, if so,
-	// then you must take care with synchronizing memory between all event callbacks, otherwise,
+	// then you must take care with synchronizing memory between all event callbacks; otherwise,
 	// it will run the engine with single thread. The number of threads in the engine will be
 	// automatically assigned to the number of usable logical CPUs that can be leveraged by the
 	// current process.
@@ -54,27 +74,6 @@ type Options struct {
 	// NumEventLoop is set up to start the given number of event-loop goroutines.
 	// Note that a non-negative NumEventLoop will override Multicore.
 	NumEventLoop int
-
-	// LB represents the load-balancing algorithm used when assigning new connections
-	// to event loops.
-	LB LoadBalancing
-
-	// ReuseAddr indicates whether to set the SO_REUSEADDR socket option.
-	ReuseAddr bool
-
-	// ReusePort indicates whether to set the SO_REUSEPORT socket option.
-	ReusePort bool
-
-	// MulticastInterfaceIndex is the index of the interface name where the multicast UDP addresses will be bound to.
-	MulticastInterfaceIndex int
-
-	// BindToDevice is the name of the interface to which the listening socket will be bound.
-	//
-	// It is only available on Linux at the moment, an error will therefore be returned when
-	// setting this option on non-linux platforms.
-	BindToDevice string
-
-	// ============================= Options for both server-side and client-side =============================
 
 	// ReadBufferCap is the maximum number of bytes that can be read from the remote when the readable event comes.
 	// The default value is 64KB, it can either be reduced to avoid starving the subsequent connections or increased
@@ -102,8 +101,18 @@ type Options struct {
 	Ticker bool
 
 	// TCPKeepAlive enables the TCP keep-alive mechanism (SO_KEEPALIVE) and set its value
-	// on TCP_KEEPIDLE, 1/5 of its value on TCP_KEEPINTVL, and 5 on TCP_KEEPCNT.
+	// on TCP_KEEPIDLE.
+	// When TCPKeepInterval is not set, 1/5 of TCPKeepAlive will be set on TCP_KEEPINTVL,
+	// and 5 will be set on TCP_KEEPCNT if TCPKeepCount is not assigned to a positive value.
 	TCPKeepAlive time.Duration
+
+	// TCPKeepInterval is the value for TCP_KEEPINTVL, it's the interval between
+	// TCP keep-alive probes.
+	TCPKeepInterval time.Duration
+
+	// TCPKeepCount is the number of keep-alive probes that will be sent before
+	// the connection is considered dead and dropped.
+	TCPKeepCount int
 
 	// TCPNoDelay controls whether the operating system should delay
 	// packet transmission in hopes of sending fewer packets (Nagle's algorithm).
@@ -217,6 +226,21 @@ func WithReuseAddr(reuseAddr bool) Option {
 func WithTCPKeepAlive(tcpKeepAlive time.Duration) Option {
 	return func(opts *Options) {
 		opts.TCPKeepAlive = tcpKeepAlive
+	}
+}
+
+// WithTCPKeepInterval sets the interval between TCP keep-alive probes.
+func WithTCPKeepInterval(tcpKeepInterval time.Duration) Option {
+	return func(opts *Options) {
+		opts.TCPKeepInterval = tcpKeepInterval
+	}
+}
+
+// WithTCPKeepCount sets the number of keep-alive probes that will be sent before
+// the connection is considered dead and dropped.
+func WithTCPKeepCount(tcpKeepCount int) Option {
+	return func(opts *Options) {
+		opts.TCPKeepCount = tcpKeepCount
 	}
 }
 
