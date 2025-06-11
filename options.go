@@ -44,17 +44,6 @@ const (
 type Options struct {
 	// ================================== Options for only server-side ==================================
 
-	// Multicore indicates whether the engine will be effectively created with multi-cores, if so,
-	// then you must take care with synchronizing memory between all event callbacks, otherwise,
-	// it will run the engine with single thread. The number of threads in the engine will be
-	// automatically assigned to the number of usable logical CPUs that can be leveraged by the
-	// current process.
-	Multicore bool
-
-	// NumEventLoop is set up to start the given number of event-loop goroutines.
-	// Note that a non-negative NumEventLoop will override Multicore.
-	NumEventLoop int
-
 	// LB represents the load-balancing algorithm used when assigning new connections
 	// to event loops.
 	LB LoadBalancing
@@ -75,6 +64,17 @@ type Options struct {
 	BindToDevice string
 
 	// ============================= Options for both server-side and client-side =============================
+
+	// Multicore indicates whether the engine will be effectively created with multi-cores, if so,
+	// then you must take care with synchronizing memory between all event callbacks, otherwise,
+	// it will run the engine with single thread. The number of threads in the engine will be
+	// automatically assigned to the number of usable logical CPUs that can be leveraged by the
+	// current process.
+	Multicore bool
+
+	// NumEventLoop is set up to start the given number of event-loop goroutines.
+	// Note that a non-negative NumEventLoop will override Multicore.
+	NumEventLoop int
 
 	// ReadBufferCap is the maximum number of bytes that can be read from the remote when the readable event comes.
 	// The default value is 64KB, it can either be reduced to avoid starving the subsequent connections or increased

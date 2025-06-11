@@ -27,6 +27,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/panjf2000/gnet/v2/internal/gfd"
 	"github.com/panjf2000/gnet/v2/pkg/buffer/ring"
 	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
 	"github.com/panjf2000/gnet/v2/pkg/logging"
@@ -768,4 +769,18 @@ func parseProtoAddr(protoAddr string) (string, string, error) {
 		return "", "", errorx.ErrInvalidNetworkAddress
 	}
 	return proto, addr, nil
+}
+
+func determineEventLoops(opts *Options) int {
+	numEventLoop := 1
+	if opts.Multicore {
+		numEventLoop = runtime.NumCPU()
+	}
+	if opts.NumEventLoop > 0 {
+		numEventLoop = opts.NumEventLoop
+	}
+	if numEventLoop > gfd.EventLoopIndexMax {
+		numEventLoop = gfd.EventLoopIndexMax
+	}
+	return numEventLoop
 }

@@ -17,7 +17,6 @@ package gnet
 import (
 	"context"
 	"errors"
-	"runtime"
 	"strings"
 	"sync/atomic"
 
@@ -120,15 +119,7 @@ func (eng *engine) stop(ctx context.Context, engine Engine) {
 }
 
 func run(eventHandler EventHandler, listeners []*listener, options *Options, addrs []string) error {
-	// Figure out the proper number of event-loops/goroutines to run.
-	numEventLoop := 1
-	if options.Multicore {
-		numEventLoop = runtime.NumCPU()
-	}
-	if options.NumEventLoop > 0 {
-		numEventLoop = options.NumEventLoop
-	}
-
+	numEventLoop := determineEventLoops(options)
 	logging.Infof("Launching gnet with %d event-loops, listening on: %s",
 		numEventLoop, strings.Join(addrs, " | "))
 
