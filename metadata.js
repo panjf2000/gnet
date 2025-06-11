@@ -1,29 +1,29 @@
 module.exports = {
   "latest_highlight": {
     "author_github": "https://github.com/panjf2000",
-    "date": "2025-05-25",
-    "description": "Release of the official stable version of v2.8.0",
+    "date": "2025-06-11",
+    "description": "Release of the official stable version of v2.9.0",
     "hide_on_release_notes": false,
-    "id": "2025-05-25-release-of-gnet-v2-8-0",
-    "path": "website/highlights/2025-05-25-release-of-gnet-v2-8-0.md",
-    "permalink": "/highlights/2025-05-25-release-of-gnet-v2-8-0/",
+    "id": "2025-06-11-release-of-gnet-v2-9-0",
+    "path": "website/highlights/2025-06-11-release-of-gnet-v2-9-0.md",
+    "permalink": "/highlights/2025-06-11-release-of-gnet-v2-9-0/",
     "tags": [
       "release",
     ],
-    "title": "Release of gnet v2.8.0"
+    "title": "Release of gnet v2.9.0"
   },
   "latest_post": {
     "author_github": "https://github.com/panjf2000",
-    "date": "2025-05-25",
-    "description": "Hello World! We present you, gnet v2.8.0!",
-    "id": "announcing-gnet-v2-8-0",
-    "path": "website/blog/announcing-gnet-v2-8-0.md",
-    "permalink": "/blog/announcing-gnet-v2-8-0/",
+    "date": "2025-06-11",
+    "description": "Hello World! We present you, gnet v2.9.0!",
+    "id": "announcing-gnet-v2-9-0",
+    "path": "website/blog/announcing-gnet-v2-9-0.md",
+    "permalink": "/blog/announcing-gnet-v2-9-0/",
     "tags": [
       "type: announcement",
       "domain: presentation"
     ],
-    "title": "Announcing gnet v2.8.0"
+    "title": "Announcing gnet v2.9.0"
   },
   "post_tags": [
     "type: announcement",

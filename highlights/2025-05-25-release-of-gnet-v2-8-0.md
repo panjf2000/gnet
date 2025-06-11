@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/highlights.json"
 title: "Release of gnet v2.8.0"
 description: "Release of the official stable version of v2.8.0"
 author_github: "https://github.com/panjf2000"
-pr_numbers: [4657bec]
+pr_numbers: [629c05e]
 release: "2.8.0"
 hide_on_release_notes: false
 tags: ["type: tag", "domain: v2.8.0"]
