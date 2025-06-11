@@ -42,31 +42,30 @@ const (
 
 // Options are configurations for the gnet application.
 type Options struct {
-	// ================================== Options for only server-side ==================================
-
 	// LB represents the load-balancing algorithm used when assigning new connections
-	// to event loops.
+	// to event loops. This option is server-only, and it is not applicable to the client.
 	LB LoadBalancing
 
 	// ReuseAddr indicates whether to set the SO_REUSEADDR socket option.
+	// This option is server-only.
 	ReuseAddr bool
 
 	// ReusePort indicates whether to set the SO_REUSEPORT socket option.
+	// This option is server-only.
 	ReusePort bool
 
 	// MulticastInterfaceIndex is the index of the interface name where the multicast UDP addresses will be bound to.
+	// This option is server-only.
 	MulticastInterfaceIndex int
 
 	// BindToDevice is the name of the interface to which the listening socket will be bound.
-	//
 	// It is only available on Linux at the moment, an error will therefore be returned when
 	// setting this option on non-linux platforms.
+	// This option is server-only.
 	BindToDevice string
 
-	// ============================= Options for both server-side and client-side =============================
-
 	// Multicore indicates whether the engine will be effectively created with multi-cores, if so,
-	// then you must take care with synchronizing memory between all event callbacks, otherwise,
+	// then you must take care with synchronizing memory between all event callbacks; otherwise,
 	// it will run the engine with single thread. The number of threads in the engine will be
 	// automatically assigned to the number of usable logical CPUs that can be leveraged by the
 	// current process.

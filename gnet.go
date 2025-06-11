@@ -257,7 +257,7 @@ type Reader interface {
 	Discard(n int) (discarded int, err error)
 
 	// InboundBuffered returns the number of bytes that can be read from the current buffer.
-	InboundBuffered() (n int)
+	InboundBuffered() int
 }
 
 // Writer is an interface that consists of a number of methods for writing that Conn must implement.
@@ -278,11 +278,11 @@ type Writer interface {
 
 	// Flush writes any buffered data to the underlying connection, it's not concurrency-safe,
 	// you must invoke it within any method in EventHandler.
-	Flush() (err error)
+	Flush() error
 
 	// OutboundBuffered returns the number of bytes that can be read from the current buffer.
 	// it's not concurrency-safe, you must invoke it within any method in EventHandler.
-	OutboundBuffered() (n int)
+	OutboundBuffered() int
 
 	// AsyncWrite writes bytes to remote asynchronously, it's concurrency-safe,
 	// you don't have to invoke it within any method in EventHandler,
@@ -331,25 +331,25 @@ type Socket interface {
 
 	// SetReadBuffer sets the size of the operating system's
 	// receive buffer associated with the connection.
-	SetReadBuffer(bytes int) error
+	SetReadBuffer(size int) error
 
 	// SetWriteBuffer sets the size of the operating system's
 	// transmit buffer associated with the connection.
-	SetWriteBuffer(bytes int) error
+	SetWriteBuffer(size int) error
 
 	// SetLinger sets the behavior of Close on a connection which still
 	// has data waiting to be sent or to be acknowledged.
 	//
-	// If sec < 0 (the default), the operating system finishes sending the
+	// If secs < 0 (the default), the operating system finishes sending the
 	// data in the background.
 	//
-	// If sec == 0, the operating system discards any unsent or
+	// If secs == 0, the operating system discards any unsent or
 	// unacknowledged data.
 	//
-	// If sec > 0, the data is sent in the background as with sec < 0. On
+	// If secs > 0, the data is sent in the background as with sec < 0. On
 	// some operating systems after sec seconds have elapsed any remaining
 	// unsent data may be discarded.
-	SetLinger(sec int) error
+	SetLinger(secs int) error
 
 	// SetKeepAlivePeriod tells the operating system to send keep-alive
 	// messages on the connection and sets period between TCP keep-alive probes.
@@ -403,23 +403,24 @@ type RegisteredResult struct {
 
 // EventLoop provides a set of methods for manipulating the event-loop.
 type EventLoop interface {
-	// ============= Concurrency-safe methods =============
-
-	// Register connects to the given address and registers the connection to the current event-loop.
+	// Register connects to the given address and registers the connection to the current event-loop,
+	// it's concurrency-safe.
 	Register(ctx context.Context, addr net.Addr) (<-chan RegisteredResult, error)
-	// Enroll is like Register, but it accepts an established net.Conn instead of a net.Addr.
+	// Enroll is like Register, but it accepts an established net.Conn instead of a net.Addr,
+	// it's concurrency-safe.
 	Enroll(ctx context.Context, c net.Conn) (<-chan RegisteredResult, error)
-	// Execute will execute the given runnable on the event-loop at some time in the future.
+	// Execute will execute the given runnable on the event-loop at some time in the future,
+	// it's concurrency-safe.
 	Execute(ctx context.Context, runnable Runnable) error
 	// Schedule is like Execute, but it allows you to specify when the runnable is executed.
-	// In other words, the runnable will be executed when the delay duration is reached.
+	// In other words, the runnable will be executed when the delay duration is reached,
+	// it's concurrency-safe.
 	// TODO(panjf2000): not supported yet, implement this.
 	Schedule(ctx context.Context, runnable Runnable, delay time.Duration) error
 
-	// ============ Concurrency-unsafe methods ============
-
 	// Close closes the given Conn that belongs to the current event-loop.
 	// It must be called on the same event-loop that the connection belongs to.
+	// This method is not concurrency-safe, you must invoke it on the event loop.
 	Close(Conn) error
 }
 
@@ -443,31 +444,31 @@ type Conn interface {
 
 	// LocalAddr is the connection's local socket address, it's not concurrency-safe,
 	// you must invoke it within any method in EventHandler.
-	LocalAddr() (addr net.Addr)
+	LocalAddr() net.Addr
 
 	// RemoteAddr is the connection's remote address, it's not concurrency-safe,
 	// you must invoke it within any method in EventHandler.
-	RemoteAddr() (addr net.Addr)
+	RemoteAddr() net.Addr
 
-	// Wake triggers a OnTraffic event for the current connection, it's concurrency-safe.
-	Wake(callback AsyncCallback) (err error)
+	// Wake triggers an OnTraffic event for the current connection, it's concurrency-safe.
+	Wake(callback AsyncCallback) error
 
 	// CloseWithCallback closes the current connection, it's concurrency-safe.
 	// Usually you should provide a non-nil callback for this method,
 	// otherwise your better choice is Close().
-	CloseWithCallback(callback AsyncCallback) (err error)
+	CloseWithCallback(callback AsyncCallback) error
 
 	// Close closes the current connection, implements net.Conn, it's concurrency-safe.
-	Close() (err error)
+	Close() error
 
 	// SetDeadline implements net.Conn.
-	SetDeadline(t time.Time) (err error)
+	SetDeadline(time.Time) error
 
 	// SetReadDeadline implements net.Conn.
-	SetReadDeadline(t time.Time) (err error)
+	SetReadDeadline(time.Time) error
 
 	// SetWriteDeadline implements net.Conn.
-	SetWriteDeadline(t time.Time) (err error)
+	SetWriteDeadline(time.Time) error
 }
 
 type (
