@@ -16,7 +16,7 @@ The `gnet` v2.9.0 is officially released!
 
 There are two new features come with this release:
 
-- Support customizing TCP_KEEPINTVL and TCP_KEEPCNT
+- Support customizing `TCP_KEEPINTVL` and `TCP_KEEPCNT`
 - Support running client with multiple event loops
 
 Please visit [Announcing gnet v2.9.0](https://gnet.host/blog/announcing-gnet-v2-9-0/) for more details.

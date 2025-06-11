@@ -13,7 +13,7 @@ The `gnet` v2.9.0 is officially released!
 
 There are two new features come with this release:
 
-- Support customizing TCP_KEEPINTVL and TCP_KEEPCNT
+- Support customizing `TCP_KEEPINTVL` and `TCP_KEEPCNT`
 - Support running client with multiple event loops
 
 In this release, we have added the ability to customize all three TCP keepalive options: `TCP_KEEPIDLE`, `TCP_KEEPINTVL`, and `TCP_KEEPCNT`, which allows developers to fine-tune the TCP keepalive settings for their applications and help accommodate various use cases of long-lived connections.
