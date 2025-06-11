@@ -69,7 +69,6 @@ func (eng *engine) start(ctx context.Context, numEventLoop int) error {
 	for i := 0; i < numEventLoop; i++ {
 		el := eventloop{
 			ch:           make(chan any, 1024),
-			idx:          i,
 			eng:          eng,
 			connections:  make(map[*conn]struct{}),
 			eventHandler: eng.eventHandler,
