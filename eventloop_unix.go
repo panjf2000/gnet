@@ -256,6 +256,17 @@ func (el *eventloop) read(c *conn) error {
 		return nil
 	}
 
+	if c.inboundBuffer.IsFull() {
+		action := el.eventHandler.OnTraffic(c)
+		switch action {
+		case None:
+		case Close:
+			return el.close(c, nil)
+		case Shutdown:
+			return errorx.ErrEngineShutdown
+		}
+		return nil
+	}
 	var recv int
 	isET := el.engine.opts.EdgeTriggeredIO
 	chunk := el.engine.opts.EdgeTriggeredIOChunk
