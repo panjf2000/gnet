@@ -162,7 +162,7 @@ loop:
 		if err == unix.EAGAIN {
 			_, err = c.outboundBuffer.Write(data)
 			if !isET {
-				err = c.loop.poller.ModReadWrite(&c.pollAttachment, false)
+				err = c.loop.poller.ModReadWrite(&c.pollAttachment, isET)
 			}
 			return
 		}
@@ -175,7 +175,7 @@ loop:
 	// Failed to send all data back to the remote, buffer the leftover data for the next round.
 	if len(data) > 0 {
 		_, _ = c.outboundBuffer.Write(data)
-		err = c.loop.poller.ModReadWrite(&c.pollAttachment, false)
+		err = c.loop.poller.ModReadWrite(&c.pollAttachment, isET)
 	}
 
 	return
@@ -212,7 +212,7 @@ loop:
 		if err == unix.EAGAIN {
 			_, err = c.outboundBuffer.Writev(bs)
 			if !isET {
-				err = c.loop.poller.ModReadWrite(&c.pollAttachment, false)
+				err = c.loop.poller.ModReadWrite(&c.pollAttachment, isET)
 			}
 			return
 		}
@@ -238,7 +238,7 @@ loop:
 	// Failed to send all data back to the remote, buffer the leftover data for the next round.
 	if remaining > 0 {
 		_, _ = c.outboundBuffer.Writev(bs)
-		err = c.loop.poller.ModReadWrite(&c.pollAttachment, false)
+		err = c.loop.poller.ModReadWrite(&c.pollAttachment, isET)
 	}
 
 	return
