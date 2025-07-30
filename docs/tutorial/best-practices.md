@@ -13,10 +13,16 @@ To avoid blocking event-loops, asynchronize your blocking code, for example by s
 
 If you're not familiar with how `gnet` works, go back and read [this](https://gnet.host/docs/about/overview/#networking-model-of-multiple-threadsgoroutines).
 
+### Avoid data corruption
+
+Any incoming bytes returned by `Conn.Peek`/`Conn.Next` must not be used in a new goroutine and the buffer returned by `Conn.Peek` must not be used after calling `Conn.Discard`.
+
+Otherwise, make a copy of the buffer returned by `Conn.Peek`/`Conn.Next` manually or call `Conn.Read()` to read the data into a new buffer to avoid data corruption.
+
+
 ### Leverage Conn.Context() to monopolize data instead of sharing it across connections
 
 It's recommended to use `Conn.Context()` to store necessary resource for each connection, so that each connection can take advantage of its exclusive resource, avoiding the contention of single resource across connections.
-
 
 ### Either loop read data in OnTraffic() or invoke c.Wake() regularly
 
