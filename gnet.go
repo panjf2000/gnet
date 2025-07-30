@@ -231,26 +231,20 @@ type Reader interface {
 	io.Reader
 	io.WriterTo
 
-	// Next returns a slice containing the next n bytes from the buffer,
-	// advancing the buffer as if the bytes had been returned by Read.
-	// Calling this method has the same effect as calling Peek and Discard.
-	// If the number of the available bytes is less than requested, a pair of (0, io.ErrShortBuffer)
-	// is returned.
+	// Next returns the next n bytes and advance the inbound buffer.
+	// buf must not be used in a new goroutine. Otherwise, use Read instead.
 	//
-	// Note that the []byte buf returned by Next() is not allowed to be passed to a new goroutine,
-	// as this []byte will be reused within event-loop.
-	// If you have to use buf in a new goroutine, then you need to make a copy of buf and pass this copy
-	// to that new goroutine.
+	// If the number of the available bytes is less than requested,
+	// a pair of (0, io.ErrShortBuffer) is returned.
 	Next(n int) (buf []byte, err error)
 
-	// Peek returns the next n bytes without advancing the inbound buffer, the returned bytes
-	// remain valid until a Discard is called. If the number of the available bytes is
-	// less than requested, a pair of (0, io.ErrShortBuffer) is returned.
+	// Peek returns the next n bytes without advancing the inbound buffer,
+	// the returned bytes remain valid until a Discard is called.
+	// buf must neither be used in a new goroutine nor anywhere after the call
+	// to Discard, make a copy of buf manually or use Read otherwise.
 	//
-	// Note that the []byte buf returned by Peek() is not allowed to be passed to a new goroutine,
-	// as this []byte will be reused within event-loop.
-	// If you have to use buf in a new goroutine, then you need to make a copy of buf and pass this copy
-	// to that new goroutine.
+	// If the number of the available bytes is less than requested,
+	// a pair of (0, io.ErrShortBuffer) is returned.
 	Peek(n int) (buf []byte, err error)
 
 	// Discard advances the inbound buffer with next n bytes, returning the number of bytes discarded.
@@ -497,10 +491,7 @@ type (
 
 		// OnTraffic fires when a socket receives data from the remote.
 		//
-		// Note that the []byte returned from Conn.Peek(int)/Conn.Next(int) is not allowed to be passed to a new goroutine,
-		// as this []byte will be reused within event-loop after OnTraffic() returns.
-		// If you have to use this []byte in a new goroutine, you should either make a copy of it or call Conn.Read([]byte)
-		// to read data into your own []byte, then pass the new []byte to the new goroutine.
+		// Also check out the comments on Reader and Writer interfaces.
 		OnTraffic(c Conn) (action Action)
 
 		// OnTick fires immediately after the engine starts and will fire again
@@ -508,9 +499,9 @@ type (
 		OnTick() (delay time.Duration, action Action)
 	}
 
-	// BuiltinEventEngine is a built-in implementation of EventHandler which sets up each method with a default implementation,
-	// you can compose it with your own implementation of EventHandler when you don't want to implement all methods
-	// in EventHandler.
+	// BuiltinEventEngine is a built-in implementation of EventHandler which sets up
+	// each method with a default implementation, you can compose it with your own
+	// implementation of EventHandler when you don't want to implement all methods in EventHandler.
 	BuiltinEventEngine struct{}
 )
 
