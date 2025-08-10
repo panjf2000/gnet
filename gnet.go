@@ -231,7 +231,7 @@ type Reader interface {
 	io.Reader
 	io.WriterTo
 
-	// Next returns the next n bytes and advance the inbound buffer.
+	// Next returns the next n bytes and advances the inbound buffer.
 	// buf must not be used in a new goroutine. Otherwise, use Read instead.
 	//
 	// If the number of the available bytes is less than requested,
@@ -499,9 +499,9 @@ type (
 		OnTick() (delay time.Duration, action Action)
 	}
 
-	// BuiltinEventEngine is a built-in implementation of EventHandler which sets up
-	// each method with a default implementation, you can compose it with your own
-	// implementation of EventHandler when you don't want to implement all methods in EventHandler.
+	// BuiltinEventEngine is a built-in implementation of EventHandler which feeds
+	// each method with an empty implementation, you can embed it within your custom
+	// struct when you don't intend to implement the entire EventHandler.
 	BuiltinEventEngine struct{}
 )
 
