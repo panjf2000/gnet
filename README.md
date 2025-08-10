@@ -255,7 +255,7 @@ Please read the [Contributing Guidelines](CONTRIBUTING.md) before opening a PR a
       </td>
       <td align="center" valign="middle">
         <a target="_blank" href="https://opencollective.com/panjf2000">
-          <img src="https://res.strikefreedom.top/static_res/logos/open-collective-logo.png" width="250" alt="ChenZhen" />
+          <img src="https://res.strikefreedom.top/static_res/logos/open-collective-logo.png" width="250" alt="OpenCollective" />
         </a>
       </td>
     </tr>
