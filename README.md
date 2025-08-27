@@ -164,9 +164,9 @@ To see the full ranking list, visit [TechEmpower Benchmark **Round 22**](https:/
 
 ## Contrasts to the similar networking libraries
 
-## On Linux (epoll)
+### On Linux (epoll)
 
-### Test Environment
+#### Environment
 
 ```bash
 # Machine information
@@ -184,15 +184,13 @@ Packet size     : 512/1024/2048/4096/8192/16384/32768/65536 bytes
 Test duration   : 15s
 ```
 
-#### [Echo benchmark](https://github.com/gnet-io/gnet-benchmarks)
+[![](https://github.com/panjf2000/gnet_benchmarks/raw/master/results/echo_conn_linux.png)](https://github.com/gnet-io/gnet-benchmarks)
 
-![](https://github.com/panjf2000/gnet_benchmarks/raw/master/results/echo_conn_linux.png)
+[![](https://github.com/panjf2000/gnet_benchmarks/raw/master/results/echo_packet_linux.png)]((https://github.com/gnet-io/gnet-benchmarks))
 
-![](https://github.com/panjf2000/gnet_benchmarks/raw/master/results/echo_packet_linux.png)
+### On MacOS (kqueue)
 
-## On MacOS (kqueue)
-
-### Test Environment
+#### Environment
 
 ```bash
 # Machine information
@@ -210,11 +208,13 @@ Packet size     : 512/1024/2048/4096/8192 bytes
 Test duration   : 15s
 ```
 
-#### [Echo benchmark](https://github.com/gnet-io/gnet-benchmarks)
+[![](https://github.com/panjf2000/gnet_benchmarks/raw/master/results/echo_conn_macos.png)]((https://github.com/gnet-io/gnet-benchmarks))
 
-![](https://github.com/panjf2000/gnet_benchmarks/raw/master/results/echo_conn_macos.png)
+[![](https://github.com/panjf2000/gnet_benchmarks/raw/master/results/echo_packet_macos.png)]((https://github.com/gnet-io/gnet-benchmarks))
 
-![](https://github.com/panjf2000/gnet_benchmarks/raw/master/results/echo_packet_macos.png)
+### Comparison with Rust
+
+[![](https://res.strikefreedom.top/static_res/blog/figures/Gjfx2GoXAAA5haW.jpeg)](https://www.youtube.com/watch?v=31R8Ef9A0iw)
 
 # ⚠️ License
 
