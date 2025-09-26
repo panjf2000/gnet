@@ -756,13 +756,13 @@ func parseProtoAddr(protoAddr string) (string, string, error) {
 		return "", "", err
 	}
 
+	if u.Scheme == "" || u.Host == "" || u.Path != "" {
+		return "", "", errorx.ErrInvalidNetworkAddress
+	}
 	switch u.Scheme {
 	case "tcp", "tcp4", "tcp6", "udp", "udp4", "udp6", "unix":
 	default:
 		return "", "", errorx.ErrUnsupportedProtocol
-	}
-	if u.Host == "" || u.Path != "" {
-		return "", "", errorx.ErrInvalidNetworkAddress
 	}
 
 	return u.Scheme, u.Host, nil
