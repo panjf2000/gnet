@@ -22,6 +22,7 @@ import (
 	"context"
 	"io"
 	"net"
+	"net/url"
 	"runtime"
 	"strings"
 	"sync"
@@ -746,21 +747,25 @@ func Stop(ctx context.Context, protoAddr string) error {
 }
 
 func parseProtoAddr(protoAddr string) (string, string, error) {
-	protoAddr = strings.ToLower(protoAddr)
-	if strings.Count(protoAddr, "://") != 1 {
+	// Percent-encode "%" in the address to avoid url.Parse error.
+	// For example: udp://[ff02::3%lo0]:9991
+	protoAddr = strings.ReplaceAll(protoAddr, "%", "%25")
+
+	u, err := url.Parse(protoAddr)
+	if err != nil {
+		return "", "", err
+	}
+
+	if u.Scheme == "" || u.Host == "" || u.Path != "" {
 		return "", "", errorx.ErrInvalidNetworkAddress
 	}
-	pair := strings.SplitN(protoAddr, "://", 2)
-	proto, addr := pair[0], pair[1]
-	switch proto {
+	switch u.Scheme {
 	case "tcp", "tcp4", "tcp6", "udp", "udp4", "udp6", "unix":
 	default:
 		return "", "", errorx.ErrUnsupportedProtocol
 	}
-	if addr == "" {
-		return "", "", errorx.ErrInvalidNetworkAddress
-	}
-	return proto, addr, nil
+
+	return u.Scheme, u.Host, nil
 }
 
 func determineEventLoops(opts *Options) int {
