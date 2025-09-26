@@ -886,6 +886,10 @@ func TestBadAddresses(t *testing.T) {
 	require.ErrorIs(t, err, errorx.ErrInvalidNetworkAddress)
 	err = Run(events, "tcp://")
 	require.ErrorIs(t, err, errorx.ErrInvalidNetworkAddress)
+	err = Run(events, ":foo")
+	require.Error(t, err, "missing protocol scheme")
+	err = Run(events, "tcp://127.0.0.1\n")
+	require.Error(t, err, "invalid control character in URL")
 }
 
 func TestTick(t *testing.T) {
