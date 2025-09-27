@@ -752,6 +752,16 @@ func parseProtoAddr(protoAddr string) (string, string, error) {
 	// This is for cases like this: udp://[ff02::3%lo0]:9991
 	protoAddr = strings.ReplaceAll(protoAddr, "%", "%25")
 
+	if runtime.GOOS == "windows" {
+		if strings.HasPrefix(protoAddr, "unix://") {
+			parts := strings.SplitN(protoAddr, "://", 2)
+			if parts[1] == "" {
+				return "", "", errorx.ErrInvalidNetworkAddress
+			}
+			return parts[0], parts[1], nil
+		}
+	}
+
 	u, err := url.Parse(protoAddr)
 	if err != nil {
 		return "", "", err
