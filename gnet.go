@@ -23,6 +23,7 @@ import (
 	"io"
 	"net"
 	"net/url"
+	"path"
 	"runtime"
 	"strings"
 	"sync"
@@ -748,7 +749,7 @@ func Stop(ctx context.Context, protoAddr string) error {
 
 func parseProtoAddr(protoAddr string) (string, string, error) {
 	// Percent-encode "%" in the address to avoid url.Parse error.
-	// For example: udp://[ff02::3%lo0]:9991
+	// This is for cases like this: udp://[ff02::3%lo0]:9991
 	protoAddr = strings.ReplaceAll(protoAddr, "%", "%25")
 
 	u, err := url.Parse(protoAddr)
@@ -756,16 +757,23 @@ func parseProtoAddr(protoAddr string) (string, string, error) {
 		return "", "", err
 	}
 
-	if u.Scheme == "" || u.Host == "" || u.Path != "" {
-		return "", "", errorx.ErrInvalidNetworkAddress
-	}
 	switch u.Scheme {
-	case "tcp", "tcp4", "tcp6", "udp", "udp4", "udp6", "unix":
+	case "":
+		return "", "", errorx.ErrInvalidNetworkAddress
+	case "tcp", "tcp4", "tcp6", "udp", "udp4", "udp6":
+		if u.Host == "" || u.Path != "" {
+			return "", "", errorx.ErrInvalidNetworkAddress
+		}
+		return u.Scheme, u.Host, nil
+	case "unix":
+		hostPath := path.Join(u.Host, u.Path)
+		if hostPath == "" {
+			return "", "", errorx.ErrInvalidNetworkAddress
+		}
+		return u.Scheme, hostPath, nil
 	default:
 		return "", "", errorx.ErrUnsupportedProtocol
 	}
-
-	return u.Scheme, u.Host, nil
 }
 
 func determineEventLoops(opts *Options) int {
