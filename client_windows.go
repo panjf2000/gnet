@@ -17,9 +17,6 @@ package gnet
 import (
 	"context"
 	"net"
-	"os"
-	"path/filepath"
-	"sync"
 
 	"golang.org/x/sync/errgroup"
 
@@ -120,29 +117,6 @@ func (cli *Client) Stop() error {
 	return err
 }
 
-var (
-	mu           sync.RWMutex
-	unixAddrDirs = make(map[string]string)
-)
-
-// unixAddr uses os.MkdirTemp to get a name that is unique.
-func unixAddr(addr string) string {
-	// Pass an empty pattern to get a directory name that is as short as possible.
-	// If we end up with a name longer than the sun_path field in the sockaddr_un
-	// struct, we won't be able to make the syscall to open the socket.
-	d, err := os.MkdirTemp("", "")
-	if err != nil {
-		panic(err)
-	}
-
-	tmpAddr := filepath.Join(d, addr)
-	mu.Lock()
-	unixAddrDirs[tmpAddr] = d
-	mu.Unlock()
-
-	return tmpAddr
-}
-
 func (cli *Client) Dial(network, addr string) (Conn, error) {
 	return cli.DialContext(network, addr, nil)
 }
@@ -152,18 +126,9 @@ func (cli *Client) DialContext(network, addr string, ctx any) (Conn, error) {
 		c   net.Conn
 		err error
 	)
-	if network == "unix" {
-		laddr, _ := net.ResolveUnixAddr(network, unixAddr(addr))
-		raddr, _ := net.ResolveUnixAddr(network, addr)
-		c, err = net.DialUnix(network, laddr, raddr)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		c, err = net.Dial(network, addr)
-		if err != nil {
-			return nil, err
-		}
+	c, err = net.Dial(network, addr)
+	if err != nil {
+		return nil, err
 	}
 	return cli.EnrollContext(c, ctx)
 }
@@ -219,12 +184,6 @@ func (cli *Client) EnrollContext(nc net.Conn, ctx any) (gc Conn, err error) {
 				n, err := nc.Read(buffer[:])
 				if err != nil {
 					el.ch <- &netErr{c, err}
-					mu.RLock()
-					tmpDir := unixAddrDirs[nc.LocalAddr().String()]
-					mu.RUnlock()
-					if err := os.RemoveAll(tmpDir); err != nil {
-						logging.Errorf("failed to remove temporary directory for unix local address: %v", err)
-					}
 					return
 				}
 				el.ch <- packTCPConn(c, buffer[:n])

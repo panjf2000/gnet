@@ -25,10 +25,7 @@ import (
 	goPool "github.com/panjf2000/gnet/v2/pkg/pool/goroutine"
 )
 
-var (
-	SysClose = unix.Close
-	stdDial  = net.Dial
-)
+var SysClose = unix.Close
 
 // NOTE: TestServeMulticast can fail with "write: no buffer space available" on Wi-Fi interface.
 func TestServeMulticast(t *testing.T) {
