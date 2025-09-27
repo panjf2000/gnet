@@ -140,18 +140,18 @@ func TestClient(t *testing.T) {
 		})
 		t.Run("unix", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				runClient(t, "unix", "gnet1.sock", &testConf{false, 0, false, false, false, false, 10, RoundRobin})
+				runClient(t, "unix", testUnixAddr(t), &testConf{false, 0, false, false, false, false, 10, RoundRobin})
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				runClient(t, "unix", "gnet2.sock", &testConf{false, 0, false, true, false, false, 10, SourceAddrHash})
+				runClient(t, "unix", testUnixAddr(t), &testConf{false, 0, false, true, false, false, 10, SourceAddrHash})
 			})
 		})
 		t.Run("unix-async", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				runClient(t, "unix", "gnet1.sock", &testConf{false, 0, false, false, true, false, 10, RoundRobin})
+				runClient(t, "unix", testUnixAddr(t), &testConf{false, 0, false, false, true, false, 10, RoundRobin})
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				runClient(t, "unix", "gnet2.sock", &testConf{false, 0, false, true, true, false, 10, SourceAddrHash})
+				runClient(t, "unix", testUnixAddr(t), &testConf{false, 0, false, true, true, false, 10, SourceAddrHash})
 			})
 		})
 	})
@@ -191,18 +191,18 @@ func TestClient(t *testing.T) {
 		})
 		t.Run("unix", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				runClient(t, "unix", "gnet1.sock", &testConf{true, 0, false, false, false, false, 10, RoundRobin})
+				runClient(t, "unix", testUnixAddr(t), &testConf{true, 0, false, false, false, false, 10, RoundRobin})
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				runClient(t, "unix", "gnet2.sock", &testConf{true, 0, false, true, false, false, 10, SourceAddrHash})
+				runClient(t, "unix", testUnixAddr(t), &testConf{true, 0, false, true, false, false, 10, SourceAddrHash})
 			})
 		})
 		t.Run("unix-async", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				runClient(t, "unix", "gnet1.sock", &testConf{true, 0, false, false, true, false, 10, RoundRobin})
+				runClient(t, "unix", testUnixAddr(t), &testConf{true, 0, false, false, true, false, 10, RoundRobin})
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				runClient(t, "unix", "gnet2.sock", &testConf{true, 0, false, true, true, false, 10, SourceAddrHash})
+				runClient(t, "unix", testUnixAddr(t), &testConf{true, 0, false, true, true, false, 10, SourceAddrHash})
 			})
 		})
 	})
@@ -242,18 +242,18 @@ func TestClient(t *testing.T) {
 		})
 		t.Run("unix", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				runClient(t, "unix", "gnet1.sock", &testConf{true, 1 << 18, false, false, false, false, 10, RoundRobin})
+				runClient(t, "unix", testUnixAddr(t), &testConf{true, 1 << 18, false, false, false, false, 10, RoundRobin})
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				runClient(t, "unix", "gnet2.sock", &testConf{true, 1 << 19, false, true, false, false, 10, SourceAddrHash})
+				runClient(t, "unix", testUnixAddr(t), &testConf{true, 1 << 19, false, true, false, false, 10, SourceAddrHash})
 			})
 		})
 		t.Run("unix-async", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				runClient(t, "unix", "gnet1.sock", &testConf{true, 1 << 18, false, false, true, false, 10, RoundRobin})
+				runClient(t, "unix", testUnixAddr(t), &testConf{true, 1 << 18, false, false, true, false, 10, RoundRobin})
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				runClient(t, "unix", "gnet2.sock", &testConf{true, 1 << 19, false, true, true, false, 10, SourceAddrHash})
+				runClient(t, "unix", testUnixAddr(t), &testConf{true, 1 << 19, false, true, true, false, 10, SourceAddrHash})
 			})
 		})
 	})
@@ -293,18 +293,18 @@ func TestClient(t *testing.T) {
 		})
 		t.Run("unix", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				runClient(t, "unix", "gnet1.sock", &testConf{false, 0, true, false, false, false, 10, RoundRobin})
+				runClient(t, "unix", testUnixAddr(t), &testConf{false, 0, true, false, false, false, 10, RoundRobin})
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				runClient(t, "unix", "gnet2.sock", &testConf{false, 0, true, true, false, false, 10, LeastConnections})
+				runClient(t, "unix", testUnixAddr(t), &testConf{false, 0, true, true, false, false, 10, LeastConnections})
 			})
 		})
 		t.Run("unix-async", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				runClient(t, "unix", "gnet1.sock", &testConf{false, 0, true, false, true, false, 10, RoundRobin})
+				runClient(t, "unix", testUnixAddr(t), &testConf{false, 0, true, false, true, false, 10, RoundRobin})
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				runClient(t, "unix", "gnet2.sock", &testConf{false, 0, true, true, true, false, 10, LeastConnections})
+				runClient(t, "unix", testUnixAddr(t), &testConf{false, 0, true, true, true, false, 10, LeastConnections})
 			})
 		})
 	})
@@ -344,18 +344,18 @@ func TestClient(t *testing.T) {
 		})
 		t.Run("unix", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				runClient(t, "unix", "gnet1.sock", &testConf{true, 0, true, false, false, false, 10, RoundRobin})
+				runClient(t, "unix", testUnixAddr(t), &testConf{true, 0, true, false, false, false, 10, RoundRobin})
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				runClient(t, "unix", "gnet2.sock", &testConf{true, 0, true, true, false, false, 10, LeastConnections})
+				runClient(t, "unix", testUnixAddr(t), &testConf{true, 0, true, true, false, false, 10, LeastConnections})
 			})
 		})
 		t.Run("unix-async", func(t *testing.T) {
 			t.Run("1-loop", func(t *testing.T) {
-				runClient(t, "unix", "gnet1.sock", &testConf{true, 0, true, false, true, false, 10, RoundRobin})
+				runClient(t, "unix", testUnixAddr(t), &testConf{true, 0, true, false, true, false, 10, RoundRobin})
 			})
 			t.Run("N-loop", func(t *testing.T) {
-				runClient(t, "unix", "gnet2.sock", &testConf{true, 0, true, true, true, false, 10, LeastConnections})
+				runClient(t, "unix", testUnixAddr(t), &testConf{true, 0, true, true, true, false, 10, LeastConnections})
 			})
 		})
 	})
@@ -543,7 +543,7 @@ func startGnetClient(t *testing.T, cli *Client, network, addr string, multicore,
 	}
 	if netDial {
 		var netConn net.Conn
-		netConn, err = stdDial(network, addr)
+		netConn, err = net.Dial(network, addr)
 		assert.NoError(t, err)
 		c, err = cli.EnrollContext(netConn, handler)
 	} else {
