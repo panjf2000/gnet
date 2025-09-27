@@ -543,7 +543,7 @@ func startGnetClient(t *testing.T, cli *Client, network, addr string, multicore,
 	}
 	if netDial {
 		var netConn net.Conn
-		netConn, err = stdDial(network, addr)
+		netConn, err = net.Dial(network, addr)
 		assert.NoError(t, err)
 		c, err = cli.EnrollContext(netConn, handler)
 	} else {
