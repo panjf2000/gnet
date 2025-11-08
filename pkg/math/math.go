@@ -15,6 +15,8 @@
 // Package math provides a few fast math functions.
 package math
 
+import "math/bits"
+
 const (
 	bitSize       = 32 << (^uint(0) >> 63)
 	maxintHeadBit = 1 << (bitSize - 2)
@@ -34,16 +36,7 @@ func CeilToPowerOfTwo(n int) int {
 	if n <= 2 {
 		return 2
 	}
-
-	n--
-	n |= n >> 1
-	n |= n >> 2
-	n |= n >> 4
-	n |= n >> 8
-	n |= n >> 16
-	n++
-
-	return n
+	return 1 << bits.Len(uint(n-1))
 }
 
 // FloorToPowerOfTwo returns n if it is a power-of-two, otherwise the next-highest power-of-two.
