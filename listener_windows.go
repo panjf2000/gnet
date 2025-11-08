@@ -29,12 +29,13 @@ import (
 )
 
 type listener struct {
-	network string
-	address string
-	once    sync.Once
-	ln      net.Listener
-	pc      net.PacketConn
-	addr    net.Addr
+	openOnce, closeOnce sync.Once
+	network             string
+	address             string
+	lc                  *net.ListenConfig
+	ln                  net.Listener
+	pc                  net.PacketConn
+	addr                net.Addr
 }
 
 func (l *listener) dup() (int, error) {
@@ -83,17 +84,39 @@ func (l *listener) dup() (int, error) {
 	return int(dupHandle), nil
 }
 
+func (l *listener) open() (err error) {
+	l.openOnce.Do(func() {
+		switch l.network {
+		case "udp", "udp4", "udp6":
+			if l.pc, err = l.lc.ListenPacket(context.Background(), l.network, l.address); err == nil {
+				l.addr = l.pc.LocalAddr()
+			}
+		case "unix":
+			_ = os.Remove(l.address)
+			fallthrough
+		case "tcp", "tcp4", "tcp6":
+			if l.ln, err = l.lc.Listen(context.Background(), l.network, l.address); err == nil {
+				l.addr = l.ln.Addr()
+			}
+		default:
+			err = errorx.ErrUnsupportedProtocol
+		}
+	})
+	return
+}
+
 func (l *listener) close() {
-	l.once.Do(func() {
+	l.closeOnce.Do(func() {
 		if l.pc != nil {
 			logging.Error(os.NewSyscallError("close", l.pc.Close()))
 			return
 		}
+		l.pc = nil
 		logging.Error(os.NewSyscallError("close", l.ln.Close()))
 	})
 }
 
-func initListener(network, addr string, options *Options) (l *listener, err error) {
+func initListener(network, addr string, options *Options) (*listener, error) {
 	lc := net.ListenConfig{
 		Control: func(network, address string, c syscall.RawConn) error {
 			return c.Control(func(fd uintptr) {
@@ -113,23 +136,8 @@ func initListener(network, addr string, options *Options) (l *listener, err erro
 		},
 		KeepAlive: options.TCPKeepAlive,
 	}
-	l = &listener{network: network, address: addr}
-	switch network {
-	case "udp", "udp4", "udp6":
-		if l.pc, err = lc.ListenPacket(context.Background(), network, addr); err != nil {
-			return nil, err
-		}
-		l.addr = l.pc.LocalAddr()
-	case "unix":
-		_ = os.Remove(addr)
-		fallthrough
-	case "tcp", "tcp4", "tcp6":
-		if l.ln, err = lc.Listen(context.Background(), network, addr); err != nil {
-			return nil, err
-		}
-		l.addr = l.ln.Addr()
-	default:
-		err = errorx.ErrUnsupportedProtocol
-	}
-	return
+
+	l := listener{network: network, address: addr, lc: &lc}
+
+	return &l, l.open()
 }

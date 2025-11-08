@@ -32,13 +32,13 @@ import (
 )
 
 type listener struct {
-	once             sync.Once
-	fd               int
-	addr             net.Addr
-	address, network string
-	sockOptInts      []socket.Option[int]
-	sockOptStrs      []socket.Option[string]
-	pollAttachment   *netpoll.PollAttachment // listener attachment for poller
+	openOnce, closeOnce sync.Once
+	fd                  int
+	addr                net.Addr
+	address, network    string
+	sockOptInts         []socket.Option[int]
+	sockOptStrs         []socket.Option[string]
+	pollAttachment      *netpoll.PollAttachment // listener attachment for poller
 }
 
 func (ln *listener) packPollAttachment(handler netpoll.PollEventHandler) *netpoll.PollAttachment {
@@ -50,33 +50,35 @@ func (ln *listener) dup() (int, error) {
 	return socket.Dup(ln.fd)
 }
 
-func (ln *listener) normalize() (err error) {
-	switch ln.network {
-	case "tcp", "tcp4", "tcp6":
-		ln.fd, ln.addr, err = socket.TCPSocket(ln.network, ln.address, true, ln.sockOptInts, ln.sockOptStrs)
-		ln.network = "tcp"
-	case "udp", "udp4", "udp6":
-		ln.fd, ln.addr, err = socket.UDPSocket(ln.network, ln.address, false, ln.sockOptInts, ln.sockOptStrs)
-		ln.network = "udp"
-	case "unix":
-		_ = os.RemoveAll(ln.address)
-		ln.fd, ln.addr, err = socket.UnixSocket(ln.network, ln.address, true, ln.sockOptInts, ln.sockOptStrs)
-	default:
-		err = errorx.ErrUnsupportedProtocol
-	}
+func (ln *listener) open() (err error) {
+	ln.openOnce.Do(func() {
+		switch ln.network {
+		case "tcp", "tcp4", "tcp6":
+			ln.fd, ln.addr, err = socket.TCPSocket(ln.network, ln.address, true, ln.sockOptInts, ln.sockOptStrs)
+			ln.network = "tcp"
+		case "udp", "udp4", "udp6":
+			ln.fd, ln.addr, err = socket.UDPSocket(ln.network, ln.address, false, ln.sockOptInts, ln.sockOptStrs)
+			ln.network = "udp"
+		case "unix":
+			_ = os.RemoveAll(ln.address)
+			ln.fd, ln.addr, err = socket.UnixSocket(ln.network, ln.address, true, ln.sockOptInts, ln.sockOptStrs)
+		default:
+			err = errorx.ErrUnsupportedProtocol
+		}
+	})
 	return
 }
 
 func (ln *listener) close() {
-	ln.once.Do(
-		func() {
-			if ln.fd > 0 {
-				logging.Error(os.NewSyscallError("close", unix.Close(ln.fd)))
-			}
-			if ln.network == "unix" {
-				logging.Error(os.RemoveAll(ln.address))
-			}
-		})
+	ln.closeOnce.Do(func() {
+		if ln.fd > 0 {
+			logging.Error(os.NewSyscallError("close", unix.Close(ln.fd)))
+		}
+		ln.fd = -1
+		if ln.network == "unix" {
+			logging.Error(os.RemoveAll(ln.address))
+		}
+	})
 }
 
 func initListener(network, addr string, options *Options) (ln *listener, err error) {
@@ -120,7 +122,7 @@ func initListener(network, addr string, options *Options) (ln *listener, err err
 	}
 
 	ln = &listener{network: network, address: addr, sockOptInts: sockOptInts, sockOptStrs: sockOptStrs}
-	err = ln.normalize()
+	err = ln.open()
 
 	if options.TCPKeepAlive > 0 && ln.network == "tcp" &&
 		(runtime.GOOS == "linux" || runtime.GOOS == "freebsd" || runtime.GOOS == "dragonfly") {
