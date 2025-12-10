@@ -19,6 +19,8 @@ description: "宏观角度陈述 gnet 框架。"
 
 ## 功能
 
+### 里程碑
+
 - [x] 基于多线程/协程网络模型的[高性能](#-性能测试)事件驱动循环
 - [x] 内置 goroutine 池，由开源库 [ants](https://github.com/panjf2000/ants) 提供支持
 - [x] 整个生命周期是无锁的
@@ -26,13 +28,20 @@ description: "宏观角度陈述 gnet 框架。"
 - [x] 高效、可重用而且自动伸缩的内存 buffer：(Elastic-)Ring-Buffer, Linked-List-Buffer and Elastic-Mixed-Buffer
 - [x] 多种网络协议/IPC 机制：`TCP`、`UDP` 和 `Unix Domain Socket`
 - [x] 多种负载均衡算法：`Round-Robin(轮询)`、`Source-Addr-Hash(源地址哈希)` 和 `Least-Connections(最少连接数)`
-- [x] 两种事件驱动机制：**Linux** 里的 `epoll` 以及 **FreeBSD/DragonFly/Darwin** 里的 `kqueue`
 - [x] 灵活的事件定时器
-- [x] 实现 `gnet` 客户端
-- [x] 支持 **Windows** 平台 (仅用于开发环境的兼容性，不要在生产环境中使用)
-- [ ] 多网络地址绑定
+- [x] `gnet` 客户端支持
+- [x] 支持 `Linux`, `macOS`, `Windows` 和 *BSD 操作系统: `Darwin`/`DragonFlyBSD`/`FreeBSD`/`NetBSD`/`OpenBSD`
+- [x] **Edge-triggered** I/O 支持
+- [x] 多网络地址绑定
+- [x] 支持注册新的连接到事件循环
+
+### 蓝图
+
 - [ ] 支持 **TLS**
-- [ ] 支持 [io_uring](https://kernel.dk/io_uring.pdf)
+- [ ] 支持 [io_uring](https://github.com/axboe/liburing/wiki/io_uring-and-networking-in-2023)
+- [ ] 支持 **KCP**
+
+***`gnet` 的 Windows 版本应该仅用于开发阶段的开发和测试，切勿用于生产环境***。
 
 ## 架构
 ### 多线程/Go程网络模型

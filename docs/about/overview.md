@@ -19,6 +19,8 @@ description: "High-level description of the gnet framework and its features."
 
 ## Features
 
+### Milestones
+
 - [x] [High-performance](#-performance) event-driven looping based on a networking model of multiple threads/goroutines
 - [x] Built-in goroutine pool powered by the library [ants](https://github.com/panjf2000/ants)
 - [x] Lock-free during the entire runtime
@@ -26,13 +28,20 @@ description: "High-level description of the gnet framework and its features."
 - [x] Efficient, reusable, and elastic memory buffer: (Elastic-)Ring-Buffer, Linked-List-Buffer and Elastic-Mixed-Buffer
 - [x] Multiple protocols/IPC mechanisms: `TCP`, `UDP`, and `Unix Domain Socket`
 - [x] Multiple load-balancing algorithms: `Round-Robin`, `Source-Addr-Hash`, and `Least-Connections`
-- [x] Two event-driven mechanisms: `epoll` on **Linux** and `kqueue` on **FreeBSD/DragonFly/Darwin**
 - [x] Flexible ticker event
-- [x] Implementation of `gnet` Client
-- [x] **Windows** platform support (For compatibility in development only, do not use it in production)
-- [ ] Multiple network addresses binding
+- [x] `gnet` client
+- [x] Running on `Linux`, `macOS`, `Windows`, and *BSD: `Darwin`/`DragonFlyBSD`/`FreeBSD`/`NetBSD`/`OpenBSD`
+- [x] **Edge-triggered** I/O support
+- [x] Multiple network addresses binding
+- [x] Support registering new connections to event-loops
+
+### Roadmap
+
 - [ ] **TLS** support
-- [ ] [io_uring](https://kernel.dk/io_uring.pdf) support
+- [ ] [io_uring](https://github.com/axboe/liburing/wiki/io_uring-and-networking-in-2023) support
+- [ ] **KCP** support
+
+***Windows version of `gnet` should only be used in development for developing and testing, it shouldn't be used in production.***
 
 ## Architecture
 
