@@ -35,7 +35,7 @@ English | [中文](README_ZH.md)
 
 # 🚀 Features
 
-## 🦖 Milestone
+## 🦖 Milestones
 
 - [x] [High-performance](#-performance) event-driven looping based on a networking model of multiple threads/goroutines
 - [x] Built-in goroutine pool powered by the library [ants](https://github.com/panjf2000/ants)
@@ -212,7 +212,7 @@ Test duration   : 15s
 
 [![](https://github.com/panjf2000/gnet_benchmarks/raw/master/results/echo_packet_macos.png)]((https://github.com/gnet-io/gnet-benchmarks))
 
-### Comparison with Rust
+### Combat with Rust
 
 [![](https://res.strikefreedom.top/static_res/blog/figures/Gjfx2GoXAAA5haW.jpeg)](https://www.youtube.com/watch?v=31R8Ef9A0iw)
 
