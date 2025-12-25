@@ -211,6 +211,8 @@ func (cli *Client) EnrollContext(c net.Conn, ctx any) (Conn, error) {
 	var dupFD int
 	e := rc.Control(func(fd uintptr) {
 		dupFD, err = unix.Dup(int(fd))
+		// Set the socket to close-on-exec, so that the socket is closed when the process forks
+		unix.CloseOnExec(dupFD)
 	})
 	if err != nil {
 		return nil, err
