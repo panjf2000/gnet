@@ -139,7 +139,7 @@ func (el *eventloop) enroll(c net.Conn, addr net.Addr, ctx any) (resCh chan Regi
 
 		var dupFD int
 		err1 := rc.Control(func(fd uintptr) {
-			dupFD, err = unix.Dup(int(fd))
+			dupFD, err = socket.Dup(int(fd))
 		})
 		if err != nil {
 			resCh <- RegisteredResult{Err: err}
