@@ -132,6 +132,13 @@ The following corporations/organizations use `gnet` as the underlying network se
         </a>
       </td>
     </tr>
+    <tr>
+      <td align="center" valign="middle">
+        <a href="https://github.com/nvelox/nvelox" target="_blank">
+          <img src="https://raw.githubusercontent.com/nvelox/nvelox/refs/heads/main/image.png" width="250" />
+        </a>
+      </td>
+    </tr>
   </tbody>
 </table>
 
