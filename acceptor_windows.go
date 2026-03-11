@@ -88,7 +88,7 @@ func (eng *engine) ListenUDP(pc net.PacketConn) (err error) {
 		// Wait for the event loop to finish processing (including any WriteTo
 		// calls) before calling ReadFrom again, to avoid fd lock contention
 		// between concurrent ReadFrom and WriteTo on the same PacketConn.
-		uc.done = make(chan struct{})
+		uc.done = make(chan struct{}, 1)
 		el.ch <- uc
 		select {
 		case <-uc.done:
