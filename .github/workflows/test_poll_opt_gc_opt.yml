@@ -55,7 +55,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: ['1.20', '1.25']
+        go: ['1.20', '1.26']
         os: [ubuntu-latest, macos-14] # check out this issue: https://github.com/actions/runner-images/issues/10924
     name: Go ${{ matrix.go }} @ ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -68,7 +68,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '^1.20'
+          go-version: ${{ matrix.go }}
 
       - name: Print Go environment
         id: go-env

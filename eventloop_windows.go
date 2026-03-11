@@ -170,6 +170,9 @@ func (el *eventloop) run() (err error) {
 			err = el.read(unpackTCPConn(v))
 		case *udpConn:
 			err = el.readUDP(v.c)
+			if v.done != nil {
+				close(v.done)
+			}
 		case func() error:
 			err = v()
 		}

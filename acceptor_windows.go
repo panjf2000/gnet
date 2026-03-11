@@ -68,6 +68,7 @@ func (eng *engine) ListenUDP(pc net.PacketConn) (err error) {
 
 	defer func() { eng.shutdown(err) }()
 
+	ctx := eng.concurrency.ctx
 	var buffer [0x10000]byte
 	for {
 		// Read data from UDP socket.
@@ -83,6 +84,16 @@ func (eng *engine) ListenUDP(pc net.PacketConn) (err error) {
 		}
 		el := eng.eventLoops.next(addr)
 		c := newUDPConn(el, pc, nil, pc.LocalAddr(), addr, nil)
-		el.ch <- packUDPConn(c, buffer[:n])
+		uc := packUDPConn(c, buffer[:n])
+		// Wait for the event loop to finish processing (including any WriteTo
+		// calls) before calling ReadFrom again, to avoid fd lock contention
+		// between concurrent ReadFrom and WriteTo on the same PacketConn.
+		uc.done = make(chan struct{})
+		el.ch <- uc
+		select {
+		case <-uc.done:
+		case <-ctx.Done():
+			return
+		}
 	}
 }

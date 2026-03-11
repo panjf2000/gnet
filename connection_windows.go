@@ -42,7 +42,8 @@ type tcpConn struct {
 }
 
 type udpConn struct {
-	c *conn
+	c    *conn
+	done chan struct{} // signals that the event loop has finished processing this UDP packet
 }
 
 type openConn struct {
