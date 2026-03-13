@@ -17,6 +17,7 @@ package gnet
 import (
 	"errors"
 	"net"
+	"os"
 	"runtime"
 
 	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
@@ -38,7 +39,7 @@ func (eng *engine) listenStream(ln net.Listener) (err error) {
 			err = e
 			if !eng.beingShutdown.Load() {
 				eng.opts.Logger.Errorf("Accept() fails due to error: %v", err)
-			} else if errors.Is(err, net.ErrClosed) {
+			} else if errors.Is(err, net.ErrClosed) || errors.Is(err, os.ErrDeadlineExceeded) {
 				err = errors.Join(err, errorx.ErrEngineShutdown)
 			}
 			return
@@ -77,7 +78,7 @@ func (eng *engine) ListenUDP(pc net.PacketConn) (err error) {
 			err = e
 			if !eng.beingShutdown.Load() {
 				eng.opts.Logger.Errorf("failed to receive data from UDP fd due to error:%v", err)
-			} else if errors.Is(err, net.ErrClosed) {
+			} else if errors.Is(err, net.ErrClosed) || errors.Is(err, os.ErrDeadlineExceeded) {
 				err = errors.Join(err, errorx.ErrEngineShutdown)
 			}
 			return

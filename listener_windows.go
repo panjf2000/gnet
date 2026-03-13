@@ -21,6 +21,7 @@ import (
 	"os"
 	"sync"
 	"syscall"
+	"time"
 
 	"golang.org/x/sys/windows"
 
@@ -108,10 +109,20 @@ func (l *listener) open() (err error) {
 func (l *listener) close() {
 	l.closeOnce.Do(func() {
 		if l.pc != nil {
+			// Set a deadline in the past to unblock any pending ReadFrom on Windows,
+			// where PacketConn.Close can block waiting for in-flight I/O to complete.
+			if c, ok := l.pc.(interface{ SetDeadline(time.Time) error }); ok {
+				c.SetDeadline(time.Now())
+			}
 			logging.Error(os.NewSyscallError("close", l.pc.Close()))
 			return
 		}
 		l.pc = nil
+		// Set a deadline in the past to unblock any pending Accept on Windows,
+		// where Listener.Close can block waiting for in-flight I/O to complete.
+		if c, ok := l.ln.(interface{ SetDeadline(time.Time) error }); ok {
+			c.SetDeadline(time.Now())
+		}
 		logging.Error(os.NewSyscallError("close", l.ln.Close()))
 	})
 }
