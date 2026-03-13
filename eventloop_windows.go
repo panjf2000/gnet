@@ -290,6 +290,9 @@ func (el *eventloop) close(c *conn, err error) error {
 	delete(el.connections, c)
 	el.incConn(-1)
 	action := el.eventHandler.OnClose(c, err)
+	// Set a deadline in the past to unblock any pending Read on Windows,
+	// where net.Conn.Close can block waiting for in-flight I/O to complete.
+	c.rawConn.SetDeadline(time.Now().Add(-time.Second))
 	err = c.rawConn.Close()
 	c.release()
 	if err != nil {
