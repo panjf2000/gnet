@@ -827,7 +827,15 @@ func runServer(t *testing.T, addrs []string, conf *testConf) {
 func startClient(t *testing.T, network, addr string, multicore, async bool, packetSize int, stallCh chan struct{}) {
 	c, err := net.Dial(network, addr)
 	assert.NoError(t, err)
-	defer c.Close() //nolint:errcheck
+	defer func() {
+		// On Windows with Go 1.26+, Close() blocks in semacquire if there is
+		// pending I/O on the connection (IOCP fd locking). Setting a deadline
+		// in the past cancels any in-flight read/write, allowing Close to proceed.
+		if runtime.GOOS == "windows" {
+			c.SetDeadline(time.Now().Add(-time.Second)) //nolint:errcheck
+		}
+		c.Close() //nolint:errcheck
+	}()
 	rd := bufio.NewReader(c)
 	if network != "udp" {
 		msg, err := rd.ReadBytes('\n')
