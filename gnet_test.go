@@ -2485,9 +2485,9 @@ func testStreamProxyServer(t *testing.T, addr string, backendServers []string, m
 		if runtime.GOOS == "windows" {
 			switch s := server.(type) {
 			case *net.UDPConn:
-				s.SetDeadline(time.Now().Add(-time.Second))
+				s.SetDeadline(time.Now().Add(-time.Second)) //nolint:errcheck
 			case *net.TCPListener:
-				s.SetDeadline(time.Now().Add(-time.Second))
+				s.SetDeadline(time.Now().Add(-time.Second)) //nolint:errcheck
 			}
 		}
 		server.Close() //nolint:errcheck
@@ -2747,9 +2747,9 @@ func testUDPProxyServer(t *testing.T, addr string, backendServers []string, mult
 		if runtime.GOOS == "windows" {
 			switch s := server.(type) {
 			case *net.UDPConn:
-				s.SetDeadline(time.Now().Add(-time.Second))
+				s.SetDeadline(time.Now().Add(-time.Second)) //nolint:errcheck
 			case *net.TCPListener:
-				s.SetDeadline(time.Now().Add(-time.Second))
+				s.SetDeadline(time.Now().Add(-time.Second)) //nolint:errcheck
 			}
 		}
 		server.Close() //nolint:errcheck
