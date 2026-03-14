@@ -2476,13 +2476,17 @@ func testStreamProxyServer(t *testing.T, addr string, backendServers []string, m
 		errorx.ErrUnsupportedOp, err)
 
 	for _, server := range netServers {
-		// Set a deadline in the past to unblock any pending I/O (e.g. ReadFromUDP)
-		// before closing, so the Close doesn't block on Windows with Go 1.26+.
-		if c, ok := server.(interface{ SetDeadline(time.Time) error }); ok {
-			c.SetDeadline(time.Now().Add(-time.Second)) //nolint:errcheck
-		}
-		if err := server.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
-			require.NoError(t, err, "Close backend server error")
+		if runtime.GOOS == "windows" {
+			// Set a deadline in the past to unblock any pending I/O (e.g. Accept/ReadFromUDP)
+			// before closing, so the Close doesn't block on Windows with Go 1.26+.
+			if c, ok := server.(interface{ SetDeadline(time.Time) error }); ok {
+				c.SetDeadline(time.Now().Add(-time.Second)) //nolint:errcheck
+			}
+			if err := server.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+				require.NoError(t, err, "Close backend server error")
+			}
+		} else {
+			require.NoError(t, server.Close(), "Close backend server error")
 		}
 	}
 
@@ -2733,13 +2737,17 @@ func testUDPProxyServer(t *testing.T, addr string, backendServers []string, mult
 	require.NoErrorf(t, err, "Run error: %v", err)
 
 	for _, server := range netServers {
-		// Set a deadline in the past to unblock any pending I/O (e.g. ReadFromUDP)
-		// before closing, so the Close doesn't block on Windows with Go 1.26+.
-		if c, ok := server.(interface{ SetDeadline(time.Time) error }); ok {
-			c.SetDeadline(time.Now().Add(-time.Second)) //nolint:errcheck
-		}
-		if err := server.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
-			require.NoError(t, err, "Close backend server error")
+		if runtime.GOOS == "windows" {
+			// Set a deadline in the past to unblock any pending I/O (e.g. Accept/ReadFromUDP)
+			// before closing, so the Close doesn't block on Windows with Go 1.26+.
+			if c, ok := server.(interface{ SetDeadline(time.Time) error }); ok {
+				c.SetDeadline(time.Now().Add(-time.Second)) //nolint:errcheck
+			}
+			if err := server.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+				require.NoError(t, err, "Close backend server error")
+			}
+		} else {
+			require.NoError(t, server.Close(), "Close backend server error")
 		}
 	}
 
