@@ -42,7 +42,8 @@ type tcpConn struct {
 }
 
 type udpConn struct {
-	c *conn
+	c    *conn
+	done chan struct{} // signals that the event loop has finished processing this UDP packet
 }
 
 type openConn struct {
@@ -80,7 +81,7 @@ func unpackTCPConn(tc *tcpConn) *conn {
 
 func packUDPConn(c *conn, buf []byte) *udpConn {
 	_, _ = c.buffer.Write(buf)
-	return &udpConn{c}
+	return &udpConn{c: c}
 }
 
 func newStreamConn(el *eventloop, nc net.Conn, ctx any) (c *conn) {

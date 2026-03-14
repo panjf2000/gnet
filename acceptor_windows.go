@@ -17,6 +17,7 @@ package gnet
 import (
 	"errors"
 	"net"
+	"os"
 	"runtime"
 
 	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
@@ -38,7 +39,7 @@ func (eng *engine) listenStream(ln net.Listener) (err error) {
 			err = e
 			if !eng.beingShutdown.Load() {
 				eng.opts.Logger.Errorf("Accept() fails due to error: %v", err)
-			} else if errors.Is(err, net.ErrClosed) {
+			} else if errors.Is(err, net.ErrClosed) || errors.Is(err, os.ErrDeadlineExceeded) {
 				err = errors.Join(err, errorx.ErrEngineShutdown)
 			}
 			return
@@ -68,6 +69,7 @@ func (eng *engine) ListenUDP(pc net.PacketConn) (err error) {
 
 	defer func() { eng.shutdown(err) }()
 
+	ctx := eng.concurrency.ctx
 	var buffer [0x10000]byte
 	for {
 		// Read data from UDP socket.
@@ -76,13 +78,25 @@ func (eng *engine) ListenUDP(pc net.PacketConn) (err error) {
 			err = e
 			if !eng.beingShutdown.Load() {
 				eng.opts.Logger.Errorf("failed to receive data from UDP fd due to error:%v", err)
-			} else if errors.Is(err, net.ErrClosed) {
+			} else if errors.Is(err, net.ErrClosed) || errors.Is(err, os.ErrDeadlineExceeded) {
 				err = errors.Join(err, errorx.ErrEngineShutdown)
 			}
 			return
 		}
 		el := eng.eventLoops.next(addr)
 		c := newUDPConn(el, pc, nil, pc.LocalAddr(), addr, nil)
-		el.ch <- packUDPConn(c, buffer[:n])
+		uc := packUDPConn(c, buffer[:n])
+		// Wait for the event loop to finish processing (including any WriteTo
+		// calls) before calling ReadFrom again, to avoid fd lock contention
+		// between concurrent ReadFrom and WriteTo on the same PacketConn.
+		// Ref: Go 1.26 src/internal/poll/fd_windows.go:1070 (WriteToInet writeLock)
+		// Ref: Go 1.26 src/internal/poll/fd_mutex.go:154 (semacquire in rwlock)
+		uc.done = make(chan struct{})
+		el.ch <- uc
+		select {
+		case <-uc.done:
+		case <-ctx.Done():
+			return
+		}
 	}
 }

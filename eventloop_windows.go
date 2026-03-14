@@ -170,6 +170,9 @@ func (el *eventloop) run() (err error) {
 			err = el.read(unpackTCPConn(v))
 		case *udpConn:
 			err = el.readUDP(v.c)
+			if v.done != nil {
+				close(v.done)
+			}
 		case func() error:
 			err = v()
 		}
@@ -287,6 +290,12 @@ func (el *eventloop) close(c *conn, err error) error {
 	delete(el.connections, c)
 	el.incConn(-1)
 	action := el.eventHandler.OnClose(c, err)
+	// Set a deadline in the past to unblock any pending Read on Windows,
+	// where net.Conn.Close can block waiting for in-flight I/O to complete.
+	// Ref: https://go.dev/doc/go1.25#os (Windows IOCP support in os.NewFile)
+	// Ref: Go 1.26 src/internal/poll/fd_mutex.go:154 (semacquire in rwlock)
+	// Ref: Go 1.26 src/internal/poll/fd_windows.go (execIO/waitIO with IOCP)
+	c.rawConn.SetDeadline(time.Now().Add(-time.Second))
 	err = c.rawConn.Close()
 	c.release()
 	if err != nil {
