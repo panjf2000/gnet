@@ -117,7 +117,6 @@ func (l *listener) close() {
 			logging.Error(os.NewSyscallError("close", l.pc.Close()))
 			return
 		}
-		l.pc = nil
 		// Set a deadline in the past to unblock any pending Accept on Windows,
 		// where Listener.Close can block waiting for in-flight I/O to complete.
 		if c, ok := l.ln.(interface{ SetDeadline(time.Time) error }); ok {
