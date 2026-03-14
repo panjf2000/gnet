@@ -95,6 +95,7 @@ jobs:
         # - reflect.Value.Int panic on complex128 in reflect.deepValueEqual
         # - growslice len out of range panic in runtime.(*Pinner).Pin
         # These are Go 1.26.1 Windows-specific issues triggered by race instrumentation.
+        # Ref: CI evidence at https://github.com/panjf2000/gnet/pull/751 (failed runs on go1.26 branch)
         run: go test -v ${{ !(runner.os == 'Windows' && startsWith(matrix.go, '1.26')) && '-race' || '' }} -tags=gc_opt -coverprofile="codecov.report" -covermode=atomic -timeout 15m -failfast
 
       - name: Upload the code coverage report to codecov.io

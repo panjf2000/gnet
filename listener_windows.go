@@ -111,6 +111,9 @@ func (l *listener) close() {
 		if l.pc != nil {
 			// Set a deadline in the past to unblock any pending ReadFrom on Windows,
 			// where PacketConn.Close can block waiting for in-flight I/O to complete.
+			// Ref: https://go.dev/doc/go1.25#os (Windows IOCP support in os.NewFile)
+			// Ref: Go 1.26 src/internal/poll/fd_mutex.go:154 (semacquire in rwlock)
+			// Ref: Go 1.26 src/internal/poll/fd_windows.go (execIO/waitIO with IOCP)
 			if c, ok := l.pc.(interface{ SetDeadline(time.Time) error }); ok {
 				c.SetDeadline(time.Now().Add(-time.Second))
 			}
@@ -119,6 +122,9 @@ func (l *listener) close() {
 		}
 		// Set a deadline in the past to unblock any pending Accept on Windows,
 		// where Listener.Close can block waiting for in-flight I/O to complete.
+		// Ref: https://go.dev/doc/go1.25#os (Windows IOCP support in os.NewFile)
+		// Ref: Go 1.26 src/internal/poll/fd_mutex.go:154 (semacquire in rwlock)
+		// Ref: Go 1.26 src/internal/poll/fd_windows.go (execIO/waitIO with IOCP)
 		if c, ok := l.ln.(interface{ SetDeadline(time.Time) error }); ok {
 			c.SetDeadline(time.Now().Add(-time.Second))
 		}
