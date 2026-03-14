@@ -39,12 +39,12 @@ func (ev *clientEvents) OnBoot(e Engine) Action {
 	fd, err := e.Dup()
 	assert.ErrorIsf(ev.tester, err, errorx.ErrEmptyEngine, "expected error: %v, but got: %v",
 		errorx.ErrUnsupportedOp, err)
-	assert.EqualValuesf(ev.tester, fd, -1, "expected -1, but got: %d", fd)
+	assert.Truef(ev.tester, fd == -1, "expected -1, but got: %d", fd)
 
 	fd, err = e.DupListener("tcp", "abc")
 	assert.ErrorIsf(ev.tester, err, errorx.ErrEmptyEngine, "expected error: %v, but got: %v",
 		errorx.ErrUnsupportedOp, err)
-	assert.EqualValuesf(ev.tester, fd, -1, "expected -1, but got: %d", fd)
+	assert.Truef(ev.tester, fd == -1, "expected -1, but got: %d", fd)
 	return None
 }
 
@@ -90,12 +90,12 @@ func (ev *clientEvents) OnShutdown(e Engine) {
 	fd, err := e.Dup()
 	assert.ErrorIsf(ev.tester, err, errorx.ErrEmptyEngine, "expected error: %v, but got: %v",
 		errorx.ErrUnsupportedOp, err)
-	assert.EqualValuesf(ev.tester, fd, -1, "expected -1, but got: %d", fd)
+	assert.Truef(ev.tester, fd == -1, "expected -1, but got: %d", fd)
 
 	fd, err = e.DupListener("tcp", "abc")
 	assert.ErrorIsf(ev.tester, err, errorx.ErrEmptyEngine, "expected error: %v, but got: %v",
 		errorx.ErrUnsupportedOp, err)
-	assert.EqualValuesf(ev.tester, fd, -1, "expected -1, but got: %d", fd)
+	assert.Truef(ev.tester, fd == -1, "expected -1, but got: %d", fd)
 }
 
 func TestClient(t *testing.T) {
@@ -410,7 +410,8 @@ func (s *testClient) OnClose(c Conn, err error) (action Action) {
 
 func (s *testClient) OnShutdown(Engine) {
 	if s.network == "udp" {
-		assert.EqualValues(s.tester, int32(s.nclients), atomic.LoadInt32(&s.udpReadHeader))
+		assert.Truef(s.tester, int32(s.nclients) == atomic.LoadInt32(&s.udpReadHeader),
+			"expected %d, but got: %d", s.nclients, atomic.LoadInt32(&s.udpReadHeader))
 	}
 }
 
@@ -419,7 +420,7 @@ func (s *testClient) OnTraffic(c Conn) (action Action) {
 		ping := make([]byte, len(pingMsg))
 		n, err := io.ReadFull(c, ping)
 		assert.NoError(s.tester, err)
-		assert.EqualValues(s.tester, len(pingMsg), n)
+		assert.Truef(s.tester, len(pingMsg) == n, "expected %d bytes, but got: %d", len(pingMsg), n)
 		assert.Equal(s.tester, string(pingMsg), string(ping), "bad header")
 	}
 	v := c.Context()
@@ -462,7 +463,7 @@ func (s *testClient) OnTraffic(c Conn) (action Action) {
 	if len(buf) > 0 {
 		n, err := c.Write(buf)
 		assert.NoError(s.tester, err)
-		assert.EqualValues(s.tester, len(buf), n)
+		assert.Truef(s.tester, len(buf) == n, "expected %d bytes, but got: %d", len(buf), n)
 	}
 	return
 }
@@ -750,7 +751,7 @@ func TestClientReadOnEOF(t *testing.T) {
 	select {
 	case res := <-ev.result:
 		assert.NoError(t, res.err)
-		assert.EqualValuesf(t, ev.data, res.data, "expected: %v, but got: %v", ev.data, res.data)
+		assert.Truef(t, bytes.Equal(ev.data, res.data), "expected: %v, but got: %v", ev.data, res.data)
 	case <-time.After(5 * time.Second):
 		t.Errorf("timeout waiting for the result")
 	}
