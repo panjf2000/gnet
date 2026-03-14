@@ -117,7 +117,6 @@ func (el *eventloop) enroll(c net.Conn, addr net.Addr, ctx any) (resCh chan Regi
 			gc = newUDPConn(el, nil, c, c.LocalAddr(), c.RemoteAddr(), ctx)
 			el.ch <- &openConn{c: gc, cb: func() { close(connOpened) }}
 			goroutine.DefaultWorkerPool.Submit(func() {
-				engCtx := el.eng.concurrency.ctx
 				var buffer [0x10000]byte
 				for {
 					n, err := c.Read(buffer[:])
@@ -126,20 +125,7 @@ func (el *eventloop) enroll(c net.Conn, addr net.Addr, ctx any) (resCh chan Regi
 						return
 					}
 					gc := newUDPConn(el, nil, c, c.LocalAddr(), c.RemoteAddr(), ctx)
-					uc := packUDPConn(gc, buffer[:n])
-					// Wait for the event loop to finish processing (including any
-					// Write calls) before calling Read again, to avoid fd lock
-					// contention between concurrent Read and Write on the same
-					// connected UDP socket.
-					// Ref: Go 1.26 src/internal/poll/fd_windows.go (execIO/waitIO with IOCP)
-					// Ref: Go 1.26 src/internal/poll/fd_mutex.go:154 (semacquire in rwlock)
-					uc.done = make(chan struct{})
-					el.ch <- uc
-					select {
-					case <-uc.done:
-					case <-engCtx.Done():
-						return
-					}
+					el.ch <- packUDPConn(gc, buffer[:n])
 				}
 			})
 		}
