@@ -2481,7 +2481,9 @@ func testStreamProxyServer(t *testing.T, addr string, backendServers []string, m
 		if c, ok := server.(interface{ SetDeadline(time.Time) error }); ok {
 			c.SetDeadline(time.Now().Add(-time.Second)) //nolint:errcheck
 		}
-		require.NoError(t, server.Close(), "Close backend server error")
+		if err := server.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+			require.NoError(t, err, "Close backend server error")
+		}
 	}
 
 	backends.Wait() //nolint:errcheck
@@ -2736,7 +2738,9 @@ func testUDPProxyServer(t *testing.T, addr string, backendServers []string, mult
 		if c, ok := server.(interface{ SetDeadline(time.Time) error }); ok {
 			c.SetDeadline(time.Now().Add(-time.Second)) //nolint:errcheck
 		}
-		require.NoError(t, server.Close(), "Close backend server error")
+		if err := server.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+			require.NoError(t, err, "Close backend server error")
+		}
 	}
 
 	backends.Wait() //nolint:errcheck
