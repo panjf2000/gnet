@@ -91,7 +91,15 @@ jobs:
         run: go test $(go list ./... | tail -n +2)
 
       - name: Run integration tests
-        run: go test -v -race -coverprofile="codecov.report" -covermode=atomic -timeout 15m -failfast
+        shell: bash
+        run: |
+          RACE_FLAG="-race"
+          # Disable the race detector on Windows with Go 1.26 due to a known Go 1.26.1
+          # runtime bug: reflect.Value.Int panics on complex128 in reflect.DeepEqual.
+          if [[ "$RUNNER_OS" == "Windows" && "${{ matrix.go }}" == "1.26" ]]; then
+            RACE_FLAG=""
+          fi
+          go test -v $RACE_FLAG -coverprofile="codecov.report" -covermode=atomic -timeout 15m -failfast
 
       - name: Upload the code coverage report to codecov.io
         uses: codecov/codecov-action@v5
