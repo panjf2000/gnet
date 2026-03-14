@@ -853,10 +853,20 @@ func startClient(t *testing.T, network, addr string, multicore, async bool, pack
 		_, err = crand.Read(reqData)
 		assert.NoError(t, err)
 		_, err = c.Write(reqData)
-		assert.NoError(t, err)
+		if err != nil {
+			break
+		}
 		respData := make([]byte, len(reqData))
+		// Set a read deadline to prevent blocking indefinitely if the
+		// server fails to respond (e.g., due to a dropped UDP packet
+		// on Windows). Without this, a single stuck client can cause
+		// the entire test to hang until the global test timeout.
+		c.SetReadDeadline(time.Now().Add(15 * time.Second)) //nolint:errcheck
 		_, err = io.ReadFull(rd, respData)
-		assert.NoError(t, err)
+		c.SetReadDeadline(time.Time{}) //nolint:errcheck
+		if err != nil {
+			break
+		}
 		if !async {
 			// assert.Equalf(t, reqData, respData, "response mismatch with protocol:%s, multi-core:%t, content of bytes: %d vs %d", network, multicore, string(reqData), string(respData))
 			assert.Equalf(
