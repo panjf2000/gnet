@@ -562,7 +562,7 @@ func (s *testServer) OnBoot(eng Engine) (action Action) {
 	if len(s.addrs) > 1 {
 		fd, err := s.eng.Dup()
 		assert.ErrorIsf(s.tester, err, errorx.ErrUnsupportedOp, "dup error")
-		assert.Truef(s.tester, fd == -1, "expected fd: -1, but got: %d", fd)
+		assert.EqualValuesf(s.tester, -1, fd, "expected fd: -1, but got: %d", fd)
 
 		addr := s.addrs[rand.Intn(len(s.addrs))]
 		network, address, _ := parseProtoAddr(addr)
@@ -574,7 +574,7 @@ func (s *testServer) OnBoot(eng Engine) (action Action) {
 		// Test invalid input
 		fd, err = s.eng.DupListener("tcp", "abc")
 		assert.ErrorIsf(s.tester, err, errorx.ErrInvalidNetworkAddress, "expected ErrInvalidNetworkAddress")
-		assert.Truef(s.tester, fd == -1, "expected fd: -1, but got: %d", fd)
+		assert.EqualValuesf(s.tester, -1, fd, "expected fd: -1, but got: %d", fd)
 	} else {
 		fd, err := s.eng.Dup()
 		assert.NoErrorf(s.tester, err, "Dup error")
@@ -597,7 +597,7 @@ func (s *testServer) OnShutdown(_ Engine) {
 	if len(s.addrs) > 1 {
 		fd, err := s.eng.Dup()
 		assert.ErrorIsf(s.tester, err, errorx.ErrUnsupportedOp, "dup error")
-		assert.Truef(s.tester, fd == -1, "expected fd: -1, but got: %d", fd)
+		assert.EqualValuesf(s.tester, -1, fd, "expected fd: -1, but got: %d", fd)
 
 		addr := s.addrs[rand.Intn(len(s.addrs))]
 		network, address, _ := parseProtoAddr(addr)
@@ -609,7 +609,7 @@ func (s *testServer) OnShutdown(_ Engine) {
 		// Test invalid input
 		fd, err = s.eng.DupListener("tcp", "abc")
 		assert.ErrorIsf(s.tester, err, errorx.ErrInvalidNetworkAddress, "expected ErrInvalidNetworkAddress")
-		assert.Truef(s.tester, fd == -1, "expected fd: -1, but got: %d", fd)
+		assert.EqualValuesf(s.tester, -1, fd, "expected fd: -1, but got: %d", fd)
 	} else {
 		fd, err := s.eng.Dup()
 		assert.NoErrorf(s.tester, err, "Dup error")
@@ -686,7 +686,7 @@ func (s *testServer) OnTraffic(c Conn) (action Action) {
 		n, err = c.Write(buf)
 	}
 	assert.NoError(s.tester, err, "writev error")
-	assert.Truef(s.tester, n == len(buf), "short writev: expected %d, but got %d", len(buf), n)
+	assert.EqualValues(s.tester, n, len(buf), "short writev")
 
 	// Only for code coverage of testing.
 	if !s.multicore {
@@ -776,7 +776,7 @@ func (s *testServer) OnTick() (delay time.Duration, action Action) {
 		disconnected := atomic.LoadInt32(&s.disconnected)
 		if int(disconnected) == streamConns && disconnected == atomic.LoadInt32(&s.connected) {
 			action = Shutdown
-			assert.Truef(s.tester, s.eng.CountConnections() == 0, "expected 0 connections, but got %d", s.eng.CountConnections())
+			assert.EqualValues(s.tester, 0, s.eng.CountConnections())
 		}
 	}
 	return
@@ -1034,9 +1034,7 @@ func (t *testShutdownServer) OnBoot(eng Engine) (action Action) {
 }
 
 func (t *testShutdownServer) OnOpen(Conn) (out []byte, action Action) {
-	expected := atomic.AddInt32(&t.clients, 1)
-	assert.Truef(t.tester, int(expected) == t.eng.CountConnections(),
-		"expected %d connections, but got %d", expected, t.eng.CountConnections())
+	assert.EqualValues(t.tester, atomic.AddInt32(&t.clients, 1), t.eng.CountConnections())
 	return
 }
 
@@ -1105,10 +1103,10 @@ func (t *testCloseActionErrorServer) OnTraffic(c Conn) (action Action) {
 	buf := make([]byte, n)
 	m, err := c.Read(buf)
 	assert.NoError(t.tester, err)
-	assert.Truef(t.tester, n == m, "read %d bytes, expected %d", m, n)
+	assert.EqualValuesf(t.tester, n, m, "read %d bytes, expected %d", m, n)
 	n, err = c.Write(buf)
 	assert.NoError(t.tester, err)
-	assert.Truef(t.tester, m == n, "wrote %d bytes, expected %d", n, m)
+	assert.EqualValuesf(t.tester, m, n, "wrote %d bytes, expected %d", n, m)
 	action = Close
 	return
 }
@@ -2055,7 +2053,7 @@ func (t *testUDPSendtoServer) OnTraffic(c Conn) Action {
 		for _, addr := range t.clientAddrs {
 			n, err := c.SendTo(t.broadcastMsg, addr)
 			assert.NoError(t.tester, err, "c.SendTo error")
-			assert.Truef(t.tester, len(t.broadcastMsg) == n,
+			assert.EqualValuesf(t.tester, len(t.broadcastMsg), n,
 				"c.SendTo should send %d bytes, but sent %d bytes", len(t.broadcastMsg), n)
 		}
 	}
@@ -2076,7 +2074,7 @@ func (t *testUDPSendtoServer) OnTick() (delay time.Duration, action Action) {
 				msg := make([]byte, len(t.broadcastMsg))
 				_, err = c.Read(msg)
 				assert.NoError(t.tester, err)
-				assert.Truef(t.tester, bytes.Equal(msg, t.broadcastMsg),
+				assert.EqualValuesf(t.tester, msg, t.broadcastMsg,
 					"broadcast message mismatch, expected: %s, got: %s", t.broadcastMsg, msg)
 				t.mu.Lock()
 				t.clientCount--
@@ -2120,7 +2118,7 @@ func startUDPEchoServer(t *testing.T, c *net.UDPConn) {
 		}
 		if nr > 0 {
 			nw, err := c.WriteToUDP(buf[:nr], remote)
-			assert.Truef(t, nr == nw, "UDP echo server should send %d bytes, but sent %d bytes", nr, nw)
+			assert.EqualValuesf(t, nr, nw, "UDP echo server should send %d bytes, but sent %d bytes", nr, nw)
 			assert.NoErrorf(t, err, "error occurred on UDP echo server %v write to %s, %v",
 				remote, c.LocalAddr().String(), err)
 		}
@@ -2478,11 +2476,6 @@ func testStreamProxyServer(t *testing.T, addr string, backendServers []string, m
 		errorx.ErrUnsupportedOp, err)
 
 	for _, server := range netServers {
-		// Set a deadline in the past to unblock any pending I/O (e.g. ReadFromUDP/Accept)
-		// before closing, so the Close doesn't block on Windows with Go 1.26+.
-		if c, ok := server.(interface{ SetDeadline(time.Time) error }); ok {
-			c.SetDeadline(time.Now().Add(-time.Second)) //nolint:errcheck
-		}
 		require.NoError(t, server.Close(), "Close backend server error")
 	}
 
@@ -2548,7 +2541,7 @@ func (p *udpProxyServer) OnTraffic(c Conn) Action {
 		assert.Greaterf(p.tester, len(buf), 0, "Next should not return empty buffer")
 		n, err := c.Write(buf)
 		assert.NoError(p.tester, err, "Write error")
-		assert.Truef(p.tester, n == len(buf), "Write should send %d bytes, but sent %d bytes", len(buf), n)
+		assert.EqualValuesf(p.tester, n, len(buf), "Write should send %d bytes, but sent %d bytes", len(buf), n)
 
 		// Send the packet to a random backend server.
 		p.backendServerPoolMu.Lock()
@@ -2559,7 +2552,7 @@ func (p *udpProxyServer) OnTraffic(c Conn) Action {
 	} else { // it's a backend connection
 		buf, err := c.Next(len(p.packet))
 		assert.NoError(p.tester, err, "Next error")
-		assert.Truef(p.tester, bytes.Equal(buf, p.packet), "Packet mismatch, expected: %s, got: %s", p.packet, buf)
+		assert.EqualValuesf(p.tester, buf, p.packet, "Packet mismatch, expected: %s, got: %s", p.packet, buf)
 		atomic.AddInt32(&p.backendBytes, int32(len(buf)))
 	}
 	return None
@@ -2733,11 +2726,6 @@ func testUDPProxyServer(t *testing.T, addr string, backendServers []string, mult
 	require.NoErrorf(t, err, "Run error: %v", err)
 
 	for _, server := range netServers {
-		// Set a deadline in the past to unblock any pending I/O (e.g. ReadFromUDP/Accept)
-		// before closing, so the Close doesn't block on Windows with Go 1.26+.
-		if c, ok := server.(interface{ SetDeadline(time.Time) error }); ok {
-			c.SetDeadline(time.Now().Add(-time.Second)) //nolint:errcheck
-		}
 		require.NoError(t, server.Close(), "Close backend server error")
 	}
 
