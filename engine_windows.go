@@ -18,7 +18,6 @@ import (
 	"context"
 	"errors"
 	"strings"
-	"sync"
 	"sync/atomic"
 
 	"golang.org/x/sync/errgroup"
@@ -56,22 +55,10 @@ func (eng *engine) shutdown(err error) {
 }
 
 func (eng *engine) closeEventLoops() {
-	// Use a sync.WaitGroup to wait for all event loops to acknowledge the
-	// shutdown before closing listeners. This avoids a race on Windows where
-	// an event loop's WriteTo on a PacketConn holds the fd's write lock while
-	// listener.close() tries to acquire it via Close(), causing a deadlock.
-	// By waiting for the event loop to finish processing, we ensure no
-	// goroutine is performing I/O on the listener when it is closed.
-	var wg sync.WaitGroup
 	eng.eventLoops.iterate(func(i int, el *eventloop) bool {
-		wg.Add(1)
-		el.ch <- func() error {
-			wg.Done()
-			return errorx.ErrEngineShutdown
-		}
+		el.ch <- errorx.ErrEngineShutdown
 		return true
 	})
-	wg.Wait()
 	for _, ln := range eng.listeners {
 		ln.close()
 	}
