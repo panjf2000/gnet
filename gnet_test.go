@@ -827,15 +827,7 @@ func runServer(t *testing.T, addrs []string, conf *testConf) {
 func startClient(t *testing.T, network, addr string, multicore, async bool, packetSize int, stallCh chan struct{}) {
 	c, err := net.Dial(network, addr)
 	assert.NoError(t, err)
-	defer func() {
-		// On Windows with Go 1.26+, Close() blocks in semacquire if there is
-		// pending I/O on the connection (IOCP fd locking). Setting a deadline
-		// in the past cancels any in-flight read/write, allowing Close to proceed.
-		if runtime.GOOS == "windows" {
-			c.SetDeadline(time.Now().Add(-time.Second)) //nolint:errcheck
-		}
-		c.Close() //nolint:errcheck
-	}()
+	defer c.Close() //nolint:errcheck
 	rd := bufio.NewReader(c)
 	if network != "udp" {
 		msg, err := rd.ReadBytes('\n')
@@ -861,20 +853,10 @@ func startClient(t *testing.T, network, addr string, multicore, async bool, pack
 		_, err = crand.Read(reqData)
 		assert.NoError(t, err)
 		_, err = c.Write(reqData)
-		if err != nil {
-			break
-		}
+		assert.NoError(t, err)
 		respData := make([]byte, len(reqData))
-		// Set a read deadline to prevent blocking indefinitely if the
-		// server fails to respond (e.g., due to a dropped UDP packet
-		// on Windows). Without this, a single stuck client can cause
-		// the entire test to hang until the global test timeout.
-		c.SetReadDeadline(time.Now().Add(15 * time.Second)) //nolint:errcheck
 		_, err = io.ReadFull(rd, respData)
-		c.SetReadDeadline(time.Time{}) //nolint:errcheck
-		if err != nil {
-			break
-		}
+		assert.NoError(t, err)
 		if !async {
 			// assert.Equalf(t, reqData, respData, "response mismatch with protocol:%s, multi-core:%t, content of bytes: %d vs %d", network, multicore, string(reqData), string(respData))
 			assert.Equalf(
@@ -2496,19 +2478,7 @@ func testStreamProxyServer(t *testing.T, addr string, backendServers []string, m
 		errorx.ErrUnsupportedOp, err)
 
 	for _, server := range netServers {
-		// On Windows with Go 1.26+, Close() on a net.Listener or net.PacketConn
-		// with pending I/O blocks indefinitely in semacquire because the fd mutex
-		// is held by the blocked I/O operation. Setting a deadline in the past
-		// unblocks the pending I/O first, allowing Close() to proceed.
-		if runtime.GOOS == "windows" {
-			switch s := server.(type) {
-			case *net.UDPConn:
-				s.SetDeadline(time.Now().Add(-time.Second)) //nolint:errcheck
-			case *net.TCPListener:
-				s.SetDeadline(time.Now().Add(-time.Second)) //nolint:errcheck
-			}
-		}
-		server.Close() //nolint:errcheck
+		require.NoError(t, server.Close(), "Close backend server error")
 	}
 
 	backends.Wait() //nolint:errcheck
@@ -2758,19 +2728,7 @@ func testUDPProxyServer(t *testing.T, addr string, backendServers []string, mult
 	require.NoErrorf(t, err, "Run error: %v", err)
 
 	for _, server := range netServers {
-		// On Windows with Go 1.26+, Close() on a net.Listener or net.PacketConn
-		// with pending I/O blocks indefinitely in semacquire because the fd mutex
-		// is held by the blocked I/O operation. Setting a deadline in the past
-		// unblocks the pending I/O first, allowing Close() to proceed.
-		if runtime.GOOS == "windows" {
-			switch s := server.(type) {
-			case *net.UDPConn:
-				s.SetDeadline(time.Now().Add(-time.Second)) //nolint:errcheck
-			case *net.TCPListener:
-				s.SetDeadline(time.Now().Add(-time.Second)) //nolint:errcheck
-			}
-		}
-		server.Close() //nolint:errcheck
+		require.NoError(t, server.Close(), "Close backend server error")
 	}
 
 	backends.Wait() //nolint:errcheck
