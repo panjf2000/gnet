@@ -56,7 +56,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: ['1.20', '1.25']
+        go: ['1.20', '1.26']
         os:
           - ubuntu-latest
           - macos-14 # check out this issue: https://github.com/actions/runner-images/issues/10924
@@ -90,8 +90,14 @@ jobs:
       - name: Run unit tests for packages
         run: go test $(go list ./... | tail -n +2)
 
+      # NOTE: -race is conditionally disabled for Windows with Go 1.26 due to
+      # known instability of the Go race detector on this platform/version
+      # combination (intermittent crashes and timeouts observed in CI).
+      # This is likely a regression in Go 1.26 on Windows. Check out #752 and #754 for details.
+      # Once the underlying issue is resolved and CI is stable, this
+      # condition should be revisited so that race testing can be re-enabled.
       - name: Run integration tests
-        run: go test -v -race -coverprofile="codecov.report" -covermode=atomic -timeout 15m -failfast
+        run: go test -v ${{ !(runner.os == 'Windows' && startsWith(matrix.go, '1.26')) && '-race' || '' }} -coverprofile="codecov.report" -covermode=atomic -timeout 15m -failfast
 
       - name: Upload the code coverage report to codecov.io
         uses: codecov/codecov-action@v5
