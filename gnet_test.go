@@ -2475,14 +2475,23 @@ func testStreamProxyServer(t *testing.T, addr string, backendServers []string, m
 	require.ErrorIsf(t, err, errorx.ErrUnsupportedOp, "Expected error: %v, but got: %v",
 		errorx.ErrUnsupportedOp, err)
 
-	// Set deadline to unblock pending Accept/ReadFromUDP operations before closing.
-	// This allows the echo server goroutines to exit cleanly.
+	// Close servers to unblock pending I/O operations.
+	// For TCP listeners, we need to set a deadline before closing to unblock Accept on Windows.
+	// For UDP connections, we can close directly since closing unblocks ReadFromUDP.
 	type deadlineSetter interface {
 		SetDeadline(t time.Time) error
 	}
 	for _, server := range netServers {
-		if ds, ok := server.(deadlineSetter); ok {
-			ds.SetDeadline(time.Now().Add(-time.Second)) //nolint:errcheck
+		// Only set deadline for TCP listeners (net.Listener), not UDP connections
+		if ln, ok := server.(net.Listener); ok {
+			// For TCP listeners, set deadline to unblock Accept
+			if ds, ok := ln.(deadlineSetter); ok {
+				ds.SetDeadline(time.Now().Add(-time.Second)) //nolint:errcheck
+			}
+		}
+		// Close all servers (both TCP and UDP)
+		if closer, ok := server.(io.Closer); ok {
+			closer.Close() //nolint:errcheck
 		}
 	}
 
@@ -2732,14 +2741,23 @@ func testUDPProxyServer(t *testing.T, addr string, backendServers []string, mult
 		WithTicker(true))
 	require.NoErrorf(t, err, "Run error: %v", err)
 
-	// Set deadline to unblock pending ReadFromUDP operations before closing.
-	// This allows the echo server goroutines to exit cleanly.
+	// Close servers to unblock pending I/O operations.
+	// For TCP listeners, we need to set a deadline before closing to unblock Accept on Windows.
+	// For UDP connections, we can close directly since closing unblocks ReadFromUDP.
 	type deadlineSetter interface {
 		SetDeadline(t time.Time) error
 	}
 	for _, server := range netServers {
-		if ds, ok := server.(deadlineSetter); ok {
-			ds.SetDeadline(time.Now().Add(-time.Second)) //nolint:errcheck
+		// Only set deadline for TCP listeners (net.Listener), not UDP connections
+		if ln, ok := server.(net.Listener); ok {
+			// For TCP listeners, set deadline to unblock Accept
+			if ds, ok := ln.(deadlineSetter); ok {
+				ds.SetDeadline(time.Now().Add(-time.Second)) //nolint:errcheck
+			}
+		}
+		// Close all servers (both TCP and UDP)
+		if closer, ok := server.(io.Closer); ok {
+			closer.Close() //nolint:errcheck
 		}
 	}
 
