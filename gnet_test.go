@@ -2107,6 +2107,38 @@ func TestUDPSendtoServer(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+// deadlineSetter is an interface for connections that support setting deadlines.
+type deadlineSetter interface {
+	SetDeadline(t time.Time) error
+}
+
+// closeTestServers closes backend test servers with proper cleanup.
+// On Windows, TCP listeners need SetDeadline before Close to unblock Accept.
+// On other platforms, Close() already unblocks I/O operations properly.
+// UDP connections are closed directly without deadline manipulation to avoid Go 1.26 IOCP bugs.
+func closeTestServers(t *testing.T, servers []io.Closer) {
+	// On Windows, set deadline for TCP listeners before closing
+	if runtime.GOOS == "windows" {
+		for _, server := range servers {
+			// Only set deadline for TCP listeners (net.Listener), not UDP connections
+			if ln, ok := server.(net.Listener); ok {
+				// For TCP listeners, set deadline to unblock Accept on Windows
+				if ds, ok := ln.(deadlineSetter); ok {
+					if err := ds.SetDeadline(time.Now().Add(-time.Second)); err != nil && !errors.Is(err, net.ErrClosed) {
+						t.Logf("SetDeadline error on %v: %v", server, err)
+					}
+				}
+			}
+		}
+	}
+	// Close all servers (both TCP and UDP)
+	for _, server := range servers {
+		if err := server.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+			t.Logf("Close error on %v: %v", server, err)
+		}
+	}
+}
+
 func startUDPEchoServer(t *testing.T, c *net.UDPConn) {
 	defer c.Close() //nolint:errcheck
 
@@ -2475,28 +2507,8 @@ func testStreamProxyServer(t *testing.T, addr string, backendServers []string, m
 	require.ErrorIsf(t, err, errorx.ErrUnsupportedOp, "Expected error: %v, but got: %v",
 		errorx.ErrUnsupportedOp, err)
 
-	// Close servers to unblock pending I/O operations.
-	// On Windows, TCP listeners need SetDeadline before Close to unblock Accept.
-	// On other platforms, Close() already unblocks I/O operations properly.
-	// UDP connections should be closed directly without deadline manipulation to avoid Go 1.26 IOCP bugs.
-	if runtime.GOOS == "windows" {
-		type deadlineSetter interface {
-			SetDeadline(t time.Time) error
-		}
-		for _, server := range netServers {
-			// Only set deadline for TCP listeners (net.Listener), not UDP connections
-			if ln, ok := server.(net.Listener); ok {
-				// For TCP listeners, set deadline to unblock Accept on Windows
-				if ds, ok := ln.(deadlineSetter); ok {
-					ds.SetDeadline(time.Now().Add(-time.Second)) //nolint:errcheck
-				}
-			}
-		}
-	}
-	for _, server := range netServers {
-		// Close all servers (both TCP and UDP)
-		server.Close() //nolint:errcheck
-	}
+	// Close backend servers
+	closeTestServers(t, netServers)
 
 	backends.Wait() //nolint:errcheck
 }
@@ -2744,28 +2756,8 @@ func testUDPProxyServer(t *testing.T, addr string, backendServers []string, mult
 		WithTicker(true))
 	require.NoErrorf(t, err, "Run error: %v", err)
 
-	// Close servers to unblock pending I/O operations.
-	// On Windows, TCP listeners need SetDeadline before Close to unblock Accept.
-	// On other platforms, Close() already unblocks I/O operations properly.
-	// UDP connections should be closed directly without deadline manipulation to avoid Go 1.26 IOCP bugs.
-	if runtime.GOOS == "windows" {
-		type deadlineSetter interface {
-			SetDeadline(t time.Time) error
-		}
-		for _, server := range netServers {
-			// Only set deadline for TCP listeners (net.Listener), not UDP connections
-			if ln, ok := server.(net.Listener); ok {
-				// For TCP listeners, set deadline to unblock Accept on Windows
-				if ds, ok := ln.(deadlineSetter); ok {
-					ds.SetDeadline(time.Now().Add(-time.Second)) //nolint:errcheck
-				}
-			}
-		}
-	}
-	for _, server := range netServers {
-		// Close all servers (both TCP and UDP)
-		server.Close() //nolint:errcheck
-	}
+	// Close backend servers
+	closeTestServers(t, netServers)
 
 	backends.Wait() //nolint:errcheck
 }
