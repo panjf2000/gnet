@@ -680,6 +680,8 @@ func TestWakeConnImmediately(t *testing.T) {
 
 	clientEV := &clientEventsForWake{tester: t}
 	logPath := filepath.Join(t.TempDir(), "gnet-test-wake-conn-immediately.log")
+	// Ensure logging.Cleanup() is called before temp directory cleanup (registered after t.TempDir())
+	t.Cleanup(logging.Cleanup)
 	client, err := NewClient(clientEV,
 		WithSocketRecvBuffer(4*1024),
 		WithSocketSendBuffer(4*1024),
@@ -688,7 +690,6 @@ func TestWakeConnImmediately(t *testing.T) {
 		WithReadBufferCap(512),
 		WithWriteBufferCap(512))
 	assert.NoError(t, err)
-	logging.Cleanup()
 
 	err = client.Start()
 	assert.NoError(t, err)
