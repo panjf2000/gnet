@@ -2114,21 +2114,26 @@ type deadlineSetter interface {
 
 // closeTestServers closes backend test servers with proper cleanup.
 // On Windows, listeners (TCP/Unix/etc.) need SetDeadline before Close to unblock Accept.
+// UDP connections need SetReadDeadline (not SetDeadline) to unblock ReadFromUDP without
+// triggering the Go 1.26 Windows IOCP panic that occurs with SetDeadline during active writes.
 // On other platforms, Close() already unblocks I/O operations properly.
-// UDP connections are closed directly without SetDeadline to avoid triggering
-// a Go 1.26 Windows IOCP panic when SetDeadline is called during active writes.
 func closeTestServers(t *testing.T, servers []io.Closer) {
 	t.Helper()
-	// On Windows, set deadline for listeners before closing
+	// On Windows, set deadlines before closing to unblock pending I/O
 	if runtime.GOOS == "windows" {
 		for _, server := range servers {
-			// Only set deadline for listeners (net.Listener), not UDP connections
 			if ln, ok := server.(net.Listener); ok {
 				// For listeners, set deadline to unblock Accept on Windows
 				if ds, ok := ln.(deadlineSetter); ok {
 					if err := ds.SetDeadline(time.Now().Add(-time.Second)); err != nil && !errors.Is(err, net.ErrClosed) {
 						t.Errorf("SetDeadline error on %v: %v", server, err)
 					}
+				}
+			} else if udpConn, ok := server.(*net.UDPConn); ok {
+				// For UDP connections, use SetReadDeadline only (not SetDeadline) to unblock ReadFromUDP
+				// without triggering IOCP panic on the write side
+				if err := udpConn.SetReadDeadline(time.Now().Add(-time.Second)); err != nil && !errors.Is(err, net.ErrClosed) {
+					t.Errorf("SetReadDeadline error on %v: %v", server, err)
 				}
 			}
 		}
