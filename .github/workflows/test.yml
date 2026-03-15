@@ -93,7 +93,7 @@ jobs:
       # NOTE: -race is conditionally disabled for Windows with Go 1.26 due to
       # known instability of the Go race detector on this platform/version
       # combination (intermittent crashes and timeouts observed in CI).
-      # This is likely a regression in Go 1.26 on Windows.
+      # This is likely a regression in Go 1.26 on Windows. Check out #752 and #754 for details.
       # Once the underlying issue is resolved and CI is stable, this
       # condition should be revisited so that race testing can be re-enabled.
       - name: Run integration tests
