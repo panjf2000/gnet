@@ -2113,17 +2113,18 @@ type deadlineSetter interface {
 }
 
 // closeTestServers closes backend test servers with proper cleanup.
-// On Windows, TCP listeners need SetDeadline before Close to unblock Accept.
+// On Windows, listeners (TCP/Unix/etc.) need SetDeadline before Close to unblock Accept.
 // On other platforms, Close() already unblocks I/O operations properly.
 // UDP connections are closed directly without SetDeadline to avoid triggering
 // a Go 1.26 Windows IOCP panic when SetDeadline is called during active writes.
 func closeTestServers(t *testing.T, servers []io.Closer) {
-	// On Windows, set deadline for TCP listeners before closing
+	t.Helper()
+	// On Windows, set deadline for listeners before closing
 	if runtime.GOOS == "windows" {
 		for _, server := range servers {
-			// Only set deadline for TCP listeners (net.Listener), not UDP connections
+			// Only set deadline for listeners (net.Listener), not UDP connections
 			if ln, ok := server.(net.Listener); ok {
-				// For TCP listeners, set deadline to unblock Accept on Windows
+				// For listeners, set deadline to unblock Accept on Windows
 				if ds, ok := ln.(deadlineSetter); ok {
 					if err := ds.SetDeadline(time.Now().Add(-time.Second)); err != nil && !errors.Is(err, net.ErrClosed) {
 						t.Errorf("SetDeadline error on %v: %v", server, err)
