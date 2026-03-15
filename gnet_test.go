@@ -2476,6 +2476,16 @@ func testStreamProxyServer(t *testing.T, addr string, backendServers []string, m
 		errorx.ErrUnsupportedOp, err)
 
 	for _, server := range netServers {
+		// On Windows Go 1.26+ IOCP, Close() doesn't immediately unblock pending IO operations.
+		// We need to set a deadline in the past to unblock ReadFromUDP/Accept before closing.
+		if runtime.GOOS == "windows" {
+			type deadlineSetter interface {
+				SetDeadline(t time.Time) error
+			}
+			if ds, ok := server.(deadlineSetter); ok {
+				ds.SetDeadline(time.Now().Add(-time.Second)) //nolint:errcheck
+			}
+		}
 		require.NoError(t, server.Close(), "Close backend server error")
 	}
 
@@ -2726,6 +2736,16 @@ func testUDPProxyServer(t *testing.T, addr string, backendServers []string, mult
 	require.NoErrorf(t, err, "Run error: %v", err)
 
 	for _, server := range netServers {
+		// On Windows Go 1.26+ IOCP, Close() doesn't immediately unblock pending IO operations.
+		// We need to set a deadline in the past to unblock ReadFromUDP before closing.
+		if runtime.GOOS == "windows" {
+			type deadlineSetter interface {
+				SetDeadline(t time.Time) error
+			}
+			if ds, ok := server.(deadlineSetter); ok {
+				ds.SetDeadline(time.Now().Add(-time.Second)) //nolint:errcheck
+			}
+		}
 		require.NoError(t, server.Close(), "Close backend server error")
 	}
 
