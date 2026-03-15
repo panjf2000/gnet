@@ -50,6 +50,10 @@ func (eng *engine) shutdown(err error) {
 	if err != nil && !errors.Is(err, errorx.ErrEngineShutdown) {
 		eng.opts.Logger.Errorf("engine is being shutdown with error: %v", err)
 	}
+	// Close listeners first to unblock any I/O operations (like ReadFrom in ListenUDP).
+	// This must happen before turnOff() because the listener goroutines are blocked
+	// on I/O and can't reach their ctx.Done() select until the I/O is unblocked.
+	eng.closeListeners()
 	eng.turnOff()
 	eng.beingShutdown.Store(true)
 }
@@ -112,18 +116,9 @@ func (eng *engine) start(ctx context.Context, numEventLoop int) error {
 }
 
 func (eng *engine) stop(ctx context.Context, engine Engine) {
-	// Close listeners first to unblock any pending I/O operations (like ReadFrom in ListenUDP)
-	// This must happen before waiting for ctx.Done() to avoid deadlock on Windows where:
-	// 1. ListenUDP is blocked on ReadFrom and waiting for ctx.Done() in select
-	// 2. ctx.Done() won't fire until ListenUDP's defer calls shutdown()
-	// 3. But ListenUDP can't return until ReadFrom is unblocked by ln.close()
-	// However, we DON'T signal event loops yet - that happens after ctx.Done().
-	eng.closeListeners()
-
 	<-ctx.Done()
 
-	// Now signal event loops to shut down after goroutines have finished
-	eng.signalShutdownToEventLoops()
+	eng.closeEventLoops()
 
 	eng.eventHandler.OnShutdown(engine)
 
