@@ -2490,9 +2490,7 @@ func testStreamProxyServer(t *testing.T, addr string, backendServers []string, m
 			}
 		}
 		// Close all servers (both TCP and UDP)
-		if closer, ok := server.(io.Closer); ok {
-			closer.Close() //nolint:errcheck
-		}
+		server.Close() //nolint:errcheck
 	}
 
 	backends.Wait() //nolint:errcheck
@@ -2756,9 +2754,7 @@ func testUDPProxyServer(t *testing.T, addr string, backendServers []string, mult
 			}
 		}
 		// Close all servers (both TCP and UDP)
-		if closer, ok := server.(io.Closer); ok {
-			closer.Close() //nolint:errcheck
-		}
+		server.Close() //nolint:errcheck
 	}
 
 	backends.Wait() //nolint:errcheck
