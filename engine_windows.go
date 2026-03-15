@@ -104,11 +104,16 @@ func (eng *engine) start(ctx context.Context, numEventLoop int) error {
 }
 
 func (eng *engine) stop(ctx context.Context, engine Engine) {
+	// Close event loops first to unblock any pending I/O operations (like ReadFrom in ListenUDP)
+	// This must happen before waiting for ctx.Done() to avoid deadlock on Windows where:
+	// 1. ListenUDP is blocked on ReadFrom and waiting for ctx.Done() in select
+	// 2. ctx.Done() won't fire until ListenUDP's defer calls shutdown()
+	// 3. But ListenUDP can't return until ReadFrom is unblocked by ln.close()
+	eng.closeEventLoops()
+
 	<-ctx.Done()
 
 	eng.eventHandler.OnShutdown(engine)
-
-	eng.closeEventLoops()
 
 	if err := eng.concurrency.Wait(); err != nil && !errors.Is(err, errorx.ErrEngineShutdown) {
 		eng.opts.Logger.Errorf("engine shutdown error: %v", err)
