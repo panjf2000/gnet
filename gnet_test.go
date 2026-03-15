@@ -2497,6 +2497,11 @@ func testStreamProxyServer(t *testing.T, addr string, backendServers []string, m
 	err = Run(&srv, addr, WithEdgeTriggeredIO(et), WithMulticore(multicore), WithTicker(true))
 	require.NoErrorf(t, err, "Run error: %v", err)
 
+	// Close backend servers immediately after Run returns to unblock any blocking I/O
+	// This must happen before backends.Wait() to prevent deadlock on Windows where
+	// UDP ReadFromUDP blocks indefinitely without a deadline
+	closeTestServers(t, netServers)
+
 	// Test the error handling of the methods of EventLoop after a shutdown.
 	_, err = srv.engine.Register(context.Background())
 	assert.ErrorIsf(t, err, errorx.ErrEngineInShutdown, "Expected error: %v, but got: %v",
@@ -2513,9 +2518,6 @@ func testStreamProxyServer(t *testing.T, addr string, backendServers []string, m
 	err = srv.eventLoop.Schedule(context.Background(), nil, time.Millisecond)
 	require.ErrorIsf(t, err, errorx.ErrUnsupportedOp, "Expected error: %v, but got: %v",
 		errorx.ErrUnsupportedOp, err)
-
-	// Close backend servers
-	closeTestServers(t, netServers)
 
 	backends.Wait() //nolint:errcheck
 }
