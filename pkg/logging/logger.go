@@ -221,7 +221,14 @@ func CreateLoggerAsLocalFile(localFilePath string, logLevel Level) (logger Logge
 	core := zapcore.NewCore(encoder, ws, levelEnabler)
 	zapLogger := zap.New(core, zap.AddCaller(), zap.AddStacktrace(ErrorLevel))
 	logger = zapLogger.Sugar()
-	flush = zapLogger.Sync
+	// Combined flusher that both syncs the zap logger and closes the lumberjack file handle.
+	// This is critical for Windows, which cannot delete files with open handles.
+	flush = func() error {
+		if err := zapLogger.Sync(); err != nil {
+			return err
+		}
+		return lumberJackLogger.Close()
+	}
 	return
 }
 
