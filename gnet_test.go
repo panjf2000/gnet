@@ -2475,21 +2475,27 @@ func testStreamProxyServer(t *testing.T, addr string, backendServers []string, m
 	require.ErrorIsf(t, err, errorx.ErrUnsupportedOp, "Expected error: %v, but got: %v",
 		errorx.ErrUnsupportedOp, err)
 
-	for _, server := range netServers {
-		// On Windows Go 1.26+ IOCP, Close() doesn't immediately unblock pending IO operations.
-		// We need to set a deadline in the past to unblock ReadFromUDP/Accept before closing.
-		if runtime.GOOS == "windows" {
-			type deadlineSetter interface {
-				SetDeadline(t time.Time) error
-			}
+	// On Windows Go 1.26+ IOCP, set deadline to unblock pending ReadFromUDP/Accept operations.
+	// The echo server goroutines will then exit and close via their defer statements.
+	if runtime.GOOS == "windows" {
+		type deadlineSetter interface {
+			SetDeadline(t time.Time) error
+		}
+		for _, server := range netServers {
 			if ds, ok := server.(deadlineSetter); ok {
 				ds.SetDeadline(time.Now().Add(-time.Second)) //nolint:errcheck
 			}
 		}
-		require.NoError(t, server.Close(), "Close backend server error")
 	}
 
 	backends.Wait() //nolint:errcheck
+
+	// On non-Windows platforms, manually close the servers since they don't have the deadline set.
+	if runtime.GOOS != "windows" {
+		for _, server := range netServers {
+			require.NoError(t, server.Close(), "Close backend server error")
+		}
+	}
 }
 
 type udpProxyServer struct {
@@ -2735,19 +2741,25 @@ func testUDPProxyServer(t *testing.T, addr string, backendServers []string, mult
 		WithTicker(true))
 	require.NoErrorf(t, err, "Run error: %v", err)
 
-	for _, server := range netServers {
-		// On Windows Go 1.26+ IOCP, Close() doesn't immediately unblock pending IO operations.
-		// We need to set a deadline in the past to unblock ReadFromUDP before closing.
-		if runtime.GOOS == "windows" {
-			type deadlineSetter interface {
-				SetDeadline(t time.Time) error
-			}
+	// On Windows Go 1.26+ IOCP, set deadline to unblock pending ReadFromUDP operations.
+	// The echo server goroutines will then exit and close via their defer statements.
+	if runtime.GOOS == "windows" {
+		type deadlineSetter interface {
+			SetDeadline(t time.Time) error
+		}
+		for _, server := range netServers {
 			if ds, ok := server.(deadlineSetter); ok {
 				ds.SetDeadline(time.Now().Add(-time.Second)) //nolint:errcheck
 			}
 		}
-		require.NoError(t, server.Close(), "Close backend server error")
 	}
 
 	backends.Wait() //nolint:errcheck
+
+	// On non-Windows platforms, manually close the servers since they don't have the deadline set.
+	if runtime.GOOS != "windows" {
+		for _, server := range netServers {
+			require.NoError(t, server.Close(), "Close backend server error")
+		}
+	}
 }
