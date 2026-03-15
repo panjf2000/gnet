@@ -2765,7 +2765,9 @@ func testUDPProxyServer(t *testing.T, addr string, backendServers []string, mult
 		WithTicker(true))
 	require.NoErrorf(t, err, "Run error: %v", err)
 
-	// Close backend servers
+	// Close backend servers immediately after Run returns to unblock any blocking I/O
+	// This must happen before backends.Wait() to prevent deadlock on Windows where
+	// UDP ReadFromUDP blocks indefinitely without a deadline
 	closeTestServers(t, netServers)
 
 	backends.Wait() //nolint:errcheck
