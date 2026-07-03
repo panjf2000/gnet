@@ -183,7 +183,8 @@ func (el *eventloop) enroll(c net.Conn, addr net.Addr, ctx any) (resCh chan Regi
 			return
 		}
 
-		gc.ctx = ctx
+		gc.SetContext(ctx)
+		gc.SetSafeContext(ctx)
 
 		connOpened := make(chan struct{})
 		ccb := &connWithCallback{c: gc, cb: func() {

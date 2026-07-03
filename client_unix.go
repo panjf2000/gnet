@@ -274,7 +274,8 @@ func (cli *Client) EnrollContext(c net.Conn, ctx any) (Conn, error) {
 	default:
 		return nil, errorx.ErrUnsupportedProtocol
 	}
-	gc.ctx = ctx
+	gc.SetContext(ctx)
+	gc.SetSafeContext(ctx)
 
 	connOpened := make(chan struct{})
 	ccb := &connWithCallback{c: gc, cb: func() {

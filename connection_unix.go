@@ -20,6 +20,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/sys/unix"
@@ -39,6 +40,7 @@ type conn struct {
 	fd             int                    // file descriptor
 	gfd            gfd.GFD                // gnet file descriptor
 	ctx            any                    // user-defined context
+	safeCtx        atomic.Pointer[any]    // safe user-defined context
 	remote         unix.Sockaddr          // remote socket address
 	proto          string                 // protocol name: "tcp", "udp", or "unix".
 	localAddr      net.Addr               // local addr
@@ -91,6 +93,7 @@ func (c *conn) release() {
 	c.opened = false
 	c.isEOF = false
 	c.ctx = nil
+	c.safeCtx.Store(nil)
 	c.buffer = nil
 	if addr, ok := c.localAddr.(*net.TCPAddr); ok && len(c.loop.listeners) == 0 && len(addr.Zone) > 0 {
 		bsPool.Put(bs.StringToBytes(addr.Zone))
@@ -558,4 +561,15 @@ func (*conn) SetReadDeadline(_ time.Time) error {
 
 func (*conn) SetWriteDeadline(_ time.Time) error {
 	return errorx.ErrUnsupportedOp
+}
+
+func (c *conn) SafeContext() (ctx any) {
+	if p := c.safeCtx.Load(); p != nil {
+		return *p
+	}
+	return nil
+}
+
+func (c *conn) SetSafeContext(ctx any) {
+	c.safeCtx.Store(&ctx)
 }

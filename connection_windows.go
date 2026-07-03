@@ -19,6 +19,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -52,14 +53,15 @@ type openConn struct {
 
 type conn struct {
 	pc            net.PacketConn
-	ctx           any                // user-defined context
-	loop          *eventloop         // owner event-loop
-	buffer        *bbPool.ByteBuffer // reuse memory of inbound data as a temporary buffer
-	cache         []byte             // temporary cache for the inbound data
-	rawConn       net.Conn           // original connection
-	localAddr     net.Addr           // local server addr
-	remoteAddr    net.Addr           // remote addr
-	inboundBuffer elastic.RingBuffer // buffer for data from the remote
+	ctx           any                 // user-defined context
+	safeCtx       atomic.Pointer[any] // safe user-defined context
+	loop          *eventloop          // owner event-loop
+	buffer        *bbPool.ByteBuffer  // reuse memory of inbound data as a temporary buffer
+	cache         []byte              // temporary cache for the inbound data
+	rawConn       net.Conn            // original connection
+	localAddr     net.Addr            // local server addr
+	remoteAddr    net.Addr            // remote addr
+	inboundBuffer elastic.RingBuffer  // buffer for data from the remote
 }
 
 func packTCPConn(c *conn, buf []byte) *tcpConn {
@@ -84,7 +86,7 @@ func packUDPConn(c *conn, buf []byte) *udpConn {
 }
 
 func newStreamConn(el *eventloop, nc net.Conn, ctx any) (c *conn) {
-	return &conn{
+	c = &conn{
 		ctx:        ctx,
 		loop:       el,
 		buffer:     bbPool.Get(),
@@ -92,10 +94,13 @@ func newStreamConn(el *eventloop, nc net.Conn, ctx any) (c *conn) {
 		localAddr:  nc.LocalAddr(),
 		remoteAddr: nc.RemoteAddr(),
 	}
+	c.SetSafeContext(ctx)
+	return c
 }
 
 func (c *conn) release() {
 	c.ctx = nil
+	c.safeCtx.Store(nil)
 	c.localAddr = nil
 	if c.rawConn != nil {
 		c.rawConn = nil
@@ -107,7 +112,7 @@ func (c *conn) release() {
 }
 
 func newUDPConn(el *eventloop, pc net.PacketConn, rc net.Conn, localAddr, remoteAddr net.Addr, ctx any) *conn {
-	return &conn{
+	c := &conn{
 		ctx:        ctx,
 		pc:         pc,
 		rawConn:    rc,
@@ -116,6 +121,8 @@ func newUDPConn(el *eventloop, pc net.PacketConn, rc net.Conn, localAddr, remote
 		localAddr:  localAddr,
 		remoteAddr: remoteAddr,
 	}
+	c.SetSafeContext(ctx)
+	return c
 }
 
 func (c *conn) resetBuffer() {
@@ -572,4 +579,15 @@ func (*conn) SetReadDeadline(_ time.Time) error {
 
 func (*conn) SetWriteDeadline(_ time.Time) error {
 	return errorx.ErrUnsupportedOp
+}
+
+func (c *conn) SafeContext() (ctx any) {
+	if p := c.safeCtx.Load(); p != nil {
+		return *p
+	}
+	return nil
+}
+
+func (c *conn) SetSafeContext(ctx any) {
+	c.safeCtx.Store(&ctx)
 }

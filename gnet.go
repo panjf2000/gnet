@@ -430,6 +430,10 @@ type Conn interface {
 	// you must invoke it within any method in EventHandler.
 	Context() (ctx any)
 
+	// SafeContext returns a user-defined context, it's concurrency-safe,
+	// you can invoke it on any goroutine.
+	SafeContext() (ctx any)
+
 	// EventLoop returns the event-loop that the connection belongs to.
 	// The returned EventLoop is concurrency-safe.
 	EventLoop() EventLoop
@@ -437,6 +441,10 @@ type Conn interface {
 	// SetContext sets a user-defined context, it's not concurrency-safe,
 	// you must invoke it within any method in EventHandler.
 	SetContext(ctx any)
+
+	// SetSafeContext sets a user-defined context, it's concurrency-safe,
+	// you can invoke it on any goroutine.
+	SetSafeContext(ctx any)
 
 	// LocalAddr is the connection's local socket address, it's not concurrency-safe,
 	// you must invoke it within any method in EventHandler.
