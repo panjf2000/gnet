@@ -1724,8 +1724,8 @@ func (t *testDisconnectedAsyncWriteServer) OnTick() (delay time.Duration, action
 
 func TestDisconnectedAsyncWrite(t *testing.T) {
 	t.Run("async-write", func(t *testing.T) {
-		events := &testDisconnectedAsyncWriteServer{tester: t, addr: ":10000"}
-		err := Run(events, "tcp://:10000", WithTicker(true))
+		events := &testDisconnectedAsyncWriteServer{tester: t, addr: ":19999"}
+		err := Run(events, "tcp://:19999", WithTicker(true))
 		assert.NoError(t, err)
 	})
 	t.Run("async-writev", func(t *testing.T) {
@@ -2100,8 +2100,8 @@ func TestUDPSendtoServer(t *testing.T) {
 	// while sendto fails on macOS with EINVAL (invalid argument) that might
 	// also occur on more BSD systems: FreeBSD, OpenBSD, NetBSD, and DragonflyBSD.
 	// To pass this test on all platforms, specify an explicit IP address here.
-	// addr := ":10000"
-	addr := "127.0.0.1:10000"
+	// addr := ":19999"
+	addr := "127.0.0.1:19999"
 	events := &testUDPSendtoServer{tester: t, addr: addr}
 	err := Run(events, "udp://"+addr, WithTicker(true))
 	assert.NoError(t, err)
@@ -2323,7 +2323,7 @@ func (p *streamProxyServer) OnTick() (time.Duration, Action) {
 
 func TestStreamProxyServer(t *testing.T) {
 	t.Run("tcp-proxy-server", func(t *testing.T) {
-		addr := "tcp://127.0.0.1:10000"
+		addr := "tcp://127.0.0.1:19999"
 		backendServers := []string{
 			"tcp://127.0.0.1:10001",
 			"tcp://127.0.0.1:10002",
@@ -2618,7 +2618,7 @@ func (p *udpProxyServer) OnTick() (delay time.Duration, action Action) {
 
 func TestUDPProxyServer(t *testing.T) {
 	t.Run("backend-udp-proxy-server", func(t *testing.T) {
-		addr := "udp://127.0.0.1:10000"
+		addr := "udp://127.0.0.1:19999"
 		backendServers := []string{
 			"udp://127.0.0.1:10001",
 			"udp://127.0.0.1:10002",
@@ -2730,4 +2730,157 @@ func testUDPProxyServer(t *testing.T, addr string, backendServers []string, mult
 	}
 
 	backends.Wait() //nolint:errcheck
+}
+
+// TestSafeContext verifies that Conn.SafeContext()/SetSafeContext() behave
+// correctly: the value set is always the value retrieved, mixing different
+// concrete types (including nil) across calls never panics, and calling
+// SafeContext() concurrently from goroutines other than the event-loop
+// goroutine is race-free, per the "concurrency-safe" contract documented
+// on the Conn interface.
+func TestSafeContext(t *testing.T) {
+	testSafeContext(t, "tcp", ":9979")
+}
+
+type safeCtxPayloadA struct{ n int32 }
+type safeCtxPayloadB struct{ s string }
+
+type testSafeContextServer struct {
+	BuiltinEventEngine
+	tester        *testing.T
+	network, addr string
+
+	trafficCount   int32
+	backgroundHits int32
+	stopBackground chan struct{}
+	done           chan struct{}
+	closedConn     Conn
+}
+
+func (s *testSafeContextServer) OnBoot(Engine) (action Action) {
+	err := goPool.DefaultWorkerPool.Submit(func() {
+		c, err := net.Dial(s.network, s.addr)
+		assert.NoError(s.tester, err)
+		defer c.Close() //nolint:errcheck
+
+		for i := 0; i < 5; i++ {
+			_, err = c.Write([]byte("ping"))
+			assert.NoError(s.tester, err)
+			buf := make([]byte, 4)
+			_, err = io.ReadFull(c, buf)
+			assert.NoError(s.tester, err)
+			assert.Equal(s.tester, "pong", string(buf))
+		}
+	})
+	assert.NoError(s.tester, err)
+	return None
+}
+
+func (s *testSafeContextServer) OnOpen(c Conn) (out []byte, action Action) {
+	// SafeContext() must return nil before SetSafeContext() is ever called.
+	assert.Nil(s.tester, c.SafeContext(), "expected nil SafeContext before first SetSafeContext")
+
+	c.SetContext(c)
+	c.SetSafeContext(&safeCtxPayloadA{n: 0})
+
+	s.stopBackground = make(chan struct{})
+	// Exercise SafeContext() concurrently from a goroutine other than the
+	// event-loop goroutine, which is the entire point of "Safe" in its name.
+	err := goPool.DefaultWorkerPool.Submit(func() {
+		for {
+			select {
+			case <-s.stopBackground:
+				return
+			default:
+			}
+			switch v := c.SafeContext().(type) {
+			case nil:
+			case *safeCtxPayloadA:
+				_ = v.n
+			case *safeCtxPayloadB:
+				_ = v.s
+			case int:
+			default:
+				assert.Failf(s.tester, "unexpected SafeContext type", "%T", v)
+			}
+			atomic.AddInt32(&s.backgroundHits, 1)
+		}
+	})
+	assert.NoError(s.tester, err)
+
+	return
+}
+
+func (s *testSafeContextServer) OnTraffic(c Conn) (action Action) {
+	buf, err := c.Next(-1)
+	assert.NoError(s.tester, err)
+	assert.Equal(s.tester, "ping", string(buf))
+
+	n := atomic.AddInt32(&s.trafficCount, 1)
+	// Rotate through different concrete types, including nil, on every
+	// call - this must never panic.
+	switch n % 4 {
+	case 0:
+		c.SetSafeContext(&safeCtxPayloadA{n: n})
+		got, ok := c.SafeContext().(*safeCtxPayloadA)
+		assert.True(s.tester, ok, "expected *safeCtxPayloadA")
+		assert.EqualValues(s.tester, n, got.n)
+	case 1:
+		c.SetSafeContext(&safeCtxPayloadB{s: "hello"})
+		got, ok := c.SafeContext().(*safeCtxPayloadB)
+		assert.True(s.tester, ok, "expected *safeCtxPayloadB")
+		assert.Equal(s.tester, "hello", got.s)
+	case 2:
+		c.SetSafeContext(int(n))
+		got, ok := c.SafeContext().(int)
+		assert.True(s.tester, ok, "expected int")
+		assert.EqualValues(s.tester, n, got)
+	case 3:
+		c.SetSafeContext(nil)
+		assert.Nil(s.tester, c.SafeContext(), "expected nil after SetSafeContext(nil)")
+	}
+
+	// Context() (the non-safe variant) must be untouched by SafeContext calls.
+	assert.Equal(s.tester, c, c.Context(), "invalid context")
+
+	_, err = c.Write([]byte("pong"))
+	assert.NoError(s.tester, err)
+
+	if n >= 5 {
+		action = Close
+	}
+	return
+}
+
+func (s *testSafeContextServer) OnClose(c Conn, _ error) (action Action) {
+	// SafeContext() must still be safely callable (no panic) right up
+	// until release(), which happens after OnClose returns.
+	_ = c.SafeContext()
+
+	close(s.stopBackground)
+	assert.Greater(s.tester, atomic.LoadInt32(&s.backgroundHits), int32(0),
+		"expected background goroutine to observe SafeContext() at least once")
+
+	s.closedConn = c
+	close(s.done)
+	action = Shutdown
+	return
+}
+
+func testSafeContext(t *testing.T, network, addr string) {
+	events := &testSafeContextServer{tester: t, network: network, addr: addr, done: make(chan struct{})}
+	err := Run(events, network+"://"+addr)
+	assert.NoError(t, err)
+	select {
+	case <-events.done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timeout waiting for test completion")
+	}
+
+	// release() (which nils out safeCtx) runs on the event-loop goroutine
+	// immediately after OnClose returns, racing with this goroutine waking
+	// up from events.done, so poll briefly instead of asserting once.
+	assert.Eventually(t, func() bool {
+		return events.closedConn.SafeContext() == nil
+	}, time.Second, time.Millisecond, "SafeContext() must be nil once the connection is released")
 }
