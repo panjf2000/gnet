@@ -844,19 +844,22 @@ func TestClientSafeContext(t *testing.T) {
 	assert.NoError(t, err)
 
 	initialCtx := &safeCtxPayloadA{n: 42}
+	ev.initialCtx = initialCtx
 	c, err := cli.DialContext("tcp", "127.0.0.1:9978", initialCtx)
 	assert.NoError(t, err)
-
-	// Immediately after DialContext, both Context() and SafeContext()
-	// must reflect the ctx argument that was passed in.
-	assert.Equal(t, initialCtx, c.Context())
-	assert.Equal(t, initialCtx, c.SafeContext())
 
 	select {
 	case <-ev.done:
 	case <-time.After(5 * time.Second):
 		t.Fatal("timeout waiting for test completion")
 	}
+
+	// release() (which nils out safeCtx) runs on the event-loop goroutine
+	// immediately after OnClose returns, racing with this goroutine waking
+	// up from ev.done, so poll briefly instead of asserting once.
+	assert.Eventually(t, func() bool {
+		return c.SafeContext() == nil
+	}, time.Second, time.Millisecond, "SafeContext() must be nil once the connection is released")
 }
 
 type clientSafeContextEvents struct {
@@ -864,12 +867,20 @@ type clientSafeContextEvents struct {
 	tester *testing.T
 	done   chan struct{}
 
+	initialCtx any
+
 	trafficCount   int32
 	backgroundHits int32
 	stopBackground chan struct{}
 }
 
 func (ev *clientSafeContextEvents) OnOpen(c Conn) (out []byte, action Action) {
+	// OnOpen always runs before any OnTraffic event for this connection, so
+	// asserting here is guaranteed to observe the dial-time ctx before it can
+	// be overwritten by OnTraffic's SetSafeContext calls.
+	assert.Equal(ev.tester, ev.initialCtx, c.Context())
+	assert.Equal(ev.tester, ev.initialCtx, c.SafeContext())
+
 	ev.stopBackground = make(chan struct{})
 	// Exercise SafeContext() concurrently from a goroutine other than the
 	// event-loop goroutine.

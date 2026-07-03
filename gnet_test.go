@@ -2754,6 +2754,7 @@ type testSafeContextServer struct {
 	backgroundHits int32
 	stopBackground chan struct{}
 	done           chan struct{}
+	closedConn     Conn
 }
 
 func (s *testSafeContextServer) OnBoot(Engine) (action Action) {
@@ -2860,6 +2861,7 @@ func (s *testSafeContextServer) OnClose(c Conn, _ error) (action Action) {
 	assert.Greater(s.tester, atomic.LoadInt32(&s.backgroundHits), int32(0),
 		"expected background goroutine to observe SafeContext() at least once")
 
+	s.closedConn = c
 	close(s.done)
 	action = Shutdown
 	return
@@ -2874,4 +2876,11 @@ func testSafeContext(t *testing.T, network, addr string) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("timeout waiting for test completion")
 	}
+
+	// release() (which nils out safeCtx) runs on the event-loop goroutine
+	// immediately after OnClose returns, racing with this goroutine waking
+	// up from events.done, so poll briefly instead of asserting once.
+	assert.Eventually(t, func() bool {
+		return events.closedConn.SafeContext() == nil
+	}, time.Second, time.Millisecond, "SafeContext() must be nil once the connection is released")
 }
