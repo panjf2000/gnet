@@ -1724,8 +1724,8 @@ func (t *testDisconnectedAsyncWriteServer) OnTick() (delay time.Duration, action
 
 func TestDisconnectedAsyncWrite(t *testing.T) {
 	t.Run("async-write", func(t *testing.T) {
-		events := &testDisconnectedAsyncWriteServer{tester: t, addr: ":10000"}
-		err := Run(events, "tcp://:10000", WithTicker(true))
+		events := &testDisconnectedAsyncWriteServer{tester: t, addr: ":19999"}
+		err := Run(events, "tcp://:19999", WithTicker(true))
 		assert.NoError(t, err)
 	})
 	t.Run("async-writev", func(t *testing.T) {
@@ -2100,8 +2100,8 @@ func TestUDPSendtoServer(t *testing.T) {
 	// while sendto fails on macOS with EINVAL (invalid argument) that might
 	// also occur on more BSD systems: FreeBSD, OpenBSD, NetBSD, and DragonflyBSD.
 	// To pass this test on all platforms, specify an explicit IP address here.
-	// addr := ":10000"
-	addr := "127.0.0.1:10000"
+	// addr := ":19999"
+	addr := "127.0.0.1:19999"
 	events := &testUDPSendtoServer{tester: t, addr: addr}
 	err := Run(events, "udp://"+addr, WithTicker(true))
 	assert.NoError(t, err)
@@ -2323,7 +2323,7 @@ func (p *streamProxyServer) OnTick() (time.Duration, Action) {
 
 func TestStreamProxyServer(t *testing.T) {
 	t.Run("tcp-proxy-server", func(t *testing.T) {
-		addr := "tcp://127.0.0.1:10000"
+		addr := "tcp://127.0.0.1:19999"
 		backendServers := []string{
 			"tcp://127.0.0.1:10001",
 			"tcp://127.0.0.1:10002",
@@ -2618,7 +2618,7 @@ func (p *udpProxyServer) OnTick() (delay time.Duration, action Action) {
 
 func TestUDPProxyServer(t *testing.T) {
 	t.Run("backend-udp-proxy-server", func(t *testing.T) {
-		addr := "udp://127.0.0.1:10000"
+		addr := "udp://127.0.0.1:19999"
 		backendServers := []string{
 			"udp://127.0.0.1:10001",
 			"udp://127.0.0.1:10002",
