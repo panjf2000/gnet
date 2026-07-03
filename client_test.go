@@ -796,3 +796,145 @@ func (cli clientReadOnEOF) OnTraffic(c Conn) (action Action) {
 	}{data: data, err: err}
 	return None
 }
+
+// TestClientSafeContext verifies that a client-side Conn's SafeContext()/
+// SetSafeContext() behave correctly on connections created via
+// Client.Dial/DialContext/EnrollContext: DialContext's ctx argument is
+// reflected by both Context() and SafeContext(), switching the stored
+// concrete type (including nil) across calls never panics, and
+// SafeContext() is safe to call concurrently from a goroutine other than
+// the event-loop goroutine.
+func TestClientSafeContext(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:9978")
+	assert.NoError(t, err)
+	defer ln.Close() //nolint:errcheck
+
+	err = goPool.DefaultWorkerPool.Submit(func() {
+		for i := 0; i < 5; i++ {
+			conn, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			err = goPool.DefaultWorkerPool.Submit(func() {
+				buf := make([]byte, 4)
+				for {
+					_, err := io.ReadFull(conn, buf)
+					if err != nil {
+						conn.Close() //nolint:errcheck
+						return
+					}
+					_, err = conn.Write([]byte("pong"))
+					if err != nil {
+						conn.Close() //nolint:errcheck
+						return
+					}
+				}
+			})
+			assert.NoError(t, err)
+		}
+	})
+	assert.NoError(t, err)
+
+	ev := &clientSafeContextEvents{tester: t, done: make(chan struct{})}
+	cli, err := NewClient(ev)
+	assert.NoError(t, err)
+	defer cli.Stop() //nolint:errcheck
+
+	err = cli.Start()
+	assert.NoError(t, err)
+
+	initialCtx := &safeCtxPayloadA{n: 42}
+	c, err := cli.DialContext("tcp", "127.0.0.1:9978", initialCtx)
+	assert.NoError(t, err)
+
+	// Immediately after DialContext, both Context() and SafeContext()
+	// must reflect the ctx argument that was passed in.
+	assert.Equal(t, initialCtx, c.Context())
+	assert.Equal(t, initialCtx, c.SafeContext())
+
+	select {
+	case <-ev.done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timeout waiting for test completion")
+	}
+}
+
+type clientSafeContextEvents struct {
+	BuiltinEventEngine
+	tester *testing.T
+	done   chan struct{}
+
+	trafficCount   int32
+	backgroundHits int32
+	stopBackground chan struct{}
+}
+
+func (ev *clientSafeContextEvents) OnOpen(c Conn) (out []byte, action Action) {
+	ev.stopBackground = make(chan struct{})
+	// Exercise SafeContext() concurrently from a goroutine other than the
+	// event-loop goroutine.
+	err := goPool.DefaultWorkerPool.Submit(func() {
+		for {
+			select {
+			case <-ev.stopBackground:
+				return
+			default:
+			}
+			switch v := c.SafeContext().(type) {
+			case nil:
+			case *safeCtxPayloadA:
+				_ = v.n
+			case *safeCtxPayloadB:
+				_ = v.s
+			case int:
+			default:
+				assert.Failf(ev.tester, "unexpected SafeContext type", "%T", v)
+			}
+			atomic.AddInt32(&ev.backgroundHits, 1)
+		}
+	})
+	assert.NoError(ev.tester, err)
+
+	out = []byte("ping")
+	return
+}
+
+func (ev *clientSafeContextEvents) OnTraffic(c Conn) (action Action) {
+	buf, err := c.Next(-1)
+	assert.NoError(ev.tester, err)
+	assert.Equal(ev.tester, "pong", string(buf))
+
+	n := atomic.AddInt32(&ev.trafficCount, 1)
+	switch n % 4 {
+	case 0:
+		c.SetSafeContext(&safeCtxPayloadA{n: n})
+	case 1:
+		c.SetSafeContext(&safeCtxPayloadB{s: "hi"})
+	case 2:
+		c.SetSafeContext(int(n))
+	case 3:
+		c.SetSafeContext(nil)
+	}
+
+	if n >= 5 {
+		action = Close
+		return
+	}
+
+	_, err = c.Write([]byte("ping"))
+	assert.NoError(ev.tester, err)
+	return
+}
+
+func (ev *clientSafeContextEvents) OnClose(c Conn, _ error) (action Action) {
+	// SafeContext() must still be safely callable (no panic) right up
+	// until release(), which happens after OnClose returns.
+	_ = c.SafeContext()
+
+	close(ev.stopBackground)
+	assert.Greater(ev.tester, atomic.LoadInt32(&ev.backgroundHits), int32(0),
+		"expected background goroutine to observe SafeContext() at least once")
+
+	close(ev.done)
+	return
+}
