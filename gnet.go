@@ -430,8 +430,8 @@ type Conn interface {
 	// you must invoke it within any method in EventHandler.
 	Context() (ctx any)
 
-	// SafeContext returns a user-defined context, it's concurrency-safe,
-	// you can invoke it on any goroutine.
+	// SafeContext is the concurrency-safe version of Context that can
+	// be invoked on any goroutine.
 	SafeContext() (ctx any)
 
 	// EventLoop returns the event-loop that the connection belongs to.
@@ -442,16 +442,20 @@ type Conn interface {
 	// you must invoke it within any method in EventHandler.
 	SetContext(ctx any)
 
-	// SetSafeContext sets a user-defined context, it's concurrency-safe,
-	// you can invoke it on any goroutine.
+	// SetSafeContext is the concurrency-safe version of SetContext that can
+	// be invoked on any goroutine.
 	SetSafeContext(ctx any)
 
 	// LocalAddr is the connection's local socket address, it's not concurrency-safe,
-	// you must invoke it within any method in EventHandler.
+	// you must invoke it and use the returned value within any method in EventHandler.
+	// If you must use the returned value outside of EventHandler, you should make
+	// a copy of it by calling net.Addr.String().
 	LocalAddr() net.Addr
 
 	// RemoteAddr is the connection's remote address, it's not concurrency-safe,
-	// you must invoke it within any method in EventHandler.
+	// you must invoke it and use the returned value within any method in EventHandler.
+	// If you must use the returned value outside of EventHandler, you should make
+	// a copy of it by calling net.Addr.String().
 	RemoteAddr() net.Addr
 
 	// Wake triggers an OnTraffic event for the current connection, it's concurrency-safe.
