@@ -38,6 +38,7 @@ type engine struct {
 	ingress      *eventloop        // main event-loop that monitors all listeners
 	eventLoops   loadBalancer      // event-loops for handling events
 	inShutdown   atomic.Bool       // whether the engine is in shutdown
+	stopping     atomic.Bool       // whether shutdown has begun; rejects new connections
 	turnOff      context.CancelFunc
 	eventHandler EventHandler // user eventHandler
 	concurrency  struct {
@@ -49,6 +50,12 @@ type engine struct {
 
 func (eng *engine) isShutdown() bool {
 	return eng.inShutdown.Load()
+}
+
+// isStopping reports whether shutdown has begun. It turns true before the
+// pollers are woken, whereas isShutdown turns true only once they are closed.
+func (eng *engine) isStopping() bool {
+	return eng.stopping.Load()
 }
 
 // shutdown signals the engine to shut down.
@@ -198,6 +205,10 @@ func (eng *engine) start(ctx context.Context, numEventLoop int) error {
 func (eng *engine) stop(ctx context.Context, s Engine) {
 	// Wait on a signal for shutdown
 	<-ctx.Done()
+
+	// Reject new connections before waking pollers. inShutdown stays the
+	// completion signal and is published only once the pollers are closed.
+	eng.stopping.Store(true)
 
 	eng.eventHandler.OnShutdown(s)
 

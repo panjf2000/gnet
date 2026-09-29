@@ -50,7 +50,7 @@ type eventloop struct {
 }
 
 func (el *eventloop) Register(ctx context.Context, addr net.Addr) (<-chan RegisteredResult, error) {
-	if el.engine.isShutdown() {
+	if el.engine.isStopping() {
 		return nil, errorx.ErrEngineInShutdown
 	}
 	if addr == nil {
@@ -60,7 +60,7 @@ func (el *eventloop) Register(ctx context.Context, addr net.Addr) (<-chan Regist
 }
 
 func (el *eventloop) Enroll(ctx context.Context, c net.Conn) (<-chan RegisteredResult, error) {
-	if el.engine.isShutdown() {
+	if el.engine.isStopping() {
 		return nil, errorx.ErrEngineInShutdown
 	}
 	if c == nil {
@@ -70,7 +70,7 @@ func (el *eventloop) Enroll(ctx context.Context, c net.Conn) (<-chan RegisteredR
 }
 
 func (el *eventloop) Execute(ctx context.Context, runnable Runnable) error {
-	if el.engine.isShutdown() {
+	if el.engine.isStopping() {
 		return errorx.ErrEngineInShutdown
 	}
 	if runnable == nil {
@@ -116,6 +116,10 @@ func (el *eventloop) enroll(c net.Conn, addr net.Addr, ctx any) (resCh chan Regi
 		defer close(resCh)
 
 		var err error
+		if el.engine.isStopping() {
+			resCh <- RegisteredResult{Err: errorx.ErrEngineInShutdown}
+			return
+		}
 		if c == nil {
 			if c, err = net.Dial(addr.Network(), addr.String()); err != nil {
 				resCh <- RegisteredResult{Err: err}
@@ -149,6 +153,11 @@ func (el *eventloop) enroll(c net.Conn, addr net.Addr, ctx any) (resCh chan Regi
 			resCh <- RegisteredResult{Err: err1}
 			return
 		}
+		defer func() {
+			if dupFD >= 0 {
+				_ = unix.Close(dupFD)
+			}
+		}()
 
 		var (
 			sockAddr unix.Sockaddr
@@ -191,15 +200,35 @@ func (el *eventloop) enroll(c net.Conn, addr net.Addr, ctx any) (resCh chan Regi
 			close(connOpened)
 		}}
 		if err := el.poller.Trigger(queue.LowPriority, el.register, ccb); err != nil {
-			gc.Close() //nolint:errcheck
 			resCh <- RegisteredResult{Err: err}
 			return
 		}
-		<-connOpened
-
+		if !awaitPollerRegister(connOpened, el.poller.Done()) {
+			resCh <- RegisteredResult{Err: errorx.ErrEngineShutdown}
+			return
+		}
+		dupFD = -1 // register owns gc.fd from here
 		resCh <- RegisteredResult{Conn: gc}
 	})
 	return
+}
+
+// awaitPollerRegister reports whether register closed opened. Both channels
+// can be ready: a completed register wins, because closeConns releases that
+// connection. A retired poller with a silent opened channel means the task
+// was dropped and the caller still owns the duplicated descriptor.
+func awaitPollerRegister(opened, done <-chan struct{}) bool {
+	select {
+	case <-opened:
+		return true
+	case <-done:
+		select {
+		case <-opened:
+			return true
+		default:
+			return false
+		}
+	}
 }
 
 func (el *eventloop) register(a any) error {
@@ -361,6 +390,9 @@ loop:
 }
 
 func (el *eventloop) close(c *conn, err error) error {
+	// An unopened conn owns no descriptor: it is either already closed, or a
+	// UDP listener's per-packet conn, or an Enroll conn whose duplicated fd
+	// stays with EnrollContext until register takes it.
 	if !c.opened || el.connections.getConn(c.fd) == nil {
 		return nil // ignore stale connections
 	}
