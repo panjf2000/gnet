@@ -75,6 +75,21 @@ go get -u github.com/panjf2000/gnet/v2
 go get -u github.com/panjf2000/gnet
 ```
 
+
+## Client shutdown and enrollment
+
+A client starts once. `Client.Stop` is safe to call repeatedly or concurrently.
+`Client.Done()` closes after event loops exit and close their sockets.
+On Unix, it also waits for accepted enrollment requests to finish.
+`Client.Err()` returns the terminal error after `Done` closes.
+An unexpected event-loop exit also completes shutdown without a separate `Stop` call.
+Do not call blocking lifecycle methods from an event-loop callback.
+
+On Unix, an accepted `EventLoop.Enroll` request always receives one terminal result, including during shutdown.
+An immediate submission error leaves the supplied socket with the caller.
+`Client.Enroll` and `Client.EnrollContext` take ownership of every nonnil supplied socket, including on rejection.
+Cancellation of an `EventLoop.Register` or `EventLoop.Enroll` context cancels setup and pending registration.
+
 # 🎡 Use cases
 
 The following corporations/organizations use `gnet` as the underlying network service in production.
