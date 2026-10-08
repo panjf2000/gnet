@@ -23,9 +23,8 @@ import (
 	"io"
 	"net"
 	"os"
-	"strconv"
 	"strings"
-	"syscall"
+	"sync"
 	"time"
 
 	"golang.org/x/sys/unix"
@@ -36,41 +35,46 @@ import (
 	"github.com/panjf2000/gnet/v2/pkg/netpoll"
 	"github.com/panjf2000/gnet/v2/pkg/pool/goroutine"
 	"github.com/panjf2000/gnet/v2/pkg/queue"
-	"github.com/panjf2000/gnet/v2/pkg/socket"
 )
 
 type eventloop struct {
-	listeners    map[int]*listener // listeners
-	idx          int               // loop index in the engine loops list
-	engine       *engine           // engine in loop
-	poller       *netpoll.Poller   // epoll or kqueue
-	buffer       []byte            // read packet buffer whose capacity is set by user, default value is 64KB
-	connections  connMatrix        // loop connections storage
-	eventHandler EventHandler      // user eventHandler
+	// Pending enrollment descriptor ownership.
+	registrationMu      sync.Mutex
+	registrations       map[*registration]struct{}
+	registrationsClosed bool
+	listeners           map[int]*listener // listeners
+	idx                 int               // loop index in the engine loops list
+	engine              *engine           // engine in loop
+	poller              *netpoll.Poller   // epoll or kqueue
+	buffer              []byte            // read packet buffer whose capacity is set by user, default value is 64KB
+	connections         connMatrix        // loop connections storage
+	eventHandler        EventHandler      // user eventHandler
 }
 
 func (el *eventloop) Register(ctx context.Context, addr net.Addr) (<-chan RegisteredResult, error) {
-	if el.engine.isShutdown() {
+	if el.engine.isStopping() {
 		return nil, errorx.ErrEngineInShutdown
 	}
 	if addr == nil {
 		return nil, errorx.ErrInvalidNetworkAddress
 	}
-	return el.enroll(nil, addr, FromContext(ctx))
+	return el.enroll(ctx, nil, addr, FromContext(ctx))
 }
 
+// Enroll transfers ownership only when submission succeeds (the immediate
+// error is nil). Its result then becomes terminal even if this loop exits.
 func (el *eventloop) Enroll(ctx context.Context, c net.Conn) (<-chan RegisteredResult, error) {
-	if el.engine.isShutdown() {
+	if el.engine.isStopping() {
 		return nil, errorx.ErrEngineInShutdown
 	}
 	if c == nil {
 		return nil, errorx.ErrInvalidNetConn
 	}
-	return el.enroll(c, c.RemoteAddr(), FromContext(ctx))
+	return el.enroll(ctx, c, c.RemoteAddr(), FromContext(ctx))
 }
 
 func (el *eventloop) Execute(ctx context.Context, runnable Runnable) error {
-	if el.engine.isShutdown() {
+	if el.engine.isStopping() {
 		return errorx.ErrEngineInShutdown
 	}
 	if runnable == nil {
@@ -105,111 +109,29 @@ func (el *eventloop) closeConns() {
 	})
 }
 
-type connWithCallback struct {
-	c  *conn
-	cb func()
-}
-
-func (el *eventloop) enroll(c net.Conn, addr net.Addr, ctx any) (resCh chan RegisteredResult, err error) {
+func (el *eventloop) enroll(caller context.Context, c net.Conn, addr net.Addr, metadata any) (resCh chan RegisteredResult, err error) {
+	if !el.engine.beginEnrollment() {
+		return nil, errorx.ErrEngineInShutdown
+	}
 	resCh = make(chan RegisteredResult, 1)
 	err = goroutine.DefaultWorkerPool.Submit(func() {
-		defer close(resCh)
-
-		var err error
-		if c == nil {
-			if c, err = net.Dial(addr.Network(), addr.String()); err != nil {
-				resCh <- RegisteredResult{Err: err}
-				return
-			}
-		}
-		defer c.Close() //nolint:errcheck
-
-		sc, ok := c.(syscall.Conn)
-		if !ok {
-			resCh <- RegisteredResult{
-				Err: fmt.Errorf("failed to assert syscall.Conn from net.Conn: %s", addr.String()),
-			}
-			return
-		}
-		rc, err := sc.SyscallConn()
-		if err != nil {
-			resCh <- RegisteredResult{Err: err}
-			return
-		}
-
-		var dupFD int
-		err1 := rc.Control(func(fd uintptr) {
-			dupFD, err = socket.Dup(int(fd))
-		})
-		if err != nil {
-			resCh <- RegisteredResult{Err: err}
-			return
-		}
-		if err1 != nil {
-			resCh <- RegisteredResult{Err: err1}
-			return
-		}
-
-		var (
-			sockAddr unix.Sockaddr
-			gc       *conn
-		)
-		switch c.(type) {
-		case *net.UnixConn:
-			sockAddr, _, _, err = socket.GetUnixSockAddr(c.RemoteAddr().Network(), c.RemoteAddr().String())
-			if err != nil {
-				resCh <- RegisteredResult{Err: err}
-				return
-			}
-			ua := c.LocalAddr().(*net.UnixAddr)
-			ua.Name = c.RemoteAddr().String() + "." + strconv.Itoa(dupFD)
-			gc = newStreamConn("unix", dupFD, el, sockAddr, c.LocalAddr(), c.RemoteAddr())
-		case *net.TCPConn:
-			sockAddr, _, _, _, err = socket.GetTCPSockAddr(c.RemoteAddr().Network(), c.RemoteAddr().String())
-			if err != nil {
-				resCh <- RegisteredResult{Err: err}
-				return
-			}
-			gc = newStreamConn("tcp", dupFD, el, sockAddr, c.LocalAddr(), c.RemoteAddr())
-		case *net.UDPConn:
-			sockAddr, _, _, _, err = socket.GetUDPSockAddr(c.RemoteAddr().Network(), c.RemoteAddr().String())
-			if err != nil {
-				resCh <- RegisteredResult{Err: err}
-				return
-			}
-			gc = newUDPConn(dupFD, el, c.LocalAddr(), sockAddr, true)
-		default:
-			resCh <- RegisteredResult{Err: fmt.Errorf("unknown type of conn: %T", c)}
-			return
-		}
-
-		gc.SetContext(ctx)
-		gc.SetSafeContext(ctx)
-
-		connOpened := make(chan struct{})
-		ccb := &connWithCallback{c: gc, cb: func() {
-			close(connOpened)
-		}}
-		if err := el.poller.Trigger(queue.LowPriority, el.register, ccb); err != nil {
-			gc.Close() //nolint:errcheck
-			resCh <- RegisteredResult{Err: err}
-			return
-		}
-		<-connOpened
-
-		resCh <- RegisteredResult{Conn: gc}
+		defer el.engine.enrollments.Done()
+		result := el.enrollConnection(caller, c, addr, metadata, queue.LowPriority, false)
+		resCh <- result
+		close(resCh)
 	})
+	if err != nil {
+		el.engine.enrollments.Done()
+		close(resCh)
+	}
 	return
 }
 
 func (el *eventloop) register(a any) error {
-	c, ok := a.(*conn)
-	if !ok {
-		ccb := a.(*connWithCallback)
-		c = ccb.c
-		defer ccb.cb()
+	if pending, ok := a.(*registration); ok {
+		return pending.run()
 	}
-	return el.register0(c)
+	return el.register0(a.(*conn))
 }
 
 func (el *eventloop) register0(c *conn) error {

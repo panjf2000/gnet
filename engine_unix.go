@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -33,6 +34,10 @@ import (
 )
 
 type engine struct {
+	// Stop admission before joining event loops.
+	admissionMu  sync.Mutex
+	stopping     atomic.Bool
+	enrollments  sync.WaitGroup
 	listeners    map[int]*listener // listeners for accepting incoming connections
 	opts         *Options          // options with engine
 	ingress      *eventloop        // main event-loop that monitors all listeners
@@ -51,8 +56,13 @@ func (eng *engine) isShutdown() bool {
 	return eng.inShutdown.Load()
 }
 
+func (eng *engine) isStopping() bool { return eng.stopping.Load() || eng.isShutdown() }
+
 // shutdown signals the engine to shut down.
 func (eng *engine) shutdown(err error) {
+	eng.admissionMu.Lock()
+	eng.stopping.Store(true)
+	eng.admissionMu.Unlock()
 	if err != nil && !errors.Is(err, errorx.ErrEngineShutdown) {
 		eng.opts.Logger.Errorf("engine is being shutdown with error: %v", err)
 	}
@@ -89,6 +99,9 @@ func (eng *engine) runEventLoops(ctx context.Context, numEventLoop int) error {
 			for _, l := range eng.listeners {
 				ln, err := initListener(l.network, l.address, eng.opts)
 				if err != nil {
+					for _, prepared := range lns {
+						prepared.close()
+					}
 					return err
 				}
 				lns[ln.fd] = ln
@@ -96,6 +109,11 @@ func (eng *engine) runEventLoops(ctx context.Context, numEventLoop int) error {
 		}
 		p, err := netpoll.OpenPoller()
 		if err != nil {
+			if i > 0 {
+				for _, prepared := range lns {
+					prepared.close()
+				}
+			}
 			return err
 		}
 		el := new(eventloop)
@@ -105,13 +123,13 @@ func (eng *engine) runEventLoops(ctx context.Context, numEventLoop int) error {
 		el.buffer = make([]byte, eng.opts.ReadBufferCap)
 		el.connections.init()
 		el.eventHandler = eng.eventHandler
+		// Transfer cleanup ownership before the first fallible poller update.
+		eng.eventLoops.register(el)
 		for _, ln := range lns {
 			if err = el.poller.AddRead(ln.packPollAttachment(el.accept), false); err != nil {
 				return err
 			}
 		}
-		eng.eventLoops.register(el)
-
 		// Start the ticker.
 		if eng.opts.Ticker && el.idx == 0 {
 			el0 = el
@@ -150,12 +168,6 @@ func (eng *engine) activateReactors(ctx context.Context, numEventLoop int) error
 		eng.eventLoops.register(el)
 	}
 
-	// Start sub reactors in the background.
-	eng.eventLoops.iterate(func(_ int, el *eventloop) bool {
-		eng.concurrency.Go(el.orbit)
-		return true
-	})
-
 	p, err := netpoll.OpenPoller()
 	if err != nil {
 		return err
@@ -166,12 +178,17 @@ func (eng *engine) activateReactors(ctx context.Context, numEventLoop int) error
 	el.engine = eng
 	el.poller = p
 	el.eventHandler = eng.eventHandler
+	eng.ingress = el
 	for _, ln := range eng.listeners {
 		if err = el.poller.AddRead(ln.packPollAttachment(el.accept0), true); err != nil {
 			return err
 		}
 	}
-	eng.ingress = el
+	// Start owners only after all pollers and listener registrations exist.
+	eng.eventLoops.iterate(func(_ int, el *eventloop) bool {
+		eng.concurrency.Go(el.orbit)
+		return true
+	})
 
 	// Start the main reactor in the background.
 	eng.concurrency.Go(el.rotate)
@@ -220,6 +237,7 @@ func (eng *engine) stop(ctx context.Context, s Engine) {
 		eng.opts.Logger.Errorf("engine shutdown error: %v", err)
 	}
 
+	eng.enrollments.Wait()
 	// Close all listeners and pollers of event-loops.
 	eng.closeEventLoops()
 
@@ -265,7 +283,8 @@ func run(eventHandler EventHandler, listeners []*listener, options *Options, add
 	}
 
 	if err := eng.start(ctx, numEventLoop); err != nil {
-		eng.closeEventLoops()
+		eng.shutdown(err)
+		eng.stop(rootCtx, e)
 		eng.opts.Logger.Errorf("gnet engine is stopping with error: %v", err)
 		return err
 	}

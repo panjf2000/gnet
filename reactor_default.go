@@ -70,8 +70,9 @@ func (el *eventloop) orbit() error {
 		el.getLogger().Errorf("event-loop(%d) is exiting due to error: %v", el.idx, err)
 	}
 
-	el.closeConns()
 	el.engine.shutdown(err)
+	el.retireRegistrations()
+	el.closeConns()
 
 	return err
 }
@@ -106,8 +107,9 @@ func (el *eventloop) run() error {
 		el.getLogger().Errorf("event-loop(%d) is exiting due to error: %v", el.idx, err)
 	}
 
-	el.closeConns()
 	el.engine.shutdown(err)
+	el.retireRegistrations()
+	el.closeConns()
 
 	return err
 }

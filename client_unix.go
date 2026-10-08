@@ -18,13 +18,9 @@ package gnet
 
 import (
 	"context"
-	"errors"
 	"net"
-	"strconv"
-	"syscall"
 
 	"golang.org/x/sync/errgroup"
-	"golang.org/x/sys/unix"
 
 	"github.com/panjf2000/gnet/v2/pkg/buffer/ring"
 	errorx "github.com/panjf2000/gnet/v2/pkg/errors"
@@ -32,13 +28,13 @@ import (
 	"github.com/panjf2000/gnet/v2/pkg/math"
 	"github.com/panjf2000/gnet/v2/pkg/netpoll"
 	"github.com/panjf2000/gnet/v2/pkg/queue"
-	"github.com/panjf2000/gnet/v2/pkg/socket"
 )
 
 // Client of gnet.
 type Client struct {
-	opts *Options
-	eng  *engine
+	lifecycle clientLifecycle
+	opts      *Options
+	eng       *engine
 }
 
 // NewClient creates an instance of Client.
@@ -98,22 +94,25 @@ func NewClient(eh EventHandler, opts ...Option) (cli *Client, err error) {
 	default:
 		options.WriteBufferCap = math.CeilToPowerOfTwo(wbc)
 	}
+	cli.lifecycle.done = make(chan struct{})
 	cli.eng = &eng
 	return
 }
 
-// Start starts the client event-loop, handing IO events.
-func (cli *Client) Start() error {
+// start prepares every loop before the lifecycle supervisor can join them.
+func (cli *Client) start() error {
 	numEventLoop := determineEventLoops(cli.opts)
 	logging.Infof("Starting gnet client with %d event loops", numEventLoop)
 
-	cli.eng.eventHandler.OnBoot(Engine{cli.eng})
+	if cli.eng.eventHandler.OnBoot(Engine{cli.eng}) == Shutdown {
+		cli.eng.shutdown(nil)
+		return nil
+	}
 
 	var el0 *eventloop
 	for i := 0; i < numEventLoop; i++ {
 		p, err := netpoll.OpenPoller()
 		if err != nil {
-			cli.eng.closeEventLoops()
 			return err
 		}
 		el := eventloop{
@@ -149,10 +148,8 @@ func (cli *Client) Start() error {
 	return nil
 }
 
-// Stop stops the client event-loop.
-func (cli *Client) Stop() error {
-	cli.eng.shutdown(nil)
-
+// waitAndClose runs once after startup has finished and shutdown was signaled.
+func (cli *Client) waitAndClose() error {
 	cli.eng.eventHandler.OnShutdown(Engine{cli.eng})
 
 	// Notify all event-loops to exit.
@@ -165,6 +162,7 @@ func (cli *Client) Stop() error {
 	// Wait for all event-loops to exit.
 	err := cli.eng.concurrency.Wait()
 
+	cli.eng.enrollments.Wait()
 	cli.eng.closeEventLoops()
 
 	// Put the engine into the shutdown state.
@@ -183,12 +181,19 @@ func (cli *Client) Dial(network, address string) (Conn, error) {
 
 // DialContext is like Dial but also accepts an empty interface ctx that can be obtained later via Conn.Context.
 func (cli *Client) DialContext(network, address string, ctx any) (Conn, error) {
-	c, err := net.Dial(network, address)
-	if err != nil {
-		return nil, err
+	if !cli.running() || !cli.eng.beginEnrollment() {
+		return nil, errorx.ErrEngineInShutdown
 	}
-	return cli.EnrollContext(c, ctx)
+	defer cli.eng.enrollments.Done()
+	el := cli.eng.eventLoops.next(nil)
+	result := el.enrollConnection(context.Background(), nil, clientDialAddress{network, address}, ctx, queue.HighPriority, true)
+	return result.Conn, result.Err
 }
+
+type clientDialAddress struct{ network, address string }
+
+func (a clientDialAddress) Network() string { return a.network }
+func (a clientDialAddress) String() string  { return a.address }
 
 // Enroll converts a net.Conn to gnet.Conn and then adds it into the Client.
 func (cli *Client) Enroll(c net.Conn) (Conn, error) {
@@ -196,97 +201,17 @@ func (cli *Client) Enroll(c net.Conn) (Conn, error) {
 }
 
 // EnrollContext is like Enroll but also accepts an empty interface ctx that can be obtained later via Conn.Context.
+// It takes ownership of every nonnil c, including when enrollment is rejected.
 func (cli *Client) EnrollContext(c net.Conn, ctx any) (Conn, error) {
-	defer c.Close() //nolint:errcheck
-
-	sc, ok := c.(syscall.Conn)
-	if !ok {
-		return nil, errors.New("failed to convert net.Conn to syscall.Conn")
+	if c == nil {
+		return nil, errorx.ErrInvalidNetConn
 	}
-	rc, err := sc.SyscallConn()
-	if err != nil {
-		return nil, errors.New("failed to get syscall.RawConn from net.Conn")
+	if !cli.running() || !cli.eng.beginEnrollment() {
+		_ = c.Close()
+		return nil, errorx.ErrEngineInShutdown
 	}
-
-	var dupFD int
-	e := rc.Control(func(fd uintptr) {
-		dupFD, err = socket.Dup(int(fd))
-	})
-	if err != nil {
-		return nil, err
-	}
-	if e != nil {
-		return nil, e
-	}
-
-	if cli.opts.SocketSendBuffer > 0 {
-		if err = socket.SetSendBuffer(dupFD, cli.opts.SocketSendBuffer); err != nil {
-			return nil, err
-		}
-	}
-	if cli.opts.SocketRecvBuffer > 0 {
-		if err = socket.SetRecvBuffer(dupFD, cli.opts.SocketRecvBuffer); err != nil {
-			return nil, err
-		}
-	}
-
+	defer cli.eng.enrollments.Done()
 	el := cli.eng.eventLoops.next(nil)
-	var (
-		sockAddr unix.Sockaddr
-		gc       *conn
-	)
-	switch c.(type) {
-	case *net.UnixConn:
-		sockAddr, _, _, err = socket.GetUnixSockAddr(c.RemoteAddr().Network(), c.RemoteAddr().String())
-		if err != nil {
-			return nil, err
-		}
-		ua := c.LocalAddr().(*net.UnixAddr)
-		ua.Name = c.RemoteAddr().String() + "." + strconv.Itoa(dupFD)
-		gc = newStreamConn("unix", dupFD, el, sockAddr, c.LocalAddr(), c.RemoteAddr())
-	case *net.TCPConn:
-		if cli.opts.TCPNoDelay == TCPNoDelay {
-			if err = socket.SetNoDelay(dupFD, 1); err != nil {
-				return nil, err
-			}
-		}
-		if cli.opts.TCPKeepAlive > 0 {
-			if err = setKeepAlive(
-				dupFD,
-				true,
-				cli.opts.TCPKeepAlive,
-				cli.opts.TCPKeepInterval,
-				cli.opts.TCPKeepCount); err != nil {
-				return nil, err
-			}
-		}
-		sockAddr, _, _, _, err = socket.GetTCPSockAddr(c.RemoteAddr().Network(), c.RemoteAddr().String())
-		if err != nil {
-			return nil, err
-		}
-		gc = newStreamConn("tcp", dupFD, el, sockAddr, c.LocalAddr(), c.RemoteAddr())
-	case *net.UDPConn:
-		sockAddr, _, _, _, err = socket.GetUDPSockAddr(c.RemoteAddr().Network(), c.RemoteAddr().String())
-		if err != nil {
-			return nil, err
-		}
-		gc = newUDPConn(dupFD, el, c.LocalAddr(), sockAddr, true)
-	default:
-		return nil, errorx.ErrUnsupportedProtocol
-	}
-	gc.SetContext(ctx)
-	gc.SetSafeContext(ctx)
-
-	connOpened := make(chan struct{})
-	ccb := &connWithCallback{c: gc, cb: func() {
-		close(connOpened)
-	}}
-	err = el.poller.Trigger(queue.HighPriority, el.register, ccb)
-	if err != nil {
-		gc.Close() //nolint:errcheck
-		return nil, err
-	}
-	<-connOpened
-
-	return gc, nil
+	result := el.enrollConnection(context.Background(), c, c.RemoteAddr(), ctx, queue.HighPriority, true)
+	return result.Conn, result.Err
 }

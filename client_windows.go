@@ -26,8 +26,9 @@ import (
 )
 
 type Client struct {
-	opts *Options
-	eng  *engine
+	lifecycle clientLifecycle
+	opts      *Options
+	eng       *engine
 }
 
 func NewClient(eh EventHandler, opts ...Option) (cli *Client, err error) {
@@ -59,15 +60,19 @@ func NewClient(eh EventHandler, opts ...Option) (cli *Client, err error) {
 			ctx context.Context
 		}{eg, ctx},
 	}
+	cli.lifecycle.done = make(chan struct{})
 	cli.eng = &eng
 	return
 }
 
-func (cli *Client) Start() error {
+func (cli *Client) start() error {
 	numEventLoop := determineEventLoops(cli.opts)
 	logging.Infof("Starting gnet client with %d event loops", numEventLoop)
 
-	cli.eng.eventHandler.OnBoot(Engine{cli.eng})
+	if cli.eng.eventHandler.OnBoot(Engine{cli.eng}) == Shutdown {
+		cli.eng.shutdown(nil)
+		return nil
+	}
 
 	var el0 *eventloop
 	for i := 0; i < numEventLoop; i++ {
@@ -97,8 +102,7 @@ func (cli *Client) Start() error {
 	return nil
 }
 
-func (cli *Client) Stop() error {
-	cli.eng.shutdown(nil)
+func (cli *Client) waitAndClose() error {
 
 	cli.eng.eventHandler.OnShutdown(Engine{cli.eng})
 
