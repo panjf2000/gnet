@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build darwin || dragonfly || freebsd || linux || netbsd || openbsd
+//go:build (darwin || dragonfly || freebsd || linux || netbsd || openbsd) && !poll_opt
 
 package netpoll_test
 

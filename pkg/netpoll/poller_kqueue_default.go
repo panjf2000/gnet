@@ -31,6 +31,7 @@ import (
 
 // Poller represents a poller which is in charge of monitoring file-descriptors.
 type Poller struct {
+	lifecycle                   pollerLifecycle
 	fd                          int
 	pipe                        []int
 	wakeupCall                  int32
@@ -41,7 +42,7 @@ type Poller struct {
 
 // OpenPoller instantiates a poller.
 func OpenPoller() (poller *Poller, err error) {
-	poller = new(Poller)
+	poller = &Poller{fd: -1}
 	if poller.fd, err = unix.Kqueue(); err != nil {
 		poller = nil
 		err = os.NewSyscallError("kqueue", err)
@@ -59,13 +60,12 @@ func OpenPoller() (poller *Poller, err error) {
 	return
 }
 
-// Close closes the poller.
+// Close closes the poller after its Polling call returns. Calls are idempotent.
 func (p *Poller) Close() error {
 	if len(p.pipe) == 2 {
-		_ = unix.Close(p.pipe[0])
-		_ = unix.Close(p.pipe[1])
+		return p.closeDescriptors(p.pipe[0], p.pipe[1], p.fd)
 	}
-	return os.NewSyscallError("close", unix.Close(p.fd))
+	return p.closeDescriptors(p.fd)
 }
 
 // Trigger enqueues task and wakes up the poller to process pending tasks.
@@ -75,6 +75,11 @@ func (p *Poller) Close() error {
 //
 // Note that asyncTaskQueue is a queue of low-priority whose size may grow large and tasks in it may backlog.
 func (p *Poller) Trigger(priority queue.EventPriority, fn queue.Func, param any) (err error) {
+	p.lifecycle.mu.RLock()
+	defer p.lifecycle.mu.RUnlock()
+	if p.lifecycle.closed {
+		return os.ErrClosed
+	}
 	task := queue.GetTask()
 	task.Exec, task.Param = fn, param
 	if priority > queue.HighPriority && p.urgentAsyncTaskQueue.Length() >= p.highPriorityEventsThreshold {
@@ -130,20 +135,20 @@ func (p *Poller) Polling(callback PollEventHandler) error {
 			task := p.urgentAsyncTaskQueue.Dequeue()
 			for ; task != nil; task = p.urgentAsyncTaskQueue.Dequeue() {
 				err = task.Exec(task.Param)
+				queue.PutTask(task)
 				if errors.Is(err, errorx.ErrEngineShutdown) {
 					return err
 				}
-				queue.PutTask(task)
 			}
 			for i := 0; i < MaxAsyncTasksAtOneTime; i++ {
 				if task = p.asyncTaskQueue.Dequeue(); task == nil {
 					break
 				}
 				err = task.Exec(task.Param)
+				queue.PutTask(task)
 				if errors.Is(err, errorx.ErrEngineShutdown) {
 					return err
 				}
-				queue.PutTask(task)
 			}
 			atomic.StoreInt32(&p.wakeupCall, 0)
 			if (!p.asyncTaskQueue.IsEmpty() || !p.urgentAsyncTaskQueue.IsEmpty()) && atomic.CompareAndSwapInt32(&p.wakeupCall, 0, 1) {
