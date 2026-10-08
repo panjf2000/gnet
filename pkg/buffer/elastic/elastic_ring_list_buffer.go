@@ -66,6 +66,25 @@ func (mb *Buffer) Peek(n int) ([][]byte, error) {
 	return mb.listBuffer.PeekWithBytes(n, head, tail)
 }
 
+// PeekInto fills at most len(dst) descriptors without allocation or scanning
+// later list nodes. Ring segments precede list entries, as with Peek.
+func (mb *Buffer) PeekInto(dst [][]byte) int {
+	if len(dst) == 0 {
+		return 0
+	}
+	n := 0
+	head, tail := mb.ringBuffer.Peek(-1)
+	if len(head) != 0 {
+		dst[n] = head
+		n++
+	}
+	if len(tail) != 0 && n < len(dst) {
+		dst[n] = tail
+		n++
+	}
+	return n + mb.listBuffer.PeekInto(dst[n:])
+}
+
 // Discard discards n bytes in this buffer.
 func (mb *Buffer) Discard(n int) (discarded int, err error) {
 	discarded, err = mb.ringBuffer.Discard(n)
@@ -95,6 +114,12 @@ func (mb *Buffer) Write(p []byte) (n int, err error) {
 		}
 	}
 	return mb.ringBuffer.Write(p)
+}
+
+// AppendOwned preserves existing ring/list ordering without copying p.
+// release follows linkedlist.Buffer.AppendOwned's ownership contract.
+func (mb *Buffer) AppendOwned(p []byte, release func(error)) {
+	mb.listBuffer.AppendOwned(p, release)
 }
 
 // Writev appends multiple byte slices to this buffer.
@@ -141,8 +166,10 @@ func (mb *Buffer) ReadFrom(r io.Reader) (int64, error) {
 
 // WriteTo implements io.WriterTo.
 func (mb *Buffer) WriteTo(w io.Writer) (n int64, err error) {
-	if n, err = mb.ringBuffer.WriteTo(w); err != nil {
-		return
+	if !mb.ringBuffer.IsEmpty() {
+		if n, err = mb.ringBuffer.WriteTo(w); err != nil {
+			return
+		}
 	}
 	var m int64
 	m, err = mb.listBuffer.WriteTo(w)

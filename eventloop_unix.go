@@ -45,6 +45,7 @@ type eventloop struct {
 	engine       *engine           // engine in loop
 	poller       *netpoll.Poller   // epoll or kqueue
 	buffer       []byte            // read packet buffer whose capacity is set by user, default value is 64KB
+	writeBuffers [iovMax][]byte    // bounded descriptors, cleared before release callbacks
 	connections  connMatrix        // loop connections storage
 	eventHandler EventHandler      // user eventHandler
 }
@@ -320,16 +321,21 @@ func (el *eventloop) write(c *conn) error {
 		err  error
 	)
 loop:
-	iov, _ := c.outboundBuffer.Peek(-1)
+	iov := el.writeBuffers[:c.outboundBuffer.PeekInto(el.writeBuffers[:])]
 	if len(iov) > 1 {
-		if len(iov) > iovMax {
-			iov = iov[:iovMax]
-		}
 		n, err = gio.Writev(c.fd, iov)
 	} else {
 		n, err = unix.Write(c.fd, iov[0])
 	}
+	for i := range iov {
+		iov[i] = nil
+	}
 	_, _ = c.outboundBuffer.Discard(n)
+	// Owned-slice releases can close this connection reentrantly. Its fd may
+	// already be reused, so do not update or write through it after callbacks.
+	if !c.opened || el.connections.getConn(c.fd) != c {
+		return nil
+	}
 	switch err {
 	case nil:
 	case unix.EAGAIN:
@@ -370,11 +376,11 @@ func (el *eventloop) close(c *conn, err error) error {
 
 	// Send residual data in buffer back to the remote before actually closing the connection.
 	for !c.outboundBuffer.IsEmpty() {
-		iov, _ := c.outboundBuffer.Peek(0)
-		if len(iov) > iovMax {
-			iov = iov[:iovMax]
-		}
+		iov := el.writeBuffers[:c.outboundBuffer.PeekInto(el.writeBuffers[:])]
 		n, err := gio.Writev(c.fd, iov)
+		for i := range iov {
+			iov[i] = nil
+		}
 		if err != nil {
 			break
 		}

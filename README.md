@@ -75,6 +75,39 @@ go get -u github.com/panjf2000/gnet/v2
 go get -u github.com/panjf2000/gnet
 ```
 
+
+## Borrowed output and priority scheduling (proposal)
+
+`OwnedWriter` lets an event-loop callback submit immutable output without copying it into a pooled buffer:
+
+```go
+writer, ok := c.(gnet.OwnedWriter)
+if ok {
+    _, err := writer.WriteOwned(data, func(err error) {
+        // Release the entire backing allocation here, including on failure.
+    })
+    _ = err
+}
+```
+
+Call `WriteOwned` only from the connection's event loop.
+Retain the entire backing allocation and keep it immutable until the release callback runs.
+The callback runs exactly once, including on rejection, and can run before `WriteOwned` returns.
+A nil callback error means all bytes reached the socket, not that the peer received them.
+A nonnil callback error means the write was rejected or remaining output was abandoned.
+Callbacks run after the completed buffer batch is unlinked and can reenter the connection.
+UDP output is unsupported on Unix. Windows uses its existing synchronous write path.
+
+`gnet.ExecuteHighPriority(owner, ctx, runnable)` schedules work through the same Unix FIFO queue as `AsyncWrite`.
+It lets a producer preserve submission order when mixing copied writes and owner-managed borrowed writes.
+Unsupported event-loop wrappers and Windows return `ErrUnsupportedOp`; there is no lower-priority fallback.
+Accepted work can be abandoned when the loop exits, as with `EventLoop.Execute`.
+The application must release resources for abandoned work after the owner has completed shutdown.
+
+The implementation uses at most 1024 write descriptors per syscall.
+The event-loop descriptor array occupies 24 KiB on 64-bit systems and 12 KiB on 32-bit systems.
+This API is a proposal for maintainer feedback on ownership, scheduling, and platform support.
+
 # 🎡 Use cases
 
 The following corporations/organizations use `gnet` as the underlying network service in production.
