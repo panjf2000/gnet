@@ -18,13 +18,58 @@ package linkedlist
 import (
 	"io"
 	"math"
+	"unsafe"
 
 	bsPool "github.com/panjf2000/gnet/v2/pkg/pool/byteslice"
 )
 
 type node struct {
-	buf  []byte
-	next *node
+	buf     []byte
+	next    *node
+	release func(error)
+}
+
+// OwnedNodeBytes is the explicit metadata retained for one owned output slice.
+// It excludes the slice allocation and runtime allocator overhead.
+const OwnedNodeBytes = int(unsafe.Sizeof(node{}))
+
+// dispose runs only after the node is unlinked and byte counts are updated.
+func (b *node) dispose(err error) {
+	buf, release := b.buf, b.release
+	b.buf, b.release = nil, nil
+	if release != nil {
+		release(err)
+	} else {
+		bsPool.Put(buf)
+	}
+}
+
+// Release borrowed nodes after the entire buffer operation commits. Otherwise
+// a callback that closes the connection can flush bytes already written by
+// the outer operation but not yet discarded from later nodes.
+type releases struct{ head, tail *node }
+
+func (r *releases) add(b *node) {
+	if b.release == nil {
+		b.dispose(nil)
+		return
+	}
+	if r.tail == nil {
+		r.head = b
+	} else {
+		r.tail.next = b
+	}
+	r.tail = b
+}
+
+func (r *releases) run() {
+	for b := r.head; b != nil; {
+		next := b.next
+		b.next = nil
+		b.dispose(nil)
+		b = next
+	}
+	r.head, r.tail = nil, nil
 }
 
 func (b *node) len() int {
@@ -41,6 +86,8 @@ type Buffer struct {
 
 // Read reads data from the Buffer.
 func (llb *Buffer) Read(p []byte) (n int, err error) {
+	var released releases
+	defer released.run()
 	if len(p) == 0 {
 		return 0, nil
 	}
@@ -52,7 +99,7 @@ func (llb *Buffer) Read(p []byte) (n int, err error) {
 			b.buf = b.buf[m:]
 			llb.pushFront(b)
 		} else {
-			bsPool.Put(b.buf)
+			released.add(b)
 		}
 		if n == len(p) {
 			return
@@ -84,11 +131,32 @@ func (llb *Buffer) Append(p []byte) {
 	llb.pushBack(&node{buf: p})
 }
 
+// AppendOwned borrows p without copying it. release runs once after its last
+// byte is discarded, or with io.ErrClosedPipe when Reset abandons the node.
+// The caller must retain the entire allocation until release, which may run
+// reentrantly. Ordinary buffer writes keep their existing pooled behavior.
+func (llb *Buffer) AppendOwned(p []byte, release func(error)) {
+	if release == nil {
+		release = func(error) {}
+	}
+	if len(p) == 0 {
+		release(nil)
+		return
+	}
+	llb.pushBack(&node{buf: p, release: release})
+}
+
 // Pop removes and returns the buffer of the head or nil if the list is empty.
 func (llb *Buffer) Pop() []byte {
 	n := llb.pop()
 	if n == nil {
 		return nil
+	}
+	if n.release != nil {
+		p := bsPool.Get(len(n.buf))
+		copy(p, n.buf)
+		n.dispose(nil)
+		return p
 	}
 	return n.buf
 }
@@ -138,6 +206,17 @@ func (llb *Buffer) Peek(maxBytes int) ([][]byte, error) {
 	return bs, nil
 }
 
+// PeekInto fills at most len(dst) descriptors in order without allocation.
+// It borrows the listed slices until the next buffer mutation.
+func (llb *Buffer) PeekInto(dst [][]byte) int {
+	n := 0
+	for iter := llb.head; iter != nil && n < len(dst); iter = iter.next {
+		dst[n] = iter.buf
+		n++
+	}
+	return n
+}
+
 // PeekWithBytes is like Peek but accepts [][]byte and puts them onto head.
 func (llb *Buffer) PeekWithBytes(maxBytes int, bs ...[]byte) ([][]byte, error) {
 	if maxBytes <= 0 || maxBytes == math.MaxInt32 {
@@ -174,6 +253,8 @@ func (llb *Buffer) PeekWithBytes(maxBytes int, bs ...[]byte) ([][]byte, error) {
 
 // Discard removes some nodes based on n bytes.
 func (llb *Buffer) Discard(n int) (discarded int, err error) {
+	var released releases
+	defer released.run()
 	if n <= 0 {
 		return
 	}
@@ -190,7 +271,7 @@ func (llb *Buffer) Discard(n int) (discarded int, err error) {
 		}
 		n -= b.len()
 		discarded += b.len()
-		bsPool.Put(b.buf)
+		released.add(b)
 	}
 	return
 }
@@ -222,6 +303,8 @@ func (llb *Buffer) ReadFrom(r io.Reader) (n int64, err error) {
 
 // WriteTo implements io.WriterTo.
 func (llb *Buffer) WriteTo(w io.Writer) (n int64, err error) {
+	var released releases
+	defer released.run()
 	var m int
 	for b := llb.pop(); b != nil; b = llb.pop() {
 		m, err = w.Write(b.buf)
@@ -229,6 +312,22 @@ func (llb *Buffer) WriteTo(w io.Writer) (n int64, err error) {
 			panic("Buffer.WriteTo: invalid Write count")
 		}
 		n += int64(m)
+		if b.release != nil {
+			partial := m < b.len()
+			if partial {
+				b.buf = b.buf[m:]
+				llb.pushFront(b)
+			} else {
+				released.add(b)
+			}
+			if err != nil {
+				return
+			}
+			if partial {
+				return n, io.ErrShortWrite
+			}
+			continue
+		}
 		if err != nil {
 			return
 		}
@@ -259,13 +358,17 @@ func (llb *Buffer) IsEmpty() bool {
 
 // Reset removes all elements from this list.
 func (llb *Buffer) Reset() {
-	for b := llb.pop(); b != nil; b = llb.pop() {
-		bsPool.Put(b.buf)
-	}
+	head := llb.head
 	llb.head = nil
 	llb.tail = nil
 	llb.size = 0
 	llb.bytes = 0
+	for b := head; b != nil; {
+		next := b.next
+		b.next = nil
+		b.dispose(io.ErrClosedPipe)
+		b = next
+	}
 }
 
 // pop returns and removes the head of l. If l is empty, it returns nil.
