@@ -16,6 +16,12 @@
 
 package netpoll
 
+import (
+	"sync/atomic"
+
+	"github.com/panjf2000/gnet/v2/pkg/queue"
+)
+
 // PollEventHandler is the callback for I/O events notified by the poller.
 type PollEventHandler func(int, IOEvent, IOFlags) error
 
@@ -23,4 +29,28 @@ type PollEventHandler func(int, IOEvent, IOFlags) error
 type PollAttachment struct {
 	FD       int
 	Callback PollEventHandler
+}
+
+// Done returns a channel that is closed when Polling returns.
+func (p *Poller) Done() <-chan struct{} {
+	return p.done
+}
+
+func (p *Poller) retire() {
+	if !p.stopped.CompareAndSwap(false, true) {
+		return
+	}
+	atomic.StoreInt32(&p.wakeupCall, 0)
+	p.dropQueue(p.urgentAsyncTaskQueue)
+	p.dropQueue(p.asyncTaskQueue)
+	close(p.done)
+}
+
+func (p *Poller) dropQueue(q queue.AsyncTaskQueue) {
+	if q == nil {
+		return
+	}
+	for task := q.Dequeue(); task != nil; task = q.Dequeue() {
+		queue.PutTask(task)
+	}
 }

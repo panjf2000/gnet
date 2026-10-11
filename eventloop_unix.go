@@ -112,10 +112,19 @@ type connWithCallback struct {
 
 func (el *eventloop) enroll(c net.Conn, addr net.Addr, ctx any) (resCh chan RegisteredResult, err error) {
 	resCh = make(chan RegisteredResult, 1)
+	if el.engine.isShutdown() {
+		resCh <- RegisteredResult{Err: errorx.ErrEngineInShutdown}
+		close(resCh)
+		return
+	}
 	err = goroutine.DefaultWorkerPool.Submit(func() {
 		defer close(resCh)
 
 		var err error
+		if el.engine.isShutdown() {
+			resCh <- RegisteredResult{Err: errorx.ErrEngineInShutdown}
+			return
+		}
 		if c == nil {
 			if c, err = net.Dial(addr.Network(), addr.String()); err != nil {
 				resCh <- RegisteredResult{Err: err}
@@ -149,6 +158,11 @@ func (el *eventloop) enroll(c net.Conn, addr net.Addr, ctx any) (resCh chan Regi
 			resCh <- RegisteredResult{Err: err1}
 			return
 		}
+		defer func() {
+			if dupFD >= 0 {
+				_ = unix.Close(dupFD)
+			}
+		}()
 
 		var (
 			sockAddr unix.Sockaddr
@@ -191,15 +205,36 @@ func (el *eventloop) enroll(c net.Conn, addr net.Addr, ctx any) (resCh chan Regi
 			close(connOpened)
 		}}
 		if err := el.poller.Trigger(queue.LowPriority, el.register, ccb); err != nil {
-			gc.Close() //nolint:errcheck
 			resCh <- RegisteredResult{Err: err}
 			return
 		}
-		<-connOpened
+		if !awaitPollerRegister(connOpened, el.poller.Done()) {
+			resCh <- RegisteredResult{Err: errorx.ErrEngineShutdown}
+			return
+		}
+		dupFD = -1
 
 		resCh <- RegisteredResult{Conn: gc}
 	})
 	return
+}
+
+// awaitPollerRegister reports whether register closed opened. Both channels
+// can be ready: a completed register wins, because closeConns releases that
+// connection. A retired poller with a silent opened channel means the task
+// was dropped and the caller still owns the duplicated descriptor.
+func awaitPollerRegister(opened, done <-chan struct{}) bool {
+	select {
+	case <-opened:
+		return true
+	case <-done:
+		select {
+		case <-opened:
+			return true
+		default:
+			return false
+		}
+	}
 }
 
 func (el *eventloop) register(a any) error {

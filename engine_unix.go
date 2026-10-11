@@ -199,6 +199,9 @@ func (eng *engine) stop(ctx context.Context, s Engine) {
 	// Wait on a signal for shutdown
 	<-ctx.Done()
 
+	// Put the engine into the shutdown state before waking pollers.
+	eng.inShutdown.Store(true)
+
 	eng.eventHandler.OnShutdown(s)
 
 	// Notify all event-loops to exit.
@@ -222,9 +225,6 @@ func (eng *engine) stop(ctx context.Context, s Engine) {
 
 	// Close all listeners and pollers of event-loops.
 	eng.closeEventLoops()
-
-	// Put the engine into the shutdown state.
-	eng.inShutdown.Store(true)
 }
 
 func run(eventHandler EventHandler, listeners []*listener, options *Options, addrs []string) error {

@@ -151,6 +151,9 @@ func (cli *Client) Start() error {
 
 // Stop stops the client event-loop.
 func (cli *Client) Stop() error {
+	// Reject new connections before waking pollers.
+	cli.eng.inShutdown.Store(true)
+
 	cli.eng.shutdown(nil)
 
 	cli.eng.eventHandler.OnShutdown(Engine{cli.eng})
@@ -166,9 +169,6 @@ func (cli *Client) Stop() error {
 	err := cli.eng.concurrency.Wait()
 
 	cli.eng.closeEventLoops()
-
-	// Put the engine into the shutdown state.
-	cli.eng.inShutdown.Store(true)
 
 	// Flush the logger.
 	logging.Cleanup()
@@ -199,6 +199,10 @@ func (cli *Client) Enroll(c net.Conn) (Conn, error) {
 func (cli *Client) EnrollContext(c net.Conn, ctx any) (Conn, error) {
 	defer c.Close() //nolint:errcheck
 
+	if cli.eng.isShutdown() {
+		return nil, errorx.ErrEngineInShutdown
+	}
+
 	sc, ok := c.(syscall.Conn)
 	if !ok {
 		return nil, errors.New("failed to convert net.Conn to syscall.Conn")
@@ -218,6 +222,11 @@ func (cli *Client) EnrollContext(c net.Conn, ctx any) (Conn, error) {
 	if e != nil {
 		return nil, e
 	}
+	defer func() {
+		if dupFD >= 0 {
+			_ = unix.Close(dupFD)
+		}
+	}()
 
 	if cli.opts.SocketSendBuffer > 0 {
 		if err = socket.SetSendBuffer(dupFD, cli.opts.SocketSendBuffer); err != nil {
@@ -283,10 +292,12 @@ func (cli *Client) EnrollContext(c net.Conn, ctx any) (Conn, error) {
 	}}
 	err = el.poller.Trigger(queue.HighPriority, el.register, ccb)
 	if err != nil {
-		gc.Close() //nolint:errcheck
 		return nil, err
 	}
-	<-connOpened
+	if !awaitPollerRegister(connOpened, el.poller.Done()) {
+		return nil, errorx.ErrEngineShutdown
+	}
+	dupFD = -1
 
 	return gc, nil
 }
