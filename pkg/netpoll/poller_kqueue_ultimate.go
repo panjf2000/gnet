@@ -35,6 +35,8 @@ type Poller struct {
 	fd                          int
 	pipe                        []int
 	wakeupCall                  int32
+	stopped                     atomic.Bool
+	done                        chan struct{}
 	asyncTaskQueue              queue.AsyncTaskQueue // queue with low priority
 	urgentAsyncTaskQueue        queue.AsyncTaskQueue // queue with high priority
 	highPriorityEventsThreshold int32                // threshold of high-priority events
@@ -43,6 +45,7 @@ type Poller struct {
 // OpenPoller instantiates a poller.
 func OpenPoller() (poller *Poller, err error) {
 	poller = new(Poller)
+	poller.done = make(chan struct{})
 	if poller.fd, err = unix.Kqueue(); err != nil {
 		poller = nil
 		err = os.NewSyscallError("kqueue", err)
@@ -62,6 +65,9 @@ func OpenPoller() (poller *Poller, err error) {
 
 // Close closes the poller.
 func (p *Poller) Close() error {
+	p.retire()
+	p.dropQueue(p.urgentAsyncTaskQueue)
+	p.dropQueue(p.asyncTaskQueue)
 	if len(p.pipe) == 2 {
 		_ = unix.Close(p.pipe[0])
 		_ = unix.Close(p.pipe[1])
@@ -76,6 +82,9 @@ func (p *Poller) Close() error {
 //
 // Note that asyncTaskQueue is a queue of low-priority whose size may grow large and tasks in it may backlog.
 func (p *Poller) Trigger(priority queue.EventPriority, fn queue.Func, param any) (err error) {
+	if p.stopped.Load() {
+		return errorx.ErrEngineShutdown
+	}
 	task := queue.GetTask()
 	task.Exec, task.Param = fn, param
 	if priority > queue.HighPriority && p.urgentAsyncTaskQueue.Length() >= p.highPriorityEventsThreshold {
@@ -84,6 +93,9 @@ func (p *Poller) Trigger(priority queue.EventPriority, fn queue.Func, param any)
 		// There might be some low-priority tasks overflowing into urgentAsyncTaskQueue in a flash,
 		// but that's tolerable because it ought to be a rare case.
 		p.urgentAsyncTaskQueue.Enqueue(task)
+	}
+	if p.stopped.Load() {
+		return errorx.ErrEngineShutdown
 	}
 	if atomic.CompareAndSwapInt32(&p.wakeupCall, 0, 1) {
 		err = p.wakePoller()
@@ -94,6 +106,7 @@ func (p *Poller) Trigger(priority queue.EventPriority, fn queue.Func, param any)
 // Polling blocks the current goroutine, monitoring the registered file descriptors and waiting for network I/O.
 // When I/O occurs on any of the file descriptors, the provided callback function is invoked.
 func (p *Poller) Polling() error {
+	defer p.retire()
 	el := newEventList(InitPollEventsCap)
 
 	var (
@@ -133,6 +146,7 @@ func (p *Poller) Polling() error {
 			for ; task != nil; task = p.urgentAsyncTaskQueue.Dequeue() {
 				err = task.Exec(task.Param)
 				if errors.Is(err, errorx.ErrEngineShutdown) {
+					queue.PutTask(task)
 					return err
 				}
 				queue.PutTask(task)
@@ -143,6 +157,7 @@ func (p *Poller) Polling() error {
 				}
 				err = task.Exec(task.Param)
 				if errors.Is(err, errorx.ErrEngineShutdown) {
+					queue.PutTask(task)
 					return err
 				}
 				queue.PutTask(task)
