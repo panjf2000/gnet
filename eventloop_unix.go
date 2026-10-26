@@ -50,7 +50,7 @@ type eventloop struct {
 }
 
 func (el *eventloop) Register(ctx context.Context, addr net.Addr) (<-chan RegisteredResult, error) {
-	if el.engine.isShutdown() {
+	if el.engine.isStopping() {
 		return nil, errorx.ErrEngineInShutdown
 	}
 	if addr == nil {
@@ -60,7 +60,7 @@ func (el *eventloop) Register(ctx context.Context, addr net.Addr) (<-chan Regist
 }
 
 func (el *eventloop) Enroll(ctx context.Context, c net.Conn) (<-chan RegisteredResult, error) {
-	if el.engine.isShutdown() {
+	if el.engine.isStopping() {
 		return nil, errorx.ErrEngineInShutdown
 	}
 	if c == nil {
@@ -70,7 +70,7 @@ func (el *eventloop) Enroll(ctx context.Context, c net.Conn) (<-chan RegisteredR
 }
 
 func (el *eventloop) Execute(ctx context.Context, runnable Runnable) error {
-	if el.engine.isShutdown() {
+	if el.engine.isStopping() {
 		return errorx.ErrEngineInShutdown
 	}
 	if runnable == nil {
@@ -105,24 +105,29 @@ func (el *eventloop) closeConns() {
 	})
 }
 
-type connWithCallback struct {
-	c  *conn
-	cb func()
-}
-
 func (el *eventloop) enroll(c net.Conn, addr net.Addr, ctx any) (resCh chan RegisteredResult, err error) {
 	resCh = make(chan RegisteredResult, 1)
 	err = goroutine.DefaultWorkerPool.Submit(func() {
 		defer close(resCh)
+		// The worker owns a supplied connection even if shutdown won the
+		// race after public admission but before this worker was scheduled.
+		defer func() {
+			if c != nil {
+				logging.Error(c.Close())
+			}
+		}()
 
 		var err error
+		if el.engine.isStopping() {
+			resCh <- RegisteredResult{Err: errorx.ErrEngineInShutdown}
+			return
+		}
 		if c == nil {
 			if c, err = net.Dial(addr.Network(), addr.String()); err != nil {
 				resCh <- RegisteredResult{Err: err}
 				return
 			}
 		}
-		defer c.Close() //nolint:errcheck
 
 		sc, ok := c.(syscall.Conn)
 		if !ok {
@@ -149,6 +154,11 @@ func (el *eventloop) enroll(c net.Conn, addr net.Addr, ctx any) (resCh chan Regi
 			resCh <- RegisteredResult{Err: err1}
 			return
 		}
+		defer func() {
+			if dupFD >= 0 {
+				_ = unix.Close(dupFD)
+			}
+		}()
 
 		var (
 			sockAddr unix.Sockaddr
@@ -186,30 +196,39 @@ func (el *eventloop) enroll(c net.Conn, addr net.Addr, ctx any) (resCh chan Regi
 		gc.SetContext(ctx)
 		gc.SetSafeContext(ctx)
 
-		connOpened := make(chan struct{})
-		ccb := &connWithCallback{c: gc, cb: func() {
-			close(connOpened)
-		}}
-		if err := el.poller.Trigger(queue.LowPriority, el.register, ccb); err != nil {
-			gc.Close() //nolint:errcheck
+		dupFD = -1 // registerConn owns and resolves every outcome from here.
+		if err := el.registerConn(gc, queue.LowPriority); err != nil {
 			resCh <- RegisteredResult{Err: err}
 			return
 		}
-		<-connOpened
-
 		resCh <- RegisteredResult{Conn: gc}
 	})
 	return
 }
 
-func (el *eventloop) register(a any) error {
-	c, ok := a.(*conn)
-	if !ok {
-		ccb := a.(*connWithCallback)
-		c = ccb.c
-		defer ccb.cb()
+// awaitPollerRegister reports whether register closed opened. Both channels
+// can be ready: a completed register wins, because closeConns releases that
+// connection. A retired poller with a silent opened channel means the task
+// was dropped and the caller still owns the duplicated descriptor.
+func awaitPollerRegister(opened, done <-chan struct{}) bool {
+	select {
+	case <-opened:
+		return true
+	case <-done:
+		select {
+		case <-opened:
+			return true
+		default:
+			return false
+		}
 	}
-	return el.register0(c)
+}
+
+func (el *eventloop) register(a any) error {
+	if r, ok := a.(*connRegistration); ok {
+		return el.registerRequest(r)
+	}
+	return el.register0(a.(*conn))
 }
 
 func (el *eventloop) register0(c *conn) error {
@@ -218,9 +237,9 @@ func (el *eventloop) register0(c *conn) error {
 		addEvents = el.poller.AddReadWrite
 	}
 	if err := addEvents(&c.pollAttachment, el.engine.opts.EdgeTriggeredIO); err != nil {
-		_ = unix.Close(c.fd)
+		closeErr := closeConnFD(c)
 		c.release()
-		return err
+		return errors.Join(err, closeErr)
 	}
 	el.connections.addConn(c, el.idx)
 	if c.isDatagram && c.remote != nil {
@@ -361,6 +380,9 @@ loop:
 }
 
 func (el *eventloop) close(c *conn, err error) error {
+	// An unopened conn owns no descriptor: it is either already closed, or a
+	// UDP listener's per-packet conn, or an Enroll conn whose duplicated fd
+	// stays with EnrollContext until register takes it.
 	if !c.opened || el.connections.getConn(c.fd) == nil {
 		return nil // ignore stale connections
 	}
@@ -384,16 +406,17 @@ func (el *eventloop) close(c *conn, err error) error {
 	c.release()
 
 	var errStr strings.Builder
-	err0, err1 := el.poller.Delete(c.fd), unix.Close(c.fd)
+	fd := c.fd
+	err0, err1 := el.poller.Delete(fd), unix.Close(fd)
 	if err0 != nil {
 		err0 = fmt.Errorf("failed to delete fd=%d from poller in event-loop(%d): %v",
-			c.fd, el.idx, os.NewSyscallError("delete", err0))
+			fd, el.idx, os.NewSyscallError("delete", err0))
 		errStr.WriteString(err0.Error())
 		errStr.WriteString(" | ")
 	}
 	if err1 != nil {
 		err1 = fmt.Errorf("failed to close fd=%d in event-loop(%d): %v",
-			c.fd, el.idx, os.NewSyscallError("close", err1))
+			fd, el.idx, os.NewSyscallError("close", err1))
 		errStr.WriteString(err1.Error())
 	}
 	if errStr.Len() > 0 {

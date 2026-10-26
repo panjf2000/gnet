@@ -33,6 +33,7 @@ import (
 
 // Poller represents a poller which is in charge of monitoring file-descriptors.
 type Poller struct {
+	pollerLifecycle
 	fd                          int    // epoll fd
 	efd                         int    // eventfd
 	efdBuf                      []byte // efd buffer to read an 8-byte integer
@@ -45,6 +46,8 @@ type Poller struct {
 // OpenPoller instantiates a poller.
 func OpenPoller() (poller *Poller, err error) {
 	poller = new(Poller)
+	poller.fd, poller.efd = -1, -1
+	poller.done = make(chan struct{})
 	if poller.fd, err = unix.EpollCreate1(unix.EPOLL_CLOEXEC); err != nil {
 		poller = nil
 		err = os.NewSyscallError("epoll_create1", err)
@@ -68,10 +71,18 @@ func OpenPoller() (poller *Poller, err error) {
 	return
 }
 
-// Close closes the poller.
+// Close closes a retired or not-yet-started poller, or returns EBUSY while Polling runs.
 func (p *Poller) Close() error {
-	_ = unix.Close(p.efd)
-	return os.NewSyscallError("close", unix.Close(p.fd))
+	return p.closePoller(func() error {
+		var wakeErr, pollErr error
+		if p.efd >= 0 {
+			wakeErr = os.NewSyscallError("close eventfd", unix.Close(p.efd))
+		}
+		if p.fd >= 0 {
+			pollErr = os.NewSyscallError("close epoll", unix.Close(p.fd))
+		}
+		return errors.Join(wakeErr, pollErr)
+	})
 }
 
 // Make the endianness of bytes compatible with more linux OSs under different processor-architectures,
@@ -88,21 +99,34 @@ var (
 //
 // Note that asyncTaskQueue is a queue of low-priority whose size may grow large and tasks in it may backlog.
 func (p *Poller) Trigger(priority queue.EventPriority, fn queue.Func, param any) (err error) {
-	task := queue.GetTask()
-	task.Exec, task.Param = fn, param
-	if priority > queue.HighPriority && p.urgentAsyncTaskQueue.Length() >= p.highPriorityEventsThreshold {
-		p.asyncTaskQueue.Enqueue(task)
-	} else {
-		// There might be some low-priority tasks overflowing into urgentAsyncTaskQueue in a flash,
-		// but that's tolerable because it ought to be a rare case.
-		p.urgentAsyncTaskQueue.Enqueue(task)
+	p.retireMu.Lock()
+	defer p.retireMu.Unlock()
+	if err = p.enqueue(priority, fn, param); err != nil {
+		return
 	}
 	if atomic.CompareAndSwapInt32(&p.wakeupCall, 0, 1) {
 		for {
 			_, err = unix.Write(p.efd, b)
-			if err == unix.EAGAIN {
-				_, _ = unix.Read(p.efd, p.efdBuf)
+			if err == unix.EINTR {
 				continue
+			}
+			if err == unix.EAGAIN {
+				// The previous edge may already have been consumed. Drain
+				// the counter and create a new edge, using a local buffer
+				// because Polling can concurrently drain the same eventfd.
+				var drained [8]byte
+				for {
+					_, err = unix.Read(p.efd, drained[:])
+					if err != unix.EINTR {
+						break
+					}
+				}
+				if err == nil || err == unix.EAGAIN {
+					continue
+				}
+			}
+			if err != nil {
+				atomic.StoreInt32(&p.wakeupCall, 0)
 			}
 			break
 		}
@@ -113,6 +137,10 @@ func (p *Poller) Trigger(priority queue.EventPriority, fn queue.Func, param any)
 // Polling blocks the current goroutine, monitoring the registered file descriptors and waiting for network I/O.
 // When I/O occurs on any of the file descriptors, the provided callback function is invoked.
 func (p *Poller) Polling(callback PollEventHandler) error {
+	if err := p.beginPolling(); err != nil {
+		return err
+	}
+	defer p.retire()
 	el := newEventList(InitPollEventsCap)
 	var doChores bool
 
@@ -147,6 +175,7 @@ func (p *Poller) Polling(callback PollEventHandler) error {
 			for ; task != nil; task = p.urgentAsyncTaskQueue.Dequeue() {
 				err = task.Exec(task.Param)
 				if errors.Is(err, errorx.ErrEngineShutdown) {
+					queue.PutTask(task)
 					return err
 				}
 				queue.PutTask(task)
@@ -157,6 +186,7 @@ func (p *Poller) Polling(callback PollEventHandler) error {
 				}
 				err = task.Exec(task.Param)
 				if errors.Is(err, errorx.ErrEngineShutdown) {
+					queue.PutTask(task)
 					return err
 				}
 				queue.PutTask(task)

@@ -52,3 +52,7 @@ retry:
 }
 
 func (p *Poller) drainWakeupEvent() {}
+
+func (*Poller) isWakeupEvent(ident int, filter IOEvent) bool {
+	return ident == 0 && filter == unix.EVFILT_USER
+}

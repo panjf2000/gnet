@@ -59,3 +59,7 @@ func (p *Poller) drainWakeupEvent() {
 	var buf [8]byte
 	_, _ = unix.Read(p.pipe[0], buf[:])
 }
+
+func (p *Poller) isWakeupEvent(ident int, filter IOEvent) bool {
+	return len(p.pipe) == 2 && ident == p.pipe[0] && filter == unix.EVFILT_READ
+}

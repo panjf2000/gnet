@@ -151,6 +151,10 @@ func (cli *Client) Start() error {
 
 // Stop stops the client event-loop.
 func (cli *Client) Stop() error {
+	// Reject new connections before the pollers are woken. EnrollContext
+	// must not duplicate a socket once Stop has begun.
+	cli.eng.stopping.Store(true)
+
 	cli.eng.shutdown(nil)
 
 	cli.eng.eventHandler.OnShutdown(Engine{cli.eng})
@@ -199,6 +203,10 @@ func (cli *Client) Enroll(c net.Conn) (Conn, error) {
 func (cli *Client) EnrollContext(c net.Conn, ctx any) (Conn, error) {
 	defer c.Close() //nolint:errcheck
 
+	if cli.eng.isStopping() {
+		return nil, errorx.ErrEngineInShutdown
+	}
+
 	sc, ok := c.(syscall.Conn)
 	if !ok {
 		return nil, errors.New("failed to convert net.Conn to syscall.Conn")
@@ -218,6 +226,13 @@ func (cli *Client) EnrollContext(c net.Conn, ctx any) (Conn, error) {
 	if e != nil {
 		return nil, e
 	}
+	// dupFD stays non-negative until register owns gc.fd. Every return before
+	// that assignment closes the descriptor, including buffer and address errors.
+	defer func() {
+		if dupFD >= 0 {
+			_ = unix.Close(dupFD)
+		}
+	}()
 
 	if cli.opts.SocketSendBuffer > 0 {
 		if err = socket.SetSendBuffer(dupFD, cli.opts.SocketSendBuffer); err != nil {
@@ -277,16 +292,9 @@ func (cli *Client) EnrollContext(c net.Conn, ctx any) (Conn, error) {
 	gc.SetContext(ctx)
 	gc.SetSafeContext(ctx)
 
-	connOpened := make(chan struct{})
-	ccb := &connWithCallback{c: gc, cb: func() {
-		close(connOpened)
-	}}
-	err = el.poller.Trigger(queue.HighPriority, el.register, ccb)
-	if err != nil {
-		gc.Close() //nolint:errcheck
+	dupFD = -1 // registerConn owns and resolves every outcome from here.
+	if err = el.registerConn(gc, queue.HighPriority); err != nil {
 		return nil, err
 	}
-	<-connOpened
-
 	return gc, nil
 }

@@ -18,10 +18,18 @@ package netpoll
 
 import "unsafe"
 
-func convertPollAttachment(ptr unsafe.Pointer, attachment *PollAttachment) {
-	*(**PollAttachment)(ptr) = attachment
+// The kernel retains the address after this call. Keep the caller's attachment
+// on the heap even though its representation is copied without pointer stores.
+//
+//go:uintptrescapes
+func convertPollAttachment(ptr unsafe.Pointer, attachment uintptr) {
+	// epoll_data is packed at an address that need not be pointer-aligned.
+	// Copy its representation as bytes rather than dereferencing a **T there.
+	*(*[unsafe.Sizeof(attachment)]byte)(ptr) = *(*[unsafe.Sizeof(attachment)]byte)(unsafe.Pointer(&attachment))
 }
 
 func restorePollAttachment(ptr unsafe.Pointer) *PollAttachment {
-	return *(**PollAttachment)(ptr)
+	var attachment *PollAttachment
+	*(*[unsafe.Sizeof(attachment)]byte)(unsafe.Pointer(&attachment)) = *(*[unsafe.Sizeof(attachment)]byte)(ptr)
+	return attachment
 }

@@ -1548,12 +1548,16 @@ func TestClosedWakeUp(t *testing.T) {
 		tester:             t,
 		BuiltinEventEngine: &BuiltinEventEngine{}, network: "tcp", addr: ":9999", protoAddr: "tcp://:9999",
 		clientClosed: make(chan struct{}),
-		serverClosed: make(chan struct{}),
+		serverClosed: make(chan Conn, 1),
 		wakeup:       make(chan struct{}),
+		done:         make(chan struct{}),
 	}
 
-	err := Run(events, events.protoAddr)
+	err := Run(events, events.protoAddr, WithReuseAddr(true))
 	assert.NoError(t, err)
+	if err == nil {
+		<-events.done
+	}
 }
 
 type testClosedWakeUpServer struct {
@@ -1562,14 +1566,26 @@ type testClosedWakeUpServer struct {
 	network, addr, protoAddr string
 
 	wakeup       chan struct{}
-	serverClosed chan struct{}
+	serverClosed chan Conn
 	clientClosed chan struct{}
+	done         chan struct{}
+	submissions  sync.WaitGroup
+	closed       bool // accessed only on the event-loop
 }
 
 func (s *testClosedWakeUpServer) OnBoot(eng Engine) (action Action) {
 	err := goPool.DefaultWorkerPool.Submit(func() {
+		defer close(s.done)
+		defer func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			assert.NoError(s.tester, eng.Stop(ctx))
+		}()
 		c, err := net.Dial(s.network, s.addr)
-		assert.NoError(s.tester, err)
+		if !assert.NoError(s.tester, err) {
+			return
+		}
+		defer func() { assert.NoError(s.tester, c.Close()) }()
 
 		_, err = c.Write([]byte("hello"))
 		assert.NoError(s.tester, err)
@@ -1579,9 +1595,32 @@ func (s *testClosedWakeUpServer) OnBoot(eng Engine) (action Action) {
 		assert.NoError(s.tester, err)
 
 		close(s.clientClosed)
-		<-s.serverClosed
+		closedConn := <-s.serverClosed
+		// OnClose does not join the goroutines submitted by OnTraffic.
+		// Join every submission before allowing Stop to retire the poller.
+		s.submissions.Wait()
 
-		logging.Debugf("stop engine...", eng.Stop(context.TODO()))
+		// OnClose runs before the connection's resources are released. A
+		// subsequent close callback is an event-loop barrier past that release.
+		closed := make(chan error, 1)
+		if assert.NoError(s.tester, closedConn.CloseWithCallback(func(_ Conn, closeErr error) error {
+			closed <- closeErr
+			return nil
+		})) {
+			assert.NoError(s.tester, <-closed)
+		}
+
+		// These calls must be admitted while the engine is still running.
+		// The callback also proves that the stale wake was processed after
+		// the close handler returned, without another OnTraffic invocation.
+		assert.NoError(s.tester, closedConn.Wake(nil))
+		processed := make(chan error, 1)
+		if assert.NoError(s.tester, closedConn.Wake(func(_ Conn, wakeErr error) error {
+			processed <- wakeErr
+			return nil
+		})) {
+			assert.NoError(s.tester, <-processed)
+		}
 	})
 	assert.NoError(s.tester, err)
 
@@ -1589,6 +1628,10 @@ func (s *testClosedWakeUpServer) OnBoot(eng Engine) (action Action) {
 }
 
 func (s *testClosedWakeUpServer) OnTraffic(c Conn) Action {
+	if s.closed {
+		s.tester.Error("OnTraffic invoked for an already-closed connection")
+		return None
+	}
 	assert.NotNil(s.tester, c.RemoteAddr())
 
 	select {
@@ -1597,9 +1640,23 @@ func (s *testClosedWakeUpServer) OnTraffic(c Conn) Action {
 		close(s.wakeup)
 	}
 
-	err := goPool.DefaultWorkerPool.Submit(func() { assert.NoError(s.tester, c.Wake(nil)) })
+	s.submissions.Add(1)
+	err := goPool.DefaultWorkerPool.Submit(func() {
+		defer s.submissions.Done()
+		assert.NoError(s.tester, c.Wake(nil))
+	})
+	if err != nil {
+		s.submissions.Done()
+	}
 	assert.NoError(s.tester, err)
-	err = goPool.DefaultWorkerPool.Submit(func() { assert.NoError(s.tester, c.Close()) })
+	s.submissions.Add(1)
+	err = goPool.DefaultWorkerPool.Submit(func() {
+		defer s.submissions.Done()
+		assert.NoError(s.tester, c.Close())
+	})
+	if err != nil {
+		s.submissions.Done()
+	}
 	assert.NoError(s.tester, err)
 
 	<-s.clientClosed
@@ -1608,12 +1665,9 @@ func (s *testClosedWakeUpServer) OnTraffic(c Conn) Action {
 	return None
 }
 
-func (s *testClosedWakeUpServer) OnClose(Conn, error) (action Action) {
-	select {
-	case <-s.serverClosed:
-	default:
-		close(s.serverClosed)
-	}
+func (s *testClosedWakeUpServer) OnClose(c Conn, _ error) (action Action) {
+	s.closed = true
+	s.serverClosed <- c
 	return
 }
 

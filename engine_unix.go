@@ -38,6 +38,7 @@ type engine struct {
 	ingress      *eventloop        // main event-loop that monitors all listeners
 	eventLoops   loadBalancer      // event-loops for handling events
 	inShutdown   atomic.Bool       // whether the engine is in shutdown
+	stopping     atomic.Bool       // whether shutdown has begun; rejects new connections
 	turnOff      context.CancelFunc
 	eventHandler EventHandler // user eventHandler
 	concurrency  struct {
@@ -49,6 +50,12 @@ type engine struct {
 
 func (eng *engine) isShutdown() bool {
 	return eng.inShutdown.Load()
+}
+
+// isStopping reports whether shutdown has begun. It turns true before the
+// pollers are woken, whereas isShutdown turns true only once they are closed.
+func (eng *engine) isStopping() bool {
+	return eng.stopping.Load()
 }
 
 // shutdown signals the engine to shut down.
@@ -84,16 +91,6 @@ func (eng *engine) runEventLoops(ctx context.Context, numEventLoop int) error {
 	lns := eng.listeners
 	// Create loops locally and bind the listeners.
 	for i := 0; i < numEventLoop; i++ {
-		if i > 0 {
-			lns = make(map[int]*listener, len(eng.listeners))
-			for _, l := range eng.listeners {
-				ln, err := initListener(l.network, l.address, eng.opts)
-				if err != nil {
-					return err
-				}
-				lns[ln.fd] = ln
-			}
-		}
 		p, err := netpoll.OpenPoller()
 		if err != nil {
 			return err
@@ -105,12 +102,24 @@ func (eng *engine) runEventLoops(ctx context.Context, numEventLoop int) error {
 		el.buffer = make([]byte, eng.opts.ReadBufferCap)
 		el.connections.init()
 		el.eventHandler = eng.eventHandler
+		// Publish ownership before any later preparation can fail.
+		eng.eventLoops.register(el)
+		if i > 0 {
+			lns = make(map[int]*listener, len(eng.listeners))
+			el.listeners = lns
+			for _, l := range eng.listeners {
+				ln, err := initListener(l.network, l.address, eng.opts)
+				if err != nil {
+					return err
+				}
+				lns[ln.fd] = ln
+			}
+		}
 		for _, ln := range lns {
 			if err = el.poller.AddRead(ln.packPollAttachment(el.accept), false); err != nil {
 				return err
 			}
 		}
-		eng.eventLoops.register(el)
 
 		// Start the ticker.
 		if eng.opts.Ticker && el.idx == 0 {
@@ -150,12 +159,6 @@ func (eng *engine) activateReactors(ctx context.Context, numEventLoop int) error
 		eng.eventLoops.register(el)
 	}
 
-	// Start sub reactors in the background.
-	eng.eventLoops.iterate(func(_ int, el *eventloop) bool {
-		eng.concurrency.Go(el.orbit)
-		return true
-	})
-
 	p, err := netpoll.OpenPoller()
 	if err != nil {
 		return err
@@ -166,12 +169,18 @@ func (eng *engine) activateReactors(ctx context.Context, numEventLoop int) error
 	el.engine = eng
 	el.poller = p
 	el.eventHandler = eng.eventHandler
+	eng.ingress = el
 	for _, ln := range eng.listeners {
 		if err = el.poller.AddRead(ln.packPollAttachment(el.accept0), true); err != nil {
 			return err
 		}
 	}
-	eng.ingress = el
+
+	// Start reactors only after every poller and listener is ready.
+	eng.eventLoops.iterate(func(_ int, el *eventloop) bool {
+		eng.concurrency.Go(el.orbit)
+		return true
+	})
 
 	// Start the main reactor in the background.
 	eng.concurrency.Go(el.rotate)
@@ -198,6 +207,10 @@ func (eng *engine) start(ctx context.Context, numEventLoop int) error {
 func (eng *engine) stop(ctx context.Context, s Engine) {
 	// Wait on a signal for shutdown
 	<-ctx.Done()
+
+	// Reject new connections before waking pollers. inShutdown stays the
+	// completion signal and is published only once the pollers are closed.
+	eng.stopping.Store(true)
 
 	eng.eventHandler.OnShutdown(s)
 
