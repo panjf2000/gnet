@@ -1,0 +1,446 @@
+diff --git a/connection_unix.go b/connection_unix.go
+index 65849ea..a31226a 100644
+--- a/connection_unix.go
++++ b/connection_unix.go
+@@ -195,7 +195,7 @@ func (c *conn) open(buf []byte) error {
+ 	}
+ 
+ 	for {
+-		n, err := gio.WriteNB(c.fd, buf)
++		n, err := gio.WriteSocketNB(c.fd, buf)
+ 		if err != nil {
+ 			if err == unix.EAGAIN {
+ 				_, _ = c.outboundBuffer.Write(buf)
+@@ -245,7 +245,7 @@ func (c *conn) write(data []byte) (n int, err error) {
+ 
+ 	var sent int
+ loop:
+-	if sent, err = gio.WriteNB(c.fd, data); err != nil {
++	if sent, err = gio.WriteSocketNB(c.fd, data); err != nil {
+ 		// A temporary error occurs, append the data to outbound buffer,
+ 		// writing it back to the remote in the next round for LT mode.
+ 		if err == unix.EAGAIN {
+diff --git a/eventloop_unix.go b/eventloop_unix.go
+index c2d2180..5ed52b4 100644
+--- a/eventloop_unix.go
++++ b/eventloop_unix.go
+@@ -320,7 +320,7 @@ func (el *eventloop) read(c *conn) error {
+ 	isET := el.engine.opts.EdgeTriggeredIO
+ 	chunk := el.engine.opts.EdgeTriggeredIOChunk
+ loop:
+-	n, err := gio.ReadNB(c.fd, el.buffer)
++	n, err := gio.ReadSocketNB(c.fd, el.buffer)
+ 	if err != nil || n == 0 {
+ 		if err == unix.EAGAIN {
+ 			return nil
+@@ -396,14 +396,14 @@ loop:
+ 	// unconditionally in that case, paying an extra iovec and a heavier syscall
+ 	// per flush on the overwhelmingly common single-segment buffer.
+ 	if len(iov) == 2 && len(iov[1]) == 0 {
+-		n, err = gio.WriteNB(c.fd, iov[0])
++		n, err = gio.WriteSocketNB(c.fd, iov[0])
+ 	} else if len(iov) > 1 {
+ 		if len(iov) > iovMax {
+ 			iov = iov[:iovMax]
+ 		}
+ 		n, err = gio.Writev(c.fd, iov)
+ 	} else {
+-		n, err = gio.WriteNB(c.fd, iov[0])
++		n, err = gio.WriteSocketNB(c.fd, iov[0])
+ 	}
+ 	_, _ = c.outboundBuffer.Discard(n)
+ 	switch err {
+@@ -452,9 +452,9 @@ func (el *eventloop) flushCoalesced(c *conn) error {
+ 			err error
+ 		)
+ 		// Common case: everything sits in the ring part of the buffer, send the
+-		// first contiguous run with a plain write(2) and no allocation.
++		// first contiguous run with the single-buffer socket syscall and no allocation.
+ 		if head, _, _ := c.outboundBuffer.PeekStatic(); len(head) > 0 {
+-			n, err = gio.WriteNB(c.fd, head)
++			n, err = gio.WriteSocketNB(c.fd, head)
+ 			if n > 0 {
+ 				_, _ = c.outboundBuffer.Discard(n)
+ 			}
+diff --git a/pkg/io/io_socket_bsd.go b/pkg/io/io_socket_bsd.go
+new file mode 100644
+index 0000000..68a34a4
+--- /dev/null
++++ b/pkg/io/io_socket_bsd.go
+@@ -0,0 +1,23 @@
++// Copyright (c) 2025 The Gnet Authors. All rights reserved.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++//go:build darwin || dragonfly || freebsd || netbsd || openbsd
++
++package io
++
++// The socket-specific entry points fall back to the existing BSD read/write
++// wrappers. The recvfrom/sendto experiment is Linux-only; this keeps the Unix
++// event-loop call sites portable and leaves BSD behavior unchanged.
++func ReadSocketNB(fd int, p []byte) (int, error)  { return ReadNB(fd, p) }
++func WriteSocketNB(fd int, p []byte) (int, error) { return WriteNB(fd, p) }
+diff --git a/pkg/io/io_socket_linux_test.go b/pkg/io/io_socket_linux_test.go
+new file mode 100644
+index 0000000..1e143bd
+--- /dev/null
++++ b/pkg/io/io_socket_linux_test.go
+@@ -0,0 +1,118 @@
++// Copyright (c) 2025 The Gnet Authors. All rights reserved.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++//go:build linux
++
++package io
++
++import (
++	"bytes"
++	"testing"
++
++	"golang.org/x/sys/unix"
++)
++
++func TestReadWriteSocketNB(t *testing.T) {
++	a, b := nonblockingPair(t)
++	buf := make([]byte, 32)
++
++	if n, err := ReadSocketNB(b, buf); n != -1 || err != unix.EAGAIN {
++		t.Fatalf("empty socket: n=%d err=%v, want -1 / EAGAIN", n, err)
++	}
++
++	// Empty reads and writes retain read/write semantics and do not consume data.
++	if n, err := WriteSocketNB(a, nil); n != 0 || err != nil {
++		t.Fatalf("zero-length write: n=%d err=%v, want 0 / nil", n, err)
++	}
++	msg := []byte("socket-specific raw syscall")
++	if n, err := WriteSocketNB(a, msg); n != len(msg) || err != nil {
++		t.Fatalf("write: n=%d err=%v, want %d / nil", n, err, len(msg))
++	}
++	if n, err := ReadSocketNB(b, nil); n != 0 || err != nil {
++		t.Fatalf("zero-length read: n=%d err=%v, want 0 / nil", n, err)
++	}
++	if n, err := ReadSocketNB(b, buf); n != len(msg) || err != nil || !bytes.Equal(buf[:n], msg) {
++		t.Fatalf("read: n=%d err=%v data=%q", n, err, buf[:max(n, 0)])
++	}
++
++	// A non-empty read after the peer closes must report EOF as 0 / nil.
++	if err := unix.Close(a); err != nil {
++		t.Fatal(err)
++	}
++	if n, err := ReadSocketNB(b, buf); n != 0 || err != nil {
++		t.Fatalf("peer close: n=%d err=%v, want 0 / nil", n, err)
++	}
++}
++
++func TestReadWriteSocketNBErrors(t *testing.T) {
++	if n, err := ReadSocketNB(-1, []byte("x")); n != -1 || err != unix.EBADF {
++		t.Fatalf("bad read fd: n=%d err=%v, want -1 / EBADF", n, err)
++	}
++	if n, err := WriteSocketNB(-1, []byte("x")); n != -1 || err != unix.EBADF {
++		t.Fatalf("bad write fd: n=%d err=%v, want -1 / EBADF", n, err)
++	}
++
++	a, b := nonblockingPair(t)
++	if err := unix.Close(b); err != nil {
++		t.Fatal(err)
++	}
++	if n, err := WriteSocketNB(a, []byte("x")); n != -1 || err != unix.EPIPE {
++		t.Fatalf("write after peer close: n=%d err=%v, want -1 / EPIPE", n, err)
++	}
++}
++
++func TestWriteSocketNBFullBufferDoesNotBlock(t *testing.T) {
++	a, _ := nonblockingPair(t)
++	chunk := make([]byte, 64*1024)
++	total := 0
++	for i := 0; i < 1<<14; i++ {
++		n, err := WriteSocketNB(a, chunk)
++		if err == unix.EAGAIN {
++			if total == 0 {
++				t.Fatal("EAGAIN before any byte was accepted")
++			}
++			return
++		}
++		if err != nil {
++			t.Fatalf("unexpected error after %d bytes: %v", total, err)
++		}
++		total += n
++	}
++	t.Fatalf("socket buffer never filled up after %d bytes", total)
++}
++
++func TestReadSocketNBNoAllocOnEAGAIN(t *testing.T) {
++	_, b := nonblockingPair(t)
++	buf := make([]byte, 64)
++	if allocs := testing.AllocsPerRun(200, func() { _, _ = ReadSocketNB(b, buf) }); allocs != 0 {
++		t.Fatalf("ReadSocketNB allocates %.1f times per EAGAIN call", allocs)
++	}
++}
++
++func TestWriteSocketNBNoAllocOnEAGAIN(t *testing.T) {
++	a, _ := nonblockingPair(t)
++	chunk := make([]byte, 64*1024)
++	for {
++		_, err := WriteSocketNB(a, chunk)
++		if err == unix.EAGAIN {
++			break
++		}
++		if err != nil {
++			t.Fatalf("fill socket buffer: %v", err)
++		}
++	}
++	if allocs := testing.AllocsPerRun(200, func() { _, _ = WriteSocketNB(a, chunk) }); allocs != 0 {
++		t.Fatalf("WriteSocketNB allocates %.1f times per EAGAIN call", allocs)
++	}
++}
+diff --git a/pkg/io/io_socket_read_linux.go b/pkg/io/io_socket_read_linux.go
+new file mode 100644
+index 0000000..82e0aff
+--- /dev/null
++++ b/pkg/io/io_socket_read_linux.go
+@@ -0,0 +1,22 @@
++// Copyright (c) 2025 The Gnet Authors. All rights reserved.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++//go:build linux && !gnet_recvfrom
++
++package io
++
++// ReadSocketNB preserves the existing read(2) path unless the gnet_recvfrom
++// build tag is enabled. Keeping this switch at build time lets the benchmark
++// compare the receive syscall independently without a runtime branch.
++func ReadSocketNB(fd int, p []byte) (int, error) { return ReadNB(fd, p) }
+diff --git a/pkg/io/io_socket_read_recvfrom_linux.go b/pkg/io/io_socket_read_recvfrom_linux.go
+new file mode 100644
+index 0000000..92a503f
+--- /dev/null
++++ b/pkg/io/io_socket_read_recvfrom_linux.go
+@@ -0,0 +1,48 @@
++// Copyright (c) 2025 The Gnet Authors. All rights reserved.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++//go:build linux && gnet_recvfrom
++
++package io
++
++import (
++	"runtime"
++	"unsafe"
++
++	"golang.org/x/sys/unix"
++)
++
++// ReadSocketNB uses recvfrom(2) for non-blocking sockets. The NULL source
++// address and address-length arguments make this equivalent to recv(2) for the
++// stream sockets used by the event loop. The gnet_recvfrom build tag enables
++// this path for isolated benchmarking; the default build retains read(2).
++//
++// It must only be used with non-blocking socket descriptors. Eventfd and other
++// non-socket descriptors must continue to use ReadNB.
++func ReadSocketNB(fd int, p []byte) (n int, err error) {
++	ptr := unsafe.Pointer(&_zero)
++	if len(p) > 0 {
++		ptr = unsafe.Pointer(&p[0])
++	}
++
++	r, _, e := unix.RawSyscall6(
++		unix.SYS_RECVFROM,
++		uintptr(fd), uintptr(ptr), uintptr(len(p)), 0, 0, 0,
++	)
++	runtime.KeepAlive(p)
++	if e != 0 {
++		return -1, errnoErr(e)
++	}
++	return int(r), nil
++}
+diff --git a/pkg/io/io_socket_sendto_linux_test.go b/pkg/io/io_socket_sendto_linux_test.go
+new file mode 100644
+index 0000000..fd7cee0
+--- /dev/null
++++ b/pkg/io/io_socket_sendto_linux_test.go
+@@ -0,0 +1,57 @@
++// Copyright (c) 2025 The Gnet Authors. All rights reserved.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++//go:build linux && gnet_sendto
++
++package io
++
++import (
++	"os"
++	"os/exec"
++	"os/signal"
++	"syscall"
++	"testing"
++	"time"
++
++	"golang.org/x/sys/unix"
++)
++
++func TestWriteSocketNBSuppressesSIGPIPE(t *testing.T) {
++	const childEnv = "GNET_TEST_SOCKET_NOSIGNAL_CHILD"
++	if os.Getenv(childEnv) == "1" {
++		sigpipe := make(chan os.Signal, 1)
++		signal.Notify(sigpipe, syscall.SIGPIPE)
++		defer signal.Stop(sigpipe)
++
++		a, b := nonblockingPair(t)
++		if err := unix.Close(b); err != nil {
++			t.Fatal(err)
++		}
++		if n, err := WriteSocketNB(a, []byte("x")); n != -1 || err != unix.EPIPE {
++			t.Fatalf("write after peer close: n=%d err=%v, want -1 / EPIPE", n, err)
++		}
++		select {
++		case sig := <-sigpipe:
++			t.Fatalf("unexpected signal after MSG_NOSIGNAL write: %v", sig)
++		case <-time.After(25 * time.Millisecond):
++		}
++		return
++	}
++
++	cmd := exec.Command(os.Args[0], "-test.run=^TestWriteSocketNBSuppressesSIGPIPE$")
++	cmd.Env = append(os.Environ(), childEnv+"=1")
++	if out, err := cmd.CombinedOutput(); err != nil {
++		t.Fatalf("SIGPIPE helper failed: %v\n%s", err, out)
++	}
++}
+diff --git a/pkg/io/io_socket_write_linux.go b/pkg/io/io_socket_write_linux.go
+new file mode 100644
+index 0000000..b1a19cd
+--- /dev/null
++++ b/pkg/io/io_socket_write_linux.go
+@@ -0,0 +1,22 @@
++// Copyright (c) 2025 The Gnet Authors. All rights reserved.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++//go:build linux && !gnet_sendto
++
++package io
++
++// WriteSocketNB preserves the existing write(2) path unless the gnet_sendto
++// build tag is enabled. Keeping this switch at build time lets the benchmark
++// compare the send syscall independently without a runtime branch.
++func WriteSocketNB(fd int, p []byte) (int, error) { return WriteNB(fd, p) }
+diff --git a/pkg/io/io_socket_write_sendto_linux.go b/pkg/io/io_socket_write_sendto_linux.go
+new file mode 100644
+index 0000000..68e710b
+--- /dev/null
++++ b/pkg/io/io_socket_write_sendto_linux.go
+@@ -0,0 +1,50 @@
++// Copyright (c) 2025 The Gnet Authors. All rights reserved.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++//go:build linux && gnet_sendto
++
++package io
++
++import (
++	"runtime"
++	"unsafe"
++
++	"golang.org/x/sys/unix"
++)
++
++// WriteSocketNB uses sendto(2) with MSG_NOSIGNAL for non-blocking sockets.
++// A NULL destination and zero address length make this equivalent to send(2)
++// on the already-connected sockets used by the event loop. MSG_NOSIGNAL
++// suppresses SIGPIPE for this syscall while preserving EPIPE as the returned
++// error. The gnet_sendto build tag enables this path for isolated benchmarking;
++// the default build retains write(2).
++//
++// It must only be used with socket descriptors. Eventfd and other non-socket
++// descriptors must continue to use WriteNB.
++func WriteSocketNB(fd int, p []byte) (n int, err error) {
++	ptr := unsafe.Pointer(&_zero)
++	if len(p) > 0 {
++		ptr = unsafe.Pointer(&p[0])
++	}
++
++	r, _, e := unix.RawSyscall6(
++		unix.SYS_SENDTO,
++		uintptr(fd), uintptr(ptr), uintptr(len(p)), uintptr(unix.MSG_NOSIGNAL), 0, 0,
++	)
++	runtime.KeepAlive(p)
++	if e != 0 {
++		return -1, errnoErr(e)
++	}
++	return int(r), nil
++}

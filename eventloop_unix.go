@@ -320,7 +320,7 @@ func (el *eventloop) read(c *conn) error {
 	isET := el.engine.opts.EdgeTriggeredIO
 	chunk := el.engine.opts.EdgeTriggeredIOChunk
 loop:
-	n, err := gio.ReadNB(c.fd, el.buffer)
+	n, err := gio.ReadSocketNB(c.fd, el.buffer)
 	if err != nil || n == 0 {
 		if err == unix.EAGAIN {
 			return nil
@@ -396,14 +396,14 @@ loop:
 	// unconditionally in that case, paying an extra iovec and a heavier syscall
 	// per flush on the overwhelmingly common single-segment buffer.
 	if len(iov) == 2 && len(iov[1]) == 0 {
-		n, err = gio.WriteNB(c.fd, iov[0])
+		n, err = gio.WriteSocketNB(c.fd, iov[0])
 	} else if len(iov) > 1 {
 		if len(iov) > iovMax {
 			iov = iov[:iovMax]
 		}
 		n, err = gio.Writev(c.fd, iov)
 	} else {
-		n, err = gio.WriteNB(c.fd, iov[0])
+		n, err = gio.WriteSocketNB(c.fd, iov[0])
 	}
 	_, _ = c.outboundBuffer.Discard(n)
 	switch err {
@@ -452,9 +452,9 @@ func (el *eventloop) flushCoalesced(c *conn) error {
 			err error
 		)
 		// Common case: everything sits in the ring part of the buffer, send the
-		// first contiguous run with a plain write(2) and no allocation.
+		// first contiguous run with the single-buffer socket syscall and no allocation.
 		if head, _, _ := c.outboundBuffer.PeekStatic(); len(head) > 0 {
-			n, err = gio.WriteNB(c.fd, head)
+			n, err = gio.WriteSocketNB(c.fd, head)
 			if n > 0 {
 				_, _ = c.outboundBuffer.Discard(n)
 			}

@@ -195,7 +195,7 @@ func (c *conn) open(buf []byte) error {
 	}
 
 	for {
-		n, err := gio.WriteNB(c.fd, buf)
+		n, err := gio.WriteSocketNB(c.fd, buf)
 		if err != nil {
 			if err == unix.EAGAIN {
 				_, _ = c.outboundBuffer.Write(buf)
@@ -245,7 +245,7 @@ func (c *conn) write(data []byte) (n int, err error) {
 
 	var sent int
 loop:
-	if sent, err = gio.WriteNB(c.fd, data); err != nil {
+	if sent, err = gio.WriteSocketNB(c.fd, data); err != nil {
 		// A temporary error occurs, append the data to outbound buffer,
 		// writing it back to the remote in the next round for LT mode.
 		if err == unix.EAGAIN {
