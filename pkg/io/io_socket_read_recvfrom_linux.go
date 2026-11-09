@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build linux && gnet_recvfrom
+//go:build linux && !gnet_legacy_read
 
 package io
 
@@ -25,8 +25,8 @@ import (
 
 // ReadSocketNB uses recvfrom(2) for non-blocking sockets. The NULL source
 // address and address-length arguments make this equivalent to recv(2) for the
-// stream sockets used by the event loop. The gnet_recvfrom build tag enables
-// this path for isolated benchmarking; the default build retains read(2).
+// stream sockets used by the event loop. This is the default Linux socket-read
+// path; gnet_legacy_read restores the previous read(2) implementation.
 //
 // It must only be used with non-blocking socket descriptors. Eventfd and other
 // non-socket descriptors must continue to use ReadNB.

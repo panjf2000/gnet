@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build linux && gnet_sendto
+//go:build linux && !gnet_legacy_write
 
 package io
 

@@ -12,11 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build linux && !gnet_sendto
+//go:build linux && gnet_legacy_write
 
 package io
 
-// WriteSocketNB preserves the existing write(2) path unless the gnet_sendto
-// build tag is enabled. Keeping this switch at build time lets the benchmark
-// compare the send syscall independently without a runtime branch.
+// WriteSocketNB preserves the legacy write(2) path when gnet_legacy_write is set.
+// The default Linux build uses sendto(2) with MSG_NOSIGNAL for socket descriptors.
 func WriteSocketNB(fd int, p []byte) (int, error) { return WriteNB(fd, p) }

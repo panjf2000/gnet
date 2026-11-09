@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build linux && gnet_sendto
+//go:build linux && !gnet_legacy_write
 
 package io
 
@@ -27,8 +27,8 @@ import (
 // A NULL destination and zero address length make this equivalent to send(2)
 // on the already-connected sockets used by the event loop. MSG_NOSIGNAL
 // suppresses SIGPIPE for this syscall while preserving EPIPE as the returned
-// error. The gnet_sendto build tag enables this path for isolated benchmarking;
-// the default build retains write(2).
+// error. This is the default Linux socket-write path; gnet_legacy_write restores
+// the previous write(2) implementation.
 //
 // It must only be used with socket descriptors. Eventfd and other non-socket
 // descriptors must continue to use WriteNB.

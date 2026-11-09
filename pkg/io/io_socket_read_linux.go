@@ -12,11 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build linux && !gnet_recvfrom
+//go:build linux && gnet_legacy_read
 
 package io
 
-// ReadSocketNB preserves the existing read(2) path unless the gnet_recvfrom
-// build tag is enabled. Keeping this switch at build time lets the benchmark
-// compare the receive syscall independently without a runtime branch.
+// ReadSocketNB preserves the legacy read(2) path when gnet_legacy_read is set.
+// The default Linux build uses recvfrom(2) for socket descriptors.
 func ReadSocketNB(fd int, p []byte) (int, error) { return ReadNB(fd, p) }
