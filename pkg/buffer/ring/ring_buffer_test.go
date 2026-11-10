@@ -5,6 +5,7 @@ import (
 	crand "crypto/rand"
 	"strings"
 	"testing"
+	"testing/iotest"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -435,4 +436,41 @@ func TestRingBuffer_WriteTo(t *testing.T) {
 	require.EqualValuesf(t, dataLen-partLen/2, m, "ringbuffer should write %d bytes, but got %d", dataLen-partLen/2, m)
 	require.EqualValues(t, append(data[partLen:], partData...), buf.Bytes())
 	require.True(t, rb.IsEmpty())
+}
+
+func TestRingBuffer_ReadFromEmptyReader(t *testing.T) {
+	rb := New(0)
+	n, err := rb.ReadFrom(strings.NewReader(""))
+	require.NoError(t, err)
+	require.Zero(t, n)
+	require.True(t, rb.IsEmpty(), "ringbuffer should be empty after reading nothing")
+	require.Zerof(t, rb.Buffered(), "ringbuffer should be empty, but has %d bytes", rb.Buffered())
+
+	_, _ = rb.Write([]byte("hello"))
+	n, err = rb.ReadFrom(strings.NewReader(""))
+	require.NoError(t, err)
+	require.Zero(t, n)
+	require.EqualValues(t, "hello", rb.Bytes())
+}
+
+func TestRingBuffer_ReadFromShortReads(t *testing.T) {
+	rb := New(1024)
+	prefix := make([]byte, 600)
+	_, err := crand.Read(prefix)
+	require.NoError(t, err)
+	_, _ = rb.Write(prefix)
+	// Move the read pointer forward so that there is free space on both
+	// sides of the data.
+	_, _ = rb.Discard(100)
+
+	data := make([]byte, 300)
+	_, err = crand.Read(data)
+	require.NoError(t, err)
+	// iotest.HalfReader returns fewer bytes than asked for, like a socket
+	// or a pipe would.
+	n, err := rb.ReadFrom(iotest.HalfReader(bytes.NewReader(data)))
+	require.NoError(t, err)
+	require.EqualValues(t, len(data), n)
+	require.EqualValues(t, len(prefix)-100+len(data), rb.Buffered())
+	require.EqualValues(t, append(prefix[100:], data...), rb.Bytes())
 }

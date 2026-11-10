@@ -347,46 +347,29 @@ func (rb *Buffer) ReadFrom(r io.Reader) (n int64, err error) {
 			rb.grow(rb.Buffered() + MinRead)
 		}
 
+		// Read into the free space that directly follows the write pointer,
+		// the space before the read pointer is filled on the next iteration
+		// once the write pointer has wrapped around.
+		var p []byte
 		if rb.w >= rb.r {
-			m, err = r.Read(rb.buf[rb.w:])
-			if m < 0 {
-				panic("RingBuffer.ReadFrom: reader returned negative count from Read")
-			}
-			rb.isEmpty = false
-			rb.w = (rb.w + m) % rb.size
-			n += int64(m)
-			if err == io.EOF {
-				return n, nil
-			}
-			if err != nil {
-				return
-			}
-			m, err = r.Read(rb.buf[:rb.r])
-			if m < 0 {
-				panic("RingBuffer.ReadFrom: reader returned negative count from Read")
-			}
-			rb.w = (rb.w + m) % rb.size
-			n += int64(m)
-			if err == io.EOF {
-				return n, nil
-			}
-			if err != nil {
-				return
-			}
+			p = rb.buf[rb.w:]
 		} else {
-			m, err = r.Read(rb.buf[rb.w:rb.r])
-			if m < 0 {
-				panic("RingBuffer.ReadFrom: reader returned negative count from Read")
-			}
+			p = rb.buf[rb.w:rb.r]
+		}
+		m, err = r.Read(p)
+		if m < 0 {
+			panic("RingBuffer.ReadFrom: reader returned negative count from Read")
+		}
+		if m > 0 {
 			rb.isEmpty = false
 			rb.w = (rb.w + m) % rb.size
 			n += int64(m)
-			if err == io.EOF {
-				return n, nil
-			}
-			if err != nil {
-				return
-			}
+		}
+		if err == io.EOF {
+			return n, nil
+		}
+		if err != nil {
+			return
 		}
 	}
 }
